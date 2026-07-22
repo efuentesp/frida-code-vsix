@@ -1,10 +1,60 @@
 import path from "node:path";
+import * as fs from "node:fs/promises";
 import * as vscode from "vscode";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
 import { getWebviewHtml } from "./webview-html";
 
 const SECRET_KEY = "frida.devengineKey";
+
+const BINARY_EXT = new Set([
+  "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "pdf", "zip", "gz", "tar",
+  "woff", "woff2", "ttf", "otf", "node", "wasm", "mp3", "mp4", "class", "exe", "dll", "so", "dylib",
+]);
+
+/** Busca archivos del workspace cuyo path contiene la consulta (fuzzy-simple). */
+async function searchFiles(query: string): Promise<string[]> {
+  const wf = vscode.workspace.workspaceFolders?.[0];
+  if (!wf) return [];
+  const exclude = "**/node_modules/**,**/.git/**,**/dist/**,**/dist-webview/**,**/.vscode/**";
+  const safe = query.trim().replace(/[*?{}[\]]/g, "?");
+  const include = safe ? `**/*${safe}*` : "**/*";
+  try {
+    const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(wf, include), exclude, 40);
+    return uris
+      .map((u) => vscode.workspace.asRelativePath(u))
+      .sort((a, b) => a.length - b.length || a.localeCompare(b))
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+/** Expande los tokens @ruta del prompt al contenido del archivo (texto), como Pi. */
+async function expandAtFiles(text: string, cwd: string): Promise<string> {
+  const re = /@([^\s@]+)/g;
+  const matches: { index: number; full: string; rel: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) matches.push({ index: m.index, full: m[0], rel: m[1] });
+  if (matches.length === 0) return text;
+  let out = text;
+  for (const mt of matches.slice().reverse()) {
+    const ext = path.extname(mt.rel).slice(1).toLowerCase();
+    if (BINARY_EXT.has(ext)) continue; // binarios: se deja el token (no se adjunta)
+    const abs = path.join(cwd, mt.rel);
+    try {
+      const st = await fs.stat(abs);
+      if (!st.isFile()) continue;
+      const content = await fs.readFile(abs, "utf8");
+      const trunc = content.length > 200_000 ? content.slice(0, 200_000) + "\n…(truncado)" : content;
+      const block = `\n\n\`\`\`${ext} // @${mt.rel}\n${trunc}\n\`\`\`\n`;
+      out = out.slice(0, mt.index) + block + out.slice(mt.index + mt.full.length);
+    } catch {
+      /* no existe / no legible → se deja el token tal cual */
+    }
+  }
+  return out;
+}
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
@@ -136,6 +186,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "new_session":
         await newSession();
         break;
+      case "search_files": {
+        const q = String(msg.query ?? "");
+        const items = await searchFiles(q);
+        post({ type: "files", query: q, items });
+        break;
+      }
     }
   }
 
@@ -150,7 +206,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "turn_start" });
     try {
       const { session } = await ensureSession();
-      await session.prompt(trimmed);
+      const expanded = await expandAtFiles(trimmed, workspaceCwd());
+      await session.prompt(expanded);
     } catch (e: any) {
       post({ type: "error", text: String(e?.message ?? e) });
     } finally {

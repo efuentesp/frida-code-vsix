@@ -46,6 +46,7 @@ export interface State {
   turns: Turn[];
   approvals: ApprovalRequest[];
   usage?: Usage;
+  files?: { query: string; items: string[] };
   nextId: number;
 }
 
@@ -64,6 +65,7 @@ export type InMessage =
   | { type: "info"; text: string }
   | { type: "cleared" }
   | ({ type: "usage" } & Usage)
+  | { type: "files"; query: string; items: string[] }
   | { type: "error"; text: string };
 
 // webview → host
@@ -74,4 +76,5 @@ export type OutMessage =
   | { type: "set_key"; key: string }
   | { type: "compact" }
   | { type: "abort" }
-  | { type: "new_session" };
+  | { type: "new_session" }
+  | { type: "search_files"; query: string };

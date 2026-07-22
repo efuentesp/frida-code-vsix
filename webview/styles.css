@@ -100,6 +100,12 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .input:focus { border-color: var(--vscode-focusBorder); }
 .hint { font-size: 11px; opacity: .6; margin-top: 4px; text-align: right; }
 
+/* Popup de archivos (@) */
+.bar { position: relative; }
+.file-popup { position: absolute; left: 12px; right: 12px; bottom: 100%; margin-bottom: 4px; max-height: 220px; overflow-y: auto; background: var(--vscode-quickInput-background, var(--vscode-editor-background)); border: 1px solid var(--vscode-focusBorder); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.4); z-index: 20; }
+.file-item { padding: 5px 10px; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-item.sel { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+
 /* Aprobaciones: banner llamativo cuando hay pendientes */
 .approvals-area { margin-top: 8px; }
 .approvals-banner { font-size: 12px; font-weight: 600; color: var(--vscode-textLink-foreground); padding: 6px 0; }

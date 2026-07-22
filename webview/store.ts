@@ -83,6 +83,9 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, usage: rest as Usage };
     }
 
+    case "files":
+      return { ...state, files: { query: msg.query, items: msg.items } };
+
     case "error":
       return { ...state, turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })) };
 

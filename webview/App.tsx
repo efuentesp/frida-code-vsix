@@ -110,7 +110,11 @@ export function App() {
           ))}
         </div>
       </div>
-      <Composer onSubmit={(text) => post({ type: "submit", text })} />
+      <Composer
+        onSubmit={(text) => post({ type: "submit", text })}
+        onSearch={(q) => post({ type: "search_files", query: q })}
+        files={state.files}
+      />
     </div>
   );
 }
