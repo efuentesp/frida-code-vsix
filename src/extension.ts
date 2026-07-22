@@ -39,6 +39,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // session.subscribe: observador para MOSTRAR (streaming + tarjetas de tool).
   // El BLOQUEO de tools vive en la extensión de gates (createApprovalGates).
+  function postUsage(session: any): void {
+    try {
+      const msgs: any[] = session?.agent?.state?.messages ?? [];
+      const contextWindow: number = session?.model?.contextWindow ?? 0;
+      let sessionTokens = 0, lastInput = 0, lastOutput = 0, cacheRead = 0, cacheWrite = 0;
+      for (const m of msgs) {
+        if (m?.role === "assistant" && m?.usage) {
+          const u = m.usage;
+          sessionTokens += (u.input ?? 0) + (u.output ?? 0);
+          lastInput = u.input ?? 0; lastOutput = u.output ?? 0;
+          cacheRead += u.cacheRead ?? 0; cacheWrite += u.cacheWrite ?? 0;
+        }
+      }
+      post({
+        type: "usage",
+        inputTokens: lastInput,
+        outputTokens: lastOutput,
+        cacheRead,
+        cacheWrite,
+        sessionTokens,
+        contextWindow,
+        contextPercent: contextWindow ? Math.min(100, (lastInput / contextWindow) * 100) : 0,
+      });
+    } catch {
+      /* noop */
+    }
+  }
+
   function wireSession(session: any): void {
     session.subscribe((event: any) => {
       switch (event?.type) {
@@ -54,6 +82,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           post({ type: "tool_end", tool: event.toolName, isError: !!event.isError });
           break;
         case "agent_end":
+          postUsage(session);
           post({ type: "turn_end" });
           break;
       }

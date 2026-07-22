@@ -1,4 +1,4 @@
-import type { InMessage, State, Turn } from "./types";
+import type { InMessage, State, Turn, Usage } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
@@ -76,7 +76,12 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, info: msg.text };
 
     case "cleared":
-      return { ...state, turns: [], approvals: [], busy: false, info: undefined };
+      return { ...state, turns: [], approvals: [], busy: false, info: undefined, usage: undefined };
+
+    case "usage": {
+      const { type: _t, ...rest } = msg;
+      return { ...state, usage: rest as Usage };
+    }
 
     case "error":
       return { ...state, turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })) };

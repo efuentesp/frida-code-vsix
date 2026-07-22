@@ -5,6 +5,7 @@ import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { Composer } from "./components/Composer";
+import { ContextBar } from "./components/ContextBar";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -90,6 +91,7 @@ export function App() {
 
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
+      {state.usage && <ContextBar usage={state.usage} />}
 
       <div className="log">
         {state.turns.map((t) => (

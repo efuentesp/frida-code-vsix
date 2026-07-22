@@ -29,12 +29,23 @@ export interface ApprovalRequest {
   diff?: string;
 }
 
+export interface Usage {
+  inputTokens: number;   // tokens del último request (= llenado actual del contexto)
+  outputTokens: number;
+  cacheRead: number;
+  cacheWrite: number;
+  sessionTokens: number;  // acumulado de la sesión (input+output)
+  contextWindow: number;  // tamaño de la ventana del modelo
+  contextPercent: number; // inputTokens / contextWindow * 100
+}
+
 export interface State {
   keyNeeded: boolean;
   busy: boolean;
   info?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
+  usage?: Usage;
   nextId: number;
 }
 
@@ -52,6 +63,7 @@ export type InMessage =
   | { type: "approvals"; approvals: ApprovalRequest[] }
   | { type: "info"; text: string }
   | { type: "cleared" }
+  | ({ type: "usage" } & Usage)
   | { type: "error"; text: string };
 
 // webview → host
