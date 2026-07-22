@@ -2,13 +2,18 @@ import path from "node:path";
 import * as vscode from "vscode";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
-import { webviewHtml } from "./webviewHtml";
+import { getWebviewHtml } from "./webview-html";
 
 const SECRET_KEY = "frida.devengineKey";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
   let frida: FridaSession | undefined;
+
+  const outChannel = vscode.window.createOutputChannel("Frida");
+  context.subscriptions.push(outChannel);
+  const log = (m: string) => outChannel.appendLine(`[${new Date().toISOString().slice(11, 23)}] ${m}`);
+  log("activate");
 
   let panel: vscode.WebviewPanel | undefined;
   const post = (msg: unknown): void => {
@@ -31,6 +36,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           void promptKey(true);
         },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+        log,
       });
       wireSession(frida.session);
     }
@@ -42,20 +48,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function wireSession(session: any): void {
     session.subscribe((event: any) => {
       switch (event?.type) {
+        case "agent_start":
+          log("agent_start");
+          break;
         case "message_update":
           if (event.assistantMessageEvent?.type === "text_delta") {
             post({ type: "delta", text: event.assistantMessageEvent.delta });
           }
           break;
         case "tool_execution_start":
+          log(`tool_start ${event.toolName}`);
           post({ type: "tool_start", tool: event.toolName, args: safeArgs(event.args) });
           break;
         case "tool_execution_end":
+          log(`tool_end ${event.toolName} isError=${!!event.isError}`);
           post({ type: "tool_end", tool: event.toolName, isError: !!event.isError });
           break;
         case "agent_end":
+          log("agent_end");
           post({ type: "turn_end" });
           break;
+        default:
+          if (event?.type) log(`event ${event.type}`);
       }
     });
   }
@@ -68,8 +82,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     panel = vscode.window.createWebviewPanel("frida", "Frida Code", vscode.ViewColumn.Two, {
       enableScripts: true,
       retainContextWhenHidden: true,
+      localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist-webview")],
     });
-    panel.webview.html = webviewHtml();
+    panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
     panel.onDidDispose(() => {
       panel = undefined;
     });
@@ -79,6 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   async function handleWebviewMessage(msg: any): Promise<void> {
+    log(`recv ${msg?.type}`);
     switch (msg?.type) {
       case "webview_ready":
         if (!keyCache) post({ type: "need_key" });
@@ -111,8 +127,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "turn_start" });
     try {
       const { session } = await ensureSession();
+      log("prompt → session.prompt()");
       await session.prompt(trimmed);
+      log("prompt: completed");
     } catch (e: any) {
+      log(`prompt: ERROR ${e?.message ?? e}`);
       post({ type: "error", text: String(e?.message ?? e) });
     } finally {
       post({ type: "turn_end" });

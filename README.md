@@ -18,16 +18,24 @@ Implementa el núcleo del MVP documentado en `CONTEXT.md`:
 
 ## Desarrollo
 
+Build dual: **esbuild** para el host (`dist/extension.js`) + **Vite** para el
+webview de React (`dist-webview/`).
+
 ```bash
 npm install
-npm run build       # o npm run watch
-# En VS Code: F5 (Launch Extension) — abre el panel con "Frida: Abrir panel"
+npm run build       # host + webview (node esbuild.js && vite build)
+npm run watch       # solo el host, en watch
+# En VS Code: F5 (Launch Extension) — el preLaunchTask recompila ambos
 ```
+
+El webview es una app React (`webview/`) que se comunica con el host por
+`postMessage` (mismo protocolo que antes). Al editar código del webview hay que
+recompilar (no hay HMR cableado en esta fase).
 
 ## Empaquetar
 
 ```bash
-npm run package     # produce frida-pi-0.0.1.vsix
+npm run package     # build + produce frida-code-0.0.1.vsix
 ```
 
 > **Tarea de empaquetado (ADR-0002):** los nativos de Pi (`photon-node` `.wasm` y
