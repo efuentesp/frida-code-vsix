@@ -8,6 +8,13 @@ body {
   background: var(--vscode-sideBar-background);
 }
 .app { display: flex; flex-direction: column; height: 100vh; }
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); }
+.toolbar .brand { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
+.toolbar .spacer { flex: 1; }
+.toolbar button { padding: 3px 10px; font-size: 11px; }
+.toolbar button:disabled { opacity: .5; cursor: default; }
+.avatar.sm { width: 18px; height: 18px; }
+.info-bar { font-size: 11px; opacity: .8; padding: 4px 12px; background: var(--vscode-list-hoverBackground); border-bottom: 1px solid var(--vscode-panel-border); }
 .log { flex: 1; overflow-y: auto; padding: 12px; scroll-behavior: smooth; }
 
 /* Turnos */
@@ -30,6 +37,7 @@ body {
 .md code { background: var(--vscode-textCodeBlock-background, rgba(127,127,127,.15)); padding: 1px 4px; border-radius: 3px; font-family: var(--vscode-editor-font-family, monospace); }
 .md pre { background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 6px 0; }
 .md pre code { background: none; padding: 0; font-size: .92em; line-height: 1.4; }
+.md pre code.hljs, .md .hljs { background: transparent; padding: 0; }
 .md a { color: var(--vscode-textLink-foreground); }
 .md strong { font-weight: 600; }
 .md table { border-collapse: collapse; margin: 6px 0; }

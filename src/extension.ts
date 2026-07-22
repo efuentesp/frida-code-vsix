@@ -10,11 +10,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
   let frida: FridaSession | undefined;
 
-  const outChannel = vscode.window.createOutputChannel("Frida");
-  context.subscriptions.push(outChannel);
-  const log = (m: string) => outChannel.appendLine(`[${new Date().toISOString().slice(11, 23)}] ${m}`);
-  log("activate");
-
   let panel: vscode.WebviewPanel | undefined;
   const post = (msg: unknown): void => {
     panel?.webview.postMessage(msg);
@@ -36,7 +31,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           void promptKey(true);
         },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
-        log,
       });
       wireSession(frida.session);
     }
@@ -48,28 +42,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function wireSession(session: any): void {
     session.subscribe((event: any) => {
       switch (event?.type) {
-        case "agent_start":
-          log("agent_start");
-          break;
         case "message_update":
           if (event.assistantMessageEvent?.type === "text_delta") {
             post({ type: "delta", text: event.assistantMessageEvent.delta });
           }
           break;
         case "tool_execution_start":
-          log(`tool_start ${event.toolName}`);
           post({ type: "tool_start", tool: event.toolName, args: safeArgs(event.args) });
           break;
         case "tool_execution_end":
-          log(`tool_end ${event.toolName} isError=${!!event.isError}`);
           post({ type: "tool_end", tool: event.toolName, isError: !!event.isError });
           break;
         case "agent_end":
-          log("agent_end");
           post({ type: "turn_end" });
           break;
-        default:
-          if (event?.type) log(`event ${event.type}`);
       }
     });
   }
@@ -94,7 +80,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   async function handleWebviewMessage(msg: any): Promise<void> {
-    log(`recv ${msg?.type}`);
     switch (msg?.type) {
       case "webview_ready":
         if (!keyCache) post({ type: "need_key" });
@@ -113,6 +98,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "set_key":
         await setKey(String(msg.key ?? ""));
         break;
+      case "compact":
+        await compactContext();
+        break;
+      case "abort":
+        await abortRun();
+        break;
+      case "new_session":
+        await newSession();
+        break;
     }
   }
 
@@ -127,15 +121,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "turn_start" });
     try {
       const { session } = await ensureSession();
-      log("prompt → session.prompt()");
       await session.prompt(trimmed);
-      log("prompt: completed");
     } catch (e: any) {
-      log(`prompt: ERROR ${e?.message ?? e}`);
       post({ type: "error", text: String(e?.message ?? e) });
     } finally {
       post({ type: "turn_end" });
     }
+  }
+
+  async function compactContext(): Promise<void> {
+    try {
+      const { session } = await ensureSession();
+      post({ type: "info", text: "Compactando contexto…" });
+      await session.compact();
+      post({ type: "info", text: "Contexto compactado." });
+    } catch (e: any) {
+      post({ type: "info", text: "Error al compactar: " + String(e?.message ?? e) });
+    }
+  }
+
+  async function abortRun(): Promise<void> {
+    try {
+      const { session } = await ensureSession();
+      await session.abort();
+    } catch {
+      /* noop */
+    }
+  }
+
+  async function newSession(): Promise<void> {
+    if (frida) {
+      try {
+        await frida.session.dispose?.();
+      } catch {
+        /* noop */
+      }
+      frida = undefined;
+    }
+    post({ type: "cleared" });
+    post({ type: "info", text: "Nueva sesión iniciada." });
   }
 
   async function setKey(key: string): Promise<void> {
@@ -165,7 +189,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
-    vscode.commands.registerCommand("frida.setKey", () => void promptKey(true))
+    vscode.commands.registerCommand("frida.setKey", () => void promptKey(true)),
+    vscode.commands.registerCommand("frida.compact", () => void compactContext()),
+    vscode.commands.registerCommand("frida.abort", () => void abortRun()),
+    vscode.commands.registerCommand("frida.newSession", () => void newSession())
   );
 }
 

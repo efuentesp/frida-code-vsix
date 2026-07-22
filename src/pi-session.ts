@@ -29,7 +29,6 @@ export interface CreateFridaSessionOptions {
   getKey: () => string | undefined;
   onUnauthorized: () => void;
   onPendingApprovals: (reqs: ApprovalRequest[]) => void;
-  log?: (m: string) => void;
 }
 
 export async function createFridaSession(opts: CreateFridaSessionOptions): Promise<FridaSession> {
@@ -56,7 +55,7 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
     await modelRuntime.setRuntimeApiKey(SOFTTEK_PROVIDER, keyHolder.current);
   }
 
-  const bridge = new ApprovalBridge(opts.onPendingApprovals, opts.log);
+  const bridge = new ApprovalBridge(opts.onPendingApprovals);
 
   const loader = new DefaultResourceLoader({
     cwd: opts.cwd,

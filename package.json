@@ -12,7 +12,10 @@
   "contributes": {
     "commands": [
       { "command": "frida.openPanel", "title": "Frida: Abrir panel" },
-      { "command": "frida.setKey", "title": "Frida: Actualizar API key (DevEngine)" }
+      { "command": "frida.setKey", "title": "Frida: Actualizar API key (DevEngine)" },
+      { "command": "frida.compact", "title": "Frida: Compactar contexto" },
+      { "command": "frida.abort", "title": "Frida: Detener respuesta" },
+      { "command": "frida.newSession", "title": "Frida: Nueva sesión" }
     ]
   },
   "scripts": {
@@ -37,6 +40,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
+    "rehype-highlight": "^7.0.1",
     "remark-gfm": "^4.0.0",
     "typescript": "^5.6.0",
     "vite": "^5.4.0"

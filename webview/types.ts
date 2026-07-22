@@ -31,6 +31,8 @@ export interface ApprovalRequest {
 
 export interface State {
   keyNeeded: boolean;
+  busy: boolean;
+  info?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
   nextId: number;
@@ -48,6 +50,8 @@ export type InMessage =
   | { type: "tool_end"; tool: string; isError?: boolean }
   | { type: "turn_end" }
   | { type: "approvals"; approvals: ApprovalRequest[] }
+  | { type: "info"; text: string }
+  | { type: "cleared" }
   | { type: "error"; text: string };
 
 // webview → host
@@ -55,4 +59,7 @@ export type OutMessage =
   | { type: "webview_ready" }
   | { type: "submit"; text: string }
   | { type: "approval_response"; id: string; decision: "accept" | "reject"; acceptAll?: boolean }
-  | { type: "set_key"; key: string };
+  | { type: "set_key"; key: string }
+  | { type: "compact" }
+  | { type: "abort" }
+  | { type: "new_session" };

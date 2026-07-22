@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { reduce, initialState } from "./store";
 import type { InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
@@ -8,8 +8,7 @@ import { Composer } from "./components/Composer";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
-// acquireVsCodeApi() solo puede llamarse UNA VEZ por webview. Se declara a nivel
-// de módulo (no de componente) para sobrevivir al doble-render/montaje de StrictMode.
+// acquireVsCodeApi() solo puede llamarse UNA VEZ por webview → singleton de módulo.
 declare function acquireVsCodeApi(): VsCodeApi;
 let _vscode: VsCodeApi | null = null;
 function getVsCode(): VsCodeApi {
@@ -20,6 +19,9 @@ function getVsCode(): VsCodeApi {
 export function App() {
   const [state, dispatch] = useReducer(reduce, initialState);
   const approvalsRef = useRef<HTMLDivElement>(null);
+  const [escHint, setEscHint] = useState(false);
+  const lastEscRef = useRef(0);
+  const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const vscode = getVsCode();
@@ -29,13 +31,36 @@ export function App() {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // Cuando hay aprobaciones pendientes, las traemos a la vista (suele ser la causa
-  // de "se detiene": el agente espera una aprobación que no se ve).
   useEffect(() => {
     if (state.approvals.length > 0) {
       approvalsRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [state.approvals]);
+
+  // Doble Escape (mientras responde) → abort, como el botón Detener.
+  useEffect(() => {
+    if (!state.busy) {
+      setEscHint(false);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const now = Date.now();
+      if (now - lastEscRef.current < 450) {
+        lastEscRef.current = 0;
+        if (escTimerRef.current) clearTimeout(escTimerRef.current);
+        setEscHint(false);
+        getVsCode().postMessage({ type: "abort" });
+      } else {
+        lastEscRef.current = now;
+        setEscHint(true);
+        if (escTimerRef.current) clearTimeout(escTimerRef.current);
+        escTimerRef.current = setTimeout(() => setEscHint(false), 1200);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state.busy]);
 
   const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
@@ -45,6 +70,27 @@ export function App() {
 
   return (
     <div className="app">
+      <header className="toolbar">
+        <span className="brand">
+          <span className="avatar ai sm">✦</span> Frida Code
+        </span>
+        <span className="spacer" />
+        <button onClick={() => post({ type: "new_session" })} disabled={state.busy}>
+          Nueva sesión
+        </button>
+        <button onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
+          Compactar
+        </button>
+        {state.busy && (
+          <button className="sec" onClick={() => post({ type: "abort" })}>
+            ■ Detener
+          </button>
+        )}
+      </header>
+
+      {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
+      {!escHint && state.info && <div className="info-bar">{state.info}</div>}
+
       <div className="log">
         {state.turns.map((t) => (
           <TurnView key={t.id} turn={t} />

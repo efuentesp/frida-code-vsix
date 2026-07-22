@@ -2,6 +2,7 @@ import type { InMessage, State, Turn } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
+  busy: false,
   turns: [],
   approvals: [],
   nextId: 1,
@@ -23,10 +24,10 @@ export function reduce(state: State, msg: InMessage): State {
 
     case "user": {
       const turn: Turn = { id: state.nextId, user: msg.text, assistantMd: "", status: null, tools: [] };
-      return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1 };
+      return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1, info: undefined };
     }
     case "turn_start":
-      return { ...state, turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })) };
+      return { ...state, busy: true, turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })) };
 
     case "delta":
       return {
@@ -64,11 +65,18 @@ export function reduce(state: State, msg: InMessage): State {
     case "turn_end":
       return {
         ...state,
+        busy: false,
         turns: withLast(state.turns, (t) => ({ ...t, status: null, executingTool: undefined })),
       };
 
     case "approvals":
       return { ...state, approvals: msg.approvals };
+
+    case "info":
+      return { ...state, info: msg.text };
+
+    case "cleared":
+      return { ...state, turns: [], approvals: [], busy: false, info: undefined };
 
     case "error":
       return { ...state, turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })) };
