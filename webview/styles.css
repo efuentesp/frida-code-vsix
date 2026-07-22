@@ -11,6 +11,9 @@ body {
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); }
 .toolbar .brand { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
 .toolbar .spacer { flex: 1; }
+.model-info { display: flex; align-items: center; gap: 8px; }
+.model-name { font-size: 11px; opacity: .75; font-weight: 500; }
+.thinking-select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent)); border-radius: 4px; padding: 2px 6px; font-family: inherit; font-size: 11px; outline: none; }
 .toolbar button { padding: 3px 10px; font-size: 11px; }
 .toolbar button:disabled { opacity: .5; cursor: default; }
 .avatar.sm { width: 18px; height: 18px; }

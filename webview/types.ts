@@ -54,6 +54,8 @@ export interface State {
   busy: boolean;
   mode: ApprovalMode;
   info?: string;
+  model?: string;
+  thinking?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
   usage?: Usage;
@@ -81,6 +83,7 @@ export type InMessage =
   | { type: "sessions"; items: SessionItem[]; currentPath?: string }
   | { type: "history"; name?: string; items: { role: string; text: string }[] }
   | { type: "mode"; mode: ApprovalMode }
+  | { type: "model_info"; model: string; thinking: string }
   | { type: "error"; text: string };
 
 // webview → host
@@ -96,4 +99,5 @@ export type OutMessage =
   | { type: "list_sessions" }
   | { type: "switch_session"; path: string }
   | { type: "rename_session"; path: string; name: string }
-  | { type: "set_mode"; mode: ApprovalMode };
+  | { type: "set_mode"; mode: ApprovalMode }
+  | { type: "set_thinking"; level: string };

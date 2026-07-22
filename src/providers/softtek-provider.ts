@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const SOFTTEK_PROVIDER = "softtek-devengine";
 export const SOFTTEK_MODEL = "gpt-5.4-mini";
+export const SOFTTEK_MODEL_DISPLAY = "GPT-5.4 Mini";
 export const DEVENGINE_BASE_URL = "https://mywork.softtek.com/apg/devengine";
 
 /**
@@ -18,12 +19,13 @@ export const SOFTTEK_PROVIDER_CONFIG = {
   models: [
     {
       id: SOFTTEK_MODEL,
-      name: "GPT-5.4 Mini",
-      reasoning: false, // ⚠️ verificar soporte de thinking
+      name: SOFTTEK_MODEL_DISPLAY,
+      reasoning: true, // habilita niveles de thinking → reasoning_effort (low/medium/high)
       input: ["text", "image"] as ("text" | "image")[],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 400_000,
       maxTokens: 128_000,
+      compat: { supportsReasoningEffort: true }, // ⚠️ verificar que DevEngine acepte reasoning_effort
     },
   ],
 };

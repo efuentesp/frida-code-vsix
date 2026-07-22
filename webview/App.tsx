@@ -84,6 +84,19 @@ export function App() {
         <span className="brand">
           <span className="avatar ai sm">✦</span> Frida Code
         </span>
+        <span className="model-info">
+          <span className="model-name">{state.model ?? "…"}</span>
+          <select
+            className="thinking-select"
+            value={state.thinking ?? "medium"}
+            onChange={(e) => post({ type: "set_thinking", level: e.target.value })}
+            title="Nivel de esfuerzo / thinking"
+          >
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </span>
         <span className="spacer" />
         <button onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
           Sesiones

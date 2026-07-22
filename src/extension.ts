@@ -5,6 +5,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
+import { SOFTTEK_MODEL_DISPLAY } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
 
 const SECRET_KEY = "frida.devengineKey";
@@ -88,6 +89,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         getMode: () => approvalMode,
       });
       wireSession(frida.session);
+      sendModelInfo();
     }
     return frida;
   }
@@ -120,6 +122,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } catch {
       /* noop */
     }
+  }
+
+  function sendModelInfo(): void {
+    post({ type: "model_info", model: SOFTTEK_MODEL_DISPLAY, thinking: frida?.session?.thinkingLevel ?? "medium" });
   }
 
   function wireSession(session: any): void {
@@ -167,6 +173,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     switch (msg?.type) {
       case "webview_ready":
         post({ type: "mode", mode: approvalMode });
+        sendModelInfo();
         if (!keyCache) post({ type: "need_key" });
         else post({ type: "session_ready" });
         break;
@@ -210,6 +217,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "set_mode":
         approvalMode = msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
         post({ type: "mode", mode: approvalMode });
+        break;
+      case "set_thinking":
+        try { frida?.session?.setThinkingLevel?.(String(msg.level ?? "medium")); } catch { /* noop */ }
+        sendModelInfo();
         break;
     }
   }
@@ -304,6 +315,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
       wireSession(frida.session);
       postHistory();
+      sendModelInfo();
     } catch (e: any) {
       post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
     }

@@ -93,6 +93,9 @@ export function reduce(state: State, msg: InMessage): State {
     case "mode":
       return { ...state, mode: msg.mode };
 
+    case "model_info":
+      return { ...state, model: msg.model, thinking: msg.thinking };
+
     case "history": {
       const turns: Turn[] = [];
       let id = 1;
