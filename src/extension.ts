@@ -1,6 +1,7 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
 import * as vscode from "vscode";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
 import { getWebviewHtml } from "./webview-html";
@@ -58,6 +59,7 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
+  const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
   let frida: FridaSession | undefined;
 
   let panel: vscode.WebviewPanel | undefined;
@@ -74,7 +76,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       frida = await createFridaSession({
         cwd: workspaceCwd(),
         agentDir: defaultAgentDir(),
-        sessionDir: path.join(context.globalStorageUri.fsPath, "sessions"),
+        sessionDir: sessionDirPath,
         getKey: () => keyCache,
         onUnauthorized: () => {
           keyCache = undefined;
@@ -192,6 +194,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         post({ type: "files", query: q, items });
         break;
       }
+      case "list_sessions":
+        await sendSessions();
+        break;
+      case "switch_session":
+        await switchSession(String(msg.path ?? ""));
+        break;
+      case "rename_session":
+        await renameSession(String(msg.path ?? ""), String(msg.name ?? ""));
+        break;
     }
   }
 
@@ -248,6 +259,77 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "info", text: "Nueva sesión iniciada." });
   }
 
+  async function sendSessions(): Promise<void> {
+    try {
+      const infos = await SessionManager.listAll(sessionDirPath);
+      const items = infos
+        .map((i: any) => ({
+          path: String(i.path),
+          name: i.name as string | undefined,
+          firstMessage: String(i.firstMessage ?? "").slice(0, 160),
+          messageCount: Number(i.messageCount ?? 0),
+          modified: i.modified instanceof Date ? i.modified.getTime() : Number(i.modified) || 0,
+        }))
+        .sort((a: any, b: any) => b.modified - a.modified);
+      post({ type: "sessions", items, currentPath: frida?.session?.sessionFile });
+    } catch (e: any) {
+      post({ type: "info", text: "Error al listar sesiones: " + String(e?.message ?? e) });
+    }
+  }
+
+  async function switchSession(pathStr: string): Promise<void> {
+    if (!pathStr) return;
+    if (frida) {
+      try { await frida.session.dispose?.(); } catch { /* noop */ }
+      frida = undefined;
+    }
+    try {
+      frida = await createFridaSession({
+        cwd: workspaceCwd(),
+        agentDir: defaultAgentDir(),
+        sessionDir: sessionDirPath,
+        openPath: pathStr,
+        getKey: () => keyCache,
+        onUnauthorized: () => { keyCache = undefined; void promptKey(true); },
+        onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+      });
+      wireSession(frida.session);
+      postHistory();
+    } catch (e: any) {
+      post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
+    }
+  }
+
+  async function renameSession(pathStr: string, name: string): Promise<void> {
+    const clean = name.trim();
+    if (!pathStr || !clean) return;
+    try {
+      if (frida && frida.session?.sessionFile === pathStr) {
+        frida.sessionManager?.appendSessionInfo?.(clean);
+      } else {
+        const sm = SessionManager.open(pathStr, sessionDirPath, workspaceCwd());
+        sm.appendSessionInfo(clean);
+      }
+      post({ type: "info", text: "Sesión renombrada: " + clean });
+      await sendSessions();
+    } catch (e: any) {
+      post({ type: "info", text: "Error al renombrar: " + String(e?.message ?? e) });
+    }
+  }
+
+  function postHistory(): void {
+    try {
+      const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
+      const items = msgs
+        .map((m: any) => ({ role: String(m?.role ?? ""), text: extractText(m) }))
+        .filter((x) => x.text || x.role === "user");
+      const name = frida?.sessionManager?.getSessionName?.();
+      post({ type: "history", name, items: items.slice(-200) });
+    } catch {
+      /* noop */
+    }
+  }
+
   async function setKey(key: string): Promise<void> {
     const trimmed = key.trim();
     if (!trimmed) return;
@@ -280,6 +362,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("frida.abort", () => void abortRun()),
     vscode.commands.registerCommand("frida.newSession", () => void newSession())
   );
+}
+
+function extractText(m: any): string {
+  const c = m?.content;
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.filter((b: any) => b?.type === "text").map((b: any) => b?.text ?? "").join("");
+  return "";
 }
 
 function safeArgs(args: unknown): string {

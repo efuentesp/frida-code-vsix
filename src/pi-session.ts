@@ -15,6 +15,7 @@ import { ApprovalBridge, ApprovalRequest } from "./approval-bridge";
 export interface FridaSession {
   session: any;
   bridge: ApprovalBridge;
+  sessionManager: any;
   setKey: (key: string) => Promise<void>;
 }
 
@@ -25,6 +26,8 @@ export interface CreateFridaSessionOptions {
   agentDir: string;
   /** Dónde guardar sesiones (globalStorageUri/sessions) — desacoplado del agentDir (D13). */
   sessionDir: string;
+  /** Si se da, abre la sesión existente (switch) en vez de crear una nueva. */
+  openPath?: string;
   /** Cache síncrono de la key (before_provider_headers es síncrono). */
   getKey: () => string | undefined;
   onUnauthorized: () => void;
@@ -79,12 +82,16 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
     );
   }
 
+  const sessionManager = opts.openPath
+    ? SessionManager.open(opts.openPath, opts.sessionDir, opts.cwd)
+    : SessionManager.create(opts.cwd, opts.sessionDir);
+
   const { session } = await createAgentSession({
     resourceLoader: loader,
     modelRuntime,
     model,
     settingsManager,
-    sessionManager: SessionManager.create(opts.cwd, opts.sessionDir),
+    sessionManager,
     agentDir: opts.agentDir,
     cwd: opts.cwd,
   } as any);
@@ -92,6 +99,7 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
   return {
     session,
     bridge,
+    sessionManager,
     setKey: async (key: string) => {
       keyHolder.current = key;
       await modelRuntime.setRuntimeApiKey(SOFTTEK_PROVIDER, key);

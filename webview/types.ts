@@ -39,6 +39,14 @@ export interface Usage {
   contextPercent: number; // inputTokens / contextWindow * 100
 }
 
+export interface SessionItem {
+  path: string;
+  name?: string;
+  firstMessage: string;
+  messageCount: number;
+  modified: number; // epoch ms
+}
+
 export interface State {
   keyNeeded: boolean;
   busy: boolean;
@@ -47,6 +55,7 @@ export interface State {
   approvals: ApprovalRequest[];
   usage?: Usage;
   files?: { query: string; items: string[] };
+  sessions?: { items: SessionItem[]; currentPath?: string };
   nextId: number;
 }
 
@@ -66,6 +75,8 @@ export type InMessage =
   | { type: "cleared" }
   | ({ type: "usage" } & Usage)
   | { type: "files"; query: string; items: string[] }
+  | { type: "sessions"; items: SessionItem[]; currentPath?: string }
+  | { type: "history"; name?: string; items: { role: string; text: string }[] }
   | { type: "error"; text: string };
 
 // webview → host
@@ -77,4 +88,7 @@ export type OutMessage =
   | { type: "compact" }
   | { type: "abort" }
   | { type: "new_session" }
-  | { type: "search_files"; query: string };
+  | { type: "search_files"; query: string }
+  | { type: "list_sessions" }
+  | { type: "switch_session"; path: string }
+  | { type: "rename_session"; path: string; name: string };

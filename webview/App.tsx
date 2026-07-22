@@ -6,6 +6,7 @@ import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { Composer } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
+import { SessionsPanel } from "./components/SessionsPanel";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -21,6 +22,7 @@ export function App() {
   const [state, dispatch] = useReducer(reduce, initialState);
   const approvalsRef = useRef<HTMLDivElement>(null);
   const [escHint, setEscHint] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const lastEscRef = useRef(0);
   const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -76,6 +78,9 @@ export function App() {
           <span className="avatar ai sm">✦</span> Frida Code
         </span>
         <span className="spacer" />
+        <button onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
+          Sesiones
+        </button>
         <button onClick={() => post({ type: "new_session" })} disabled={state.busy}>
           Nueva sesión
         </button>
@@ -115,6 +120,14 @@ export function App() {
         onSearch={(q) => post({ type: "search_files", query: q })}
         files={state.files}
       />
+      {sessionsOpen && state.sessions && (
+        <SessionsPanel
+          sessions={state.sessions}
+          onClose={() => setSessionsOpen(false)}
+          onSwitch={(p) => { post({ type: "switch_session", path: p }); setSessionsOpen(false); }}
+          onRename={(p, n) => post({ type: "rename_session", path: p, name: n })}
+        />
+      )}
     </div>
   );
 }

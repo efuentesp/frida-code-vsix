@@ -86,6 +86,31 @@ export function reduce(state: State, msg: InMessage): State {
     case "files":
       return { ...state, files: { query: msg.query, items: msg.items } };
 
+    case "sessions":
+      return { ...state, sessions: { items: msg.items, currentPath: msg.currentPath } };
+
+    case "history": {
+      const turns: Turn[] = [];
+      let id = 1;
+      for (const it of msg.items) {
+        if (it.role === "user") {
+          turns.push({ id: id++, user: it.text, assistantMd: "", status: null, tools: [] });
+        } else {
+          const last = turns[turns.length - 1];
+          if (last) last.assistantMd += it.text;
+          else turns.push({ id: id++, user: "", assistantMd: it.text, status: null, tools: [] });
+        }
+      }
+      return {
+        ...state,
+        turns,
+        approvals: [],
+        busy: false,
+        info: msg.name ? `Sesión: ${msg.name}` : state.info,
+        nextId: id,
+      };
+    }
+
     case "error":
       return { ...state, turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })) };
 
