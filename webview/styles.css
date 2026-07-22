@@ -134,6 +134,14 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .approvals-area { margin-top: 8px; }
 .approvals-banner { font-size: 12px; font-weight: 600; color: var(--vscode-textLink-foreground); padding: 6px 0; }
 
+/* Welcome / estado vacío */
+.welcome { max-width: 480px; margin: 8vh auto 0; text-align: center; padding: 0 16px; }
+.welcome-logo { display: flex; justify-content: center; margin-bottom: 14px; }
+.avatar.lg { width: 48px; height: 48px; }
+.welcome h1 { margin: 0 0 4px; font-size: 1.5em; }
+.welcome-sub { opacity: .7; margin: 0 0 18px; }
+.welcome .tips { text-align: left; max-width: 420px; margin: 0 auto; padding-left: 18px; opacity: .85; font-size: 12px; line-height: 1.8; }
+
 /* Onboarding */
 .overlay { position: fixed; inset: 0; background: var(--vscode-sideBar-background); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding: 24px; z-index: 10; }
 .overlay h2 { margin: 0; display: flex; align-items: center; gap: 8px; }

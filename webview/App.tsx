@@ -7,6 +7,7 @@ import { ApprovalCard } from "./components/ApprovalCard";
 import { Composer } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
+import { Welcome } from "./components/Welcome";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -128,6 +129,7 @@ export function App() {
       {state.usage && <ContextBar usage={state.usage} />}
 
       <div className="log">
+        {state.turns.length === 0 && <Welcome />}
         {state.turns.map((t) => (
           <TurnView key={t.id} turn={t} />
         ))}
