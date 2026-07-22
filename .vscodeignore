@@ -1,0 +1,17 @@
+# Excluir artefactos de desarrollo (el SDK de Pi ya está bundleado en dist/).
+# node_modules (deps de runtime, incl. los nativos .wasm/.node) SÍ se incluye.
+**/*.ts
+**/*.map
+**/tsconfig.json
+src/**
+scripts/**
+dist/smoke.*
+esbuild.js
+.vscode/**
+.vscodeignore
+node_modules/.cache/**
+node_modules/**/*.md
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/docs/**
+node_modules/**/examples/**
