@@ -47,9 +47,12 @@ export interface SessionItem {
   modified: number; // epoch ms
 }
 
+export type ApprovalMode = "manual" | "auto-edit" | "auto";
+
 export interface State {
   keyNeeded: boolean;
   busy: boolean;
+  mode: ApprovalMode;
   info?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
@@ -77,6 +80,7 @@ export type InMessage =
   | { type: "files"; query: string; items: string[] }
   | { type: "sessions"; items: SessionItem[]; currentPath?: string }
   | { type: "history"; name?: string; items: { role: string; text: string }[] }
+  | { type: "mode"; mode: ApprovalMode }
   | { type: "error"; text: string };
 
 // webview → host
@@ -91,4 +95,5 @@ export type OutMessage =
   | { type: "search_files"; query: string }
   | { type: "list_sessions" }
   | { type: "switch_session"; path: string }
-  | { type: "rename_session"; path: string; name: string };
+  | { type: "rename_session"; path: string; name: string }
+  | { type: "set_mode"; mode: ApprovalMode };

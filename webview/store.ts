@@ -3,6 +3,7 @@ import type { InMessage, State, Turn, Usage } from "./types";
 export const initialState: State = {
   keyNeeded: false,
   busy: false,
+  mode: "manual",
   turns: [],
   approvals: [],
   nextId: 1,
@@ -88,6 +89,9 @@ export function reduce(state: State, msg: InMessage): State {
 
     case "sessions":
       return { ...state, sessions: { items: msg.items, currentPath: msg.currentPath } };
+
+    case "mode":
+      return { ...state, mode: msg.mode };
 
     case "history": {
       const turns: Turn[] = [];

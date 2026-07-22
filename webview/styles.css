@@ -14,7 +14,11 @@ body {
 .toolbar button { padding: 3px 10px; font-size: 11px; }
 .toolbar button:disabled { opacity: .5; cursor: default; }
 .avatar.sm { width: 18px; height: 18px; }
+.toolbar button.toggle { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.toolbar button.toggle.auto-edit { background: var(--vscode-textLink-foreground, #4daafc); color: #fff; }
+.toolbar button.toggle.auto { background: var(--vscode-editorWarning-foreground, #d29922); color: #000; font-weight: 600; }
 .info-bar { font-size: 11px; opacity: .8; padding: 4px 12px; background: var(--vscode-list-hoverBackground); border-bottom: 1px solid var(--vscode-panel-border); }
+.info-bar.warn { color: var(--vscode-editorWarning-foreground); background: rgba(210,153,34,.14); opacity: 1; }
 .status-bar { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 11px; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); }
 .ctx-label { opacity: .7; }
 .ctx-bar { flex: 0 0 90px; height: 6px; background: var(--vscode-editorWidget-background, rgba(127,127,127,.2)); border-radius: 3px; overflow: hidden; }

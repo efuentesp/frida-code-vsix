@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { reduce, initialState } from "./store";
-import type { InMessage, OutMessage } from "./types";
+import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
@@ -16,6 +16,13 @@ let _vscode: VsCodeApi | null = null;
 function getVsCode(): VsCodeApi {
   if (!_vscode) _vscode = acquireVsCodeApi();
   return _vscode;
+}
+
+function nextMode(m: ApprovalMode): ApprovalMode {
+  return m === "manual" ? "auto-edit" : m === "auto-edit" ? "auto" : "manual";
+}
+function labelMode(m: ApprovalMode): string {
+  return m === "manual" ? "Manual" : m === "auto-edit" ? "Auto-edit" : "Auto";
 }
 
 export function App() {
@@ -87,6 +94,13 @@ export function App() {
         <button onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
           Compactar
         </button>
+        <button
+          className={"toggle " + state.mode}
+          title="Modo de aprobación: Manual → Auto-edit → Auto (clic para ciclar)"
+          onClick={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
+        >
+          {labelMode(state.mode)}
+        </button>
         {state.busy && (
           <button className="sec" onClick={() => post({ type: "abort" })}>
             ■ Detener
@@ -94,6 +108,8 @@ export function App() {
         )}
       </header>
 
+      {state.mode === "auto-edit" && <div className="info-bar warn">⚠ Edición automática: crear/editar archivos sin confirmación (bash sí pide).</div>}
+      {state.mode === "auto" && <div className="info-bar warn">⚠ Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
       {state.usage && <ContextBar usage={state.usage} />}

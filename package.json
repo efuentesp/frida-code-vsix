@@ -15,7 +15,8 @@
       { "command": "frida.setKey", "title": "Frida: Actualizar API key (DevEngine)" },
       { "command": "frida.compact", "title": "Frida: Compactar contexto" },
       { "command": "frida.abort", "title": "Frida: Detener respuesta" },
-      { "command": "frida.newSession", "title": "Frida: Nueva sesión" }
+      { "command": "frida.newSession", "title": "Frida: Nueva sesión" },
+      { "command": "frida.approvalMode", "title": "Frida: Cambiar modo de aprobación" }
     ]
   },
   "scripts": {

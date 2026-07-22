@@ -10,6 +10,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { createSofttekProviderHooks, SOFTTEK_MODEL, SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_CONFIG } from "./providers/softtek-provider";
 import { createApprovalGates } from "./gates/approval-gates";
+import type { ApprovalMode } from "./gates/approval-gates";
 import { ApprovalBridge, ApprovalRequest } from "./approval-bridge";
 
 export interface FridaSession {
@@ -32,6 +33,7 @@ export interface CreateFridaSessionOptions {
   getKey: () => string | undefined;
   onUnauthorized: () => void;
   onPendingApprovals: (reqs: ApprovalRequest[]) => void;
+  getMode: () => ApprovalMode;
 }
 
 export async function createFridaSession(opts: CreateFridaSessionOptions): Promise<FridaSession> {
@@ -66,7 +68,7 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
     settingsManager,
     extensionFactories: [
       createSofttekProviderHooks({ getKey: () => keyHolder.current, onUnauthorized: opts.onUnauthorized }),
-      createApprovalGates(bridge),
+      createApprovalGates(bridge, opts.getMode),
     ],
   });
   await loader.reload();

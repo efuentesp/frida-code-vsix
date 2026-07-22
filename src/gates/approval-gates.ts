@@ -1,6 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ApprovalBridge, ApprovalRequest } from "../approval-bridge";
 
+export type ApprovalMode = "manual" | "auto-edit" | "auto";
+
 const FREE_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const DIFF_TOOLS = new Set(["edit", "write"]);
 
@@ -12,11 +14,13 @@ const DIFF_TOOLS = new Set(["edit", "write"]);
  * Política: libres = read/grep/find/ls; diff = edit+write (toggle per-session
  * compartido); siempre gateado y SIN toggle = bash.
  */
-export function createApprovalGates(bridge: ApprovalBridge) {
+export function createApprovalGates(bridge: ApprovalBridge, getMode: () => ApprovalMode) {
   let acceptAllEdits = false; // per-session; solo edit/write; bash NUNCA
 
   return (pi: ExtensionAPI) => {
     pi.on("tool_call", async (event: any, _ctx: any) => {
+      const mode = getMode();
+      if (mode === "auto") return; // auto: todo pasa sin preguntar
       const tool: string = event.toolName;
 
       if (FREE_TOOLS.has(tool)) return; // libre
@@ -24,7 +28,10 @@ export function createApprovalGates(bridge: ApprovalBridge) {
       const isBash = tool === "bash";
       if (!isDiff && !isBash) return; // tool desconocido: dejamos pasar (PoC)
 
-      if (isDiff && acceptAllEdits) return; // toggle de sesión activo
+      // auto-edit: crear/editar archivos pasan; bash sigue pidiendo aprobación
+      if (isDiff && mode === "auto-edit") return;
+      // manual: toggle per-session sigue aplicando a edit/write
+      if (isDiff && acceptAllEdits) return;
 
       const req: ApprovalRequest = {
         id: event.toolCallId,

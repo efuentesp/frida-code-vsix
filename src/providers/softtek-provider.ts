@@ -34,7 +34,6 @@ export interface SofttekProviderDeps {
   /** Se invoca al recibir 401 → el host reabre el onboarding. */
   onUnauthorized: () => void;
 }
-
 /**
  * Factory de la extensión de Pi con SOLO los hooks. NO registra el provider
  * (eso va en ModelRuntime.registerProvider). El gateway usa **X-Api-Key**

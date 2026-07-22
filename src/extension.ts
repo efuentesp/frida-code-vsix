@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
+import type { ApprovalMode } from "./gates/approval-gates";
 import { getWebviewHtml } from "./webview-html";
 
 const SECRET_KEY = "frida.devengineKey";
@@ -60,6 +61,7 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
   const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
+  let approvalMode: ApprovalMode = "manual";
   let frida: FridaSession | undefined;
 
   let panel: vscode.WebviewPanel | undefined;
@@ -83,6 +85,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           void promptKey(true);
         },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+        getMode: () => approvalMode,
       });
       wireSession(frida.session);
     }
@@ -163,6 +166,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   async function handleWebviewMessage(msg: any): Promise<void> {
     switch (msg?.type) {
       case "webview_ready":
+        post({ type: "mode", mode: approvalMode });
         if (!keyCache) post({ type: "need_key" });
         else post({ type: "session_ready" });
         break;
@@ -202,6 +206,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         break;
       case "rename_session":
         await renameSession(String(msg.path ?? ""), String(msg.name ?? ""));
+        break;
+      case "set_mode":
+        approvalMode = msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
+        post({ type: "mode", mode: approvalMode });
         break;
     }
   }
@@ -292,6 +300,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         getKey: () => keyCache,
         onUnauthorized: () => { keyCache = undefined; void promptKey(true); },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+        getMode: () => approvalMode,
       });
       wireSession(frida.session);
       postHistory();
@@ -360,7 +369,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("frida.setKey", () => void promptKey(true)),
     vscode.commands.registerCommand("frida.compact", () => void compactContext()),
     vscode.commands.registerCommand("frida.abort", () => void abortRun()),
-    vscode.commands.registerCommand("frida.newSession", () => void newSession())
+    vscode.commands.registerCommand("frida.newSession", () => void newSession()),
+    vscode.commands.registerCommand("frida.approvalMode", () => {
+      approvalMode = approvalMode === "manual" ? "auto-edit" : approvalMode === "auto-edit" ? "auto" : "manual";
+      post({ type: "mode", mode: approvalMode });
+    })
   );
 }
 
