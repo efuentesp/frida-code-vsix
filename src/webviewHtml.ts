@@ -118,7 +118,7 @@ export function webviewHtml(): string {
 </head>
 <body>
   <div id="overlay" class="hidden">
-    <h2><span class="avatar ai">${ICON.spark}</span> Frida</h2>
+    <h2><span class="avatar ai">${ICON.spark}</span> Frida Code</h2>
     <p>Introduce tu API key de DevEngine. Se guarda en el keychain del SO (no se versiona).</p>
     <input id="keyInput" type="password" placeholder="mwr-sk-..." />
     <button id="keySend">Guardar key y empezar</button>

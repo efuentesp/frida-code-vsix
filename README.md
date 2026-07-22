@@ -1,4 +1,4 @@
-# Frida Pi (PoC)
+# Frida Code (PoC)
 
 Extensión VS Code que embebe el SDK de **Pi** y se conecta por defecto al
 **Softtek DevEngine Gateway**, con gates de aprobación tipo Claude Code.

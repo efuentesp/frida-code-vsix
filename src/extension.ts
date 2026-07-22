@@ -65,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       panel.reveal(vscode.ViewColumn.Two, true);
       return;
     }
-    panel = vscode.window.createWebviewPanel("frida", "Frida", vscode.ViewColumn.Two, {
+    panel = vscode.window.createWebviewPanel("frida", "Frida Code", vscode.ViewColumn.Two, {
       enableScripts: true,
       retainContextWhenHidden: true,
     });

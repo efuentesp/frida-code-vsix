@@ -1,6 +1,6 @@
 {
-  "name": "frida-pi",
-  "displayName": "Frida Pi",
+  "name": "frida-code",
+  "displayName": "Frida Code",
   "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
   "version": "0.0.1",
   "publisher": "softtek",
@@ -18,7 +18,7 @@
   "scripts": {
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "vsce package",
+    "package": "npm run build && vsce package",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
