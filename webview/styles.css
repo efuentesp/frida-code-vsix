@@ -68,16 +68,20 @@ body {
 
 /* Tarjetas de tool */
 .tool { border: 1px solid var(--vscode-panel-border); border-radius: 6px; background: var(--vscode-textBlockQuote-background, rgba(127,127,127,.08)); margin: 6px 0; overflow: hidden; }
-.tool-head { display: flex; align-items: center; gap: 7px; padding: 6px 8px; cursor: pointer; user-select: none; }
-.tool-head .ic { display: flex; color: var(--vscode-descriptionForeground); }
-.tool-head .nm { font-family: var(--vscode-editor-font-family, monospace); font-size: .9em; }
-.tool-head .st { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; opacity: .85; }
-.tool-head .st.ok { color: var(--vscode-testing-iconPassed, #3fb950); }
-.tool-head .st.err { color: var(--vscode-testing-iconFailed, #f85149); }
-.tool-args { padding: 0 8px 8px; }
-.tool-args pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--vscode-editor-font-family, monospace); font-size: .85em; color: var(--vscode-descriptionForeground); }
-.tool.collapsed .tool-args { display: none; }
-.tool.collapsed .chev { transform: rotate(0deg); }
+.tool-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: default; user-select: none; }
+.tool-head.has-result { cursor: pointer; }
+.tool-head:hover.has-result { background: var(--vscode-list-hoverBackground); }
+.tc-icon { width: 16px; text-align: center; opacity: .85; flex: none; }
+.tc-label { font-family: var(--vscode-editor-font-family, monospace); font-size: .9em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vscode-foreground); }
+.tc-status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; opacity: .85; white-space: nowrap; flex: none; }
+.tc-status .spin { width: 11px; height: 11px; border-width: 2px; }
+.tc-status.ok { color: var(--vscode-testing-iconPassed, #3fb950); }
+.tc-status.error { color: var(--vscode-testing-iconFailed, #f85149); }
+.tc-chev { transition: transform .1s; transform: rotate(90deg); opacity: .6; display: flex; flex: none; }
+.tc-chev.closed { transform: rotate(0deg); }
+.tool-result { border-top: 1px solid var(--vscode-panel-border); padding: 6px 8px; }
+.tool-result pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--vscode-editor-font-family, monospace); font-size: .82em; color: var(--vscode-descriptionForeground); max-height: 240px; overflow-y: auto; }
+.tool.collapsed .tool-result { display: none; }
 .chev { transition: transform .1s; transform: rotate(90deg); opacity: .6; display: flex; }
 .icon { display: block; }
 

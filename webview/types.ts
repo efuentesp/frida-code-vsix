@@ -4,8 +4,11 @@ export type ToolState = "running" | "ok" | "error";
 
 export interface ToolEntry {
   tool: string;
-  args: string;
+  args: unknown;
   state: ToolState;
+  startedAt: number;
+  endedAt?: number;
+  result?: string;
 }
 
 // Ejecución de bash del usuario (!command / !!command).
@@ -25,7 +28,7 @@ export type TurnStatus = "thinking" | "executing" | null;
 // real (texto → tool → texto → …) en vez de separar texto y tools.
 export type Segment =
   | { kind: "text"; text: string }
-  | { kind: "tool"; tool: string; args: string; state: ToolState };
+  | ({ kind: "tool" } & ToolEntry);
 
 export interface Turn {
   id: number;
@@ -142,8 +145,8 @@ export type InMessage =
   | { type: "agent_busy"; busy: boolean }
   | { type: "turn_active" }
   | { type: "delta"; text: string }
-  | { type: "tool_start"; tool: string; args?: string }
-  | { type: "tool_end"; tool: string; isError?: boolean }
+  | { type: "tool_start"; tool: string; args?: unknown }
+  | { type: "tool_end"; tool: string; isError?: boolean; result?: string }
   | { type: "bash_start"; command: string; excludeFromContext: boolean }
   | { type: "bash_chunk"; text: string }
   | { type: "bash_end"; exitCode?: number; cancelled?: boolean; truncated?: boolean; fullOutputPath?: string }

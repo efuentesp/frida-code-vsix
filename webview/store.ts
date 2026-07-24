@@ -58,7 +58,7 @@ export function reduce(state: State, msg: InMessage): State {
           ...t,
           status: "executing",
           executingTool: msg.tool,
-          segments: [...t.segments, { kind: "tool", tool: msg.tool, args: msg.args ?? "", state: "running" }],
+          segments: [...t.segments, { kind: "tool", tool: msg.tool, args: msg.args ?? {}, state: "running", startedAt: Date.now() }],
         })),
       };
 
@@ -70,7 +70,7 @@ export function reduce(state: State, msg: InMessage): State {
           const segments = t.segments.map((s) => {
             if (!done && s.kind === "tool" && s.state === "running" && s.tool === msg.tool) {
               done = true;
-              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState };
+              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState, endedAt: Date.now(), result: msg.result };
             }
             return s;
           });

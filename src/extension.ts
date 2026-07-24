@@ -265,10 +265,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           }
           break;
         case "tool_execution_start":
-          post({ type: "tool_start", tool: event.toolName, args: safeArgs(event.args) });
+          post({ type: "tool_start", tool: event.toolName, args: compactArgs(event.args) });
           break;
         case "tool_execution_end":
-          post({ type: "tool_end", tool: event.toolName, isError: !!event.isError });
+          post({ type: "tool_end", tool: event.toolName, isError: !!event.isError, result: summarizeResult(event.result) });
           break;
       }
     });
@@ -680,11 +680,49 @@ function extractText(m: any): string {
   return "";
 }
 
-function safeArgs(args: unknown): string {
+// Compacta los args de un tool a un objeto legible, truncando strings largos
+// (content/oldText/newText…) para no inflar el postMessage. El webview usa
+// solo los campos clave (path, command, pattern, edits.length) para la cabecera.
+function compactArgs(args: unknown): unknown {
+  if (args == null || typeof args !== "object") return args;
   try {
-    return JSON.stringify(args).slice(0, 500);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+      if (typeof v === "string") {
+        out[k] = v.length > 120 ? v.slice(0, 120) + "…" : v;
+      } else if (Array.isArray(v)) {
+        out[k] = v.map((item) => (item && typeof item === "object" ? compactArgs(item) : item));
+      } else if (v && typeof v === "object") {
+        out[k] = compactArgs(v);
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
   } catch {
-    return String(args).slice(0, 500);
+    return args;
+  }
+}
+
+// Extrae el texto del resultado de un tool (result.content = bloques text/image)
+// y lo trunca para mostrarlo en el cuerpo plegable de la tarjeta.
+function summarizeResult(result: any): string {
+  if (!result) return "";
+  try {
+    const content = result.content;
+    if (Array.isArray(content)) {
+      const text = content
+        .filter((b: any) => b?.type === "text")
+        .map((b: any) => String(b?.text ?? ""))
+        .join("");
+      if (!text) return "";
+      return text.length > 2000 ? text.slice(0, 2000) + "\n…(truncado)" : text;
+    }
+    if (typeof result === "string") return result.slice(0, 2000);
+    if (typeof result.details === "string") return result.details.slice(0, 2000);
+    return "";
+  } catch {
+    return "";
   }
 }
 
