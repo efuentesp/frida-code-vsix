@@ -33,6 +33,8 @@ function labelMode(m: ApprovalMode): string {
 export function App() {
   const [state, dispatch] = useReducer(reduce, initialState);
   const approvalsRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
   const [escHint, setEscHint] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
@@ -54,6 +56,13 @@ export function App() {
       approvalsRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [state.approvals, state.questions]);
+
+  // Auto-scroll: mantiene la vista en la última respuesta salvo que el usuario
+  // haya subido a leer (stick-to-bottom). Se dispara con cada delta/tool/turno.
+  useEffect(() => {
+    const el = logRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [state.turns]);
 
   // Doble Escape (mientras responde) → abort, como el botón Detener.
   useEffect(() => {
@@ -191,7 +200,15 @@ export function App() {
         />
       )}
 
-      <div className="log">
+      <div
+        className="log"
+        ref={logRef}
+        onScroll={() => {
+          const el = logRef.current;
+          if (!el) return;
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+      >
         {state.turns.length === 0 && <Welcome />}
         {state.turns.map((t) => (
           <TurnView key={t.id} turn={t} />

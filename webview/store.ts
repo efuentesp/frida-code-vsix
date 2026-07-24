@@ -1,4 +1,4 @@
-import type { InMessage, State, Turn, Usage, WorkspaceInfo } from "./types";
+import type { InMessage, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
@@ -25,7 +25,7 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, keyNeeded: false };
 
     case "user": {
-      const turn: Turn = { id: state.nextId, user: msg.text, assistantMd: "", status: null, tools: [] };
+      const turn: Turn = { id: state.nextId, user: msg.text, segments: [], status: null };
       return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1, info: undefined };
     }
     case "turn_start":
@@ -34,7 +34,18 @@ export function reduce(state: State, msg: InMessage): State {
     case "delta":
       return {
         ...state,
-        turns: withLast(state.turns, (t) => ({ ...t, assistantMd: t.assistantMd + msg.text })),
+        turns: withLast(state.turns, (t) => {
+          // Concatena al último segmento de texto; si no, crea uno nuevo (así
+          // se preserva el orden texto↔tool).
+          const segs = [...t.segments];
+          const last = segs[segs.length - 1];
+          if (last && last.kind === "text") {
+            segs[segs.length - 1] = { ...last, text: last.text + msg.text };
+          } else {
+            segs.push({ kind: "text", text: msg.text });
+          }
+          return { ...t, segments: segs };
+        }),
       };
 
     case "tool_start":
@@ -44,7 +55,7 @@ export function reduce(state: State, msg: InMessage): State {
           ...t,
           status: "executing",
           executingTool: msg.tool,
-          tools: [...t.tools, { tool: msg.tool, args: msg.args ?? "", state: "running" }],
+          segments: [...t.segments, { kind: "tool", tool: msg.tool, args: msg.args ?? "", state: "running" }],
         })),
       };
 
@@ -53,16 +64,16 @@ export function reduce(state: State, msg: InMessage): State {
         ...state,
         turns: withLast(state.turns, (t) => {
           let done = false;
-          const tools = t.tools.map((tc) => {
-            if (!done && tc.state === "running" && tc.tool === msg.tool) {
+          const segments = t.segments.map((s) => {
+            if (!done && s.kind === "tool" && s.state === "running" && s.tool === msg.tool) {
               done = true;
-              return { ...tc, state: (msg.isError ? "error" : "ok") as "error" | "ok" };
+              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState };
             }
-            return tc;
+            return s;
           });
           // Tras un tool, el modelo vuelve a razonar sobre el resultado antes
           // del siguiente paso → el indicador del footer refleja "Pensando…".
-          return { ...t, tools, status: "thinking", executingTool: undefined };
+          return { ...t, segments, status: "thinking", executingTool: undefined };
         }),
       };
 
@@ -166,11 +177,18 @@ export function reduce(state: State, msg: InMessage): State {
       let id = 1;
       for (const it of msg.items) {
         if (it.role === "user") {
-          turns.push({ id: id++, user: it.text, assistantMd: "", status: null, tools: [] });
+          turns.push({ id: id++, user: it.text, segments: [], status: null });
         } else {
           const last = turns[turns.length - 1];
-          if (last) last.assistantMd += it.text;
-          else turns.push({ id: id++, user: "", assistantMd: it.text, status: null, tools: [] });
+          if (last) {
+            const segs = [...last.segments];
+            const prev = segs[segs.length - 1];
+            if (prev && prev.kind === "text") segs[segs.length - 1] = { ...prev, text: prev.text + it.text };
+            else segs.push({ kind: "text", text: it.text });
+            last.segments = segs;
+          } else {
+            turns.push({ id: id++, user: "", segments: [{ kind: "text", text: it.text }], status: null });
+          }
         }
       }
       return {

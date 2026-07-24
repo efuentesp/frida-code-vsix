@@ -21,13 +21,18 @@ export interface BashRun {
 
 export type TurnStatus = "thinking" | "executing" | null;
 
+// Bloque ordenado del contenido de un turno del asistente. Preserva la cronología
+// real (texto → tool → texto → …) en vez de separar texto y tools.
+export type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; tool: string; args: string; state: ToolState };
+
 export interface Turn {
   id: number;
   user: string;
-  assistantMd: string;
+  segments: Segment[];
   status: TurnStatus;
   executingTool?: string;
-  tools: ToolEntry[];
   bash?: BashRun;
   error?: string;
 }
