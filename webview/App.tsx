@@ -62,7 +62,7 @@ export function App() {
   useEffect(() => {
     const el = logRef.current;
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [state.turns]);
+  }, [state.turns, state.queued]);
 
   // Doble Escape (mientras responde) → abort, como el botón Detener.
   useEffect(() => {
@@ -214,6 +214,9 @@ export function App() {
           <TurnView key={t.id} turn={t} />
         ))}
         <div ref={approvalsRef} className="approvals-area">
+          {state.queued.map((q, i) => (
+            <div key={i} className="queued-msg">↳ encolado: {q}</div>
+          ))}
           {state.approvals.length > 0 && (
             <div className="approvals-banner">⏸ Frida espera tu aprobación:</div>
           )}
@@ -241,7 +244,7 @@ export function App() {
           <div className="proc-bar"><span className="spin" /> {procLabel}</div>
         )}
         <Composer
-          onSubmit={(text) => post({ type: "submit", text })}
+          onSubmit={(text, mode) => post({ type: "submit", text, mode })}
           onSearch={(q) => post({ type: "search_files", query: q })}
           files={state.files}
           commands={commands}

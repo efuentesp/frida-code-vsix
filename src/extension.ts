@@ -68,6 +68,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
   let approvalMode: ApprovalMode = "manual";
   let frida: FridaSession | undefined;
+  // Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
+  // de turnos dentro del agent run actual (para saber cuándo se entrega uno).
+  const pendingQueue: { text: string }[] = [];
+  let turnsInRun = 0;
 
   let panel: vscode.WebviewPanel | undefined;
   const post = (msg: unknown): void => {
@@ -222,9 +226,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   }
 
+  function postQueued(): void {
+    post({ type: "queued", items: pendingQueue.map((q) => q.text) });
+  }
+
+  function resetQueue(): void {
+    pendingQueue.length = 0;
+    turnsInRun = 0;
+    postQueued();
+  }
+
   function wireSession(session: any): void {
     session.subscribe((event: any) => {
       switch (event?.type) {
+        case "agent_start":
+          turnsInRun = 0;
+          post({ type: "agent_busy", busy: true });
+          post({ type: "turn_active" });
+          break;
+        case "agent_end":
+          postUsage(session);
+          post({ type: "agent_busy", busy: false });
+          break;
+        case "turn_start":
+          // turn_start tras el primero (turnsInRun>0) = entrega de un mensaje
+          // encolado: creamos su turno aquí para que los deltas caigan en él.
+          if (turnsInRun > 0 && pendingQueue.length > 0) {
+            const next = pendingQueue.shift()!;
+            post({ type: "user", text: next.text });
+            postQueued();
+          }
+          turnsInRun++;
+          post({ type: "turn_active" });
+          break;
         case "message_update":
           if (event.assistantMessageEvent?.type === "text_delta") {
             post({ type: "delta", text: event.assistantMessageEvent.delta });
@@ -235,10 +269,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           break;
         case "tool_execution_end":
           post({ type: "tool_end", tool: event.toolName, isError: !!event.isError });
-          break;
-        case "agent_end":
-          postUsage(session);
-          post({ type: "turn_end" });
           break;
       }
     });
@@ -279,7 +309,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
         break;
       case "submit":
-        await runPrompt(String(msg.text ?? ""));
+        await runPrompt(String(msg.text ?? ""), msg.mode === "followUp" ? "followUp" : "steer");
         break;
       case "approval_response":
         (await ensureSession()).bridge.resolve({
@@ -342,7 +372,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
-  async function runPrompt(text: string): Promise<void> {
+  async function runPrompt(text: string, mode: "steer" | "followUp" = "steer"): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (!keyCache) {
@@ -361,16 +391,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
-    post({ type: "user", text: trimmed });
-    post({ type: "turn_start" });
+    let session: FridaSession;
     try {
-      const { session } = await ensureSession();
-      const expanded = await expandAtFiles(trimmed, workspaceCwd());
-      await session.prompt(expanded);
+      session = await ensureSession();
     } catch (e: any) {
       post({ type: "error", text: String(e?.message ?? e) });
-    } finally {
-      post({ type: "turn_end" });
+      return;
+    }
+    const expanded = await expandAtFiles(trimmed, workspaceCwd());
+
+    // Si el agente está ocupado, encolamos (Message Queue de pi): el turno de
+    // este mensaje NO se crea ahora, sino cuando el agente lo entregue
+    // (turn_start>0 en wireSession), para que los deltas del turno en curso
+    // sigan cayendo en su propio turno y no se mezclen.
+    if (session.session?.isStreaming) {
+      pendingQueue.push({ text: trimmed });
+      postQueued();
+      try {
+        await session.session.prompt(expanded, { streamingBehavior: mode });
+      } catch (e: any) {
+        const idx = pendingQueue.findIndex((q) => q.text === trimmed);
+        if (idx >= 0) pendingQueue.splice(idx, 1);
+        postQueued();
+        post({ type: "error", text: String(e?.message ?? e) });
+      }
+      return;
+    }
+
+    // Agente libre: turno normal. El busy lo marcan los eventos agent_start/end
+    // reales de pi (no turn_start/turn_end manuales).
+    post({ type: "user", text: trimmed });
+    try {
+      await session.session.prompt(expanded);
+    } catch (e: any) {
+      post({ type: "error", text: String(e?.message ?? e) });
     }
   }
 
@@ -387,6 +441,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     if (session.session?.isBashRunning) {
       post({ type: "error", text: "Ya hay un comando bash en ejecución. Cancela primero." });
+      return;
+    }
+    if (session.session?.isStreaming) {
+      // El atajo de bash directo del usuario compite con el agent run por el
+      // indicador de “busy”; pídele que espere (como hace pi con el bash).
+      post({ type: "error", text: "Espera a que Frida termine de procesar para ejecutar bash directo (!)." });
       return;
     }
     post({ type: "user", text: raw });
@@ -488,6 +548,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       frida = undefined;
     }
     post({ type: "cleared" });
+    resetQueue();
     post({ type: "info", text: "Nueva sesión iniciada." });
     if (keyCache) bootstrapSession(); // recrea la sesión para mostrar recursos
   }
@@ -516,6 +577,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       try { await frida.session.dispose?.(); } catch { /* noop */ }
       frida = undefined;
     }
+    resetQueue();
     try {
       frida = await createFridaSession({
         cwd: workspaceCwd(),

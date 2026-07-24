@@ -149,6 +149,9 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .approvals-area { margin-top: 8px; }
 .approvals-banner { font-size: 12px; font-weight: 600; color: var(--vscode-textLink-foreground); padding: 6px 0; }
 
+/* Mensajes encolados (steer/followUp) mientras el agente trabaja */
+.queued-msg { font-size: 12px; opacity: .6; font-style: italic; padding: 4px 10px; border-left: 2px solid var(--vscode-textLink-foreground, #4daafc); margin: 4px 0; word-break: break-word; }
+
 /* QuestionCard (ask_user_question, ADR-0006) — hermana de ApprovalCard */
 .question { border: 1px solid var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder)); border-radius: 8px; padding: 10px; margin: 8px 0; background: var(--vscode-list-hoverBackground); }
 .question .ttl { display: flex; align-items: center; gap: 7px; font-weight: 600; margin-bottom: 6px; }

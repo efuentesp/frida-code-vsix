@@ -19,7 +19,7 @@ export function Composer({
   files,
   commands,
 }: {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, mode: "steer" | "followUp") => void;
   onSearch: (query: string) => void;
   files?: Files;
   commands?: CommandItem[];
@@ -157,7 +157,7 @@ export function Composer({
     } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (text.trim()) {
-        onSubmit(text.trim());
+        onSubmit(text.trim(), e.altKey ? "followUp" : "steer");
         setText("");
       }
     }
@@ -213,7 +213,7 @@ export function Composer({
         onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
         onKeyDown={onKeyDown}
       />
-      <div className="hint">@ archivos · / skill·prompt · ! ejecuta y envía · !! sin enviar · Enter envía</div>
+      <div className="hint">@ archivos · / skill·prompt · ! bash · Enter envía · Alt+Enter = followUp</div>
     </div>
   );
 }

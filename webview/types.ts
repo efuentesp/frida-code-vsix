@@ -129,6 +129,7 @@ export interface State {
   sessions?: { items: SessionItem[]; currentPath?: string };
   resources?: ResourceSummary;
   workspace?: WorkspaceInfo;
+  queued: string[];
   nextId: number;
 }
 
@@ -138,14 +139,15 @@ export type InMessage =
   | { type: "key_set" }
   | { type: "session_ready" }
   | { type: "user"; text: string }
-  | { type: "turn_start" }
+  | { type: "agent_busy"; busy: boolean }
+  | { type: "turn_active" }
   | { type: "delta"; text: string }
   | { type: "tool_start"; tool: string; args?: string }
   | { type: "tool_end"; tool: string; isError?: boolean }
   | { type: "bash_start"; command: string; excludeFromContext: boolean }
   | { type: "bash_chunk"; text: string }
   | { type: "bash_end"; exitCode?: number; cancelled?: boolean; truncated?: boolean; fullOutputPath?: string }
-  | { type: "turn_end" }
+  | { type: "queued"; items: string[] }
   | { type: "approvals"; approvals: ApprovalRequest[] }
   | { type: "questions"; items: QuestionRequest[] }
   | { type: "info"; text: string }
@@ -163,7 +165,7 @@ export type InMessage =
 // webview → host
 export type OutMessage =
   | { type: "webview_ready" }
-  | { type: "submit"; text: string }
+  | { type: "submit"; text: string; mode: "steer" | "followUp" }
   | { type: "approval_response"; id: string; decision: "accept" | "reject"; acceptAll?: boolean }
   | { type: "question_response"; id: string; answers: QuestionAnswer[]; cancelled: boolean }
   | { type: "set_key"; key: string }

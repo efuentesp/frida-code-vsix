@@ -7,6 +7,7 @@ export const initialState: State = {
   turns: [],
   approvals: [],
   questions: [],
+  queued: [],
   nextId: 1,
 };
 
@@ -28,8 +29,10 @@ export function reduce(state: State, msg: InMessage): State {
       const turn: Turn = { id: state.nextId, user: msg.text, segments: [], status: null };
       return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1, info: undefined };
     }
-    case "turn_start":
-      return { ...state, busy: true, turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })) };
+    case "agent_busy":
+      return { ...state, busy: msg.busy };
+    case "turn_active":
+      return { ...state, turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })) };
 
     case "delta":
       return {
@@ -128,13 +131,6 @@ export function reduce(state: State, msg: InMessage): State {
       };
     }
 
-    case "turn_end":
-      return {
-        ...state,
-        busy: false,
-        turns: withLast(state.turns, (t) => ({ ...t, status: null, executingTool: undefined })),
-      };
-
     case "approvals":
       return { ...state, approvals: msg.approvals };
 
@@ -145,7 +141,7 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, info: msg.text };
 
     case "cleared":
-      return { ...state, turns: [], approvals: [], questions: [], busy: false, info: undefined, usage: undefined, resources: undefined };
+      return { ...state, turns: [], approvals: [], questions: [], queued: [], busy: false, info: undefined, usage: undefined, resources: undefined };
 
     case "usage": {
       const { type: _t, ...rest } = msg;
@@ -160,6 +156,9 @@ export function reduce(state: State, msg: InMessage): State {
 
     case "resources":
       return { ...state, resources: msg.data };
+
+    case "queued":
+      return { ...state, queued: msg.items };
 
     case "workspace": {
       const { type: _t, ...rest } = msg;
