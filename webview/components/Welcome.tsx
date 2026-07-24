@@ -14,6 +14,14 @@ const TIPS: React.ReactNode[] = [
     </li>
   ),
   (
+    <li key="slash">
+      Invoca <strong>skills</strong> y <strong>prompts</strong> escribiendo <code>/</code>{" "}
+      (filtra escribiendo, <kbd>↑</kbd>/<kbd>↓</kbd> navega, <kbd>Enter</kbd> selecciona).{" "}
+      O a mano: <code>/skill:nombre</code>, <code>/nombre</code>.{" "}
+      Mira <strong>Recursos</strong> para verlos.
+    </li>
+  ),
+  (
     <li key="resources">
       Tus <strong>skills</strong>, <strong>prompts</strong> y <strong>extensiones</strong> se cargan de{" "}
       <code>~/.pi/agent</code> (global) y <code>.pi</code> (proyecto). Botón{" "}

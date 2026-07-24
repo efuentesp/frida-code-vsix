@@ -74,6 +74,42 @@ function extName(p: string): string {
   return base.replace(/\.ts$/, "");
 }
 
+// Sección de referencia rápida: cómo invocar skills y prompts.
+function UsageSection() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className={"res-section usage" + (open ? "" : " collapsed")}>
+      <div className="res-section-head" onClick={() => setOpen(!open)}>
+        <span className="chev">▸</span>
+        <span className="res-section-title">Cómo invocarlos</span>
+        <span className="res-section-count">ref</span>
+      </div>
+      {open && (
+        <div className="res-section-body">
+          <p className="res-loc-intro">
+            Escribe <code>/</code> en el cuadro de texto: aparece la lista de skills y prompts cargados. Sigue escribiendo para filtrar; <kbd>↑</kbd>/<kbd>↓</kbd> navega, <kbd>Enter</kbd> o <kbd>Tab</kbd> seleccionan, <kbd>Esc</kbd> cierra.
+          </p>
+          <div className="res-loc-row">
+            <div className="res-loc-kind">Skill</div>
+            <code className="res-loc-path">/skill:&lt;nombre&gt;</code>
+            <span className="res-loc-sep">·</span>
+            <code className="res-loc-path muted">ej. /skill:diagnose</code>
+          </div>
+          <div className="res-loc-row">
+            <div className="res-loc-kind">Prompt</div>
+            <code className="res-loc-path">/&lt;nombre&gt;</code>
+            <span className="res-loc-sep">·</span>
+            <code className="res-loc-path muted">ej. /review</code>
+          </div>
+          <p className="res-loc-note">
+            Al enviar, Frida expande el contenido del skill/prompt y lo pasa al modelo.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ResourcesPanel({
   res,
   model,
@@ -92,6 +128,8 @@ export function ResourcesPanel({
         </div>
         <div className="sessions-list">
           {model && <div className="res-model">Modelo: <code>{model}</code></div>}
+
+          <UsageSection />
 
           <Section title="Extensiones" count={res.extensions.length}>
             {res.extensions.map((e, i) => {

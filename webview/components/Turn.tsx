@@ -6,7 +6,7 @@ import { BashCard } from "./BashCard";
 
 export function TurnView({ turn }: { turn: Turn }) {
   const hasAssistant =
-    !!turn.assistantMd || turn.status !== null || turn.tools.length > 0 || !!turn.error || !!turn.bash;
+    !!turn.assistantMd || turn.tools.length > 0 || !!turn.error || !!turn.bash;
   return (
     <div className="turn">
       <div className="row">
@@ -29,16 +29,6 @@ export function TurnView({ turn }: { turn: Turn }) {
             {turn.assistantMd && (
               <div className="bubble">
                 <Markdown>{turn.assistantMd}</Markdown>
-              </div>
-            )}
-            {turn.status === "thinking" && (
-              <div className="status">
-                <span className="spin" /> Pensando…
-              </div>
-            )}
-            {turn.status === "executing" && (
-              <div className="status">
-                <span className="spin" /> Ejecutando {turn.executingTool}…
               </div>
             )}
             {turn.tools.map((t, i) => (

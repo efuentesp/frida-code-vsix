@@ -1,11 +1,11 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { reduce, initialState } from "./store";
 import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionCard } from "./components/QuestionCard";
-import { Composer } from "./components/Composer";
+import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
@@ -98,6 +98,27 @@ export function App() {
 
   const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
+  // Lista de comandos para el autocompletado de "/": skills + prompts cargados.
+  const commands: CommandItem[] = useMemo(() => {
+    const r = state.resources;
+    if (!r) return [];
+    return [
+      ...r.skills.map((s) => ({ kind: "skill" as const, label: `/skill:${s.name}`, name: s.name, description: s.description })),
+      ...r.prompts.map((p) => ({ kind: "prompt" as const, label: `/${p.name}`, name: p.name, description: p.description })),
+    ];
+  }, [state.resources]);
+
+  // Etiqueta del indicador de procesamiento (fijo en el footer). Refleja el
+  // sub-estado cuando se conoce; no depende del scroll de la conversación.
+  const procLabel = (() => {
+    if (!state.busy) return null;
+    const last = state.turns[state.turns.length - 1];
+    if (last?.bash?.status === "running") return "Ejecutando bash…";
+    if (last?.status === "executing" && last.executingTool) return `Ejecutando ${last.executingTool}…`;
+    if (last?.status === "thinking") return "Pensando…";
+    return "Procesando…";
+  })();
+
   if (state.keyNeeded) {
     return <Onboarding onSubmit={(key) => post({ type: "set_key", key })} />;
   }
@@ -162,7 +183,6 @@ export function App() {
       {state.mode === "auto" && <div className="info-bar warn">⚠ Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
-      {state.usage && <ContextBar usage={state.usage} />}
       {state.resources && !resDismissed && (
         <ResourcesBar
           res={state.resources}
@@ -200,12 +220,17 @@ export function App() {
         </div>
       </div>
       <div className="footer">
-        <WorkspaceBar ws={state.workspace} onRefresh={() => post({ type: "workspace" })} />
+        {procLabel && (
+          <div className="proc-bar"><span className="spin" /> {procLabel}</div>
+        )}
         <Composer
           onSubmit={(text) => post({ type: "submit", text })}
           onSearch={(q) => post({ type: "search_files", query: q })}
           files={state.files}
+          commands={commands}
         />
+        <WorkspaceBar ws={state.workspace} onRefresh={() => post({ type: "workspace" })} />
+        {state.usage && <ContextBar usage={state.usage} />}
       </div>
       {sessionsOpen && state.sessions && (
         <SessionsPanel

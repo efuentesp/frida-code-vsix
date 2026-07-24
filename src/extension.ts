@@ -105,7 +105,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function postUsage(session: any): void {
     try {
       const msgs: any[] = session?.agent?.state?.messages ?? [];
-      const contextWindow: number = session?.model?.contextWindow ?? 0;
       let sessionTokens = 0, lastInput = 0, lastOutput = 0, cacheRead = 0, cacheWrite = 0;
       for (const m of msgs) {
         if (m?.role === "assistant" && m?.usage) {
@@ -115,15 +114,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cacheRead += u.cacheRead ?? 0; cacheWrite += u.cacheWrite ?? 0;
         }
       }
+      // Contexto ACTUAL: pi estima los tokens del contexto vivo con
+      // estimateContextTokens (getContextUsage). Es más confiable que el
+      // `input` del último usage, que según el gateway puede venir vacío y
+      // dejar el % en 0.
+      const ctx = session?.getContextUsage?.();
+      const contextTokens = ctx?.tokens ?? null;
+      const contextWindow = ctx?.contextWindow ?? session?.model?.contextWindow ?? 0;
+      const contextPercent =
+        ctx?.percent ??
+        (contextTokens != null && contextWindow ? Math.min(100, (contextTokens / contextWindow) * 100) : 0);
       post({
         type: "usage",
-        inputTokens: lastInput,
+        inputTokens: contextTokens ?? lastInput, // tokens que ocupan el contexto
         outputTokens: lastOutput,
         cacheRead,
         cacheWrite,
         sessionTokens,
         contextWindow,
-        contextPercent: contextWindow ? Math.min(100, (lastInput / contextWindow) * 100) : 0,
+        contextPercent,
       });
     } catch {
       /* noop */

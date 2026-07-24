@@ -112,7 +112,7 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 
 /* Footer: barra de workspace + composer */
 .footer { border-top: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); }
-.ws-bar { display: flex; align-items: center; gap: 12px; padding: 4px 12px; font-size: 11px; border-bottom: 1px solid var(--vscode-panel-border); }
+.ws-bar { display: flex; align-items: center; gap: 12px; padding: 4px 12px; font-size: 11px; border-top: 1px solid var(--vscode-panel-border); border-bottom: 1px solid var(--vscode-panel-border); }
 .ws-bar .ws-cwd { display: flex; align-items: center; gap: 4px; opacity: .9; min-width: 0; }
 .ws-bar .ws-cwd code { font-family: var(--vscode-editor-font-family, monospace); font-size: .92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-bar .ws-branch { display: inline-flex; align-items: center; gap: 2px; color: var(--vscode-gitDecoration-unmodifiedResourceForeground, var(--vscode-testing-iconPassed, #3fb950)); white-space: nowrap; }
@@ -120,6 +120,10 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .ws-bar .ws-dirty { opacity: .9; }
 .ws-bar .ws-refresh { margin-left: auto; background: none; border: none; color: var(--vscode-descriptionForeground); cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1; }
 .ws-bar .ws-refresh:hover { color: var(--vscode-foreground); }
+
+/* Indicador de procesamiento fijo (sobre el Composer, no depende del scroll) */
+.proc-bar { display: flex; align-items: center; gap: 8px; padding: 4px 12px; font-size: 12px; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); }
+.proc-bar .spin { width: 11px; height: 11px; border-width: 2px; }
 .file-popup { position: absolute; left: 12px; right: 12px; bottom: 100%; margin-bottom: 4px; max-height: 220px; overflow-y: auto; background: var(--vscode-quickInput-background, var(--vscode-editor-background)); border: 1px solid var(--vscode-focusBorder); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.4); z-index: 20; }
 .file-item { padding: 5px 10px; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-item.sel { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
@@ -200,6 +204,14 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .bar.bash-mode .input { border-color: var(--vscode-terminal-ansiGreen, #3fb950); }
 .bar.bash-mode .hint { color: var(--vscode-terminal-ansiGreen, #3fb950); opacity: .85; }
 
+/* Autocompletado de comandos (/) — reutiliza .file-popup/.file-item */
+.cmd-item { display: flex; align-items: center; gap: 8px; }
+.cmd-item .cmd-kind { font-size: 9px; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: .5px; flex: none; }
+.cmd-item .cmd-kind.skill { background: var(--vscode-textLink-foreground, #4daafc); color: #fff; }
+.cmd-item .cmd-kind.prompt { background: var(--vscode-badge-background, rgba(127,127,127,.25)); color: var(--vscode-badge-foreground, var(--vscode-descriptionForeground)); }
+.cmd-item .cmd-label { font-family: var(--vscode-editor-font-family, monospace); font-size: .9em; flex: none; }
+.cmd-item .cmd-desc { color: var(--vscode-descriptionForeground); opacity: .8; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Barra compacta de recursos cargados (no intrusiva) */
 .res-bar { display: flex; align-items: center; gap: 8px; margin: 0 12px; padding: 4px 10px; border: 1px solid var(--vscode-panel-border); border-left: 3px solid var(--vscode-textLink-foreground, #4daafc); border-radius: 4px; background: var(--vscode-textBlockQuote-background, rgba(127,127,127,.08)); font-size: 11px; }
 .res-bar.has-errors { border-left-color: var(--vscode-editorWarning-foreground, #d29922); }
@@ -242,3 +254,4 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .res-loc-sep { opacity: .4; }
 .res-loc-note { font-size: 11px; opacity: .7; margin: 8px 0 4px; }
 .res-loc-note code { font-family: var(--vscode-editor-font-family, monospace); }
+kbd { font-family: var(--vscode-editor-font-family, monospace); font-size: .88em; padding: 0 4px; border: 1px solid var(--vscode-panel-border); border-bottom-width: 2px; border-radius: 3px; background: var(--vscode-textBlockQuote-background, rgba(127,127,127,.1)); }

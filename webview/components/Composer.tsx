@@ -5,17 +5,28 @@ interface Files {
   items: string[];
 }
 
+// Item de comando para el autocompletado de "/": skills y prompts cargados.
+export interface CommandItem {
+  kind: "skill" | "prompt";
+  label: string; // "/skill:foo" o "/foo"
+  name: string;
+  description: string;
+}
+
 export function Composer({
   onSubmit,
   onSearch,
   files,
+  commands,
 }: {
   onSubmit: (text: string) => void;
   onSearch: (query: string) => void;
   files?: Files;
+  commands?: CommandItem[];
 }) {
   const [text, setText] = useState("");
-  const [activeQuery, setActiveQuery] = useState<string | null>(null);
+  const [activeQuery, setActiveQuery] = useState<string | null>(null); // "@"
+  const [commandQuery, setCommandQuery] = useState<string | null>(null); // "/"
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,11 +37,26 @@ export function Composer({
   }, []);
   useEffect(() => {
     setSel(0);
-  }, [activeQuery, files]);
+  }, [activeQuery, commandQuery, files]);
 
+  // --- Autocompletado de archivos (@): host-driven ---
   const suggestions =
     activeQuery !== null && files && files.query === activeQuery ? files.items : [];
-  const open = suggestions.length > 0;
+  const fileOpen = suggestions.length > 0;
+
+  // --- Autocompletado de comandos (/): filtrado local sobre skills+prompts ---
+  const commandMatches =
+    commandQuery !== null && commands
+      ? commands.filter((c) => {
+          const q = commandQuery.toLowerCase();
+          return (
+            c.name.toLowerCase().includes(q) ||
+            c.label.toLowerCase().includes(q) ||
+            c.description.toLowerCase().includes(q)
+          );
+        })
+      : [];
+  const commandOpen = commandMatches.length > 0;
 
   function detectQuery(value: string, caret: number): string | null {
     const before = value.slice(0, caret);
@@ -42,6 +68,16 @@ export function Composer({
     return q;
   }
 
+  function detectCommand(value: string, caret: number): string | null {
+    const before = value.slice(0, caret);
+    const slash = before.lastIndexOf("/");
+    if (slash === -1) return null;
+    if (slash > 0 && !/\s/.test(before[slash - 1])) return null; // / debe iniciar token
+    const q = before.slice(slash + 1);
+    if (q.includes("\n") || q.includes(" ") || q.includes("@")) return null; // cerró el token
+    return q;
+  }
+
   function grow(el: HTMLTextAreaElement) {
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
@@ -49,16 +85,21 @@ export function Composer({
 
   function recompute(el: HTMLTextAreaElement) {
     grow(el);
-    const q = detectQuery(el.value, el.selectionStart ?? 0);
-    if (q !== null && q.length >= 1) {
-      if (q !== activeQuery) {
-        setActiveQuery(q);
+    const caret = el.selectionStart ?? 0;
+    // archivos (@)
+    const fq = detectQuery(el.value, caret);
+    if (fq !== null && fq.length >= 1) {
+      if (fq !== activeQuery) {
+        setActiveQuery(fq);
         if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onSearch(q), 120);
+        timer.current = setTimeout(() => onSearch(fq), 120);
       }
     } else if (activeQuery !== null) {
       setActiveQuery(null);
     }
+    // comandos (/) — se activa incluso con query vacío (muestra todos)
+    const cq = detectCommand(el.value, caret);
+    if (cq !== commandQuery) setCommandQuery(cq);
   }
 
   function insert(item: string) {
@@ -81,28 +122,38 @@ export function Composer({
     });
   }
 
+  function insertCommand(cmd: CommandItem) {
+    const el = ref.current;
+    if (!el) return;
+    const caret = el.selectionStart ?? 0;
+    const value = el.value;
+    const before = value.slice(0, caret);
+    const after = value.slice(caret);
+    const slash = before.lastIndexOf("/");
+    if (slash === -1) return;
+    const replacement = cmd.label + " ";
+    const next = before.slice(0, slash) + replacement + after;
+    setText(next);
+    setCommandQuery(null);
+    const pos = slash + replacement.length;
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(pos, pos);
+      grow(el);
+    });
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (open) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSel((s) => Math.min(s + 1, suggestions.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSel((s) => Math.max(s - 1, 0));
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        insert(suggestions[sel]);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setActiveQuery(null);
-        return;
-      }
+    if (fileOpen) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, suggestions.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insert(suggestions[sel]); return; }
+      if (e.key === "Escape") { e.preventDefault(); setActiveQuery(null); return; }
+    } else if (commandOpen) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, commandMatches.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertCommand(commandMatches[sel]); return; }
+      if (e.key === "Escape") { e.preventDefault(); setCommandQuery(null); return; }
     } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (text.trim()) {
@@ -114,7 +165,7 @@ export function Composer({
 
   return (
     <div className={"bar" + (bashMode ? " bash-mode" : "")}>
-      {open && (
+      {fileOpen && (
         <div className="file-popup">
           {suggestions.map((f, i) => (
             <div
@@ -130,11 +181,29 @@ export function Composer({
           ))}
         </div>
       )}
+      {commandOpen && (
+        <div className="file-popup cmd-popup">
+          {commandMatches.map((c, i) => (
+            <div
+              key={c.label}
+              className={"file-item cmd-item" + (i === sel ? " sel" : "")}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                insertCommand(c);
+              }}
+            >
+              <span className={"cmd-kind " + c.kind}>{c.kind}</span>
+              <code className="cmd-label">{c.label}</code>
+              {c.description && <span className="cmd-desc">{c.description}</span>}
+            </div>
+          ))}
+        </div>
+      )}
       <textarea
         ref={ref}
         className="input"
         rows={1}
-        placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ = archivo · ! = bash · Enter = enviar)"}
+        placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ archivo · / skill·prompt · ! bash · Enter = enviar)"}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -144,7 +213,7 @@ export function Composer({
         onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
         onKeyDown={onKeyDown}
       />
-      <div className="hint">@ = archivos · ! ejecuta y envía · !! ejecuta sin enviar · Enter envía</div>
+      <div className="hint">@ archivos · / skill·prompt · ! ejecuta y envía · !! sin enviar · Enter envía</div>
     </div>
   );
 }

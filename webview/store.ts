@@ -60,7 +60,9 @@ export function reduce(state: State, msg: InMessage): State {
             }
             return tc;
           });
-          return { ...t, tools };
+          // Tras un tool, el modelo vuelve a razonar sobre el resultado antes
+          // del siguiente paso → el indicador del footer refleja "Pensando…".
+          return { ...t, tools, status: "thinking", executingTool: undefined };
         }),
       };
 
