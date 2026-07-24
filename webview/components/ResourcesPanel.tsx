@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { ResourceSummary } from "../types";
+import { Tooltip } from "./Tooltip";
 
 // Sección colapsable dentro del panel.
 function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
@@ -139,10 +140,12 @@ export function ResourcesPanel({
               ];
               return (
                 <div key={i} className="res-item">
-                  <div className="res-item-name" title={shortPath(e.path)}>
-                    {e.inline ? <span className="tag inline">inline</span> : <span className="tag">ext</span>}
-                    <span className="ext-name">{extName(e.path)}</span>
-                  </div>
+                  <Tooltip label={shortPath(e.path)} side="top">
+                    <div className="res-item-name">
+                      {e.inline ? <span className="tag inline">inline</span> : <span className="tag">ext</span>}
+                      <span className="ext-name">{extName(e.path)}</span>
+                    </div>
+                  </Tooltip>
                   {pills.length > 0 && (
                     <div className="res-item-pills">
                       {pills.map((p, j) => (

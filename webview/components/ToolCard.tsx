@@ -1,5 +1,7 @@
 import type { ToolEntry } from "../types";
 import { Icon } from "./Icon";
+import { Tooltip } from "./Tooltip";
+import { Spinner } from "./Spinner";
 import { useEffect, useState } from "react";
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
@@ -56,14 +58,13 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
       <div
         className={"tool-head" + (hasResult ? " has-result" : "")}
         onClick={() => hasResult && setOpen(!open)}
-        title={hasResult ? (open ? "Contraer resultado" : "Ver resultado") : undefined}
       >
         <span className="tc-icon">{icon}</span>
         <code className="tc-label">{label}</code>
         <span className={"tc-status " + entry.state}>
           {running ? (
             <>
-              <span className="spin" /> {fmtDuration(elapsed)}
+              <Spinner size={13} /> {fmtDuration(elapsed)}
             </>
           ) : entry.state === "ok" ? (
             <>
@@ -76,9 +77,11 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
           )}
         </span>
         {hasResult && (
-          <span className={"tc-chev" + (open ? "" : " closed")}>
-            <Icon name="chevron" size={12} />
-          </span>
+          <Tooltip label={open ? "Contraer resultado" : "Ver resultado"} side="top">
+            <span className={"tc-chev" + (open ? "" : " closed")}>
+              <Icon name="chevron" size={12} />
+            </span>
+          </Tooltip>
         )}
       </div>
       {hasResult && (

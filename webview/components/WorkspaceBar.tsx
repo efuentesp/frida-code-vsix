@@ -1,4 +1,5 @@
 import type { WorkspaceInfo } from "../types";
+import { Tooltip } from "./Tooltip";
 
 // Pinta la carpeta de trabajo y el branch git (con indicador de cambios).
 // Siempre visible en el footer, para saber exactamente dónde opera el agente.
@@ -15,18 +16,24 @@ export function WorkspaceBar({
 }) {
   return (
     <div className="ws-bar">
-      <span className="ws-cwd" title={ws?.cwd}>
-        📁 <code>{ws ? shortCwd(ws.cwd) : "…"}</code>
-      </span>
-      {ws?.branch && (
-        <span className={"ws-branch" + (ws.dirty ? " dirty" : "")} title={ws.dirty ? "Hay cambios sin committer" : "Rama actual"}>
-          ⎇ {ws.branch}
-          {ws.dirty && <span className="ws-dirty"> ✱</span>}
+      <Tooltip label={ws?.cwd ?? "Carpeta de trabajo"} side="top">
+        <span className="ws-cwd">
+          📁 <code>{ws ? shortCwd(ws.cwd) : "…"}</code>
         </span>
+      </Tooltip>
+      {ws?.branch && (
+        <Tooltip label={ws.dirty ? "Hay cambios sin committer" : "Rama actual"} side="top">
+          <span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>
+            ⎇ {ws.branch}
+            {ws.dirty && <span className="ws-dirty"> ✱</span>}
+          </span>
+        </Tooltip>
       )}
-      <button className="ws-refresh" onClick={onRefresh} title="Refrescar carpeta y rama">
-        ↻
-      </button>
+      <Tooltip label="Refrescar carpeta y rama" side="top">
+        <button className="ws-refresh" onClick={onRefresh}>
+          ↻
+        </button>
+      </Tooltip>
     </div>
   );
 }

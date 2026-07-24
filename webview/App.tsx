@@ -12,7 +12,9 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
-import logo from "./assets/frida-logo.png";
+import { Bot, History, Library, Minimize2, RotateCw, ShieldCheck, Square, SquarePen } from "lucide-react";
+import { Tooltip } from "./components/Tooltip";
+import { Spinner } from "./components/Spinner";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -39,8 +41,6 @@ export function App() {
   const [escHint, setEscHint] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
-  const [resDismissed, setResDismissed] = useState(false);
-  const resSigRef = useRef("");
   const lastEscRef = useRef(0);
   const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -90,22 +90,6 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [state.busy]);
 
-  // Vuelve a mostrar la barra de recursos cuando cambia su contenido
-  // (inicio, nueva sesión, abrir sesión, reload). Respeta el descarte del
-  // usuario si los recursos no cambiaron (p. ej. un list_resources bajo demanda).
-  useEffect(() => {
-    const r = state.resources;
-    if (!r) return;
-    const sig =
-      `${r.extensions.length}|${r.skills.length}|${r.prompts.length}|` +
-      `${r.themes.length}|${r.contextFiles.length}|${r.errors.length}|` +
-      `${r.extensions[0]?.path ?? ""}`;
-    if (sig !== resSigRef.current) {
-      resSigRef.current = sig;
-      setResDismissed(false);
-    }
-  }, [state.resources]);
-
   const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
   // Lista de comandos para el autocompletado de "/": skills + prompts cargados.
@@ -137,69 +121,75 @@ export function App() {
     <div className="app">
       <header className="toolbar">
         <span className="brand">
-          <img src={logo} className="brand-logo" alt="" /> Frida Code
+          <span className="avatar ai sm"><Bot size={13} /></span> Frida Code
         </span>
         <span className="model-info">
           <span className="model-name">{state.model ?? "…"}</span>
-          <select
-            className="thinking-select"
-            value={state.thinking ?? "medium"}
-            onChange={(e) => post({ type: "set_thinking", level: e.target.value })}
-            title="Nivel de esfuerzo / thinking"
-          >
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-          </select>
+          <Tooltip label="Nivel de esfuerzo / thinking" side="bottom">
+            <select
+              className="thinking-select"
+              value={state.thinking ?? "medium"}
+              onChange={(e) => post({ type: "set_thinking", level: e.target.value })}
+            >
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </Tooltip>
         </span>
         <span className="spacer" />
-        <button
-          onClick={() => { post({ type: "list_resources" }); setResourcesOpen(true); }}
-          title="Recursos cargados (extensiones, skills, prompts, themes, contexto)"
-        >
-          Recursos
-        </button>
-        <button onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
-          Sesiones
-        </button>
-        <button onClick={() => post({ type: "new_session" })} disabled={state.busy}>
-          Nueva sesión
-        </button>
-        <button onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
-          Compactar
-        </button>
-        <button
-          onClick={() => post({ type: "reload" })}
-          disabled={state.busy}
-          title="Recargar extensiones, skills, prompts, themes y archivos de contexto"
-        >
-          ↻ Recargar
-        </button>
-        <button
-          className={"toggle " + state.mode}
-          title="Modo de aprobación: Manual → Auto-edit → Auto (clic para ciclar)"
-          onClick={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
-        >
-          {labelMode(state.mode)}
-        </button>
-        {state.busy && (
-          <button className="sec" onClick={() => post({ type: "abort" })}>
-            ■ Detener
-          </button>
-        )}
+        <span className="tb-group">
+          <Tooltip label="Recursos cargados (extensiones, skills, prompts, themes, contexto)" side="bottom">
+            <button className="ico" onClick={() => { post({ type: "list_resources" }); setResourcesOpen(true); }}>
+              <Library size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Sesiones anteriores" side="bottom">
+            <button className="ico" onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
+              <History size={15} />
+            </button>
+          </Tooltip>
+        </span>
+        <span className="tb-sep" />
+        <span className="tb-group">
+          <Tooltip label="Nueva sesión" side="bottom">
+            <button className="ico" onClick={() => post({ type: "new_session" })} disabled={state.busy}>
+              <SquarePen size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Compactar contexto" side="bottom">
+            <button className="ico" onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
+              <Minimize2 size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Recargar extensiones y recursos" side="bottom">
+            <button className="ico" onClick={() => post({ type: "reload" })} disabled={state.busy}>
+              <RotateCw size={15} />
+            </button>
+          </Tooltip>
+        </span>
+        <span className="tb-sep" />
+        <span className="tb-group">
+          <Tooltip label="Modo de aprobación: Manual → Auto-edit → Auto (clic para ciclar)" side="bottom">
+            <button className={"toggle " + state.mode} onClick={() => post({ type: "set_mode", mode: nextMode(state.mode) })}>
+              <ShieldCheck size={14} /> {labelMode(state.mode)}
+            </button>
+          </Tooltip>
+          {state.busy && (
+            <Tooltip label="Detener la respuesta en curso" side="bottom">
+              <button className="sec" onClick={() => post({ type: "abort" })}>
+                <Square size={12} /> Detener
+              </button>
+            </Tooltip>
+          )}
+        </span>
       </header>
 
       {state.mode === "auto-edit" && <div className="info-bar warn">⚠ Edición automática: crear/editar archivos sin confirmación (bash sí pide).</div>}
       {state.mode === "auto" && <div className="info-bar warn">⚠ Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
-      {state.resources && !resDismissed && (
-        <ResourcesBar
-          res={state.resources}
-          onDetails={() => setResourcesOpen(true)}
-          onDismiss={() => setResDismissed(true)}
-        />
-      )}
+      {state.resources && <ResourcesBar res={state.resources} />}
 
       <div
         className="log"
@@ -242,7 +232,7 @@ export function App() {
       </div>
       <div className="footer">
         {procLabel && (
-          <div className="proc-bar"><span className="spin" /> {procLabel}</div>
+          <div className="proc-bar"><Spinner size={14} /> {procLabel}</div>
         )}
         <Composer
           onSubmit={(text, mode) => post({ type: "submit", text, mode })}

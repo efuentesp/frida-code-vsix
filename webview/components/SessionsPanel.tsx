@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { SessionItem } from "../types";
+import { Tooltip } from "./Tooltip";
 
 interface Sessions {
   items: SessionItem[];
@@ -62,24 +63,26 @@ export function SessionsPanel({
                   </div>
                 ) : (
                   <>
-                    <div
-                      className="session-main"
-                      onClick={() => onSwitch(s.path)}
-                      title="Abrir esta sesión"
-                    >
-                      <div className="session-title">
-                        {isCurrent && <span className="dot">●</span>}
-                        {title}
+                    <Tooltip label="Abrir esta sesión" side="top">
+                      <div
+                        className="session-main"
+                        onClick={() => onSwitch(s.path)}
+                      >
+                        <div className="session-title">
+                          {isCurrent && <span className="dot">●</span>}
+                          {title}
+                        </div>
+                        <div className="session-meta">
+                          {s.messageCount} msgs · {fmtDate(s.modified)}
+                        </div>
                       </div>
-                      <div className="session-meta">
-                        {s.messageCount} msgs · {fmtDate(s.modified)}
-                      </div>
-                    </div>
-                    <button
-                      className="sec icon-btn"
-                      title="Renombrar"
-                      onClick={() => { setEditing(s.path); setDraft(s.name || ""); }}
-                    >✎</button>
+                    </Tooltip>
+                    <Tooltip label="Renombrar" side="top">
+                      <button
+                        className="sec icon-btn"
+                        onClick={() => { setEditing(s.path); setDraft(s.name || ""); }}
+                      >✎</button>
+                    </Tooltip>
                   </>
                 )}
               </div>

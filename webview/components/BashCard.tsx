@@ -1,5 +1,6 @@
 import type { BashRun } from "../types";
 import { Icon } from "./Icon";
+import { Spinner } from "./Spinner";
 import { useState } from "react";
 
 // Tarjeta para un atajo de bash del usuario (!command / !!command).
@@ -22,7 +23,7 @@ export function BashCard({ run }: { run: BashRun }) {
         <span className="st">
           {running ? (
             <>
-              <span className="spin" /> ejecutando
+              <Spinner size={13} /> ejecutando
             </>
           ) : run.status === "ok" ? (
             <>
