@@ -76,13 +76,17 @@ export interface QuestionRequest {
 }
 
 export interface Usage {
-  inputTokens: number;   // tokens del último request (= llenado actual del contexto)
-  outputTokens: number;
-  cacheRead: number;
-  cacheWrite: number;
-  sessionTokens: number;  // acumulado de la sesión (input+output)
-  contextWindow: number;  // tamaño de la ventana del modelo
-  contextPercent: number; // inputTokens / contextWindow * 100
+  // Tokens acumulados de la sesión (estilo pi: ↑/↓/R/W/CH)
+  inputTotal: number;   // ↑ input acumulado
+  outputTotal: number;  // ↓ output acumulado
+  cacheRead: number;    // R cache read acumulado
+  cacheWrite: number;   // W cache write acumulado
+  cacheHitRate?: number; // CH% del último request
+  cost: number;         // $ (0 si no aplica)
+  // Contexto actual (barra)
+  contextTokens: number;   // tokens que ocupan el contexto vivo
+  contextWindow: number;
+  contextPercent: number;
 }
 
 export interface SessionItem {
@@ -113,6 +117,7 @@ export interface WorkspaceInfo {
   cwd: string;
   branch?: string;
   dirty?: boolean;
+  sessionName?: string;
 }
 
 export type ApprovalMode = "manual" | "auto-edit" | "auto";

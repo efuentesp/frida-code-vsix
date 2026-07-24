@@ -100,6 +100,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       wireSession(frida.session);
       sendModelInfo();
       postResources();
+      void postWorkspace();
     }
     return frida;
   }
@@ -109,34 +110,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function postUsage(session: any): void {
     try {
       const msgs: any[] = session?.agent?.state?.messages ?? [];
-      let sessionTokens = 0, lastInput = 0, lastOutput = 0, cacheRead = 0, cacheWrite = 0;
+      let inputTotal = 0, outputTotal = 0, cacheRead = 0, cacheWrite = 0, cost = 0;
+      let lastInput = 0, lastCacheRead = 0, lastCacheWrite = 0;
       for (const m of msgs) {
         if (m?.role === "assistant" && m?.usage) {
           const u = m.usage;
-          sessionTokens += (u.input ?? 0) + (u.output ?? 0);
-          lastInput = u.input ?? 0; lastOutput = u.output ?? 0;
-          cacheRead += u.cacheRead ?? 0; cacheWrite += u.cacheWrite ?? 0;
+          inputTotal += u.input ?? 0;
+          outputTotal += u.output ?? 0;
+          cacheRead += u.cacheRead ?? 0;
+          cacheWrite += u.cacheWrite ?? 0;
+          lastInput = u.input ?? 0; lastCacheRead = u.cacheRead ?? 0; lastCacheWrite = u.cacheWrite ?? 0;
+          if (typeof u.cost === "number") cost += u.cost;
         }
       }
-      // Contexto ACTUAL: pi estima los tokens del contexto vivo con
-      // estimateContextTokens (getContextUsage). Es más confiable que el
-      // `input` del último usage, que según el gateway puede venir vacío y
-      // dejar el % en 0.
+      // Cache hit rate del último request (como la TUI de pi).
+      const promptTokens = lastInput + lastCacheRead + lastCacheWrite;
+      const cacheHitRate =
+        promptTokens > 0 && (lastCacheRead > 0 || lastCacheWrite > 0)
+          ? (lastCacheRead / promptTokens) * 100
+          : undefined;
+      // Contexto ACTUAL: pi estima los tokens del contexto vivo (getContextUsage).
       const ctx = session?.getContextUsage?.();
-      const contextTokens = ctx?.tokens ?? null;
+      const contextTokens = ctx?.tokens ?? 0;
       const contextWindow = ctx?.contextWindow ?? session?.model?.contextWindow ?? 0;
       const contextPercent =
-        ctx?.percent ??
-        (contextTokens != null && contextWindow ? Math.min(100, (contextTokens / contextWindow) * 100) : 0);
+        ctx?.percent ?? (contextWindow ? Math.min(100, (contextTokens / contextWindow) * 100) : 0);
       post({
         type: "usage",
-        inputTokens: contextTokens ?? lastInput, // tokens que ocupan el contexto
-        outputTokens: lastOutput,
-        cacheRead,
-        cacheWrite,
-        sessionTokens,
-        contextWindow,
-        contextPercent,
+        inputTotal, outputTotal, cacheRead, cacheWrite, cacheHitRate, cost,
+        contextTokens, contextWindow, contextPercent,
       });
     } catch {
       /* noop */
@@ -195,8 +197,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Info del workspace: carpeta de trabajo + branch git (y si hay cambios
   // sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
   // pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
-  async function collectWorkspace(): Promise<{ cwd: string; branch?: string; dirty?: boolean }> {
+  async function collectWorkspace(): Promise<{ cwd: string; branch?: string; dirty?: boolean; sessionName?: string }> {
     const cwd = workspaceCwd();
+    const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
     try {
       const { stdout: branchOut } = await execFileP("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, timeout: 3000 });
       const branch = branchOut.trim();
@@ -205,9 +208,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const { stdout: status } = await execFileP("git", ["status", "--porcelain"], { cwd, timeout: 3000 });
         dirty = status.trim().length > 0;
       } catch { /* ignore */ }
-      return { cwd, branch, dirty };
+      return { cwd, branch, dirty, sessionName };
     } catch {
-      return { cwd }; // no es repo o git no disponible
+      return { cwd, sessionName }; // no es repo o git no disponible
     }
   }
 
@@ -600,6 +603,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       postHistory();
       sendModelInfo();
       postResources();
+      void postWorkspace();
     } catch (e: any) {
       post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
     }
@@ -617,6 +621,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       post({ type: "info", text: "Sesión renombrada: " + clean });
       await sendSessions();
+      void postWorkspace();
     } catch (e: any) {
       post({ type: "info", text: "Error al renombrar: " + String(e?.message ?? e) });
     }

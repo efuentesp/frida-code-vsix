@@ -21,6 +21,9 @@ export function WorkspaceBar({
           📁 <code>{ws ? shortCwd(ws.cwd) : "…"}</code>
         </span>
       </Tooltip>
+      {ws?.sessionName && (
+        <span className="ws-session" title={ws.sessionName}>• {ws.sessionName}</span>
+      )}
       {ws?.branch && (
         <Tooltip label={ws.dirty ? "Hay cambios sin committer" : "Rama actual"} side="top">
           <span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>

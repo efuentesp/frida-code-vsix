@@ -41,8 +41,8 @@ export function Welcome() {
       <div className="welcome-logo">
         <img src={logo} className="welcome-logo-img" alt="Frida Code" />
       </div>
-      <h1>Frida Code</h1>
-      <p className="welcome-sub">Tu asistente de código sobre DevEngine.</p>
+      <h1>Softtek</h1>
+      <p className="welcome-sub">Tu asistente de código sobre Frida DevEngine.</p>
       <ul className="tips">{TIPS}</ul>
     </div>
   );

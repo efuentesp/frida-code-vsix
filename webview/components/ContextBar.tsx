@@ -9,6 +9,7 @@ function fmt(n: number): string {
 export function ContextBar({ usage }: { usage: Usage }) {
   const pct = Math.round(usage.contextPercent);
   const level = pct >= 90 ? "high" : pct >= 70 ? "mid" : "low";
+  const hasCache = usage.cacheRead > 0 || usage.cacheWrite > 0;
   return (
     <div className="status-bar">
       <span className="ctx-label">Contexto</span>
@@ -17,10 +18,17 @@ export function ContextBar({ usage }: { usage: Usage }) {
       </span>
       <span className="ctx-pct">{pct}%</span>
       <span className="ctx-tokens">
-        {fmt(usage.inputTokens)} / {fmt(usage.contextWindow)}
+        {fmt(usage.contextTokens)} / {fmt(usage.contextWindow)}
       </span>
       <span className="ctx-sep">·</span>
-      <span className="ctx-session">Sesión {fmt(usage.sessionTokens)} tok</span>
+      <span className="ctx-stats">
+        <span>↑{fmt(usage.inputTotal)}</span>
+        <span>↓{fmt(usage.outputTotal)}</span>
+        {hasCache && <span>R{fmt(usage.cacheRead)}</span>}
+        {hasCache && <span>W{fmt(usage.cacheWrite)}</span>}
+        {usage.cacheHitRate !== undefined && <span>CH{usage.cacheHitRate.toFixed(0)}%</span>}
+        {usage.cost > 0 && <span>${usage.cost.toFixed(3)}</span>}
+      </span>
     </div>
   );
 }
