@@ -12,7 +12,7 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
-import { Bot, History, Library, Minimize2, RotateCw, ShieldCheck, Square, SquarePen } from "lucide-react";
+import { Bot, History, Library, Minimize2, RotateCw, ShieldCheck, SquarePen } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
 
@@ -175,13 +175,6 @@ export function App() {
               <ShieldCheck size={14} /> {labelMode(state.mode)}
             </button>
           </Tooltip>
-          {state.busy && (
-            <Tooltip label="Detener la respuesta en curso" side="bottom">
-              <button className="sec" onClick={() => post({ type: "abort" })}>
-                <Square size={12} /> Detener
-              </button>
-            </Tooltip>
-          )}
         </span>
       </header>
 
@@ -239,6 +232,8 @@ export function App() {
           onSearch={(q) => post({ type: "search_files", query: q })}
           files={state.files}
           commands={commands}
+          busy={state.busy}
+          onAbort={() => post({ type: "abort" })}
         />
         <WorkspaceBar ws={state.workspace} onRefresh={() => post({ type: "workspace" })} />
         {state.usage && <ContextBar usage={state.usage} />}
@@ -249,6 +244,7 @@ export function App() {
           onClose={() => setSessionsOpen(false)}
           onSwitch={(p) => { post({ type: "switch_session", path: p }); setSessionsOpen(false); }}
           onRename={(p, n) => post({ type: "rename_session", path: p, name: n })}
+          onDelete={(p) => post({ type: "delete_session", path: p })}
         />
       )}
       {resourcesOpen && state.resources && (

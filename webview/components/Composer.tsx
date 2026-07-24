@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { Send, Square } from "lucide-react";
+import { Tooltip } from "./Tooltip";
 
 interface Files {
   query: string;
@@ -18,11 +20,15 @@ export function Composer({
   onSearch,
   files,
   commands,
+  busy,
+  onAbort,
 }: {
   onSubmit: (text: string, mode: "steer" | "followUp") => void;
   onSearch: (query: string) => void;
   files?: Files;
   commands?: CommandItem[];
+  busy?: boolean;
+  onAbort?: () => void;
 }) {
   const [text, setText] = useState("");
   const [activeQuery, setActiveQuery] = useState<string | null>(null); // "@"
@@ -143,6 +149,12 @@ export function Composer({
     });
   }
 
+  function sendNow() {
+    if (!text.trim()) return;
+    onSubmit(text.trim(), "steer");
+    setText("");
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (fileOpen) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, suggestions.length - 1)); return; }
@@ -199,20 +211,35 @@ export function Composer({
           ))}
         </div>
       )}
-      <textarea
-        ref={ref}
-        className="input"
-        rows={1}
-        placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ archivo · / skill·prompt · ! bash · Enter = enviar)"}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          recompute(e.target);
-        }}
-        onKeyUp={(e) => recompute(e.target as HTMLTextAreaElement)}
-        onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
-        onKeyDown={onKeyDown}
-      />
+      <div className="input-row">
+        <textarea
+          ref={ref}
+          className="input"
+          rows={1}
+          placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ archivo · / skill·prompt · ! bash · Enter = enviar)"}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            recompute(e.target);
+          }}
+          onKeyUp={(e) => recompute(e.target as HTMLTextAreaElement)}
+          onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
+          onKeyDown={onKeyDown}
+        />
+        {busy ? (
+          <Tooltip label="Detener" side="top">
+            <button className="send-btn stop" onClick={() => onAbort?.()}>
+              <Square size={15} />
+            </button>
+          </Tooltip>
+        ) : (
+          <Tooltip label="Enviar (Enter)" side="top">
+            <button className="send-btn" onClick={sendNow} disabled={!text.trim()}>
+              <Send size={16} />
+            </button>
+          </Tooltip>
+        )}
+      </div>
       <div className="hint">@ archivos · / skill·prompt · ! bash · Enter envía · Alt+Enter = followUp</div>
     </div>
   );

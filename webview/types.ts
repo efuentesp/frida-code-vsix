@@ -182,5 +182,6 @@ export type OutMessage =
   | { type: "workspace" }
   | { type: "switch_session"; path: string }
   | { type: "rename_session"; path: string; name: string }
+  | { type: "delete_session"; path: string }
   | { type: "set_mode"; mode: ApprovalMode }
   | { type: "set_thinking"; level: string };

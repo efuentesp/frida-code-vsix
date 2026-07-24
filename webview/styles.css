@@ -118,6 +118,11 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 /* Composer */
 .bar { padding: 8px 12px 12px; }
 .input { width: 100%; resize: none; min-height: 28px; max-height: 140px; padding: 8px 10px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 6px; font-family: inherit; font-size: 13px; outline: none; line-height: 1.4; }
+.input-row { display: flex; align-items: flex-end; gap: 8px; }
+.input-row .input { flex: 1; min-width: 0; }
+.send-btn { flex: none; padding: 7px; line-height: 0; display: inline-flex; align-items: center; justify-content: center; }
+.send-btn:disabled { opacity: .4; cursor: default; }
+.send-btn.stop { background: var(--vscode-errorForeground, #f85149); color: #fff; }
 .input:focus { border-color: var(--vscode-focusBorder); }
 .hint { font-size: 11px; opacity: .6; margin-top: 4px; text-align: right; }
 
@@ -152,11 +157,18 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .session-row:hover { background: var(--vscode-list-hoverBackground); }
 .session-row.current { background: var(--vscode-list-inactiveSelectionBackground); }
 .session-main { flex: 1; min-width: 0; cursor: pointer; }
+.session-row .tip-wrap { flex: none; }
 .session-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-title .dot { color: var(--vscode-textLink-foreground); margin-right: 4px; }
 .session-meta { font-size: 11px; opacity: .6; margin-top: 2px; }
 .session-rename { display: flex; gap: 4px; width: 100%; }
 .rename-input { flex: 1; padding: 4px 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-focusBorder); border-radius: 4px; font-family: inherit; font-size: 12px; outline: none; }
+.session-confirm { display: flex; align-items: center; gap: 6px; width: 100%; }
+.session-confirm-msg { flex: 1; font-size: 12px; opacity: .85; }
+button.danger { background: var(--vscode-errorForeground, #f85149); color: #fff; }
+button.danger:hover { filter: brightness(.92); }
+.icon-btn.danger:hover { color: var(--vscode-errorForeground, #f85149); }
+.icon-btn:disabled { opacity: .4; cursor: default; }
 .icon-btn { padding: 4px 8px !important; }
 
 /* Aprobaciones: banner llamativo cuando hay pendientes */

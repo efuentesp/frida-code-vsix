@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SessionItem } from "../types";
 import { Tooltip } from "./Tooltip";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface Sessions {
   items: SessionItem[];
@@ -21,13 +22,16 @@ export function SessionsPanel({
   onClose,
   onSwitch,
   onRename,
+  onDelete,
 }: {
   sessions: Sessions;
   onClose: () => void;
   onSwitch: (path: string) => void;
   onRename: (path: string, name: string) => void;
+  onDelete: (path: string) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   const items = sessions.items ?? [];
@@ -61,27 +65,43 @@ export function SessionsPanel({
                     <button onClick={() => { onRename(s.path, draft); setEditing(null); }}>✓</button>
                     <button className="sec" onClick={() => setEditing(null)}>✗</button>
                   </div>
+                ) : confirming === s.path ? (
+                  <div className="session-confirm">
+                    <span className="session-confirm-msg">¿Eliminar esta sesión?</span>
+                    <button className="sec" onClick={() => setConfirming(null)}>Cancelar</button>
+                    <button className="danger" onClick={() => { onDelete(s.path); setConfirming(null); }}>Eliminar</button>
+                  </div>
                 ) : (
                   <>
-                    <Tooltip label="Abrir esta sesión" side="top">
-                      <div
-                        className="session-main"
-                        onClick={() => onSwitch(s.path)}
-                      >
-                        <div className="session-title">
-                          {isCurrent && <span className="dot">●</span>}
-                          {title}
-                        </div>
-                        <div className="session-meta">
-                          {s.messageCount} msgs · {fmtDate(s.modified)}
-                        </div>
+                    <div
+                      className="session-main"
+                      onClick={() => onSwitch(s.path)}
+                      title="Abrir esta sesión"
+                    >
+                      <div className="session-title">
+                        {isCurrent && <span className="dot">●</span>}
+                        {title}
                       </div>
-                    </Tooltip>
+                      <div className="session-meta">
+                        {s.messageCount} msgs · {fmtDate(s.modified)}
+                      </div>
+                    </div>
                     <Tooltip label="Renombrar" side="top">
                       <button
                         className="sec icon-btn"
                         onClick={() => { setEditing(s.path); setDraft(s.name || ""); }}
-                      >✎</button>
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label={isCurrent ? "No puedes eliminar la sesión activa" : "Eliminar"} side="top">
+                      <button
+                        className="sec icon-btn danger"
+                        disabled={isCurrent}
+                        onClick={() => setConfirming(s.path)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </Tooltip>
                   </>
                 )}

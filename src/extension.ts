@@ -364,6 +364,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "rename_session":
         await renameSession(String(msg.path ?? ""), String(msg.name ?? ""));
         break;
+      case "delete_session":
+        await deleteSession(String(msg.path ?? ""));
+        break;
       case "set_mode":
         approvalMode = msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
         post({ type: "mode", mode: approvalMode });
@@ -616,6 +619,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await sendSessions();
     } catch (e: any) {
       post({ type: "info", text: "Error al renombrar: " + String(e?.message ?? e) });
+    }
+  }
+
+  // Elimina una sesión borrando su archivo JSONL. SessionManager no expone
+  // delete, pero no hace falta: listAll lee los archivos del disco cada vez.
+  // La sesión activa se bloquea para no romper el agente en curso.
+  async function deleteSession(pathStr: string): Promise<void> {
+    if (!pathStr) return;
+    if (frida && frida.session?.sessionFile === pathStr) {
+      post({ type: "info", text: "No puedes eliminar la sesión activa." });
+      return;
+    }
+    try {
+      await fs.unlink(pathStr);
+      post({ type: "info", text: "Sesión eliminada." });
+      await sendSessions();
+    } catch (e: any) {
+      post({ type: "info", text: "Error al eliminar: " + String(e?.message ?? e) });
     }
   }
 
