@@ -12,6 +12,7 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
+import logo from "./assets/frida-logo.png";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -136,7 +137,7 @@ export function App() {
     <div className="app">
       <header className="toolbar">
         <span className="brand">
-          <span className="avatar ai sm">✦</span> Frida Code
+          <img src={logo} className="brand-logo" alt="" /> Frida Code
         </span>
         <span className="model-info">
           <span className="model-name">{state.model ?? "…"}</span>

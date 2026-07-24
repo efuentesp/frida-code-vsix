@@ -179,6 +179,8 @@ button.sec:hover { background: var(--vscode-button-secondaryHoverBackground); }
 /* Welcome / estado vacío */
 .welcome { max-width: 480px; margin: 8vh auto 0; text-align: center; padding: 0 16px; }
 .welcome-logo { display: flex; justify-content: center; margin-bottom: 14px; }
+.welcome-logo-img { width: 112px; height: 112px; object-fit: contain; }
+.brand-logo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 .avatar.lg { width: 48px; height: 48px; }
 .welcome h1 { margin: 0 0 4px; font-size: 1.5em; }
 .welcome-sub { opacity: .7; margin: 0 0 18px; }

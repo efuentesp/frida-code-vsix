@@ -6,6 +6,8 @@ export function buildWebviewHtml(opts: {
   indexHtml: string;
   asWebviewUri: (assetFile: string) => string;
   cspSource: string;
+  faviconUri?: string;
+  faviconType?: string;
 }): string {
   const nonce = getNonce();
   const csp = [
@@ -18,9 +20,12 @@ export function buildWebviewHtml(opts: {
 
   let html = opts.indexHtml;
 
-  // Inyectar CSP en <head>.
+  // Inyectar CSP + favicon en <head>.
+  const faviconTag = opts.faviconUri
+    ? `<link rel="icon" type="${opts.faviconType ?? "image/png"}" href="${opts.faviconUri}" />`
+    : "";
   if (/<head>/i.test(html)) {
-    html = html.replace(/<head>/i, `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}" />`);
+    html = html.replace(/<head>/i, `<head>\n<meta http-equiv="Content-Security-Policy" content="${csp}" />\n${faviconTag}`);
   }
 
   // Reescribir URIs de assets: src="./assets/x" o href="./assets/x" → asWebviewUri(x).

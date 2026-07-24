@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { QuestionAnswer, QuestionRequest } from "../types";
-import { Icon } from "./Icon";
+import { Bot } from "lucide-react";
 
 // Estado de respuesta por pregunta. `custom` (texto libre) reemplaza cualquier
 // selección cuando no está vacío; `selected` aplica solo en multi-select.
@@ -59,7 +59,7 @@ export function QuestionCard({
     <div className="question">
       <div className="ttl">
         <span className="ic">
-          <Icon name="spark" />
+          <Bot size={14} />
         </span>
         <span>
           Frida te pregunta

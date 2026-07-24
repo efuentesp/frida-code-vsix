@@ -1,5 +1,5 @@
 import type { Turn } from "../types";
-import { Icon } from "./Icon";
+import { Bot, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./ToolCard";
 import { BashCard } from "./BashCard";
@@ -10,7 +10,7 @@ export function TurnView({ turn }: { turn: Turn }) {
     <div className="turn">
       <div className="row">
         <span className="avatar user">
-          <Icon name="user" />
+          <UserRound size={15} />
         </span>
         <div className="body">
           <div className="who">Tú</div>
@@ -21,7 +21,7 @@ export function TurnView({ turn }: { turn: Turn }) {
       {hasAssistant && (
         <div className="row">
           <span className="avatar ai">
-            <Icon name="spark" />
+            <Bot size={15} />
           </span>
           <div className="body">
             <div className="who">Frida</div>

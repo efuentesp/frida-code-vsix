@@ -282,7 +282,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     panel = vscode.window.createWebviewPanel("frida", "Frida Code", vscode.ViewColumn.Two, {
       enableScripts: true,
       retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist-webview")],
+      localResourceRoots: [
+        vscode.Uri.joinPath(context.extensionUri, "dist-webview"),
+        vscode.Uri.joinPath(context.extensionUri, "media"),
+      ],
     });
     panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
     panel.onDidDispose(() => {

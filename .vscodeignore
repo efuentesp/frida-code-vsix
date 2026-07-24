@@ -17,3 +17,5 @@ node_modules/**/test/**
 node_modules/**/tests/**
 node_modules/**/docs/**
 node_modules/**/examples/**
+# lucide-react ya se bundlea (tree-shaken) en dist-webview/; no hace falta su source en el .vsix
+node_modules/lucide-react/**

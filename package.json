@@ -6,18 +6,44 @@
   "publisher": "softtek",
   "license": "UNLICENSED",
   "private": true,
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Other"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
   "main": "./dist/extension.js",
+  "icon": "media/frida-logo.png",
   "contributes": {
     "commands": [
-      { "command": "frida.openPanel", "title": "Frida: Abrir panel" },
-      { "command": "frida.setKey", "title": "Frida: Actualizar API key (DevEngine)" },
-      { "command": "frida.compact", "title": "Frida: Compactar contexto" },
-      { "command": "frida.reload", "title": "Frida: Recargar extensiones y recursos" },
-      { "command": "frida.abort", "title": "Frida: Detener respuesta" },
-      { "command": "frida.newSession", "title": "Frida: Nueva sesión" },
-      { "command": "frida.approvalMode", "title": "Frida: Cambiar modo de aprobación" }
+      {
+        "command": "frida.openPanel",
+        "title": "Frida: Abrir panel"
+      },
+      {
+        "command": "frida.setKey",
+        "title": "Frida: Actualizar API key (DevEngine)"
+      },
+      {
+        "command": "frida.compact",
+        "title": "Frida: Compactar contexto"
+      },
+      {
+        "command": "frida.reload",
+        "title": "Frida: Recargar extensiones y recursos"
+      },
+      {
+        "command": "frida.abort",
+        "title": "Frida: Detener respuesta"
+      },
+      {
+        "command": "frida.newSession",
+        "title": "Frida: Nueva sesión"
+      },
+      {
+        "command": "frida.approvalMode",
+        "title": "Frida: Cambiar modo de aprobación"
+      }
     ]
   },
   "scripts": {
@@ -40,6 +66,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
+    "lucide-react": "^1.26.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",

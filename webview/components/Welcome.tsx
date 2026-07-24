@@ -1,4 +1,4 @@
-import { Icon } from "./Icon";
+import logo from "../assets/frida-logo.png";
 
 // Los tips se renderizan como JSX (no markdown) para resaltar atajos con <code>.
 const TIPS: React.ReactNode[] = [
@@ -39,9 +39,7 @@ export function Welcome() {
   return (
     <div className="welcome">
       <div className="welcome-logo">
-        <span className="avatar ai lg">
-          <Icon name="spark" size={26} />
-        </span>
+        <img src={logo} className="welcome-logo-img" alt="Frida Code" />
       </div>
       <h1>Frida Code</h1>
       <p className="welcome-sub">Tu asistente de código sobre DevEngine.</p>

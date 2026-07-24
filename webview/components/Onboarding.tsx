@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Icon } from "./Icon";
+import { Bot } from "lucide-react";
 
 export function Onboarding({ onSubmit }: { onSubmit: (key: string) => void }) {
   const [key, setKey] = useState("");
@@ -7,7 +7,7 @@ export function Onboarding({ onSubmit }: { onSubmit: (key: string) => void }) {
     <div className="overlay">
       <h2>
         <span className="avatar ai">
-          <Icon name="spark" />
+          <Bot size={15} />
         </span>{" "}
         Frida Code
       </h2>
