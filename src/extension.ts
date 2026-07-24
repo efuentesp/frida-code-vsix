@@ -7,7 +7,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
-import { SOFTTEK_MODEL_DISPLAY } from "./providers/softtek-provider";
+import { SOFTTEK_MODEL_DISPLAY, SOFTTEK_PROVIDER_DISPLAY } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
 
 const execFileP = promisify(execFile);
@@ -101,6 +101,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       sendModelInfo();
       postResources();
       void postWorkspace();
+      postUsage(frida.session);
     }
     return frida;
   }
@@ -146,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   function sendModelInfo(): void {
-    post({ type: "model_info", model: SOFTTEK_MODEL_DISPLAY, thinking: frida?.session?.thinkingLevel ?? "medium" });
+    post({ type: "model_info", provider: SOFTTEK_PROVIDER_DISPLAY, model: SOFTTEK_MODEL_DISPLAY, thinking: frida?.session?.thinkingLevel ?? "medium" });
   }
 
   // Recolecta los recursos cargados por el resourceLoader de pi (extensiones,
@@ -273,6 +274,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         case "tool_execution_end":
           post({ type: "tool_end", tool: event.toolName, isError: !!event.isError, result: summarizeResult(event.result) });
           break;
+        case "compaction_start":
+          post({ type: "compact_start", reason: event.reason });
+          break;
+        case "compaction_end":
+          post({
+            type: "compact_end",
+            reason: event.reason,
+            aborted: !!event.aborted,
+            tokensBefore: event.result?.tokensBefore,
+            summary: event.result?.summary,
+            errorMessage: event.errorMessage,
+          });
+          // La compactación reescribió los mensajes y el contexto.
+          postHistory();
+          postUsage(session);
+          void postWorkspace();
+          break;
+        case "session_info_changed":
+          // El nombre de sesión cambió (p. ej. auto-título) → refrescar la barra.
+          void postWorkspace();
+          break;
       }
     });
   }
@@ -336,6 +358,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         break;
       case "compact":
         await compactContext();
+        break;
+      case "cancel_compaction":
+        await cancelCompaction();
         break;
       case "abort":
         await abortRun();
@@ -484,11 +509,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   async function compactContext(): Promise<void> {
     try {
       const { session } = await ensureSession();
-      post({ type: "info", text: "Compactando contexto…" });
+      // El feedback (estado + resumen + tokens) lo dan los eventos
+      // compaction_start / compaction_end del SDK, tanto para la compactación
+      // manual como para la automática (threshold / overflow).
       await session.compact();
-      post({ type: "info", text: "Contexto compactado." });
     } catch (e: any) {
       post({ type: "info", text: "Error al compactar: " + String(e?.message ?? e) });
+    }
+  }
+
+  async function cancelCompaction(): Promise<void> {
+    try {
+      const { session } = await ensureSession();
+      session.abortCompaction?.();
+    } catch {
+      /* noop */
     }
   }
 
@@ -603,6 +638,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       postHistory();
       sendModelInfo();
       postResources();
+      postUsage(frida.session);
       void postWorkspace();
     } catch (e: any) {
       post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });

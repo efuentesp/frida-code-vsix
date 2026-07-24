@@ -22,6 +22,17 @@ export interface BashRun {
   fullOutputPath?: string;
 }
 
+export type CompactionReason = "manual" | "threshold" | "overflow";
+
+// Resumen de una compactación de contexto (evento compaction_end del SDK).
+export interface CompactionEntry {
+  id: number;
+  afterTurnId: number | null; // turn tras el cual se inserta (cronología)
+  tokensBefore: number;
+  summary: string;
+  reason: CompactionReason;
+}
+
 export type TurnStatus = "thinking" | "executing" | null;
 
 // Bloque ordenado del contenido de un turno del asistente. Preserva la cronología
@@ -128,6 +139,7 @@ export interface State {
   mode: ApprovalMode;
   info?: string;
   model?: string;
+  provider?: string;
   thinking?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
@@ -138,6 +150,9 @@ export interface State {
   resources?: ResourceSummary;
   workspace?: WorkspaceInfo;
   queued: string[];
+  isCompacting: boolean;
+  compactReason?: CompactionReason;
+  compactions: CompactionEntry[];
   nextId: number;
 }
 
@@ -161,13 +176,15 @@ export type InMessage =
   | { type: "info"; text: string }
   | { type: "cleared" }
   | ({ type: "usage" } & Usage)
+  | { type: "compact_start"; reason: CompactionReason }
+  | { type: "compact_end"; reason: CompactionReason; aborted: boolean; tokensBefore?: number; summary?: string; errorMessage?: string }
   | { type: "files"; query: string; items: string[] }
   | { type: "sessions"; items: SessionItem[]; currentPath?: string }
   | { type: "resources"; data: ResourceSummary }
   | { type: "workspace"; cwd: string; branch?: string; dirty?: boolean }
   | { type: "history"; name?: string; items: { role: string; text: string }[] }
   | { type: "mode"; mode: ApprovalMode }
-  | { type: "model_info"; model: string; thinking: string }
+  | { type: "model_info"; provider?: string; model: string; thinking: string }
   | { type: "error"; text: string };
 
 // webview → host
@@ -178,6 +195,7 @@ export type OutMessage =
   | { type: "question_response"; id: string; answers: QuestionAnswer[]; cancelled: boolean }
   | { type: "set_key"; key: string }
   | { type: "compact" }
+  | { type: "cancel_compaction" }
   | { type: "reload" }
   | { type: "abort" }
   | { type: "new_session" }

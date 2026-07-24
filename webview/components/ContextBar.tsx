@@ -18,17 +18,21 @@ export function ContextBar({ usage }: { usage: Usage }) {
       </span>
       <span className="ctx-pct">{pct}%</span>
       <span className="ctx-tokens">
-        {fmt(usage.contextTokens)} / {fmt(usage.contextWindow)}
+        {usage.contextWindow > 0 ? `${fmt(usage.contextTokens)} / ${fmt(usage.contextWindow)}` : "…"}
       </span>
-      <span className="ctx-sep">·</span>
-      <span className="ctx-stats">
-        <span>↑{fmt(usage.inputTotal)}</span>
-        <span>↓{fmt(usage.outputTotal)}</span>
-        {hasCache && <span>R{fmt(usage.cacheRead)}</span>}
-        {hasCache && <span>W{fmt(usage.cacheWrite)}</span>}
-        {usage.cacheHitRate !== undefined && <span>CH{usage.cacheHitRate.toFixed(0)}%</span>}
-        {usage.cost > 0 && <span>${usage.cost.toFixed(3)}</span>}
-      </span>
+      {(usage.inputTotal > 0 || usage.outputTotal > 0) && (
+        <>
+          <span className="ctx-sep">·</span>
+          <span className="ctx-stats">
+            <span>↑{fmt(usage.inputTotal)}</span>
+            <span>↓{fmt(usage.outputTotal)}</span>
+            {hasCache && <span>R{fmt(usage.cacheRead)}</span>}
+            {hasCache && <span>W{fmt(usage.cacheWrite)}</span>}
+            {usage.cacheHitRate !== undefined && <span>CH{usage.cacheHitRate.toFixed(0)}%</span>}
+            {usage.cost > 0 && <span>${usage.cost.toFixed(3)}</span>}
+          </span>
+        </>
+      )}
     </div>
   );
 }

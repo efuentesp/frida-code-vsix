@@ -1,4 +1,4 @@
-import type { InMessage, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
+import type { CompactionReason, InMessage, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
@@ -8,6 +8,9 @@ export const initialState: State = {
   approvals: [],
   questions: [],
   queued: [],
+  isCompacting: false,
+  compactions: [],
+  usage: { inputTotal: 0, outputTotal: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, contextWindow: 0, contextPercent: 0 },
   nextId: 1,
 };
 
@@ -141,7 +144,7 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, info: msg.text };
 
     case "cleared":
-      return { ...state, turns: [], approvals: [], questions: [], queued: [], busy: false, info: undefined, usage: undefined, resources: undefined };
+      return { ...state, turns: [], approvals: [], questions: [], queued: [], busy: false, isCompacting: false, compactReason: undefined, compactions: [], info: undefined, usage: { inputTotal: 0, outputTotal: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, contextWindow: 0, contextPercent: 0 }, resources: undefined };
 
     case "usage": {
       const { type: _t, ...rest } = msg;
@@ -169,7 +172,7 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, mode: msg.mode };
 
     case "model_info":
-      return { ...state, model: msg.model, thinking: msg.thinking };
+      return { ...state, model: msg.model, provider: msg.provider, thinking: msg.thinking };
 
     case "history": {
       const turns: Turn[] = [];
@@ -195,9 +198,33 @@ export function reduce(state: State, msg: InMessage): State {
         turns,
         approvals: [],
         busy: false,
+        isCompacting: false,
+        compactions: [],
         info: msg.name ? `Sesión: ${msg.name}` : state.info,
         nextId: id,
       };
+    }
+
+    case "compact_start":
+      return { ...state, isCompacting: true, compactReason: msg.reason as CompactionReason };
+
+    case "compact_end": {
+      let compactions = state.compactions;
+      if (!msg.aborted && msg.tokensBefore != null && msg.summary) {
+        const afterTurnId = state.turns.length ? state.turns[state.turns.length - 1].id : null;
+        compactions = [
+          ...compactions,
+          { id: state.nextId, afterTurnId, tokensBefore: msg.tokensBefore, summary: msg.summary, reason: msg.reason as CompactionReason },
+        ];
+      }
+      const info = msg.aborted
+        ? "Compactación cancelada"
+        : msg.errorMessage
+        ? "Error al compactar: " + msg.errorMessage
+        : msg.tokensBefore != null && msg.summary
+        ? `Contexto compactado desde ${msg.tokensBefore.toLocaleString()} tokens`
+        : state.info;
+      return { ...state, isCompacting: false, compactReason: undefined, compactions, info, nextId: state.nextId + 1 };
     }
 
     case "error":

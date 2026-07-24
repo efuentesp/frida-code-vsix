@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { reduce, initialState } from "./store";
 import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
+import { CompactionCard } from "./components/CompactionCard";
 import { QuestionCard } from "./components/QuestionCard";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
@@ -123,20 +124,6 @@ export function App() {
         <span className="brand">
           <span className="avatar ai sm"><Bot size={13} /></span> Frida Code
         </span>
-        <span className="model-info">
-          <span className="model-name">{state.model ?? "…"}</span>
-          <Tooltip label="Nivel de esfuerzo / thinking" side="bottom">
-            <select
-              className="thinking-select"
-              value={state.thinking ?? "medium"}
-              onChange={(e) => post({ type: "set_thinking", level: e.target.value })}
-            >
-              <option value="low">low</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
-            </select>
-          </Tooltip>
-        </span>
         <span className="spacer" />
         <span className="tb-group">
           <Tooltip label="Recursos cargados (extensiones, skills, prompts, themes, contexto)" side="bottom">
@@ -158,7 +145,7 @@ export function App() {
             </button>
           </Tooltip>
           <Tooltip label="Compactar contexto" side="bottom">
-            <button className="ico" onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
+            <button className="ico" onClick={() => post({ type: "compact" })} disabled={state.busy || state.isCompacting || state.turns.length === 0}>
               <Minimize2 size={15} />
             </button>
           </Tooltip>
@@ -178,6 +165,28 @@ export function App() {
         </span>
       </header>
 
+      <div className="sub-header">
+        <Tooltip label="Proveedor" side="bottom">
+          <span className="sub-provider">{state.provider ?? "…"}</span>
+        </Tooltip>
+        <span className="sub-sep">·</span>
+        <Tooltip label="Modelo" side="bottom">
+          <span className="sub-model">{state.model ?? "…"}</span>
+        </Tooltip>
+        <span className="sub-sep">·</span>
+        <Tooltip label="Nivel de esfuerzo / thinking" side="bottom">
+          <select
+            className="thinking-select"
+            value={state.thinking ?? "medium"}
+            onChange={(e) => post({ type: "set_thinking", level: e.target.value })}
+          >
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+          </select>
+        </Tooltip>
+      </div>
+
       {state.mode === "auto-edit" && <div className="info-bar warn">⚠ Edición automática: crear/editar archivos sin confirmación (bash sí pide).</div>}
       {state.mode === "auto" && <div className="info-bar warn">⚠ Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
@@ -194,8 +203,16 @@ export function App() {
         }}
       >
         {state.turns.length === 0 && <Welcome />}
+        {state.compactions.filter((c) => c.afterTurnId === null).map((c) => (
+          <CompactionCard key={c.id} entry={c} />
+        ))}
         {state.turns.map((t) => (
-          <TurnView key={t.id} turn={t} />
+          <Fragment key={t.id}>
+            <TurnView turn={t} />
+            {state.compactions.filter((c) => c.afterTurnId === t.id).map((c) => (
+              <CompactionCard key={c.id} entry={c} />
+            ))}
+          </Fragment>
         ))}
         <div ref={approvalsRef} className="approvals-area">
           {state.queued.map((q, i) => (
@@ -224,8 +241,16 @@ export function App() {
         </div>
       </div>
       <div className="footer">
-        {procLabel && (
-          <div className="proc-bar"><Spinner size={14} /> {procLabel}</div>
+        {state.isCompacting ? (
+          <div className="proc-bar">
+            <Spinner size={14} />
+            Compactando contexto{state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…
+            <button className="proc-cancel" onClick={() => post({ type: "cancel_compaction" })}>Cancelar</button>
+          </div>
+        ) : (
+          procLabel && (
+            <div className="proc-bar"><Spinner size={14} /> {procLabel}</div>
+          )
         )}
         <Composer
           onSubmit={(text, mode) => post({ type: "submit", text, mode })}

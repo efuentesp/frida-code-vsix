@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 export const SOFTTEK_PROVIDER = "softtek-devengine";
 export const SOFTTEK_MODEL = "gpt-5.4-mini";
 export const SOFTTEK_MODEL_DISPLAY = "GPT-5.4 Mini";
+export const SOFTTEK_PROVIDER_DISPLAY = "Softtek DevEngine";
 export const DEVENGINE_BASE_URL = "https://mywork.softtek.com/apg/devengine";
 
 /**
