@@ -4,10 +4,14 @@ import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
+import { QuestionCard } from "./components/QuestionCard";
 import { Composer } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
+import { ResourcesBar } from "./components/ResourcesBar";
+import { ResourcesPanel } from "./components/ResourcesPanel";
+import { WorkspaceBar } from "./components/WorkspaceBar";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -31,6 +35,9 @@ export function App() {
   const approvalsRef = useRef<HTMLDivElement>(null);
   const [escHint, setEscHint] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [resDismissed, setResDismissed] = useState(false);
+  const resSigRef = useRef("");
   const lastEscRef = useRef(0);
   const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -43,10 +50,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (state.approvals.length > 0) {
+    if (state.approvals.length > 0 || state.questions.length > 0) {
       approvalsRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [state.approvals]);
+  }, [state.approvals, state.questions]);
 
   // Doble Escape (mientras responde) → abort, como el botón Detener.
   useEffect(() => {
@@ -72,6 +79,22 @@ export function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [state.busy]);
+
+  // Vuelve a mostrar la barra de recursos cuando cambia su contenido
+  // (inicio, nueva sesión, abrir sesión, reload). Respeta el descarte del
+  // usuario si los recursos no cambiaron (p. ej. un list_resources bajo demanda).
+  useEffect(() => {
+    const r = state.resources;
+    if (!r) return;
+    const sig =
+      `${r.extensions.length}|${r.skills.length}|${r.prompts.length}|` +
+      `${r.themes.length}|${r.contextFiles.length}|${r.errors.length}|` +
+      `${r.extensions[0]?.path ?? ""}`;
+    if (sig !== resSigRef.current) {
+      resSigRef.current = sig;
+      setResDismissed(false);
+    }
+  }, [state.resources]);
 
   const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
@@ -99,6 +122,12 @@ export function App() {
           </select>
         </span>
         <span className="spacer" />
+        <button
+          onClick={() => { post({ type: "list_resources" }); setResourcesOpen(true); }}
+          title="Recursos cargados (extensiones, skills, prompts, themes, contexto)"
+        >
+          Recursos
+        </button>
         <button onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
           Sesiones
         </button>
@@ -107,6 +136,13 @@ export function App() {
         </button>
         <button onClick={() => post({ type: "compact" })} disabled={state.busy || state.turns.length === 0}>
           Compactar
+        </button>
+        <button
+          onClick={() => post({ type: "reload" })}
+          disabled={state.busy}
+          title="Recargar extensiones, skills, prompts, themes y archivos de contexto"
+        >
+          ↻ Recargar
         </button>
         <button
           className={"toggle " + state.mode}
@@ -127,6 +163,13 @@ export function App() {
       {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
       {state.usage && <ContextBar usage={state.usage} />}
+      {state.resources && !resDismissed && (
+        <ResourcesBar
+          res={state.resources}
+          onDetails={() => setResourcesOpen(true)}
+          onDismiss={() => setResDismissed(true)}
+        />
+      )}
 
       <div className="log">
         {state.turns.length === 0 && <Welcome />}
@@ -144,19 +187,39 @@ export function App() {
               onRespond={(r) => post({ type: "approval_response", id: a.id, ...r })}
             />
           ))}
+          {state.questions.length > 0 && (
+            <div className="approvals-banner">❓ Frida necesita tu respuesta:</div>
+          )}
+          {state.questions.map((q) => (
+            <QuestionCard
+              key={q.id}
+              request={q}
+              onRespond={(r) => post({ type: "question_response", id: q.id, ...r })}
+            />
+          ))}
         </div>
       </div>
-      <Composer
-        onSubmit={(text) => post({ type: "submit", text })}
-        onSearch={(q) => post({ type: "search_files", query: q })}
-        files={state.files}
-      />
+      <div className="footer">
+        <WorkspaceBar ws={state.workspace} onRefresh={() => post({ type: "workspace" })} />
+        <Composer
+          onSubmit={(text) => post({ type: "submit", text })}
+          onSearch={(q) => post({ type: "search_files", query: q })}
+          files={state.files}
+        />
+      </div>
       {sessionsOpen && state.sessions && (
         <SessionsPanel
           sessions={state.sessions}
           onClose={() => setSessionsOpen(false)}
           onSwitch={(p) => { post({ type: "switch_session", path: p }); setSessionsOpen(false); }}
           onRename={(p, n) => post({ type: "rename_session", path: p, name: n })}
+        />
+      )}
+      {resourcesOpen && state.resources && (
+        <ResourcesPanel
+          res={state.resources}
+          model={state.model}
+          onClose={() => setResourcesOpen(false)}
         />
       )}
     </div>

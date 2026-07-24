@@ -19,6 +19,7 @@ export function Composer({
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bashMode = text.trimStart().startsWith("!");
 
   useEffect(() => {
     ref.current?.focus();
@@ -112,7 +113,7 @@ export function Composer({
   }
 
   return (
-    <div className="bar">
+    <div className={"bar" + (bashMode ? " bash-mode" : "")}>
       {open && (
         <div className="file-popup">
           {suggestions.map((f, i) => (
@@ -133,7 +134,7 @@ export function Composer({
         ref={ref}
         className="input"
         rows={1}
-        placeholder="Pídele algo a Frida…  (@ = archivo · Enter = enviar)"
+        placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ = archivo · ! = bash · Enter = enviar)"}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -143,7 +144,7 @@ export function Composer({
         onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
         onKeyDown={onKeyDown}
       />
-      <div className="hint">@ = archivos · Enter envía · Shift+Enter = salto</div>
+      <div className="hint">@ = archivos · ! ejecuta y envía · !! ejecuta sin enviar · Enter envía</div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
@@ -7,6 +9,8 @@ import { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
 import { SOFTTEK_MODEL_DISPLAY } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
+
+const execFileP = promisify(execFile);
 
 const SECRET_KEY = "frida.devengineKey";
 
@@ -86,10 +90,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           void promptKey(true);
         },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+        onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
         getMode: () => approvalMode,
       });
       wireSession(frida.session);
       sendModelInfo();
+      postResources();
     }
     return frida;
   }
@@ -128,6 +134,85 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "model_info", model: SOFTTEK_MODEL_DISPLAY, thinking: frida?.session?.thinkingLevel ?? "medium" });
   }
 
+  // Recolecta los recursos cargados por el resourceLoader de pi (extensiones,
+  // skills, prompts, themes, archivos de contexto) para mostrarlos en el panel.
+  // Equivalente al showLoadedResources de la TUI. Los tipos internos de pi no se
+  // reexportan por el SDK, así que se tratan como any.
+  function collectResources(): any {
+    const session: any = frida?.session;
+    const rl: any = session?.resourceLoader;
+    if (!rl) return undefined;
+    const ext = rl.getExtensions?.() ?? { extensions: [], errors: [] };
+    const skills = rl.getSkills?.() ?? { skills: [], diagnostics: [] };
+    const prompts = rl.getPrompts?.() ?? { prompts: [], diagnostics: [] };
+    const themes = rl.getThemes?.() ?? { themes: [] };
+    const agents = rl.getAgentsFiles?.() ?? { agentsFiles: [] };
+    const errors: { path: string; error: string }[] = [];
+    for (const e of ext.errors ?? []) errors.push({ path: String(e.path), error: String(e.error) });
+    for (const d of [...(skills.diagnostics ?? []), ...(prompts.diagnostics ?? [])]) {
+      errors.push({ path: String(d?.path ?? d?.file ?? ""), error: String(d?.message ?? d) });
+    }
+    return {
+      extensions: (ext.extensions ?? [])
+        .filter((e: any) => !e.hidden)
+        .map((e: any) => {
+          const p = String(e.path ?? "");
+          return {
+            path: p,
+            // pi marca las factories registradas en código como "<inline:...>"
+            // (resource-loader.js). Las de disco tienen un path real de archivo.
+            inline: p.startsWith("<inline:"),
+            tools: Array.from(e.tools?.keys?.() ?? []),
+            commands: Array.from(e.commands?.keys?.() ?? []),
+          };
+        }),
+      skills: (skills.skills ?? []).map((s: any) => ({ name: String(s.name), description: String(s.description ?? "") })),
+      prompts: (prompts.prompts ?? []).map((p: any) => ({ name: String(p.name), description: String(p.description ?? "") })),
+      themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
+      contextFiles: (agents.agentsFiles ?? []).map((f: any) => ({ path: String(f.path) })),
+      errors,
+    };
+  }
+
+  function postResources(): void {
+    const data = collectResources();
+    if (data) post({ type: "resources", data });
+  }
+
+  // Info del workspace: carpeta de trabajo + branch git (y si hay cambios
+  // sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
+  // pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
+  async function collectWorkspace(): Promise<{ cwd: string; branch?: string; dirty?: boolean }> {
+    const cwd = workspaceCwd();
+    try {
+      const { stdout: branchOut } = await execFileP("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, timeout: 3000 });
+      const branch = branchOut.trim();
+      let dirty = false;
+      try {
+        const { stdout: status } = await execFileP("git", ["status", "--porcelain"], { cwd, timeout: 3000 });
+        dirty = status.trim().length > 0;
+      } catch { /* ignore */ }
+      return { cwd, branch, dirty };
+    } catch {
+      return { cwd }; // no es repo o git no disponible
+    }
+  }
+
+  async function postWorkspace(): Promise<void> {
+    try {
+      const ws = await collectWorkspace();
+      post({ type: "workspace", ...ws });
+    } catch { /* ignore */ }
+  }
+
+  // Crea la sesión en segundo plano (onboarding/listo/inicio) para poder mostrar
+  // los recursos cuanto antes. Captura errores para no dejar promesas sin manejar.
+  function bootstrapSession(): void {
+    void ensureSession().catch((e: any) => {
+      post({ type: "info", text: "No se pudo iniciar la sesión: " + String(e?.message ?? e) });
+    });
+  }
+
   function wireSession(session: any): void {
     session.subscribe((event: any) => {
       switch (event?.type) {
@@ -164,6 +249,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     panel.onDidDispose(() => {
       panel = undefined;
     });
+    panel.onDidChangeViewState(() => {
+      if (panel?.visible) void postWorkspace();
+    });
     panel.webview.onDidReceiveMessage((msg: any) => {
       void handleWebviewMessage(msg);
     });
@@ -175,7 +263,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         post({ type: "mode", mode: approvalMode });
         sendModelInfo();
         if (!keyCache) post({ type: "need_key" });
-        else post({ type: "session_ready" });
+        else {
+          post({ type: "session_ready" });
+          bootstrapSession(); // crea la sesión para mostrar recursos al inicio
+          void postWorkspace();
+        }
         break;
       case "submit":
         await runPrompt(String(msg.text ?? ""));
@@ -187,6 +279,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           acceptAll: !!msg.acceptAll,
         });
         break;
+      case "question_response":
+        (await ensureSession()).questionBridge.resolve({
+          id: msg.id,
+          answers: msg.answers ?? [],
+          cancelled: !!msg.cancelled,
+        });
+        break;
       case "set_key":
         await setKey(String(msg.key ?? ""));
         break;
@@ -195,6 +294,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         break;
       case "abort":
         await abortRun();
+        break;
+      case "reload":
+        await reloadResources();
+        break;
+      case "list_resources":
+        postResources();
+        break;
+      case "workspace":
+        await postWorkspace();
         break;
       case "new_session":
         await newSession();
@@ -232,6 +340,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       post({ type: "need_key" });
       return;
     }
+
+    // Modo bash del usuario: "!comando" ejecuta y envía el output al LLM;
+    // "!!comando" ejecuta sin enviarlo (solo se muestra en el panel).
+    // Es ejecución directa del usuario (no pasa por el gate de bash de D7).
+    if (trimmed.startsWith("!")) {
+      const exclude = trimmed.startsWith("!!");
+      const command = (exclude ? trimmed.slice(2) : trimmed.slice(1)).trim();
+      if (!command) return; // "!" a secas → se ignora
+      await runBashShortcut(command, exclude, trimmed);
+      return;
+    }
+
     post({ type: "user", text: trimmed });
     post({ type: "turn_start" });
     try {
@@ -243,6 +363,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     } finally {
       post({ type: "turn_end" });
     }
+  }
+
+  // Ejecuta un atajo de bash del usuario (!comando / !!comando).
+  // Usa session.executeBash del SDK: si excludeFromContext=false, el resultado
+  // queda registrado en el contexto del LLM (igual que la TUI de pi).
+  async function runBashShortcut(command: string, exclude: boolean, raw: string): Promise<void> {
+    let session: FridaSession;
+    try {
+      session = await ensureSession();
+    } catch (e: any) {
+      post({ type: "error", text: String(e?.message ?? e) });
+      return;
+    }
+    if (session.session?.isBashRunning) {
+      post({ type: "error", text: "Ya hay un comando bash en ejecución. Cancela primero." });
+      return;
+    }
+    post({ type: "user", text: raw });
+    post({ type: "bash_start", command, excludeFromContext: exclude });
+    try {
+      const result: any = await session.session.executeBash(
+        command,
+        (chunk: string) => post({ type: "bash_chunk", text: chunk }),
+        { excludeFromContext: exclude }
+      );
+      post({
+        type: "bash_end",
+        exitCode: result?.exitCode,
+        cancelled: !!result?.cancelled,
+        truncated: !!result?.truncated,
+        fullOutputPath: result?.fullOutputPath,
+      });
+    } catch (e: any) {
+      post({ type: "bash_end", exitCode: undefined, cancelled: false });
+      post({ type: "error", text: String(e?.message ?? e) });
+    }
+    // El comando pudo cambiar el branch/estado de git (p. ej. !git checkout).
+    void postWorkspace();
   }
 
   async function compactContext(): Promise<void> {
@@ -259,9 +417,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   async function abortRun(): Promise<void> {
     try {
       const { session } = await ensureSession();
-      await session.abort();
+      if (session.session?.isBashRunning) {
+        await session.session.abortBash?.();
+        return;
+      }
+      await session.session.abort();
     } catch {
       /* noop */
+    }
+  }
+
+  // Recarga en caliente de extensiones, skills, prompts, themes, archivos de
+  // contexto y settings (equivalente al /reload de la TUI de pi). No pierde el
+  // historial ni la sesión; re-ejecuta las factories (gates, provider hooks,
+  // ask_user_question) y reescanea el descubrimiento abierto (ADR-0005).
+  async function reloadResources(): Promise<void> {
+    let sess: FridaSession;
+    try {
+      sess = await ensureSession();
+    } catch (e: any) {
+      post({ type: "info", text: "Error al recargar: " + String(e?.message ?? e) });
+      return;
+    }
+    const session = sess.session;
+    if (session?.isStreaming) {
+      post({ type: "info", text: "Espera a que termine la respuesta actual antes de recargar." });
+      return;
+    }
+    if (session?.isCompacting) {
+      post({ type: "info", text: "Espera a que termine la compactación antes de recargar." });
+      return;
+    }
+    post({ type: "info", text: "Recargando extensiones, skills, prompts, themes y contexto…" });
+    try {
+      await session.reload();
+      sendModelInfo(); // por si settings cambió el thinking level
+      // ⚠ Verificar en runtime: la key inyectada (setRuntimeApiKey) vive en el
+      // ModelRuntime, que el reload no toca; debería persistir. Si llegara a
+      // fallar la autenticación tras un reload, reinyectar con sess.setKey(keyCache).
+      const rl: any = session?.resourceLoader;
+      const extCount = rl?.getExtensions?.()?.extensions?.length;
+      const skillCount = rl?.getSkills?.()?.skills?.length;
+      const counts =
+        extCount !== undefined || skillCount !== undefined
+          ? ` · ${extCount ?? 0} extensiones, ${skillCount ?? 0} skills`
+          : "";
+      post({ type: "info", text: "Recarga completada" + counts });
+      postResources();
+    } catch (e: any) {
+      post({ type: "info", text: "Error al recargar: " + String(e?.message ?? e) });
     }
   }
 
@@ -276,6 +480,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     post({ type: "cleared" });
     post({ type: "info", text: "Nueva sesión iniciada." });
+    if (keyCache) bootstrapSession(); // recrea la sesión para mostrar recursos
   }
 
   async function sendSessions(): Promise<void> {
@@ -311,11 +516,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         getKey: () => keyCache,
         onUnauthorized: () => { keyCache = undefined; void promptKey(true); },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
+        onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
         getMode: () => approvalMode,
       });
       wireSession(frida.session);
       postHistory();
       sendModelInfo();
+      postResources();
     } catch (e: any) {
       post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
     }
@@ -356,7 +563,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (!trimmed) return;
     await context.secrets.store(SECRET_KEY, trimmed);
     keyCache = trimmed;
-    if (frida) await frida.setKey(trimmed); // inyecta la key al runtime (setRuntimeApiKey)
+    if (frida) {
+      await frida.setKey(trimmed); // inyecta la key al runtime (setRuntimeApiKey)
+      postResources();
+    } else {
+      bootstrapSession(); // crea sesión y publica recursos al terminar el onboarding
+    }
     post({ type: "key_set" });
     post({ type: "session_ready" });
   }
@@ -380,6 +592,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
     vscode.commands.registerCommand("frida.setKey", () => void promptKey(true)),
     vscode.commands.registerCommand("frida.compact", () => void compactContext()),
+    vscode.commands.registerCommand("frida.reload", () => void reloadResources()),
     vscode.commands.registerCommand("frida.abort", () => void abortRun()),
     vscode.commands.registerCommand("frida.newSession", () => void newSession()),
     vscode.commands.registerCommand("frida.approvalMode", () => {

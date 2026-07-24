@@ -8,6 +8,17 @@ export interface ToolEntry {
   state: ToolState;
 }
 
+// Ejecución de bash del usuario (!command / !!command).
+export interface BashRun {
+  command: string;
+  excludeFromContext: boolean; // true = "!!" (el output no fue al LLM)
+  output: string;
+  status: "running" | "ok" | "error" | "cancelled";
+  exitCode?: number;
+  truncated?: boolean;
+  fullOutputPath?: string;
+}
+
 export type TurnStatus = "thinking" | "executing" | null;
 
 export interface Turn {
@@ -17,6 +28,7 @@ export interface Turn {
   status: TurnStatus;
   executingTool?: string;
   tools: ToolEntry[];
+  bash?: BashRun;
   error?: string;
 }
 
@@ -27,6 +39,32 @@ export interface ApprovalRequest {
   path?: string;
   command?: string;
   diff?: string;
+}
+
+export interface QuestionOption {
+  label: string;
+  description: string;
+  preview?: string;
+}
+
+export interface QuestionSpec {
+  question: string;
+  header: string;
+  multiSelect?: boolean;
+  options: QuestionOption[];
+}
+
+export interface QuestionAnswer {
+  questionIndex: number;
+  kind: "option" | "custom" | "multi";
+  answer: string | null;
+  selected?: string[];
+  notes?: string;
+}
+
+export interface QuestionRequest {
+  id: string;
+  questions: QuestionSpec[];
 }
 
 export interface Usage {
@@ -47,6 +85,28 @@ export interface SessionItem {
   modified: number; // epoch ms
 }
 
+// Recursos cargados por el resourceLoader de pi (ver panel de recursos).
+export interface ResourceExtension {
+  path: string;
+  inline: boolean;
+  tools?: string[];
+  commands?: string[];
+}
+export interface ResourceSummary {
+  extensions: ResourceExtension[];
+  skills: { name: string; description: string }[];
+  prompts: { name: string; description: string }[];
+  themes: { name: string }[];
+  contextFiles: { path: string }[];
+  errors: { path: string; error: string }[];
+}
+
+export interface WorkspaceInfo {
+  cwd: string;
+  branch?: string;
+  dirty?: boolean;
+}
+
 export type ApprovalMode = "manual" | "auto-edit" | "auto";
 
 export interface State {
@@ -58,9 +118,12 @@ export interface State {
   thinking?: string;
   turns: Turn[];
   approvals: ApprovalRequest[];
+  questions: QuestionRequest[];
   usage?: Usage;
   files?: { query: string; items: string[] };
   sessions?: { items: SessionItem[]; currentPath?: string };
+  resources?: ResourceSummary;
+  workspace?: WorkspaceInfo;
   nextId: number;
 }
 
@@ -74,13 +137,19 @@ export type InMessage =
   | { type: "delta"; text: string }
   | { type: "tool_start"; tool: string; args?: string }
   | { type: "tool_end"; tool: string; isError?: boolean }
+  | { type: "bash_start"; command: string; excludeFromContext: boolean }
+  | { type: "bash_chunk"; text: string }
+  | { type: "bash_end"; exitCode?: number; cancelled?: boolean; truncated?: boolean; fullOutputPath?: string }
   | { type: "turn_end" }
   | { type: "approvals"; approvals: ApprovalRequest[] }
+  | { type: "questions"; items: QuestionRequest[] }
   | { type: "info"; text: string }
   | { type: "cleared" }
   | ({ type: "usage" } & Usage)
   | { type: "files"; query: string; items: string[] }
   | { type: "sessions"; items: SessionItem[]; currentPath?: string }
+  | { type: "resources"; data: ResourceSummary }
+  | { type: "workspace"; cwd: string; branch?: string; dirty?: boolean }
   | { type: "history"; name?: string; items: { role: string; text: string }[] }
   | { type: "mode"; mode: ApprovalMode }
   | { type: "model_info"; model: string; thinking: string }
@@ -91,12 +160,16 @@ export type OutMessage =
   | { type: "webview_ready" }
   | { type: "submit"; text: string }
   | { type: "approval_response"; id: string; decision: "accept" | "reject"; acceptAll?: boolean }
+  | { type: "question_response"; id: string; answers: QuestionAnswer[]; cancelled: boolean }
   | { type: "set_key"; key: string }
   | { type: "compact" }
+  | { type: "reload" }
   | { type: "abort" }
   | { type: "new_session" }
   | { type: "search_files"; query: string }
   | { type: "list_sessions" }
+  | { type: "list_resources" }
+  | { type: "workspace" }
   | { type: "switch_session"; path: string }
   | { type: "rename_session"; path: string; name: string }
   | { type: "set_mode"; mode: ApprovalMode }

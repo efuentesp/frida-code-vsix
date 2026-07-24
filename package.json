@@ -14,6 +14,7 @@
       { "command": "frida.openPanel", "title": "Frida: Abrir panel" },
       { "command": "frida.setKey", "title": "Frida: Actualizar API key (DevEngine)" },
       { "command": "frida.compact", "title": "Frida: Compactar contexto" },
+      { "command": "frida.reload", "title": "Frida: Recargar extensiones y recursos" },
       { "command": "frida.abort", "title": "Frida: Detener respuesta" },
       { "command": "frida.newSession", "title": "Frida: Nueva sesión" },
       { "command": "frida.approvalMode", "title": "Frida: Cambiar modo de aprobación" }
@@ -28,7 +29,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.81.1"
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "typebox": "1.1.38"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

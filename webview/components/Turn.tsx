@@ -2,9 +2,11 @@ import type { Turn } from "../types";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./ToolCard";
+import { BashCard } from "./BashCard";
 
 export function TurnView({ turn }: { turn: Turn }) {
-  const hasAssistant = !!turn.assistantMd || turn.status !== null || turn.tools.length > 0 || !!turn.error;
+  const hasAssistant =
+    !!turn.assistantMd || turn.status !== null || turn.tools.length > 0 || !!turn.error || !!turn.bash;
   return (
     <div className="turn">
       <div className="row">
@@ -42,6 +44,7 @@ export function TurnView({ turn }: { turn: Turn }) {
             {turn.tools.map((t, i) => (
               <ToolCard key={i} entry={t} />
             ))}
+            {turn.bash && <BashCard run={turn.bash} />}
             {turn.error && <div className="err">⚠ {turn.error}</div>}
           </div>
         </div>

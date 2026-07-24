@@ -1,4 +1,4 @@
-import type { InMessage, State, Turn, Usage } from "./types";
+import type { InMessage, State, Turn, Usage, WorkspaceInfo } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
@@ -6,6 +6,7 @@ export const initialState: State = {
   mode: "manual",
   turns: [],
   approvals: [],
+  questions: [],
   nextId: 1,
 };
 
@@ -63,6 +64,57 @@ export function reduce(state: State, msg: InMessage): State {
         }),
       };
 
+    // Atajo de bash del usuario (!command / !!command). Se adjunta al turno
+    // creado por el mensaje "user" previo y se actualiza con chunks/end.
+    case "bash_start":
+      return {
+        ...state,
+        busy: true,
+        turns: withLast(state.turns, (t) => ({
+          ...t,
+          bash: {
+            command: msg.command,
+            excludeFromContext: msg.excludeFromContext,
+            output: "",
+            status: "running",
+          },
+        })),
+      };
+
+    case "bash_chunk":
+      return {
+        ...state,
+        turns: withLast(state.turns, (t) =>
+          t.bash ? { ...t, bash: { ...t.bash, output: t.bash.output + msg.text } } : t
+        ),
+      };
+
+    case "bash_end": {
+      const status = msg.cancelled
+        ? "cancelled"
+        : msg.exitCode !== undefined && msg.exitCode !== 0
+        ? "error"
+        : "ok";
+      return {
+        ...state,
+        busy: false,
+        turns: withLast(state.turns, (t) =>
+          t.bash
+            ? {
+                ...t,
+                bash: {
+                  ...t.bash,
+                  status,
+                  exitCode: msg.exitCode,
+                  truncated: msg.truncated,
+                  fullOutputPath: msg.fullOutputPath,
+                },
+              }
+            : t
+        ),
+      };
+    }
+
     case "turn_end":
       return {
         ...state,
@@ -73,11 +125,14 @@ export function reduce(state: State, msg: InMessage): State {
     case "approvals":
       return { ...state, approvals: msg.approvals };
 
+    case "questions":
+      return { ...state, questions: msg.items };
+
     case "info":
       return { ...state, info: msg.text };
 
     case "cleared":
-      return { ...state, turns: [], approvals: [], busy: false, info: undefined, usage: undefined };
+      return { ...state, turns: [], approvals: [], questions: [], busy: false, info: undefined, usage: undefined, resources: undefined };
 
     case "usage": {
       const { type: _t, ...rest } = msg;
@@ -89,6 +144,14 @@ export function reduce(state: State, msg: InMessage): State {
 
     case "sessions":
       return { ...state, sessions: { items: msg.items, currentPath: msg.currentPath } };
+
+    case "resources":
+      return { ...state, resources: msg.data };
+
+    case "workspace": {
+      const { type: _t, ...rest } = msg;
+      return { ...state, workspace: rest as WorkspaceInfo };
+    }
 
     case "mode":
       return { ...state, mode: msg.mode };

@@ -131,6 +131,7 @@ el resto son reversibles o el camino obvio y se detallan aquí.
 | 11 | Phone-home a pi.dev | **Desactivado** (detalle abajo) |
 | 12 | Bump de Pi | Pin exacto + vigilancia out-of-band en CI + rebuild+test. **Responsable: PSG** (detalle abajo) |
 | 13 | Sesiones (JSONL) | `context.globalStorageUri`, desacoplado del `agentDir` (detalle abajo) |
+| 14 | Preguntar al usuario (`ask_user_question`) | Tool dedicado nativo vía puente al webview, **no** `ExtensionUIContext` general — _ver [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md)_ |
 
 ### D6 — Conexión / proveedor
 
@@ -211,6 +212,31 @@ abierto (ADR-0005), pero las sesiones se persisten en `context.globalStorageUri`
 in-memory: preserva `/resume`, branching y compaction. **Sensibles:** contienen
 el historial = **código fuente** del dev; el `globalStorageUri` no debe quedar
 bajo una carpeta sincronizada en la nube (OneDrive/iCloud) ni commiteada.
+
+### D14 — Preguntar al usuario (`ask_user_question`)
+
+Herramienta para que el modelo **pregunte con opciones concretas** (hasta 4
+preguntas, 2-4 opciones cada una, con texto libre siempre disponible) en vez de
+adivinar ante una decisión real (estrategia, alcance, convención). Equivalente en
+**idea** a `@juicesharp/rpiv-ask-user-question`, pero **nativa de Frida**: una
+extensión de Pi propia (`createAskUserQuestion`) que registra el tool y lo rutea al
+webview por un puente `QuestionBridge`, **exactamente el mismo patrón que los gates
+de D7** (`ApprovalBridge`). El `execute` del tool queda en `await` sobre el puente;
+el webview muestra una `QuestionCard` (hermana de `ApprovalCard`) y responde por
+`postMessage`; el handler del host resuelve la promesa y el resultado viaja al
+modelo como `content` del tool.
+
+**Decisión de costura** (formalizada en
+[ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md)): tool dedicado,
+**sin** activar el `ExtensionUIContext` general de Pi (`setUIContext`). Así el host
+sigue en `ctx.mode="print"` / `hasUI=false` y eso **no afecta** a este tool, que no
+usa `ctx.ui`. Descartado cargar el paquete rpiv por descubrimiento (su diálogo es
+TUI propia y reabre ADR-0005).
+
+**MVP:** multi-pregunta + texto-libre + single/multi-select + nota opcional.
+Post-MVP (reversible): previews markdown, pestañas tipo rpiv, reserved labels, i18n.
+**No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
+descubierta.
 
 ---
 

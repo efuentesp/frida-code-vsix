@@ -12,10 +12,13 @@ import { createSofttekProviderHooks, SOFTTEK_MODEL, SOFTTEK_PROVIDER, SOFTTEK_PR
 import { createApprovalGates } from "./gates/approval-gates";
 import type { ApprovalMode } from "./gates/approval-gates";
 import { ApprovalBridge, ApprovalRequest } from "./approval-bridge";
+import { createAskUserQuestion } from "./tools/ask-user-question";
+import { QuestionBridge, type QuestionRequest } from "./question-bridge";
 
 export interface FridaSession {
   session: any;
   bridge: ApprovalBridge;
+  questionBridge: QuestionBridge;
   sessionManager: any;
   setKey: (key: string) => Promise<void>;
 }
@@ -33,6 +36,7 @@ export interface CreateFridaSessionOptions {
   getKey: () => string | undefined;
   onUnauthorized: () => void;
   onPendingApprovals: (reqs: ApprovalRequest[]) => void;
+  onPendingQuestions: (reqs: QuestionRequest[]) => void;
   getMode: () => ApprovalMode;
 }
 
@@ -61,14 +65,16 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
   }
 
   const bridge = new ApprovalBridge(opts.onPendingApprovals);
+  const questionBridge = new QuestionBridge(opts.onPendingQuestions);
 
   const loader = new DefaultResourceLoader({
     cwd: opts.cwd,
     agentDir: opts.agentDir,
     settingsManager,
     extensionFactories: [
-      createSofttekProviderHooks({ getKey: () => keyHolder.current, onUnauthorized: opts.onUnauthorized }),
-      createApprovalGates(bridge, opts.getMode),
+      { name: "softtek-provider", factory: createSofttekProviderHooks({ getKey: () => keyHolder.current, onUnauthorized: opts.onUnauthorized }) },
+      { name: "approval-gates", factory: createApprovalGates(bridge, opts.getMode) },
+      { name: "ask-user-question", factory: createAskUserQuestion(questionBridge) },
     ],
   });
   await loader.reload();
@@ -101,6 +107,7 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
   return {
     session,
     bridge,
+    questionBridge,
     sessionManager,
     setKey: async (key: string) => {
       keyHolder.current = key;

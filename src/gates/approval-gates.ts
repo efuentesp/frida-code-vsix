@@ -18,7 +18,7 @@ export function createApprovalGates(bridge: ApprovalBridge, getMode: () => Appro
   let acceptAllEdits = false; // per-session; solo edit/write; bash NUNCA
 
   return (pi: ExtensionAPI) => {
-    pi.on("tool_call", async (event: any, _ctx: any) => {
+    pi.on("tool_call", async (event: any, ctx: any) => {
       const mode = getMode();
       if (mode === "auto") return; // auto: todo pasa sin preguntar
       const tool: string = event.toolName;
@@ -42,7 +42,7 @@ export function createApprovalGates(bridge: ApprovalBridge, getMode: () => Appro
         diff: isDiff ? renderDiff(event.input) : undefined,
       };
 
-      const resp = await bridge.request(req);
+      const resp = await bridge.request(req, ctx?.signal);
       if (resp.decision === "reject") {
         return { block: true, reason: "El usuario rechazó la acción." };
       }
