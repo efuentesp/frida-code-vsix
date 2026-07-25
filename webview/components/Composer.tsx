@@ -430,7 +430,7 @@ export function Composer({
           ref={ref}
           className="input"
           rows={1}
-          placeholder={bashMode ? "$ ejecuta bash…  (! = envía al modelo · !! = no envía)" : "Pídele algo a Frida…  (@ archivo · / skill·prompt · ! bash · Enter = enviar)"}
+          placeholder={bashMode ? "$ ejecuta bash…" : "Pídele algo a Frida…"}
           value={text}
           onChange={(e) => {
             setText(e.target.value);

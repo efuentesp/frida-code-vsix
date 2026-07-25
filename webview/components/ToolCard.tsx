@@ -3,7 +3,8 @@ import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { Tooltip } from "./Tooltip";
 import { Spinner } from "./Spinner";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { FilePen, FileText, Folder, PencilLine, Search, Terminal, Wrench } from "lucide-react";
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
 function fmtDuration(ms: number): string {
@@ -13,28 +14,28 @@ function fmtDuration(ms: number): string {
 }
 
 // Resumen legible de la llamada (icono + texto) según el tool, en vez de JSON.
-function toolCallInfo(tool: string, args: unknown): { icon: string; label: string } {
+function toolCallInfo(tool: string, args: unknown): { icon: ReactNode; label: string } {
   const a = (args ?? {}) as Record<string, unknown>;
   const s = (v: unknown) => String(v ?? "");
   switch (tool) {
     case "read":
-      return { icon: "📄", label: s(a.path) };
+      return { icon: <FileText size={13} />, label: s(a.path) };
     case "bash":
-      return { icon: "$", label: s(a.command) };
+      return { icon: <Terminal size={13} />, label: s(a.command) };
     case "edit": {
       const n = Array.isArray(a.edits) ? a.edits.length : 0;
-      return { icon: "✎", label: `${s(a.path)}${n ? ` · ${n} edición(es)` : ""}` };
+      return { icon: <PencilLine size={13} />, label: `${s(a.path)}${n ? ` · ${n} edición(es)` : ""}` };
     }
     case "write":
-      return { icon: "✎", label: s(a.path) };
+      return { icon: <FilePen size={13} />, label: s(a.path) };
     case "grep":
-      return { icon: "🔎", label: `"${s(a.pattern)}"${a.path ? ` en ${s(a.path)}` : ""}` };
+      return { icon: <Search size={13} />, label: `"${s(a.pattern)}"${a.path ? ` en ${s(a.path)}` : ""}` };
     case "find":
-      return { icon: "🔎", label: `${s(a.pattern)}${a.path ? ` en ${s(a.path)}` : ""}` };
+      return { icon: <Search size={13} />, label: `${s(a.pattern)}${a.path ? ` en ${s(a.path)}` : ""}` };
     case "ls":
-      return { icon: "📁", label: s(a.path) };
+      return { icon: <Folder size={13} />, label: s(a.path) };
     default:
-      return { icon: "🔧", label: tool };
+      return { icon: <Wrench size={13} />, label: tool };
   }
 }
 

@@ -1,6 +1,7 @@
 import type { BashRun } from "../types";
 import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
+import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 // Tarjeta para un atajo de bash del usuario (!command / !!command).
@@ -42,7 +43,7 @@ export function BashCard({ run }: { run: BashRun }) {
         {run.output && <pre>{run.output}</pre>}
         {!run.output && !running && <div className="empty">(sin salida)</div>}
         {run.truncated && run.fullOutputPath && (
-          <div className="trunc">⚠ Salida truncada. Output completo: {run.fullOutputPath}</div>
+          <div className="trunc"><TriangleAlert size={12} /> Salida truncada. Output completo: {run.fullOutputPath}</div>
         )}
         {dim && <div className="dim-note">No enviado al modelo (!!)</div>}
       </div>

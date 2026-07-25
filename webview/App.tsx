@@ -13,7 +13,7 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
-import { Bot, Brain, History, Key, Library, Minimize2, RotateCw, ShieldCheck, SquarePen } from "lucide-react";
+import { Bot, Brain, CircleHelp, CircleStop, CornerDownRight, History, Key, Library, Minimize2, Pause, RotateCw, ShieldCheck, SquarePen, TriangleAlert } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
@@ -242,9 +242,9 @@ export function App() {
         </Tooltip>
       </div>
 
-      {state.mode === "auto-edit" && <div className="info-bar warn">⚠ Edición automática: crear/editar archivos sin confirmación (bash sí pide).</div>}
-      {state.mode === "auto" && <div className="info-bar warn">⚠ Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
-      {escHint && <div className="info-bar">⎋ Presiona Esc de nuevo para detener…</div>}
+      {state.mode === "auto-edit" && <div className="info-bar warn"><TriangleAlert size={12} /> Edición automática: crear/editar archivos sin confirmación (bash sí pide).</div>}
+      {state.mode === "auto" && <div className="info-bar warn"><TriangleAlert size={12} /> Auto ON: edit/write/bash corren sin pedirte confirmación.</div>}
+      {escHint && <div className="info-bar"><CircleStop size={12} /> Presiona Esc de nuevo para detener…</div>}
       {!escHint && state.info && <div className="info-bar">{state.info}</div>}
       {state.resources && <ResourcesBar res={state.resources} />}
 
@@ -271,10 +271,10 @@ export function App() {
         ))}
         <div ref={approvalsRef} className="approvals-area">
           {state.queued.map((q, i) => (
-            <div key={i} className="queued-msg">↳ encolado: {q}</div>
+            <div key={i} className="queued-msg"><CornerDownRight size={12} /> encolado: {q}</div>
           ))}
           {state.approvals.length > 0 && (
-            <div className="approvals-banner">⏸ Frida espera tu aprobación:</div>
+            <div className="approvals-banner"><Pause size={12} /> Frida espera tu aprobación:</div>
           )}
           {state.approvals.map((a) => (
             <ApprovalCard
@@ -284,7 +284,7 @@ export function App() {
             />
           ))}
           {state.questions.length > 0 && (
-            <div className="approvals-banner">❓ Frida necesita tu respuesta:</div>
+            <div className="approvals-banner"><CircleHelp size={12} /> Frida necesita tu respuesta:</div>
           )}
           {state.questions.map((q) => (
             <QuestionCard

@@ -1,4 +1,5 @@
 import type { ResourceSummary } from "../types";
+import { Sparkles } from "lucide-react";
 
 // Barra fija de una línea con los conteos de recursos cargados.
 // Solo informativa; el detalle se abre con el botón "Recursos" (Library) del header.
@@ -13,7 +14,7 @@ export function ResourcesBar({ res }: { res: ResourceSummary }) {
 
   return (
     <div className={"res-bar" + (res.errors.length ? " has-errors" : "")}>
-      <span className="res-ic">✦</span>
+      <span className="res-ic"><Sparkles size={12} /></span>
       <span className="res-summary">{parts.join(" · ") || "Sin recursos externos"}</span>
     </div>
   );

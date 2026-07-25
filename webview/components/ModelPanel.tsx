@@ -1,6 +1,6 @@
 import type { ProviderOption } from "../types";
 import { Tooltip } from "./Tooltip";
-import { Check, LogIn, LogOut, X } from "lucide-react";
+import { Check, Dot, LogIn, LogOut, X } from "lucide-react";
 
 export function ModelPanel({
   providers,
@@ -76,7 +76,7 @@ export function ModelPanel({
                         disabled={disabled}
                         onClick={() => onSelect(p.id, mm.id)}
                       >
-                        <span className="model-radio">{selected && "●"}</span>
+                        <span className="model-radio">{selected && <Dot size={16} />}</span>
                         <span className="model-name">{mm.name}</span>
                       </button>
                     );

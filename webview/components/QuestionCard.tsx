@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { QuestionAnswer, QuestionRequest } from "../types";
-import { Bot } from "lucide-react";
+import { Bot, Check, Circle, Dot, Square } from "lucide-react";
 
 // Estado de respuesta por pregunta. `custom` (texto libre) reemplaza cualquier
 // selección cuando no está vacío; `selected` aplica solo en multi-select.
@@ -83,7 +83,7 @@ export function QuestionCard({
                     : setDraft(i, { option: o.label });
                 return (
                   <button type="button" key={o.label} className={"q-option" + (checked ? " on" : "")} onClick={toggle}>
-                    <span className="q-mark">{q.multiSelect ? (checked ? "☑" : "☐") : checked ? "●" : "○"}</span>
+                    <span className="q-mark">{q.multiSelect ? (checked ? <Check size={13} /> : <Square size={13} />) : checked ? <Dot size={16} /> : <Circle size={13} />}</span>
                     <span className="q-opt-body">
                       <span className="q-opt-label">{o.label}</span>
                       {o.description && <span className="q-opt-desc">{o.description}</span>}
@@ -99,7 +99,7 @@ export function QuestionCard({
               onChange={(e) => setDraft(i, { custom: e.target.value })}
             />
             <details className="q-note">
-              <summary>Añadir nota {d.note?.trim() ? "✓" : ""}</summary>
+              <summary>Añadir nota {d.note?.trim() ? <Check size={12} /> : null}</summary>
               <textarea
                 placeholder="Aclara o matiza tu respuesta (opcional)…"
                 value={d.note ?? ""}

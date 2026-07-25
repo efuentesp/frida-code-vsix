@@ -1,5 +1,5 @@
 import type { Turn } from "../types";
-import { Bot, Copy, UserRound } from "lucide-react";
+import { Bot, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./ToolCard";
 import { BashCard } from "./BashCard";
@@ -63,7 +63,7 @@ export function TurnView({ turn, onCopy, hideThinking }: { turn: Turn; onCopy?: 
               )
             )}
             {turn.bash && <BashCard run={turn.bash} />}
-            {turn.error && <div className="err">⚠ {turn.error}</div>}
+            {turn.error && <div className="err"><TriangleAlert size={12} /> {turn.error}</div>}
           </div>
         </div>
       )}

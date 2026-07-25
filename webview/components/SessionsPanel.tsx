@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { SessionItem } from "../types";
 import { Tooltip } from "./Tooltip";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Dot, Pencil, Trash2, X } from "lucide-react";
 
 interface Sessions {
   items: SessionItem[];
@@ -62,8 +62,8 @@ export function SessionsPanel({
                         if (e.key === "Escape") setEditing(null);
                       }}
                     />
-                    <button onClick={() => { onRename(s.path, draft); setEditing(null); }}>✓</button>
-                    <button className="sec" onClick={() => setEditing(null)}>✗</button>
+                    <button onClick={() => { onRename(s.path, draft); setEditing(null); }}><Check size={14} /></button>
+                    <button className="sec" onClick={() => setEditing(null)}><X size={14} /></button>
                   </div>
                 ) : confirming === s.path ? (
                   <div className="session-confirm">
@@ -79,7 +79,7 @@ export function SessionsPanel({
                       title="Abrir esta sesión"
                     >
                       <div className="session-title">
-                        {isCurrent && <span className="dot">●</span>}
+                        {isCurrent && <span className="dot"><Dot size={16} /></span>}
                         {title}
                       </div>
                       <div className="session-meta">

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { ResourceSummary } from "../types";
 import { Tooltip } from "./Tooltip";
+import { ChevronRight } from "lucide-react";
 
 // Sección colapsable dentro del panel.
 function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
@@ -9,7 +10,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
   return (
     <div className={"res-section" + (open ? "" : " collapsed")}>
       <div className="res-section-head" onClick={() => setOpen(!open)}>
-        <span className="chev">▸</span>
+        <span className="chev"><ChevronRight size={12} /></span>
         <span className="res-section-title">{title}</span>
         <span className="res-section-count">{count}</span>
       </div>
@@ -33,7 +34,7 @@ function LocationsSection() {
   return (
     <div className={"res-section locations" + (open ? "" : " collapsed")}>
       <div className="res-section-head" onClick={() => setOpen(!open)}>
-        <span className="chev">▸</span>
+        <span className="chev"><ChevronRight size={12} /></span>
         <span className="res-section-title">Dónde se cargan</span>
         <span className="res-section-count">ref</span>
       </div>
@@ -81,7 +82,7 @@ function UsageSection() {
   return (
     <div className={"res-section usage" + (open ? "" : " collapsed")}>
       <div className="res-section-head" onClick={() => setOpen(!open)}>
-        <span className="chev">▸</span>
+        <span className="chev"><ChevronRight size={12} /></span>
         <span className="res-section-title">Cómo invocarlos</span>
         <span className="res-section-count">ref</span>
       </div>
