@@ -7,42 +7,125 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
 import { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
-import { SOFTTEK_MODEL_DISPLAY, SOFTTEK_PROVIDER_DISPLAY } from "./providers/softtek-provider";
+import { SOFTTEK_MODEL_DISPLAY, SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_DISPLAY } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
 
 const execFileP = promisify(execFile);
 
 const SECRET_KEY = "frida.devengineKey";
+const ACTIVE_MODEL_KEY = "frida.activeModel";
+const SUPPORTED_PROVIDERS = [SOFTTEK_PROVIDER, "github-copilot"];
 
 const BINARY_EXT = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "pdf", "zip", "gz", "tar",
   "woff", "woff2", "ttf", "otf", "node", "wasm", "mp3", "mp4", "class", "exe", "dll", "so", "dylib",
 ]);
 
-/** Busca archivos del workspace cuyo path contiene la consulta (fuzzy-simple). */
-async function searchFiles(query: string): Promise<string[]> {
-  const wf = vscode.workspace.workspaceFolders?.[0];
-  if (!wf) return [];
-  const exclude = "**/node_modules/**,**/.git/**,**/dist/**,**/dist-webview/**,**/.vscode/**";
-  const safe = query.trim().replace(/[*?{}[\]]/g, "?");
-  const include = safe ? `**/*${safe}*` : "**/*";
+/** Puntaje fuzzy (subsequence) para rankear archivos @. Mayor = mejor. */
+function fuzzyScore(text: string, query: string): number {
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  if (!q) return 0;
+  let score = 0, ti = 0, qi = 0, consecutive = 0;
+  while (ti < t.length && qi < q.length) {
+    if (t[ti] === q[qi]) {
+      consecutive++;
+      score += 1 + consecutive;
+      if (ti === 0 || /[\/._\- ]/.test(t[ti - 1])) score += 5; // inicio de palabra
+      qi++;
+    } else {
+      consecutive = 0;
+    }
+    ti++;
+  }
+  if (qi < q.length) return -1; // no es subsequence → descartar
+  const base = text.split("/").pop() ?? text;
+  if (base.toLowerCase().includes(q)) score += 10; // match en el nombre
+  score -= (text.match(/\//g)?.length ?? 0) * 0.5; // menos profundo = mejor
+  return score;
+}
+
+// Caché corto de la lista de archivos del repo (evita llamar a git en cada tecla).
+let repoFilesCache: { cwd: string; files: string[]; at: number } | null = null;
+const REPO_FILES_TTL = 5000;
+
+// Carpetas que se ocultan al navegar directorios (además de las que empiezan con .).
+const SEARCH_HIDDEN_EXCLUDE = new Set(["node_modules", ".git", "dist", "dist-webview", ".vscode", ".next", ".cache", "build"]);
+
+/** Lista los archivos del workspace respetando .gitignore (trackeados + no
+ *  ignorados vía git), relativos al workspace folder. Fallback a findFiles. */
+async function listRepoFiles(cwd: string): Promise<string[]> {
+  if (repoFilesCache && repoFilesCache.cwd === cwd && Date.now() - repoFilesCache.at < REPO_FILES_TTL) {
+    return repoFilesCache.files;
+  }
+  let files: string[];
   try {
-    const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(wf, include), exclude, 40);
-    return uris
-      .map((u) => vscode.workspace.asRelativePath(u))
-      .sort((a, b) => a.length - b.length || a.localeCompare(b))
-      .slice(0, 20);
+    const top = await execFileP("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 3000 });
+    const repoRoot = top.stdout.trim();
+    const wsRel = path.relative(repoRoot, cwd); // "" si el workspace es la raíz
+    const tracked = await execFileP("git", ["ls-files"], { cwd: repoRoot, timeout: 6000 });
+    const others = await execFileP("git", ["ls-files", "--others", "--exclude-standard"], { cwd: repoRoot, timeout: 6000 });
+    const all = (tracked.stdout + "\n" + others.stdout).split("\n").map((s) => s.trim()).filter(Boolean);
+    files = !wsRel ? all : all.filter((f) => f.startsWith(wsRel + "/")).map((f) => f.slice(wsRel.length + 1));
+  } catch {
+    // Sin git: findFiles con excludes típicos.
+    const exclude = "**/node_modules/**,**/.git/**,**/dist/**,**/dist-webview/**,**/.vscode/**";
+    const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(cwd, "**/*"), exclude, 300);
+    files = uris.map((u) => vscode.workspace.asRelativePath(u));
+  }
+  repoFilesCache = { cwd, files, at: Date.now() };
+  return files;
+}
+
+/** Navegación de carpeta: lista el contenido del directorio indicado por el
+ *  prefijo (los directorios terminan en '/'). Filtra por el último segmento. */
+async function listDirectory(prefix: string, cwd: string): Promise<string[]> {
+  const hasSlash = prefix.endsWith("/");
+  const slashIdx = prefix.lastIndexOf("/");
+  const dir = hasSlash ? prefix.slice(0, -1) : prefix.slice(0, slashIdx);
+  const filter = (hasSlash ? "" : prefix.slice(slashIdx + 1)).toLowerCase();
+  const absDir = path.join(cwd, dir || ".");
+  let entries: any[];
+  try {
+    entries = await fs.readdir(absDir, { withFileTypes: true });
   } catch {
     return [];
   }
+  return entries
+    .filter((e) => !e.name.startsWith(".") && !SEARCH_HIDDEN_EXCLUDE.has(e.name))
+    .filter((e) => filter === "" || e.name.toLowerCase().includes(filter))
+    .sort((a, b) => {
+      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, 50)
+    .map((e) => (dir ? `${dir}/${e.name}` : e.name) + (e.isDirectory() ? "/" : ""));
+}
+
+/** Autocompletado de archivos @: navegación de carpetas si hay '/', si no fuzzy
+ *  global respetando .gitignore. */
+async function searchFiles(query: string): Promise<string[]> {
+  const wf = vscode.workspace.workspaceFolders?.[0];
+  if (!wf) return [];
+  const cwd = wf.uri.fsPath;
+  const q = query.trim();
+  if (q.includes("/")) return listDirectory(q, cwd); // navegación
+  if (q.length === 0) return []; // '@' solo: no inundar
+  const files = await listRepoFiles(cwd);
+  return files
+    .map((rel) => ({ rel, score: fuzzyScore(rel, q) }))
+    .filter((x) => x.score >= 0)
+    .sort((a, b) => b.score - a.score || a.rel.length - b.rel.length || a.rel.localeCompare(b.rel))
+    .slice(0, 30)
+    .map((x) => x.rel);
 }
 
 /** Expande los tokens @ruta del prompt al contenido del archivo (texto), como Pi. */
 async function expandAtFiles(text: string, cwd: string): Promise<string> {
-  const re = /@([^\s@]+)/g;
+  const re = /@(?:"([^"]+)"|([^\s@]+))/g;
   const matches: { index: number; full: string; rel: string }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) matches.push({ index: m.index, full: m[0], rel: m[1] });
+  while ((m = re.exec(text)) !== null) matches.push({ index: m.index, full: m[0], rel: m[1] ?? m[2] });
   if (matches.length === 0) return text;
   let out = text;
   for (const mt of matches.slice().reverse()) {
@@ -68,6 +151,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
   let approvalMode: ApprovalMode = "manual";
   let frida: FridaSession | undefined;
+  let activeModel: { provider: string; modelId: string } | undefined = context.globalState.get(ACTIVE_MODEL_KEY);
   // Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
   // de turnos dentro del agent run actual (para saber cuándo se entrega uno).
   const pendingQueue: { text: string }[] = [];
@@ -88,10 +172,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         cwd: workspaceCwd(),
         agentDir: defaultAgentDir(),
         sessionDir: sessionDirPath,
+        activeModel,
         getKey: () => keyCache,
         onUnauthorized: () => {
           keyCache = undefined;
-          void promptKey(true);
+          void promptKey("unauthorized");
         },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
         onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
@@ -100,8 +185,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       wireSession(frida.session);
       sendModelInfo();
       postResources();
+      postModels();
       void postWorkspace();
       postUsage(frida.session);
+      // Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
+      // crear la sesión siempre permite elegir Copilot desde el onboarding).
+      const anyAuthed = SUPPORTED_PROVIDERS.some((id) => !!frida?.modelRuntime?.hasConfiguredAuth?.(id));
+      post({ type: anyAuthed ? "session_ready" : "need_key" });
     }
     return frida;
   }
@@ -146,8 +236,123 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
+  function providerDisplayName(id: string): string {
+    if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
+    if (id === "github-copilot") return "GitHub Copilot";
+    return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
+  }
+
   function sendModelInfo(): void {
-    post({ type: "model_info", provider: SOFTTEK_PROVIDER_DISPLAY, model: SOFTTEK_MODEL_DISPLAY, thinking: frida?.session?.thinkingLevel ?? "medium" });
+    const m = frida?.session?.model;
+    if (m) {
+      post({ type: "model_info", provider: providerDisplayName(m.provider), model: m.name, thinking: frida?.session?.thinkingLevel ?? "medium" });
+    }
+  }
+
+  // Catálogo de proveedores/modelos soportados para el selector del webview.
+  function postModels(): void {
+    if (!frida) return;
+    const mr = frida.modelRuntime;
+    const providers = SUPPORTED_PROVIDERS.map((id) => ({
+      id,
+      name: providerDisplayName(id),
+      oauth: !!mr.isUsingOAuth?.(id),
+      authed: !!mr.hasConfiguredAuth?.(id),
+      models: (mr.getModels?.(id) ?? []).map((mm: any) => ({ id: mm.id, name: mm.name })),
+    }));
+    const m = frida.session?.model;
+    post({
+      type: "models",
+      providers,
+      active: m ? { provider: m.provider, modelId: m.id } : undefined,
+    });
+  }
+
+  async function selectModel(providerId: string, modelId: string): Promise<void> {
+    if (!frida) return;
+    const m = frida.modelRuntime.getModel?.(providerId, modelId);
+    if (!m) {
+      post({ type: "info", text: "Modelo no disponible." });
+      postModels();
+      return;
+    }
+    try {
+      await frida.session.setModel(m);
+      activeModel = { provider: providerId, modelId };
+      await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
+      sendModelInfo();
+      postModels();
+      postUsage(frida.session);
+    } catch (e: any) {
+      post({ type: "info", text: "No se pudo cambiar de modelo: " + String(e?.message ?? e) });
+    }
+  }
+
+  // AuthInteraction (pi-ai): implementa prompt()/notify() para el login OAuth.
+  // notify({device_code}) abre el navegador y publica el userCode al webview.
+  function makeAuthInteraction(): any {
+    return {
+      prompt: async (p: any) => {
+        if (p.type === "select") {
+          const items = (p.options ?? []).map((o: any) => ({ label: o.label, description: o.description, id: o.id }));
+          const pick = (await vscode.window.showQuickPick(items as any, { placeHolder: p.message, ignoreFocusOut: true })) as any;
+          return pick?.id ?? "";
+        }
+        const val = await vscode.window.showInputBox({
+          prompt: p.message,
+          password: p.type === "secret",
+          placeHolder: p.placeholder,
+          ignoreFocusOut: true,
+        });
+        return val ?? "";
+      },
+      notify: (e: any) => {
+        if (e.type === "device_code") {
+          vscode.env.openExternal(vscode.Uri.parse(e.verificationUri));
+          post({ type: "oauth_device_code", userCode: e.userCode, verificationUri: e.verificationUri });
+        } else if (e.type === "auth_url") {
+          vscode.env.openExternal(vscode.Uri.parse(e.url));
+          post({ type: "info", text: "Abriendo el navegador para autenticación…" });
+        } else if (e.type === "info" || e.type === "progress") {
+          post({ type: "info", text: e.message });
+        }
+      },
+    };
+  }
+
+  function copilotDefaultModelId(): string | undefined {
+    const models: any[] = frida?.modelRuntime?.getModels?.("github-copilot") ?? [];
+    return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
+  }
+
+  async function loginProvider(providerId: string): Promise<void> {
+    if (!frida) return;
+    try {
+      await frida.modelRuntime.login?.(providerId, "oauth", makeAuthInteraction());
+      post({ type: "info", text: `Sesión iniciada: ${providerDisplayName(providerId)}` });
+      post({ type: "oauth_clear" });
+      // Primer arranque (onboarding): activar el modelo default de Copilot.
+      if (!activeModel && providerId === "github-copilot") {
+        const defaultId = copilotDefaultModelId();
+        if (defaultId) await selectModel(providerId, defaultId);
+      }
+      postModels();
+      post({ type: "session_ready" }); // cierra el onboarding si estaba abierto
+    } catch (e: any) {
+      post({ type: "info", text: "Error al iniciar sesión: " + String(e?.message ?? e) });
+      post({ type: "oauth_clear" });
+    }
+  }
+
+  async function logoutProvider(providerId: string): Promise<void> {
+    if (!frida) return;
+    try {
+      await frida.modelRuntime.logout?.(providerId);
+      post({ type: "info", text: `Sesión cerrada: ${providerDisplayName(providerId)}` });
+      postModels();
+    } catch {
+      /* noop */
+    }
   }
 
   // Recolecta los recursos cargados por el resourceLoader de pi (extensiones,
@@ -266,13 +471,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         case "message_update":
           if (event.assistantMessageEvent?.type === "text_delta") {
             post({ type: "delta", text: event.assistantMessageEvent.delta });
+          } else if (event.assistantMessageEvent?.type === "thinking_delta") {
+            post({ type: "thinking_delta", text: event.assistantMessageEvent.delta });
           }
           break;
         case "tool_execution_start":
           post({ type: "tool_start", tool: event.toolName, args: compactArgs(event.args) });
           break;
         case "tool_execution_end":
-          post({ type: "tool_end", tool: event.toolName, isError: !!event.isError, result: summarizeResult(event.result) });
+          post({
+            type: "tool_end",
+            tool: event.toolName,
+            isError: !!event.isError,
+            result: summarizeResult(event.result),
+            diff: typeof event.result?.details?.diff === "string" ? event.result.details.diff : undefined,
+          });
           break;
         case "compaction_start":
           post({ type: "compact_start", reason: event.reason });
@@ -328,16 +541,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     switch (msg?.type) {
       case "webview_ready":
         post({ type: "mode", mode: approvalMode });
-        sendModelInfo();
-        if (!keyCache) post({ type: "need_key" });
-        else {
-          post({ type: "session_ready" });
-          bootstrapSession(); // crea la sesión para mostrar recursos al inicio
-          void postWorkspace();
-        }
+        bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
         break;
       case "submit":
-        await runPrompt(String(msg.text ?? ""), msg.mode === "followUp" ? "followUp" : "steer");
+        await runPrompt(String(msg.text ?? ""), msg.mode === "followUp" ? "followUp" : "steer", msg.images);
         break;
       case "approval_response":
         (await ensureSession()).bridge.resolve({
@@ -356,6 +563,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "set_key":
         await setKey(String(msg.key ?? ""));
         break;
+      case "copy_text":
+        try { await vscode.env.clipboard.writeText(String(msg.text ?? "")); } catch { /* noop */ }
+        break;
+      case "rotate_key":
+        await promptKey("manual");
+        break;
       case "compact":
         await compactContext();
         break;
@@ -370,6 +583,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         break;
       case "list_resources":
         postResources();
+        break;
+      case "list_models":
+        postModels();
+        break;
+      case "select_model":
+        await selectModel(String(msg.provider ?? ""), String(msg.model ?? ""));
+        break;
+      case "login_provider":
+        await loginProvider(String(msg.provider ?? ""));
+        break;
+      case "logout_provider":
+        await logoutProvider(String(msg.provider ?? ""));
+        break;
+      case "fork":
+        await forkSession();
+        break;
+      case "fork_at":
+        await forkAt(String(msg.entryId ?? ""));
         break;
       case "workspace":
         await postWorkspace();
@@ -406,12 +637,122 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
-  async function runPrompt(text: string, mode: "steer" | "followUp" = "steer"): Promise<void> {
+  // Built-in slash commands del composer (estilo TUI de pi). Se interceptan
+  // en runPrompt ANTES de enviar al agente.
+  const BUILTIN_SLASH = new Set([
+    "compact", "reload", "new", "model", "login", "logout", "name", "copy", "help", "clone", "fork",
+  ]);
+
+  async function runBuiltinSlash(text: string): Promise<boolean> {
+    const m = text.match(/^\/(\w+)(?:\s+([\s\S]*))?$/);
+    if (!m) return false;
+    const cmd = m[1];
+    const arg = (m[2] ?? "").trim();
+    if (!BUILTIN_SLASH.has(cmd)) return false; // /skill:... y prompts → al agente
+    switch (cmd) {
+      case "compact": void compactContext(); break;
+      case "reload": void reloadResources(); break;
+      case "new": void newSession(); break;
+      case "model":
+        if (arg) {
+          const slash = arg.indexOf("/");
+          if (slash > 0) await selectModel(arg.slice(0, slash), arg.slice(slash + 1));
+          else post({ type: "info", text: "Uso: /model <provider/model>  (ej. github-copilot/gpt-5)" });
+        } else {
+          post({ type: "open_models" });
+        }
+        break;
+      case "login":
+        if (arg) void loginProvider(arg);
+        else post({ type: "info", text: "Uso: /login <provider>  (ej. github-copilot)" });
+        break;
+      case "logout":
+        if (arg) void logoutProvider(arg);
+        else post({ type: "info", text: "Uso: /logout <provider>  (ej. github-copilot)" });
+        break;
+      case "name":
+        if (arg) await renameCurrentSession(arg);
+        else post({ type: "info", text: "Uso: /name <nombre de la sesión>" });
+        break;
+      case "copy": await copyLastMessage(); break;
+      case "help": postHelp(); break;
+      case "clone": await cloneSession(); break;
+      case "fork": await forkSession(); break;
+    }
+    return true;
+  }
+
+  async function renameCurrentSession(name: string): Promise<void> {
+    const pathStr = frida?.session?.sessionFile;
+    if (!pathStr) { post({ type: "info", text: "No hay sesión activa para renombrar." }); return; }
+    await renameSession(pathStr, name);
+  }
+
+  async function copyLastMessage(): Promise<void> {
+    const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i]?.role === "assistant") {
+        const t = extractText(msgs[i]);
+        if (t) {
+          await vscode.env.clipboard.writeText(t);
+          post({ type: "info", text: "Último mensaje copiado al portapapeles." });
+          return;
+        }
+      }
+    }
+    post({ type: "info", text: "No hay mensaje del asistente para copiar." });
+  }
+
+  function postHelp(): void {
+    post({
+      type: "info",
+      text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener",
+    });
+  }
+
+  // Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
+  // en la hoja actual = copia completa). Equivalente al /clone de la TUI.
+  async function cloneSession(): Promise<void> {
+    if (!frida) return;
+    const sm = frida.sessionManager;
+    const leafId = sm?.getLeafId?.();
+    if (!leafId) { post({ type: "info", text: "Nada que clonar todavía." }); return; }
+    const newPath = sm?.createBranchedSession?.(leafId);
+    if (!newPath) { post({ type: "info", text: "No se pudo clonar la sesión (espera al primer mensaje del asistente)." }); return; }
+    post({ type: "info", text: "Sesión clonada." });
+    await switchSession(newPath);
+  }
+
+  // Bifurcar desde un mensaje anterior: publica los puntos (mensajes del usuario)
+  // para que el webview muestre un selector. Equivalente al /fork de la TUI.
+  async function forkSession(): Promise<void> {
+    if (!frida) return;
+    const points: any[] = frida.session?.getUserMessagesForForking?.() ?? [];
+    if (points.length === 0) { post({ type: "info", text: "No hay mensajes para bifurcar." }); return; }
+    post({ type: "fork_points", points: points.map((p) => ({ entryId: p.entryId, text: p.text })) });
+  }
+
+  // Crea la rama desde el padre del mensaje elegido (igual que runtime.fork "before").
+  async function forkAt(entryId: string): Promise<void> {
+    if (!frida || !entryId) return;
+    const sm = frida.sessionManager;
+    const entry = sm?.getEntry?.(entryId);
+    if (!entry) { post({ type: "info", text: "Punto de bifurcación no encontrado." }); return; }
+    const target = entry.parentId ?? entryId;
+    const newPath = sm?.createBranchedSession?.(target);
+    if (!newPath) { post({ type: "info", text: "No se pudo bifurcar la sesión." }); return; }
+    post({ type: "info", text: "Sesión bifurcada desde el punto elegido." });
+    await switchSession(newPath);
+  }
+
+  async function runPrompt(text: string, mode: "steer" | "followUp" = "steer", images?: { data: string; mimeType: string }[]): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) return;
-    if (!keyCache) {
-      post({ type: "need_key" });
-      return;
+
+    // Built-in slash commands (/compact, /reload, /model, /login, /name, …).
+    // Se interceptan ANTES de pedir auth: no todos requieren sesión/modelo.
+    if (trimmed.startsWith("/")) {
+      if (await runBuiltinSlash(trimmed)) return;
     }
 
     // Modo bash del usuario: "!comando" ejecuta y envía el output al LLM;
@@ -432,7 +773,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       post({ type: "error", text: String(e?.message ?? e) });
       return;
     }
+    // Auth global: API key de Softtek o login de suscripción (Copilot).
+    const anyAuthed = SUPPORTED_PROVIDERS.some((id) => !!session.modelRuntime?.hasConfiguredAuth?.(id));
+    if (!anyAuthed) {
+      post({ type: "need_key" });
+      return;
+    }
     const expanded = await expandAtFiles(trimmed, workspaceCwd());
+
+    // Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
+    const imgs = images && images.length > 0 ? images.map((i) => ({ type: "image" as const, data: i.data, mimeType: i.mimeType })) : undefined;
 
     // Si el agente está ocupado, encolamos (Message Queue de pi): el turno de
     // este mensaje NO se crea ahora, sino cuando el agente lo entregue
@@ -442,7 +792,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       pendingQueue.push({ text: trimmed });
       postQueued();
       try {
-        await session.session.prompt(expanded, { streamingBehavior: mode });
+        await session.session.prompt(expanded, { streamingBehavior: mode, images: imgs });
       } catch (e: any) {
         const idx = pendingQueue.findIndex((q) => q.text === trimmed);
         if (idx >= 0) pendingQueue.splice(idx, 1);
@@ -454,9 +804,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Agente libre: turno normal. El busy lo marcan los eventos agent_start/end
     // reales de pi (no turn_start/turn_end manuales).
-    post({ type: "user", text: trimmed });
+    post({ type: "user", text: trimmed, images: imgs?.map((i) => ({ data: i.data, mimeType: i.mimeType })) });
     try {
-      await session.session.prompt(expanded);
+      await session.session.prompt(expanded, imgs ? { images: imgs } : undefined);
     } catch (e: any) {
       post({ type: "error", text: String(e?.message ?? e) });
     }
@@ -629,7 +979,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         sessionDir: sessionDirPath,
         openPath: pathStr,
         getKey: () => keyCache,
-        onUnauthorized: () => { keyCache = undefined; void promptKey(true); },
+        onUnauthorized: () => { keyCache = undefined; void promptKey("unauthorized"); },
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
         onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
         getMode: () => approvalMode,
@@ -638,6 +988,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       postHistory();
       sendModelInfo();
       postResources();
+      postModels();
       postUsage(frida.session);
       void postWorkspace();
     } catch (e: any) {
@@ -684,9 +1035,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function postHistory(): void {
     try {
       const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
-      const items = msgs
-        .map((m: any) => ({ role: String(m?.role ?? ""), text: extractText(m) }))
-        .filter((x) => x.text || x.role === "user");
+      const items: any[] = [];
+      const pendingTools = new Map<string, any>(); // toolCallId → segment tool
+      for (const m of msgs) {
+        const role = String(m?.role ?? "");
+        const content = m?.content;
+        const parts: any[] = Array.isArray(content)
+          ? content
+          : typeof content === "string"
+          ? [{ type: "text", text: content }]
+          : [];
+        if (role === "user") {
+          items.push({ role: "user", text: extractText(m) });
+        } else if (role === "assistant") {
+          const segs: any[] = [];
+          for (const p of parts) {
+            if (p?.type === "text" && p.text) segs.push({ kind: "text", text: String(p.text) });
+            else if (p?.type === "thinking" && p.thinking) segs.push({ kind: "thinking", text: String(p.thinking) });
+            else if (p?.type === "toolCall") {
+              const seg: any = { kind: "tool", tool: String(p.name ?? ""), args: compactArgs(p.arguments), state: "running" };
+              segs.push(seg);
+              if (p.id) pendingTools.set(String(p.id), seg);
+            }
+          }
+          if (segs.length > 0) items.push({ role: "assistant", segments: segs });
+        } else if (role === "tool") {
+          // Empareja cada toolResult con su toolCall pendiente (por toolCallId).
+          for (const p of parts) {
+            if (p?.type === "toolResult") {
+              const seg = p.toolCallId ? pendingTools.get(String(p.toolCallId)) : null;
+              if (seg) {
+                seg.state = p.isError ? "error" : "ok";
+                seg.result = summarizeToolResultContent(p.content);
+                pendingTools.delete(String(p.toolCallId));
+              }
+            }
+          }
+        }
+      }
       const name = frida?.sessionManager?.getSessionName?.();
       post({ type: "history", name, items: items.slice(-200) });
     } catch {
@@ -709,11 +1095,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     post({ type: "session_ready" });
   }
 
-  async function promptKey(isRotation = false): Promise<void> {
+  async function promptKey(reason: "initial" | "manual" | "unauthorized" = "initial"): Promise<void> {
+    const messages = {
+      initial: "Introduce tu API key de DevEngine (se envía como X-Api-Key).",
+      manual: "Actualiza tu API key de DevEngine (se envía como X-Api-Key).",
+      unauthorized: "Tu API key de DevEngine fue rechazada o venció. Vuelve a introducirla.",
+    };
     const key = await vscode.window.showInputBox({
-      prompt: isRotation
-        ? "Tu API key de DevEngine fue rechazada (401). Vuelve a introducirla."
-        : "Introduce tu API key de DevEngine (se envía como X-Api-Key).",
+      prompt: messages[reason],
       password: true,
       ignoreFocusOut: true,
     });
@@ -726,7 +1115,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
-    vscode.commands.registerCommand("frida.setKey", () => void promptKey(true)),
+    vscode.commands.registerCommand("frida.setKey", () => void promptKey("manual")),
     vscode.commands.registerCommand("frida.compact", () => void compactContext()),
     vscode.commands.registerCommand("frida.reload", () => void reloadResources()),
     vscode.commands.registerCommand("frida.abort", () => void abortRun()),
@@ -774,21 +1163,37 @@ function compactArgs(args: unknown): unknown {
 function summarizeResult(result: any): string {
   if (!result) return "";
   try {
+    let text = "";
     const content = result.content;
     if (Array.isArray(content)) {
-      const text = content
+      text = content
         .filter((b: any) => b?.type === "text")
         .map((b: any) => String(b?.text ?? ""))
         .join("");
-      if (!text) return "";
-      return text.length > 2000 ? text.slice(0, 2000) + "\n…(truncado)" : text;
+    } else if (typeof result === "string") {
+      text = result;
+    } else if (typeof result.details === "string") {
+      text = result.details;
     }
-    if (typeof result === "string") return result.slice(0, 2000);
-    if (typeof result.details === "string") return result.details.slice(0, 2000);
-    return "";
+    // Límite alto: el webview hace scroll en vez de cortar a mitad línea.
+    return text.length > 100000 ? text.slice(0, 100000) : text;
   } catch {
     return "";
   }
+}
+
+// Texto del contenido de un toolResult (mensaje role "tool") para el historial.
+function summarizeToolResultContent(content: any): string {
+  if (!content) return "";
+  if (typeof content === "string") return content.slice(0, 100000);
+  if (Array.isArray(content)) {
+    const text = content
+      .filter((b: any) => b?.type === "text")
+      .map((b: any) => String(b?.text ?? ""))
+      .join("");
+    return text.slice(0, 100000);
+  }
+  return "";
 }
 
 export function deactivate(): void {

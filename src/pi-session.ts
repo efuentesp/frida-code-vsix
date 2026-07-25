@@ -17,6 +17,7 @@ import { QuestionBridge, type QuestionRequest } from "./question-bridge";
 
 export interface FridaSession {
   session: any;
+  modelRuntime: any;
   bridge: ApprovalBridge;
   questionBridge: QuestionBridge;
   sessionManager: any;
@@ -32,6 +33,9 @@ export interface CreateFridaSessionOptions {
   sessionDir: string;
   /** Si se da, abre la sesión existente (switch) en vez de crear una nueva. */
   openPath?: string;
+  /** Proveedor/modelo activo persistido por el host. Si no resuelve o no está
+   * autenticado, cae al default (Softtek DevEngine). */
+  activeModel?: { provider: string; modelId: string };
   /** Cache síncrono de la key (before_provider_headers es síncrono). */
   getKey: () => string | undefined;
   onUnauthorized: () => void;
@@ -79,14 +83,18 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
   });
   await loader.reload();
 
-  const model = modelRuntime.getModel(SOFTTEK_PROVIDER, SOFTTEK_MODEL);
+  // Resolver el modelo ACTIVO: el guardado por el host si está disponible
+  // (y autenticado para OAuth), si no, el default de Softtek.
+  let model: any;
+  if (opts.activeModel) {
+    const am = opts.activeModel;
+    const authed = am.provider === SOFTTEK_PROVIDER || modelRuntime.hasConfiguredAuth(am.provider);
+    if (authed) model = modelRuntime.getModel(am.provider, am.modelId);
+  }
+  if (!model) model = modelRuntime.getModel(SOFTTEK_PROVIDER, SOFTTEK_MODEL);
   if (!model) {
-    // ⚠️ Verificar en runtime: el provider se registra en la factory; según el
-    // timing/registro, getModel podría no verlo todavía. Si ocurre, revisar cómo
-    // ModelRuntime expone los providers registrados por extensión.
     throw new Error(
-      `No se resolvió el modelo ${SOFTTEK_PROVIDER}/${SOFTTEK_MODEL} tras registrar el provider. ` +
-        `Verifica que ModelRuntime vea los providers de extensión.`
+      `No se resolvió un modelo utilizable (activo=${opts.activeModel?.provider}/${opts.activeModel?.modelId}).`
     );
   }
 
@@ -106,6 +114,7 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
 
   return {
     session,
+    modelRuntime,
     bridge,
     questionBridge,
     sessionManager,

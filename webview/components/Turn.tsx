@@ -1,11 +1,16 @@
 import type { Turn } from "../types";
-import { Bot, UserRound } from "lucide-react";
+import { Bot, Copy, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./ToolCard";
 import { BashCard } from "./BashCard";
 
-export function TurnView({ turn }: { turn: Turn }) {
+export function TurnView({ turn, onCopy, hideThinking }: { turn: Turn; onCopy?: (text: string) => void; hideThinking?: boolean }) {
   const hasAssistant = turn.segments.length > 0 || !!turn.error || !!turn.bash;
+  const assistantText = turn.segments
+    .map((s) => (s.kind === "text" ? s.text : null))
+    .filter((x): x is string => !!x)
+    .join("\n\n")
+    .trim();
   return (
     <div className="turn">
       <div className="row">
@@ -15,6 +20,13 @@ export function TurnView({ turn }: { turn: Turn }) {
         <div className="body">
           <div className="who">Tú</div>
           <div className="bubble">{turn.user}</div>
+          {turn.images && turn.images.length > 0 && (
+            <div className="bubble imgs-inline">
+              {turn.images.map((im, i) => (
+                <img key={i} className="img-thumb" src={`data:${im.mimeType};base64,${im.data}`} alt="" />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -24,9 +36,23 @@ export function TurnView({ turn }: { turn: Turn }) {
             <Bot size={15} />
           </span>
           <div className="body">
-            <div className="who">Frida</div>
+            <div className="who">
+              Frida
+              {onCopy && assistantText && (
+                <button className="turn-copy" title="Copiar respuesta" onClick={() => onCopy(assistantText)}>
+                  <Copy size={12} />
+                </button>
+              )}
+            </div>
             {turn.segments.map((s, i) =>
-              s.kind === "text" ? (
+              s.kind === "thinking" ? (
+                !hideThinking && s.text ? (
+                  <details key={i} className="thinking">
+                    <summary>Razonamiento</summary>
+                    <div className="thinking-body"><Markdown>{s.text}</Markdown></div>
+                  </details>
+                ) : null
+              ) : s.kind === "text" ? (
                 s.text ? (
                   <div key={i} className="bubble">
                     <Markdown>{s.text}</Markdown>

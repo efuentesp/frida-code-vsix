@@ -1,4 +1,4 @@
-import type { CompactionReason, InMessage, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
+import type { CompactionReason, InMessage, Segment, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
 
 export const initialState: State = {
   keyNeeded: false,
@@ -29,7 +29,7 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, keyNeeded: false };
 
     case "user": {
-      const turn: Turn = { id: state.nextId, user: msg.text, segments: [], status: null };
+      const turn: Turn = { id: state.nextId, user: msg.text, images: msg.images, segments: [], status: null };
       return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1, info: undefined };
     }
     case "agent_busy":
@@ -54,6 +54,21 @@ export function reduce(state: State, msg: InMessage): State {
         }),
       };
 
+    case "thinking_delta":
+      return {
+        ...state,
+        turns: withLast(state.turns, (t) => {
+          const segs = [...t.segments];
+          const last = segs[segs.length - 1];
+          if (last && last.kind === "thinking") {
+            segs[segs.length - 1] = { ...last, text: last.text + msg.text };
+          } else {
+            segs.push({ kind: "thinking", text: msg.text });
+          }
+          return { ...t, segments: segs };
+        }),
+      };
+
     case "tool_start":
       return {
         ...state,
@@ -73,7 +88,7 @@ export function reduce(state: State, msg: InMessage): State {
           const segments = t.segments.map((s) => {
             if (!done && s.kind === "tool" && s.state === "running" && s.tool === msg.tool) {
               done = true;
-              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState, endedAt: Date.now(), result: msg.result };
+              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState, endedAt: Date.now(), result: msg.result, diff: msg.diff };
             }
             return s;
           });
@@ -168,6 +183,18 @@ export function reduce(state: State, msg: InMessage): State {
       return { ...state, workspace: rest as WorkspaceInfo };
     }
 
+    case "models":
+      return { ...state, models: { providers: msg.providers, active: msg.active } };
+
+    case "oauth_device_code":
+      return { ...state, oauthDeviceCode: { userCode: msg.userCode, verificationUri: msg.verificationUri } };
+
+    case "oauth_clear":
+      return { ...state, oauthDeviceCode: undefined };
+
+    case "fork_points":
+      return { ...state, forkPoints: msg.points };
+
     case "mode":
       return { ...state, mode: msg.mode };
 
@@ -180,16 +207,26 @@ export function reduce(state: State, msg: InMessage): State {
       for (const it of msg.items) {
         if (it.role === "user") {
           turns.push({ id: id++, user: it.text, segments: [], status: null });
-        } else {
+        } else if (it.role === "assistant") {
+          const segs = (it.segments ?? []).map((s): Segment => {
+            if (s.kind === "text") return { kind: "text", text: s.text };
+            if (s.kind === "thinking") return { kind: "thinking", text: s.text };
+            return {
+              kind: "tool",
+              tool: s.tool,
+              args: s.args ?? {},
+              state: s.state ?? "ok",
+              startedAt: 0,
+              endedAt: 0,
+              result: s.result,
+              diff: s.diff,
+            };
+          });
           const last = turns[turns.length - 1];
           if (last) {
-            const segs = [...last.segments];
-            const prev = segs[segs.length - 1];
-            if (prev && prev.kind === "text") segs[segs.length - 1] = { ...prev, text: prev.text + it.text };
-            else segs.push({ kind: "text", text: it.text });
-            last.segments = segs;
+            last.segments = [...last.segments, ...segs];
           } else {
-            turns.push({ id: id++, user: "", segments: [{ kind: "text", text: it.text }], status: null });
+            turns.push({ id: id++, user: "", segments: segs, status: null });
           }
         }
       }

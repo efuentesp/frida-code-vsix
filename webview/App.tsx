@@ -13,9 +13,12 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
-import { Bot, History, Library, Minimize2, RotateCw, ShieldCheck, SquarePen } from "lucide-react";
+import { Bot, Brain, History, Key, Library, Minimize2, RotateCw, ShieldCheck, SquarePen } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
+import { ModelPanel } from "./components/ModelPanel";
+import { ForkPanel } from "./components/ForkPanel";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -42,12 +45,27 @@ export function App() {
   const [escHint, setEscHint] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
+  const [forkOpen, setForkOpen] = useState(false);
+  const [hideThinking, setHideThinking] = useState(false);
   const lastEscRef = useRef(0);
   const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const vscode = getVsCode();
-    const handler = (e: MessageEvent) => dispatch(e.data as InMessage);
+    const handler = (e: MessageEvent) => {
+      const msg = e.data as InMessage;
+      if (msg.type === "open_models") {
+        setModelsOpen(true);
+        getVsCode().postMessage({ type: "list_models" });
+        return;
+      }
+      if (msg.type === "fork_points") {
+        setForkOpen(true);
+        return;
+      }
+      dispatch(msg);
+    };
     window.addEventListener("message", handler);
     vscode.postMessage({ type: "webview_ready" });
     return () => window.removeEventListener("message", handler);
@@ -93,15 +111,34 @@ export function App() {
 
   const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
-  // Lista de comandos para el autocompletado de "/": skills + prompts cargados.
+  // Built-in slash commands (siempre disponibles, ejecutados por el host).
+  const builtinCommands: CommandItem[] = useMemo(
+    () => [
+      { kind: "builtin", label: "/compact", name: "compact", description: "Compactar el contexto de la sesión" },
+      { kind: "builtin", label: "/reload", name: "reload", description: "Recargar extensiones, skills y prompts" },
+      { kind: "builtin", label: "/new", name: "new", description: "Iniciar una sesión nueva" },
+      { kind: "builtin", label: "/model", name: "model", description: "Abrir el selector de modelo/proveedor", argumentHint: "<provider/model>" },
+      { kind: "builtin", label: "/login", name: "login", description: "Iniciar sesión con un proveedor (suscripción)", argumentHint: "<provider>" },
+      { kind: "builtin", label: "/logout", name: "logout", description: "Cerrar sesión de un proveedor", argumentHint: "<provider>" },
+      { kind: "builtin", label: "/name", name: "name", description: "Renombrar la sesión actual", argumentHint: "<nombre>" },
+      { kind: "builtin", label: "/copy", name: "copy", description: "Copiar el último mensaje al portapapeles" },
+      { kind: "builtin", label: "/clone", name: "clone", description: "Duplicar la sesión actual" },
+      { kind: "builtin", label: "/fork", name: "fork", description: "Bifurcar desde un mensaje anterior" },
+      { kind: "builtin", label: "/help", name: "help", description: "Mostrar atajos y comandos" },
+    ],
+    []
+  );
+
+  // Lista de comandos para el autocompletado de "/": built-in + skills + prompts.
   const commands: CommandItem[] = useMemo(() => {
     const r = state.resources;
-    if (!r) return [];
+    if (!r) return builtinCommands;
     return [
+      ...builtinCommands,
       ...r.skills.map((s) => ({ kind: "skill" as const, label: `/skill:${s.name}`, name: s.name, description: s.description })),
       ...r.prompts.map((p) => ({ kind: "prompt" as const, label: `/${p.name}`, name: p.name, description: p.description })),
     ];
-  }, [state.resources]);
+  }, [state.resources, builtinCommands]);
 
   // Etiqueta del indicador de procesamiento (fijo en el footer). Refleja el
   // sub-estado cuando se conoce; no depende del scroll de la conversación.
@@ -115,7 +152,13 @@ export function App() {
   })();
 
   if (state.keyNeeded) {
-    return <Onboarding onSubmit={(key) => post({ type: "set_key", key })} />;
+    return (
+      <Onboarding
+        deviceCode={state.oauthDeviceCode}
+        onSubmit={(key) => post({ type: "set_key", key })}
+        onLoginCopilot={() => post({ type: "login_provider", provider: "github-copilot" })}
+      />
+    );
   }
 
   return (
@@ -149,6 +192,11 @@ export function App() {
               <Minimize2 size={15} />
             </button>
           </Tooltip>
+          <Tooltip label={hideThinking ? "Mostrar razonamiento" : "Ocultar razonamiento"} side="bottom">
+            <button className={"ico" + (hideThinking ? " off" : " active")} onClick={() => setHideThinking((v) => !v)}>
+              <Brain size={15} />
+            </button>
+          </Tooltip>
           <Tooltip label="Recargar extensiones y recursos" side="bottom">
             <button className="ico" onClick={() => post({ type: "reload" })} disabled={state.busy}>
               <RotateCw size={15} />
@@ -170,8 +218,10 @@ export function App() {
           <span className="sub-provider">{state.provider ?? "…"}</span>
         </Tooltip>
         <span className="sub-sep">·</span>
-        <Tooltip label="Modelo" side="bottom">
-          <span className="sub-model">{state.model ?? "…"}</span>
+        <Tooltip label="Cambiar modelo / proveedor" side="bottom">
+          <button className="sub-model-btn" onClick={() => { setModelsOpen(true); post({ type: "list_models" }); }}>
+            {state.model ?? "…"} <ChevronDown size={12} />
+          </button>
         </Tooltip>
         <span className="sub-sep">·</span>
         <Tooltip label="Nivel de esfuerzo / thinking" side="bottom">
@@ -184,6 +234,11 @@ export function App() {
             <option value="medium">medium</option>
             <option value="high">high</option>
           </select>
+        </Tooltip>
+        <Tooltip label={state.keyNeeded ? "Configurar API key" : "Cambiar API key"} side="bottom">
+          <button className={"sub-key" + (state.keyNeeded ? " missing" : "")} onClick={() => post({ type: "rotate_key" })}>
+            <Key size={12} />
+          </button>
         </Tooltip>
       </div>
 
@@ -208,7 +263,7 @@ export function App() {
         ))}
         {state.turns.map((t) => (
           <Fragment key={t.id}>
-            <TurnView turn={t} />
+            <TurnView turn={t} hideThinking={hideThinking} onCopy={(text) => post({ type: "copy_text", text })} />
             {state.compactions.filter((c) => c.afterTurnId === t.id).map((c) => (
               <CompactionCard key={c.id} entry={c} />
             ))}
@@ -253,10 +308,11 @@ export function App() {
           )
         )}
         <Composer
-          onSubmit={(text, mode) => post({ type: "submit", text, mode })}
+          onSubmit={(text, mode, images) => post({ type: "submit", text, mode, images })}
           onSearch={(q) => post({ type: "search_files", query: q })}
           files={state.files}
           commands={commands}
+          models={state.models}
           busy={state.busy}
           onAbort={() => post({ type: "abort" })}
         />
@@ -277,6 +333,24 @@ export function App() {
           res={state.resources}
           model={state.model}
           onClose={() => setResourcesOpen(false)}
+        />
+      )}
+      {modelsOpen && state.models && (
+        <ModelPanel
+          providers={state.models.providers}
+          active={state.models.active}
+          deviceCode={state.oauthDeviceCode}
+          onClose={() => setModelsOpen(false)}
+          onSelect={(provider, model) => post({ type: "select_model", provider, model })}
+          onLogin={(provider) => post({ type: "login_provider", provider })}
+          onLogout={(provider) => post({ type: "logout_provider", provider })}
+        />
+      )}
+      {forkOpen && state.forkPoints && state.forkPoints.length > 0 && (
+        <ForkPanel
+          points={state.forkPoints}
+          onClose={() => setForkOpen(false)}
+          onFork={(entryId) => post({ type: "fork_at", entryId })}
         />
       )}
     </div>

@@ -1,5 +1,6 @@
 import type { ToolEntry } from "../types";
 import { Icon } from "./Icon";
+import { Markdown } from "./Markdown";
 import { Tooltip } from "./Tooltip";
 import { Spinner } from "./Spinner";
 import { useEffect, useState } from "react";
@@ -37,12 +38,41 @@ function toolCallInfo(tool: string, args: unknown): { icon: string; label: strin
   }
 }
 
+// Render del resultado según el tipo de tool (estilo TUI: diff, código, terminal).
+function renderResult(entry: ToolEntry) {
+  if (entry.diff) {
+    const lines = entry.diff.split("\n");
+    return (
+      <pre className="diff-out">
+        {lines.map((ln, i) => {
+          const cls = ln.startsWith("+") ? "add" : ln.startsWith("-") ? "del" : "ctx";
+          return <span key={i} className={"diff-line " + cls}>{ln || " "}</span>;
+        })}
+      </pre>
+    );
+  }
+  if (!entry.result?.trim()) return null;
+  // read/write → bloque de código con resaltado según extensión.
+  if (entry.tool === "read" || entry.tool === "write") {
+    const path = String((entry.args as any)?.path ?? "");
+    const ext = (path.split(".").pop() || "").toLowerCase();
+    const fence = "```";
+    return (
+      <div className="tool-result md">
+        <Markdown>{`${fence}${ext}\n${entry.result}\n${fence}`}</Markdown>
+      </div>
+    );
+  }
+  // bash / grep / default → terminal plano.
+  return <pre className="tool-result">{entry.result}</pre>;
+}
+
 export function ToolCard({ entry }: { entry: ToolEntry }) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const running = entry.state === "running";
   const { icon, label } = toolCallInfo(entry.tool, entry.args);
-  const hasResult = !!(entry.result && entry.result.trim());
+  const hasResult = !!(entry.result && entry.result.trim()) || !!entry.diff;
 
   // Cronómetro en vivo solo mientras ejecuta (re-render ligero cada 250 ms).
   useEffect(() => {
@@ -84,11 +114,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
           </Tooltip>
         )}
       </div>
-      {hasResult && (
-        <div className="tool-result">
-          <pre>{entry.result}</pre>
-        </div>
-      )}
+      {open && hasResult && <div className="tool-result-wrap">{renderResult(entry)}</div>}
     </div>
   );
 }

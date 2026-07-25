@@ -54,9 +54,9 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
       }
     });
 
-    // 401 → re-onboarding de la key (D6).
+    // 401/403 → re-onboarding de la key (D6).
     pi.on("after_provider_response", (event: any, ctx: any) => {
-      if (ctx.model?.provider === SOFTTEK_PROVIDER && event.status === 401) {
+      if (ctx.model?.provider === SOFTTEK_PROVIDER && (event.status === 401 || event.status === 403)) {
         deps.onUnauthorized();
       }
     });
