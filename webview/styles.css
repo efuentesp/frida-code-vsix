@@ -264,6 +264,62 @@ button.danger:hover { filter: brightness(.92); }
 .q-note summary { cursor: pointer; font-size: 12px; color: var(--vscode-descriptionForeground); }
 .q-note textarea { width: 100%; min-height: 48px; margin-top: 4px; resize: vertical; }
 
+/* Previews markdown side-by-side (ADR-0006, post-MVP). Solo single-select.
+   flex-wrap → side-by-side si hay ancho, apilado debajo si el panel es estrecho. */
+.q-with-preview { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+.q-with-preview .q-options { flex: 1 1 55%; min-width: 180px; margin-bottom: 6px; }
+.q-preview {
+  flex: 1 1 40%;
+  min-width: 200px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.2));
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  font-size: 12px;
+}
+.q-preview .md { font-size: 12px; }
+.q-preview .md pre { margin: 0 0 6px; }
+.q-preview .md :last-child { margin-bottom: 0; }
+.q-preview-empty { color: var(--vscode-descriptionForeground); font-size: 12px; }
+
+/* Pestañas para múltiples preguntas (ADR-0006, post-MVP). Con 1 sola pregunta
+   se usa el layout simple; con >1, esta tab bar + pestaña "Revisar". */
+.q-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128,128,128,0.2)); }
+.q-tab {
+  background: var(--vscode-editor-background);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vscode-descriptionForeground);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.q-tab:hover { background: var(--vscode-list-hoverBackground); }
+.q-tab.active { border-color: var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder)); color: inherit; font-weight: 600; }
+.q-tab.done { color: inherit; }
+.q-tab.review { font-weight: 600; }
+.q-tab-body { min-height: 60px; }
+.q-tab-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.q-tab-nav-right { display: flex; gap: 8px; }
+
+/* Pestaña "Revisar": resumen de respuestas + pendientes (borde ámbar). */
+.q-review { display: flex; flex-direction: column; gap: 6px; }
+.q-review-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  border: 1px solid transparent;
+}
+.q-review-item.pending { border-color: var(--vscode-inputValidation-warningBorder, #cca700); }
+.q-review-q { display: block; font-size: 12px; color: var(--vscode-descriptionForeground); margin-bottom: 2px; }
+.q-review-a { display: block; font-size: 13px; font-weight: 600; }
+.q-review-item.pending .q-review-a { color: var(--vscode-descriptionForeground); font-style: italic; font-weight: 400; }
+
 /* Welcome / estado vacío */
 .welcome { max-width: 480px; margin: 2vh auto 0; text-align: center; padding: 0 16px; }
 .welcome-logo { display: flex; justify-content: center; margin-bottom: 14px; }

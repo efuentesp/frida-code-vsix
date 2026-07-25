@@ -234,7 +234,7 @@ usa `ctx.ui`. Descartado cargar el paquete rpiv por descubrimiento (su diálogo 
 TUI propia y reabre ADR-0005).
 
 **MVP:** multi-pregunta + texto-libre + single/multi-select + nota opcional.
-Post-MVP (reversible): previews markdown, pestañas tipo rpiv, reserved labels, i18n.
+Post-MVP **implementado**: validación runtime exhaustiva + reserved labels (`Otro`/`Escribe algo`/`Type something.`/`Other`/`Next`/`Siguiente`), previews markdown en la UI (side-by-side en single-select), pestañas tipo rpiv con pestaña Revisar (multregunta tabbed), y refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`). Pendiente: i18n. _Detalle en [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md) → «Post-MVP resuelto»._
 **No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
 descubierta.
 
