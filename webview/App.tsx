@@ -13,12 +13,13 @@ import { Welcome } from "./components/Welcome";
 import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
-import { Bot, Brain, CircleHelp, CircleStop, CornerDownRight, History, Key, Library, Minimize2, Pause, RotateCw, ShieldCheck, SquarePen, TriangleAlert } from "lucide-react";
+import { Bot, Brain, CircleHelp, CircleStop, CornerDownRight, History, Key, Library, Minimize2, Pause, RotateCw, Settings, ShieldCheck, SquarePen, TriangleAlert, X } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
 import { ModelPanel } from "./components/ModelPanel";
 import { ForkPanel } from "./components/ForkPanel";
+import { TodoPanel } from "./components/TodoPanel";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -47,6 +48,7 @@ export function App() {
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [forkOpen, setForkOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const [hideThinking, setHideThinking] = useState(false);
   const lastEscRef = useRef(0);
   const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,6 +126,7 @@ export function App() {
       { kind: "builtin", label: "/copy", name: "copy", description: "Copiar el último mensaje al portapapeles" },
       { kind: "builtin", label: "/clone", name: "clone", description: "Duplicar la sesión actual" },
       { kind: "builtin", label: "/fork", name: "fork", description: "Bifurcar desde un mensaje anterior" },
+      { kind: "builtin", label: "/todos", name: "todos", description: "Mostrar la lista de tareas agrupada por estado" },
       { kind: "builtin", label: "/help", name: "help", description: "Mostrar atajos y comandos" },
     ],
     []
@@ -177,6 +180,11 @@ export function App() {
           <Tooltip label="Sesiones anteriores" side="bottom">
             <button className="ico" onClick={() => { setSessionsOpen(true); post({ type: "list_sessions" }); }}>
               <History size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Configuración" side="bottom">
+            <button className="ico" onClick={() => setConfigOpen(true)}>
+              <Settings size={15} />
             </button>
           </Tooltip>
         </span>
@@ -307,6 +315,7 @@ export function App() {
             <div className="proc-bar"><Spinner size={14} /> {procLabel}</div>
           )
         )}
+        {state.todos && state.toolToggles?.todo !== false && <TodoPanel todos={state.todos} />}
         <Composer
           onSubmit={(text, mode, images) => post({ type: "submit", text, mode, images })}
           onSearch={(q) => post({ type: "search_files", query: q })}
@@ -352,6 +361,39 @@ export function App() {
           onClose={() => setForkOpen(false)}
           onFork={(entryId) => post({ type: "fork_at", entryId })}
         />
+      )}
+      {configOpen && (
+        <div className="cfg-panel">
+          <div className="cfg-head">
+            <span className="cfg-title">Configuración</span>
+            <button className="ico" onClick={() => setConfigOpen(false)}>
+              <X size={15} />
+            </button>
+          </div>
+          <div className="cfg-body">
+            <div className="cfg-section">Herramientas del agente</div>
+            <div className="cfg-row">
+              <div className="cfg-row-info">
+                <div className="cfg-row-title">Preguntar al usuario</div>
+                <div className="cfg-row-desc">Habilita el tool <code>ask_user_question</code> para que el agente pregunte con opciones concretas en vez de adivinar.</div>
+              </div>
+              <button
+                className={"switch" + ((state.toolToggles?.askUserQuestion ?? true) ? " on" : "")}
+                onClick={() => post({ type: "set_tool_toggle", key: "askUserQuestion", enabled: !(state.toolToggles?.askUserQuestion ?? true) })}
+              />
+            </div>
+            <div className="cfg-row">
+              <div className="cfg-row-info">
+                <div className="cfg-row-title">Lista de tareas</div>
+                <div className="cfg-row-desc">Habilita el tool <code>todo</code> y el panel de Tareas para seguimiento multi-paso. Los cambios se aplican recargando las extensiones (sin perder el historial).</div>
+              </div>
+              <button
+                className={"switch" + ((state.toolToggles?.todo ?? true) ? " on" : "")}
+                onClick={() => post({ type: "set_tool_toggle", key: "todo", enabled: !(state.toolToggles?.todo ?? true) })}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

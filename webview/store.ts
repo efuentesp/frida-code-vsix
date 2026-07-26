@@ -201,6 +201,12 @@ export function reduce(state: State, msg: InMessage): State {
     case "model_info":
       return { ...state, model: msg.model, provider: msg.provider, thinking: msg.thinking };
 
+    case "todos":
+      return { ...state, todos: { tasks: msg.tasks, nextId: msg.nextId } };
+
+    case "tool_toggles":
+      return { ...state, toolToggles: { askUserQuestion: msg.askUserQuestion, todo: msg.todo } };
+
     case "history": {
       const turns: Turn[] = [];
       let id = 1;

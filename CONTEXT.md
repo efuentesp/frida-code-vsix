@@ -132,6 +132,7 @@ el resto son reversibles o el camino obvio y se detallan aquí.
 | 12 | Bump de Pi | Pin exacto + vigilancia out-of-band en CI + rebuild+test. **Responsable: PSG** (detalle abajo) |
 | 13 | Sesiones (JSONL) | `context.globalStorageUri`, desacoplado del `agentDir` (detalle abajo) |
 | 14 | Preguntar al usuario (`ask_user_question`) | Tool dedicado nativo vía puente al webview, **no** `ExtensionUIContext` general — _ver [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md)_ |
+| 15 | Lista de tareas (`todo`) + Configuración | Tool `todo` nativo (porte de rpiv-todo, sin overlay TUI) + panel en el webview + Configuración conmutable (settings ↔ webview) — _ver [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)_ |
 
 ### D6 — Conexión / proveedor
 
@@ -237,6 +238,37 @@ TUI propia y reabre ADR-0005).
 Post-MVP **implementado**: validación runtime exhaustiva + reserved labels (`Otro`/`Escribe algo`/`Type something.`/`Other`/`Next`/`Siguiente`), previews markdown en la UI (side-by-side en single-select), pestañas tipo rpiv con pestaña Revisar (multregunta tabbed), y refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`). Pendiente: i18n. _Detalle en [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md) → «Post-MVP resuelto»._
 **No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
 descubierta.
+
+### D15 — Lista de tareas (`todo`) + Configuración
+
+Herramienta para que el modelo **planee y siga trabajo multi-paso** (máquina
+`pending → in_progress → completed`, más `deleted`; dependencias `blockedBy` con
+validación de transiciones/ciclos). Equivalente en **idea** a
+`@juicesharp/rpiv-todo`, pero **nativa de Frida**: porte de su lógica (reducer,
+replay, schema) a `src/tools/todo/`, registrado como factory inline. El **overlay
+TUI** (`setWidget`/`aboveEditor`) **no aplica** (host en `print`/`hasUI=false` por
+ADR-0006): su equivalente es un `TodoPanel` en el webview, fijo arriba del
+transcript y auto-oculto si la lista vacía.
+
+Sin puente bloqueante: a diferencia de D14, el tool **no** espera respuesta del
+usuario — el `execute` muta un holder en memoria (`src/todo-state.ts`) y el host
+publica el estado al webview desde `tool_execution_end` (canal unidireccional). La
+lista **sobrevive sin disco**: cada `toolResult` "todo" lleva el snapshot en
+`details` y `replayFromBranch` lo reconstruye al crear/abrir sesión (resiste
+recarga, switch y compaction).
+
+**Configuración conmutable** (formalizada en
+[ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)): settings de
+VS Code (`frida.todo.enabled`, `frida.askUserQuestion.enabled`, default `true`)
+como fuente de verdad de intención, expuestos en una vista "Configuración" del
+webview (botón ⚙). Las factories se envuelven con `toggleable(getEnabled,
+factory)`; un cambio persiste el setting y dispara `session.reload()`, que
+re-ejecuta las factories y re-evalúa los getters → el tool aparece/desaparece **en
+caliente sin perder el historial**. El panel se oculta cuando el toggle está
+apagado, aunque haya tareas en el historial.
+
+**No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
+descubierta. _Detalle en [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)_
 
 ---
 

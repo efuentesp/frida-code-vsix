@@ -161,6 +161,24 @@ export interface ProviderOption {
 
 export type ApprovalMode = "manual" | "auto-edit" | "auto";
 
+// Tareas del tool `todo` (host publica solo las no eliminadas).
+export type TaskStatus = "pending" | "in_progress" | "completed";
+export interface TodoTask {
+  id: number;
+  subject: string;
+  description?: string;
+  activeForm?: string;
+  status: TaskStatus;
+  blockedBy?: number[];
+  owner?: string;
+}
+
+// Toggles de la Configuración (qué tools del agente están activos).
+export interface ToolToggles {
+  askUserQuestion: boolean;
+  todo: boolean;
+}
+
 export interface State {
   keyNeeded: boolean;
   busy: boolean;
@@ -184,6 +202,8 @@ export interface State {
   isCompacting: boolean;
   compactReason?: CompactionReason;
   compactions: CompactionEntry[];
+  todos?: { tasks: TodoTask[]; nextId: number };
+  toolToggles?: ToolToggles;
   nextId: number;
 }
 
@@ -222,6 +242,8 @@ export type InMessage =
   | { type: "history"; name?: string; items: HistoryItem[] }
   | { type: "mode"; mode: ApprovalMode }
   | { type: "model_info"; provider?: string; model: string; thinking: string }
+  | { type: "todos"; tasks: TodoTask[]; nextId: number }
+  | { type: "tool_toggles"; askUserQuestion: boolean; todo: boolean }
   | { type: "error"; text: string };
 
 // webview → host
@@ -252,4 +274,5 @@ export type OutMessage =
   | { type: "rename_session"; path: string; name: string }
   | { type: "delete_session"; path: string }
   | { type: "set_mode"; mode: ApprovalMode }
-  | { type: "set_thinking"; level: string };
+  | { type: "set_thinking"; level: string }
+  | { type: "set_tool_toggle"; key: "askUserQuestion" | "todo"; enabled: boolean };

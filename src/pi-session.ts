@@ -13,7 +13,20 @@ import { createApprovalGates } from "./gates/approval-gates";
 import type { ApprovalMode } from "./gates/approval-gates";
 import { ApprovalBridge, ApprovalRequest } from "./approval-bridge";
 import { createAskUserQuestion } from "./tools/ask-user-question";
+import { createTodoTool } from "./tools/todo/todo";
+import { replayFromBranch } from "./tools/todo/replay";
 import { QuestionBridge, type QuestionRequest } from "./question-bridge";
+import { resetTodoState, setTodoState } from "./todo-state";
+
+/** Una factory de Pi + un getter que decide si registrarse (toggle de config). */
+function toggleable(
+	getEnabled: () => boolean,
+	factory: (pi: import("@earendil-works/pi-coding-agent").ExtensionAPI) => void,
+): (pi: import("@earendil-works/pi-coding-agent").ExtensionAPI) => void {
+	return (pi) => {
+		if (getEnabled()) factory(pi);
+	};
+}
 
 export interface FridaSession {
   session: any;
@@ -42,6 +55,9 @@ export interface CreateFridaSessionOptions {
   onPendingApprovals: (reqs: ApprovalRequest[]) => void;
   onPendingQuestions: (reqs: QuestionRequest[]) => void;
   getMode: () => ApprovalMode;
+  /** Toggles de tools (Configuración). Las factories se registran según estos. */
+  askUserQuestionEnabled: () => boolean;
+  todoEnabled: () => boolean;
 }
 
 export async function createFridaSession(opts: CreateFridaSessionOptions): Promise<FridaSession> {
@@ -78,7 +94,11 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
     extensionFactories: [
       { name: "softtek-provider", factory: createSofttekProviderHooks({ getKey: () => keyHolder.current, onUnauthorized: opts.onUnauthorized }) },
       { name: "approval-gates", factory: createApprovalGates(bridge, opts.getMode) },
-      { name: "ask-user-question", factory: createAskUserQuestion(questionBridge) },
+      // Tools conmutables desde la Configuración (frida.askUserQuestion.enabled /
+      // frida.todo.enabled). El getter se re-evalúa en cada session.reload(), así
+      // un cambio de toggle se aplica en caliente sin perder el historial.
+      { name: "ask-user-question", factory: toggleable(opts.askUserQuestionEnabled, createAskUserQuestion(questionBridge)) },
+      { name: "todo", factory: toggleable(opts.todoEnabled, createTodoTool()) },
     ],
   });
   await loader.reload();
@@ -101,6 +121,13 @@ export async function createFridaSession(opts: CreateFridaSessionOptions): Promi
   const sessionManager = opts.openPath
     ? SessionManager.open(opts.openPath, opts.sessionDir, opts.cwd)
     : SessionManager.create(opts.cwd, opts.sessionDir);
+
+  // Reconstruir el estado del tool `todo` desde el historial de la sesión (cada
+  // toolResult "todo" lleva el snapshot en details). Al crear sesión nueva el
+  // branch está vacío → EMPTY_STATE. resetTodoState() garantiza un punto de
+  // partida limpio antes del replay (no pisa sesiones anteriores en memoria).
+  resetTodoState();
+  setTodoState(replayFromBranch({ sessionManager }));
 
   const { session } = await createAgentSession({
     resourceLoader: loader,

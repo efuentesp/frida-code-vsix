@@ -9,6 +9,8 @@ import { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
 import { SOFTTEK_MODEL_DISPLAY, SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_DISPLAY } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
+import { getTodoState } from "./todo-state";
+import { isAskUserQuestionEnabled, isTodoEnabled, readToolToggles, writeToolToggle } from "./settings";
 
 const execFileP = promisify(execFile);
 
@@ -181,12 +183,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
         onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
         getMode: () => approvalMode,
+        askUserQuestionEnabled: isAskUserQuestionEnabled,
+        todoEnabled: isTodoEnabled,
       });
       wireSession(frida.session);
       sendModelInfo();
       postResources();
       postModels();
       void postWorkspace();
+      postTodos();
+      postToolToggles();
       postUsage(frida.session);
       // Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
       // crear la sesión siempre permite elegir Copilot desde el onboarding).
@@ -400,6 +406,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (data) post({ type: "resources", data });
   }
 
+  // Estado del tool `todo` → webview (panel de Tareas). Lee el holder en memoria,
+  // que pi-session reconstruye por replay al crear/abrir sesión. Se publica:
+  //  - al crear/abrir sesión (ensureSession/switchSession)
+  //  - tras cada `tool_execution_end` del tool "todo"
+  function postTodos(): void {
+    const s = getTodoState();
+    const tasks = s.tasks
+      .filter((t) => t.status !== "deleted")
+      .map((t) => ({
+        id: t.id,
+        subject: t.subject,
+        description: t.description,
+        activeForm: t.activeForm,
+        status: t.status,
+        blockedBy: t.blockedBy,
+        owner: t.owner,
+      }));
+    post({ type: "todos", tasks, nextId: s.nextId });
+  }
+
+  // Toggles de Configuración (tools activos) → webview, para la vista de
+  // Configuración. Se leen en vivo de los settings de VS Code.
+  function postToolToggles(): void {
+    post({ type: "tool_toggles", ...readToolToggles() });
+  }
+
   // Info del workspace: carpeta de trabajo + branch git (y si hay cambios
   // sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
   // pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
@@ -486,6 +518,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             result: summarizeResult(event.result),
             diff: typeof event.result?.details?.diff === "string" ? event.result.details.diff : undefined,
           });
+          // El tool `todo` mutó el holder; republica el estado al panel.
+          if (event.toolName === "todo" && !event.isError) postTodos();
           break;
         case "compaction_start":
           post({ type: "compact_start", reason: event.reason });
@@ -541,6 +575,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     switch (msg?.type) {
       case "webview_ready":
         post({ type: "mode", mode: approvalMode });
+        postToolToggles();
+        postTodos();
         bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
         break;
       case "submit":
@@ -630,6 +666,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         approvalMode = msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
         post({ type: "mode", mode: approvalMode });
         break;
+      case "set_tool_toggle":
+        await writeToolToggle(msg.key, !!msg.enabled);
+        postToolToggles();
+        // Re-ejecuta las factories para activar/desactivar el tool en caliente
+        // (frida.askUserQuestion.enabled / frida.todo.enabled). Igual que /reload,
+        // no pierde el historial; el estado de `todo` se recupera por replay.
+        await reloadResources();
+        break;
       case "set_thinking":
         try { frida?.session?.setThinkingLevel?.(String(msg.level ?? "medium")); } catch { /* noop */ }
         sendModelInfo();
@@ -640,7 +684,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Built-in slash commands del composer (estilo TUI de pi). Se interceptan
   // en runPrompt ANTES de enviar al agente.
   const BUILTIN_SLASH = new Set([
-    "compact", "reload", "new", "model", "login", "logout", "name", "copy", "help", "clone", "fork",
+    "compact", "reload", "new", "model", "login", "logout", "name", "copy", "help", "clone", "fork", "todos",
   ]);
 
   async function runBuiltinSlash(text: string): Promise<boolean> {
@@ -678,6 +722,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       case "help": postHelp(); break;
       case "clone": await cloneSession(); break;
       case "fork": await forkSession(); break;
+      case "todos": postTodosCommand(); break;
     }
     return true;
   }
@@ -706,8 +751,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   function postHelp(): void {
     post({
       type: "info",
-      text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener",
+      text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener",
     });
+  }
+
+  // /todos: imprime la lista de tareas agrupada por estado (estilo /todos de la
+  // TUI de pi/rpiv). Lee el holder en memoria del tool `todo`.
+  function postTodosCommand(): void {
+    const s = getTodoState();
+    const visible = s.tasks.filter((t) => t.status !== "deleted");
+    if (visible.length === 0) {
+      post({ type: "info", text: "No hay tareas todavía." });
+      return;
+    }
+    const fmt = (t: any) =>
+      `  #${t.id} ${t.subject}` +
+      (t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "") +
+      (t.blockedBy?.length ? ` ⛓ ${t.blockedBy.map((id: number) => `#${id}`).join(",")}` : "");
+    const pending = visible.filter((t) => t.status === "pending");
+    const inProg = visible.filter((t) => t.status === "in_progress");
+    const done = visible.filter((t) => t.status === "completed");
+    const lines: string[] = [`Tareas: ${done.length}/${visible.length}`];
+    if (inProg.length) { lines.push("── En progreso ──"); for (const t of inProg) lines.push(fmt(t)); }
+    if (pending.length) { lines.push("── Pendientes ──"); for (const t of pending) lines.push(fmt(t)); }
+    if (done.length) { lines.push("── Completadas ──"); for (const t of done) lines.push(fmt(t)); }
+    post({ type: "info", text: lines.join("\n") });
   }
 
   // Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
@@ -983,6 +1051,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
         onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
         getMode: () => approvalMode,
+        askUserQuestionEnabled: isAskUserQuestionEnabled,
+        todoEnabled: isTodoEnabled,
       });
       wireSession(frida.session);
       postHistory();
@@ -991,6 +1061,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       postModels();
       postUsage(frida.session);
       void postWorkspace();
+      postTodos();
+      postToolToggles();
     } catch (e: any) {
       post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
     }

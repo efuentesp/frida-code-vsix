@@ -44,7 +44,22 @@
         "command": "frida.approvalMode",
         "title": "Frida: Cambiar modo de aprobación"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Frida Code",
+      "properties": {
+        "frida.askUserQuestion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita el tool `ask_user_question` para que el agente pregunte con opciones concretas en vez de adivinar. Se aplica al recargar (botón Configuración o `/reload`)."
+        },
+        "frida.todo.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita el tool `todo` y el panel de Tareas para seguimiento multi-paso. Se aplica al recargar (botón Configuración o `/reload`)."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node esbuild.js && vite build",
