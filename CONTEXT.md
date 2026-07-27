@@ -69,12 +69,12 @@ cualquier garantía de confidencialidad.
 
 **Router (de la empresa):**
 Gateway interno tipo-OpenRouter que centraliza el acceso a los modelos aprobados;
-todo el uso sancionado pasa por aquí y queda auditado. En Pi se registra como un _provider_.
-_Evitar:_ gateway, proxy (demasiado genéricos).
+todo el uso sancionado pasa por aquí y queda auditado. En Pi se registra como un *provider*.
+*Evitar:* gateway, proxy (demasiado genéricos).
 
 **Provider (de Pi):**
-La abstracción de Pi para un backend de LLM (`pi.registerProvider(...)`). El _router_ de la empresa se enchufa aquí. Un provider ofrece uno o más modelos.
-_Evitar:_ "endpoint", "modelo" (un modelo pertenece a un provider).
+La abstracción de Pi para un backend de LLM (`pi.registerProvider(...)`). El *router* de la empresa se enchufa aquí. Un provider ofrece uno o más modelos.
+*Evitar:* "endpoint", "modelo" (un modelo pertenece a un provider).
 
 **Extensión de Pi:**
 Módulo TypeScript (factory inline o paquete) que Pi carga **en-proceso** para registrar tools, providers, comandos o handlers de eventos. Corre con los permisos del proceso. (El gate de aprobación y el proveedor del router son extensiones de Pi.)
@@ -85,10 +85,10 @@ El producto que construimos — el `.vsix` que TI instala. **No** es lo mismo qu
 
 **Perímetro de seguridad:**
 Un control que **impide** la fuga. Este proyecto **no** lo es (ver §2 / ADR-0001).
-_Evitar:_ aplicar "perímetro"/"candado" a esta herramienta.
+*Evitar:* aplicar "perímetro"/"candado" a esta herramienta.
 
 **Disuasivo:**
-Hacer lo correcto fácil y por defecto; lo incorrecto requiere esfuerzo consciente. Es la postura real del proyecto (no un candado). Con recursos abiertos (ADR-0005), la fricción _dentro de la herramienta_ se reduce.
+Hacer lo correcto fácil y por defecto; lo incorrecto requiere esfuerzo consciente. Es la postura real del proyecto (no un candado). Con recursos abiertos (ADR-0005), la fricción *dentro de la herramienta* se reduce.
 
 **Egress:**
 Salida de datos de la máquina del desarrollador hacia un endpoint. El modelo de amenaza es la **fuga por egress** hacia modelos/endpoints no autorizados.
@@ -100,8 +100,8 @@ El paso de confirmación antes de ejecutar un tool, implementado con el evento `
 Bandera per-session que silencia los gates de `edit`+`write` ("aceptar todas esta sesión"). **Nunca** cubre `bash`.
 
 **Proveedor exclusivo (por defecto):**
-El router + modelo fijo es el valor **por defecto** y lo único que el onboarding configura — pero **no** está _enforced_: un desarrollador puede registrar otro proveedor (ADR-0005).
-_Evitar:_ "candado", o "exclusivo" sin el "(por defecto)".
+El router + modelo fijo es el valor **por defecto** y lo único que el onboarding configura — pero **no** está *enforced*: un desarrollador puede registrar otro proveedor (ADR-0005).
+*Evitar:* "candado", o "exclusivo" sin el "(por defecto)".
 
 **Onboarding de key:**
 Flujo que pide al dev su API key personal (guardada en `SecretStorage`) al activar, y la re-pide ante un 401.
@@ -117,22 +117,25 @@ Las marcadas con **ADR** son difíciles de revertir y sorprendentes sin contexto
 el resto son reversibles o el camino obvio y se detallan aquí.
 
 | # | Decisión | Resumen / Ref |
-|---|----------|---------------|
-| 1 | Modelo de amenaza | Fuga de datos (egress) — _ver [ADR-0001](./docs/adr/0001-alcance-disuasivo-no-perimetro.md)_ |
-| 2 | Perímetro de seguridad | Red + router (red pendiente). La extensión es UX, **no** candado — _ver [ADR-0001](./docs/adr/0001-alcance-disuasivo-no-perimetro.md)_ |
+| --- | ---------- | --------------- |
+| 1 | Modelo de amenaza | Fuga de datos (egress) — *ver [ADR-0001](./docs/adr/0001-alcance-disuasivo-no-perimetro.md)* |
+| 2 | Perímetro de seguridad | Red + router (red pendiente). La extensión es UX, **no** candado — *ver [ADR-0001](./docs/adr/0001-alcance-disuasivo-no-perimetro.md)* |
 | 3 | UX objetivo | Panel lateral completo tipo Claude Code (chat + tool-cards + diffs aprobables) |
 | 4 | Motor | **Pi** (no oh-my-pi). Empezar básico; subagentes/MCP/planeación como extensiones después |
-| 5 | Integración de Pi | **SDK embebido en-proceso** — _ver [ADR-0002](./docs/adr/0002-sdk-en-proceso-no-rpc.md)_ |
+| 5 | Integración de Pi | **SDK embebido en-proceso** — *ver [ADR-0002](./docs/adr/0002-sdk-en-proceso-no-rpc.md)* |
 | 6 | Conexión / proveedor | Router hardcoded en código + key en `SecretStorage` + modelo único (default) — detalle abajo |
 | 7 | Aprobación de acciones | Gates vía `tool_call`; libres/diff/siempre — detalle abajo |
-| 8 | Distribución | **`.vsix` solo por TI**, key por dev — _ver [ADR-0003](./docs/adr/0003-instalacion-por-ti-key-por-dev.md)_ |
-| 9 | Mantenimiento | **Depender + pin exacto, no forkear** — _ver [ADR-0004](./docs/adr/0004-depender-y-pin-sin-forkear.md)_ |
-| 10 | Carga de recursos del agente | **Descubrimiento abierto** — _ver [ADR-0005](./docs/adr/0005-descubrimiento-de-recursos-abierto.md)_ |
+| 8 | Distribución | **`.vsix` solo por TI**, key por dev — *ver [ADR-0003](./docs/adr/0003-instalacion-por-ti-key-por-dev.md)* |
+| 9 | Mantenimiento | **Depender + pin exacto, no forkear** — *ver [ADR-0004](./docs/adr/0004-depender-y-pin-sin-forkear.md)* |
+| 10 | Carga de recursos del agente | **Descubrimiento abierto** — *ver [ADR-0005](./docs/adr/0005-descubrimiento-de-recursos-abierto.md)* |
 | 11 | Phone-home a pi.dev | **Desactivado** (detalle abajo) |
 | 12 | Bump de Pi | Pin exacto + vigilancia out-of-band en CI + rebuild+test. **Responsable: PSG** (detalle abajo) |
 | 13 | Sesiones (JSONL) | `context.globalStorageUri`, desacoplado del `agentDir` (detalle abajo) |
-| 14 | Preguntar al usuario (`ask_user_question`) | Tool dedicado nativo vía puente al webview, **no** `ExtensionUIContext` general — _ver [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md)_ |
-| 15 | Lista de tareas (`todo`) + Configuración | Tool `todo` nativo (porte de rpiv-todo, sin overlay TUI) + panel en el webview + Configuración conmutable (settings ↔ webview) — _ver [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)_ |
+| 14 | Preguntar al usuario (`ask_user_question`) | Tool dedicado nativo vía puente al webview, **no** `ExtensionUIContext` general — *ver [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md)* |
+| 15 | Lista de tareas (`todo`) + Configuración | Tool `todo` nativo (porte de rpiv-todo, sin overlay TUI) + panel en el webview + Configuración conmutable (settings ↔ webview) — *ver [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)* |
+| 16 | pi-lens: capa semántica del *agente* | Distinto del LSP de VS Code (que sirve al *humano* que edita). Se aprovechan los tools de pi-lens orientados al modelo (ast_grep, funnel, blast-radius, read-guard); **no** se publican squiggles/formato en el editor (redundante con VS Code); auto-format/autofix de pi-lens desactivados y diagnósticos visibles como resumen por turno en el panel (ver ADR-0008) — *detalle D16*
+| 17 | Reintentos del provider | Cuando el gateway devuelve un error retriable, el SDK reintenta (maxRetries:3) y Frida lo muestra como el TUI: countdown "Reintentando (n/3)…", doble Esc para cancelar (abortRetry) y error final si todos fallan — *detalle D17*
+| 18 | Alineación con el TUI de pi | Paridad de eventos que el TUI cubría y Frida no: reintentos de compactación, progreso de tools (toolCallId), feedback de abort, skill blocks colapsables, branch summary y sync de thinking — *detalle D18*
 
 ### D6 — Conexión / proveedor
 
@@ -166,7 +169,7 @@ La key vive **solo en memoria del proceso** (no en env — sería visible al too
 ADR-0005). La detección de 401 usa `after_provider_response`
 (`event.status === 401`, scoping igual al de arriba) → reabre el onboarding.
 **No es un candado:** con el descubrimiento abierto (ADR-0005) un dev puede
-registrar otro proveedor; la empresa controla el _default_ vía código + router,
+registrar otro proveedor; la empresa controla el *default* vía código + router,
 no el conjunto accesible.
 
 ### D7 — Aprobación (gates)
@@ -235,7 +238,7 @@ usa `ctx.ui`. Descartado cargar el paquete rpiv por descubrimiento (su diálogo 
 TUI propia y reabre ADR-0005).
 
 **MVP:** multi-pregunta + texto-libre + single/multi-select + nota opcional.
-Post-MVP **implementado**: validación runtime exhaustiva + reserved labels (`Otro`/`Escribe algo`/`Type something.`/`Other`/`Next`/`Siguiente`), previews markdown en la UI (side-by-side en single-select), pestañas tipo rpiv con pestaña Revisar (multregunta tabbed), y refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`). Pendiente: i18n. _Detalle en [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md) → «Post-MVP resuelto»._
+Post-MVP **implementado**: validación runtime exhaustiva + reserved labels (`Otro`/`Escribe algo`/`Type something.`/`Other`/`Next`/`Siguiente`), previews markdown en la UI (side-by-side en single-select), pestañas tipo rpiv con pestaña Revisar (multregunta tabbed), y refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`). Pendiente: i18n. *Detalle en [ADR-0006](./docs/adr/0006-preguntar-al-usuario-tool-dedicado.md) → «Post-MVP resuelto».*
 **No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
 descubierta.
 
@@ -268,7 +271,187 @@ caliente sin perder el historial**. El panel se oculta cuando el toggle está
 apagado, aunque haya tareas en el historial.
 
 **No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
-descubierta. _Detalle en [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)_
+descubierta. *Detalle en [ADR-0007](./docs/adr/0007-todo-nativo-configuracion-conmutable.md)*
+
+### D16 — pi-lens es la capa semántica del *agente*, distinta del LSP del editor
+
+`pi-lens` ya está instalado en `~/.pi/agent` y, con el descubrimiento abierto
+(ADR-0005), **ya se carga en-proceso** al crear la sesión: el
+`DefaultResourceLoader` lo resuelve vía `packageManager` desde el `agentDir`. Por
+lo tanto, **no requiere registro ni empaquetado extra** en Frida — sus binarios
+N-API (`@ast-grep/napi`), WASM (`web-tree-sitter`) y grammars viven en el
+`agentDir` del dev.
+
+**Distinción clave (no es redundancia):** el LSP de VS Code sirve al ***humano***
+que teclea en el editor (squiggles, Problems, formateo on-save, go-to-definition
+bajo el cursor). pi-lens sirve al ***agente*** que edita vía tools (`read`/`edit`/
+`write`): le da capacidades semánticas afinadas para **ahorrar tokens** y para
+**operar sobre archivos que el humano ni siquiera tiene abiertos**. Operan en
+planos distintos — compiten por **proceso** (pueden correr dos servers del mismo
+lenguaje a la vez), no por **función**.
+
+**Decisión: aprovechar los tools que dan al *agente* lo que VS Code no le da;
+no replicar el *editor*.**
+
+- **Se aprovecha tal cual** (ya disponible para el modelo; aparece como tarjetas
+  de tool normales; **VS Code no los sustituye**):
+  - `ast_grep_search` / `ast_grep_replace`: búsqueda/reemplazo **estructural** con
+    metavariables (`$VAR`, `$$$ARGS`) en ~40 lenguajes. Sin equivalente nativo en
+    VS Code — evita regex frágiles al reescribir código. Probablemente lo más
+    valioso para un agente que muta código.
+  - Funnel de descubrimiento: `module_report` → `read_symbol` → `read_enclosing`
+    (outline navegable **rankeado** con `usedBy`, `recommendedReads`,
+    `blastRadius`, en ~¼ de tokens que un `read` entero). VS Code expone
+    `documentSymbol`, pero **sin ranking, sin blast-radius, sin who-uses-this**.
+  - `symbol_search`: índice BM25 siempre caliente de identificadores del proyecto
+    ("¿qué archivos son relevantes a X?", demoviendo tests/vendor/docs). VS Code
+    tiene `workspaceSymbol` (busca *definiciones*), no *rankea archivos*.
+  - Review graph + blast radius: grafo `file → symbol → dependency` precomputado
+    ("si tocas esto, *estos* archivos dependen de ello"). VS Code solo da
+    `findReferences` uno-por-uno (lento) o `callHierarchy` (no todos los LSP).
+  - `lsp_navigation` / `lsp_diagnostics` / `lens_diagnostics` como **consulta
+    puntual del modelo** (definition/references/rename/diagnósticos bajo demanda).
+  - **Read-before-edit guard**: bloquea al **modelo** de editar archivos que no ha
+    leído en la sesión (zero-read / out-of-range / stale-hash). Es una **política
+    sobre el agente**; VS Code no tiene concepto de "lo que el agente leyó".
+    Complementa los gates de D7 → conviene **dejarlo activo**.
+
+- **NO se integra al editor** (esto sí sería redundante con VS Code):
+  - Publicar diagnósticos LSP como squiggles / panel *Problems*: VS Code ya corre su
+    propio LSP (TS/ESLint/Python…) y ya los muestra. (Opción descartada por
+    duplicación visible.)
+  - Auto-format / autofix de pi-lens: VS Code formatea on-save; el de pi-lens
+    competiría y, además, mutaría archivos **fuera** del gate (D7). **Desactivado
+    en Frida** vía `PI_LENS_CONFIG_PATH` (merge de la config del usuario forzando
+    `format.enabled`/`autofix.enabled` = false; sólo afecta al proceso de Frida,
+    no al CLI `pi` del usuario).
+
+**Trade-off de proceso (si el doble LSP pesa):** pi-lens permite `--no-lsp` para
+apagar su propio LSP. Se **pierde** `lsp_navigation`, `lsp_diagnostics` y la
+cascada de diagnósticos; se **conserva** (basado en tree-sitter WASM, no LSP):
+`module_report`, `read_symbol`, `read_enclosing`, `symbol_search`,
+`ast_grep_search/replace`, read-guard y review-graph/blast-radius. Es decir, el
+~80 % más valioso para el agente sobrevive sin LSP. Opción a considerar si el
+overhead de correr dos servers del mismo lenguaje resulta notorio.
+
+**¿Construir tools propios sobre el LSP de VS Code en su lugar?** Técnicamente
+posible (`vscode.executeDefinitionProvider`, `getDiagnostics`, …), pero implicaría
+**reinventar** el funnel, el ranking y el blast-radius encima de primitivos sin
+afinar, y amarrar al agente a lo que VS Code tenga indexado/abierto y a las
+extensiones de lenguaje instaladas. Descartado: pi-lens ya cumple ese rol y ya
+está cargado.
+
+**Realización (implementado, *ver [ADR-0008](./docs/adr/0008-pi-lens-mutaciones-y-panel.md)*):**
+(1) el auto-format/autofix de pi-lens está desactivado en Frida (`src/pilens-config.ts`
+
+- `PI_LENS_CONFIG_PATH`, seteado antes de `loader.reload()`); (2) los diagnósticos de
+pi-lens se muestran como **resumen por turno en el panel del webview** (NO en el
+editor) escuchando el evento `pilens:diagnostics` del bus (`src/lens-diagnostics-bridge.ts`
+- `webview/components/LensDiagnostics.tsx`). El estado LSP explícito (activo/fallido)
+y el advisory textual del turno quedan fuera: pi-lens los publica vía `ctx.ui`
+(`hasUI=false` en Frida) o los persiste en archivos internos, sin canal del bus
+viable (ver ADR-0008, parte 2-C).
+
+**No reabre ADR-0005:** no cargamos ni instalamos ninguna extensión ajena nueva;
+sólo **consumimos** la ya descubierta. Tampoco genera egress ni mutaciones por
+parte del host: los tools operan sobre texto local y el read-guard es una política
+interna de pi-lens (ver la sección *Read-Before-Edit Guard* de
+`pi-lens/docs/features.md`).
+
+---
+
+### D17 — Reintentos del provider: visibilidad y cancel (alineado al TUI de pi)
+
+**Problema.** Cuando el gateway (Softtek DevEngine) devuelve un error
+**retriable** (429 / 5xx / timeout), el SDK de Pi reintenta automáticamente
+(`settings.retry.maxRetries` = **3** por defecto, backoff exponencial): por cada
+intento emite `agent_start` → (fallo, sin texto) → `agent_end {willRetry:true}`
+
+- `auto_retry_start {attempt, maxAttempts, delayMs, errorMessage}`, y al final
+`auto_retry_end {success, finalError}`. La primera versión de Frida **ignoraba**
+todos estos eventos → el indicador "Procesando…" parpadeaba 3 veces **en silencio**
+sin respuesta ni error visible.
+
+**Decisión: alinear el manejo con el TUI de pi** (la referencia canónica del
+comportamiento del agente, igual que `/compact`, message queue, etc.). El TUI
+usa un `RetryStatusIndicator` con **cuenta regresiva**, `Esc → session.abortRetry()`,
+y `showError` solo si los reintentos se agotan.
+
+**Realización (implementado):**
+
+- `case "auto_retry_start"` en `wireSession` → `inRetry=true` + `post retry_start`
+  al webview → el footer muestra **`Reintentando (n/3) en Xs… (doble Esc para cancelar)`**
+  con countdown en vivo (`useState`+`useEffect` cada 250 ms sobre `state.retry.delayMs`).
+- `case "auto_retry_end"` → `inRetry=false` + `post retry_end`; si `!success`,
+  `post error` con el `finalError` del gateway → se pinta como `turn.error`
+  (`Turn.tsx` ya lo renderizaba). **Esto revela la causa raíz** (429/5xx/timeout).
+- `case "agent_end"` → si `errorMessage && !willRetry`, `post error` (errores
+  terminales no-retriables).
+- `abortRun()` → si `inRetry`, llama `session.abortRetry()` (cancela sólo el
+  reintento) antes que `session.abort()` (el run entero). El doble-Esc del webview
+  sigue posteando `abort`; el host decide cuál.
+
+**Mismo mecanismo para los reintentos de la compactación:** la sumarización que
+hace `/compact` (y la auto-compaction) también reintenta con el mismo presupuesto
+(`summarization_retry_scheduled` / `_attempt_start` / `_finished`). Frida **reusa**
+`state.retry` y el countdown: `summarization_retry_scheduled` → `retry_start`
+(el countdown se muestra dentro del proc-bar "Compactando…" como
+"Reintentando compactación (n/3) en Xs…"); `_attempt_start` / `_finished` →
+`retry_end` (vuelve a "Compactando…"). El error final ya llega por
+`compaction_end.errorMessage` (que Frida ya mostraba). Cancelar sigue siendo el
+botón `Cancelar` → `cancel_compaction` (`abortCompaction`), no `abortRetry`.
+
+**No es un candado ni introduce egress:** sólo consume eventos del SDK y los
+reenvía al webview. El error que se muestra viene del provider (texto local).
+
+**Punto frágil a regresar en cada bump de Pi** (junto a D12/ADR-0006): los
+eventos `auto_retry_start`/`auto_retry_end` y su payload
+(`{attempt, maxAttempts, delayMs, errorMessage}` / `{success, attempt, finalError}`),
+el flag `willRetry` en `agent_end`, los eventos `summarization_retry_*`
+(`{attempt, maxAttempts, delayMs, errorMessage}` / `{source, reason?}` / `{}`),
+y el método `session.abortRetry()`.
+
+---
+
+### D18 — Alineación con el TUI de pi (paridad de eventos/features)
+
+El TUI de pi (`modes/interactive/`) es la referencia canónica del comportamiento del
+agente. Frida ya alineaba varios (`/compact`, message queue, `/fork`…); esta ronda
+cerró los **huecos** que el TUI cubría y Frida no. Cada uno consume eventos del SDK
+que antes se ignoraban (salvo #4/#5, que parsean mensajes) y los reenvía al webview.
+
+- **Reintentos de la compactación** (`summarization_retry_scheduled/_attempt_start/
+  _finished`, #1): reúso del `state.retry` y countdown de D17; el proc-bar "Compactando…"
+  muestra "Reintentando compactación (n/3) en Xs…" y vuelve entre intentos. El error
+  final ya venía por `compaction_end.errorMessage`.
+- **Progreso de tools largos** (`tool_execution_update`, #2): Frida ahora propaga
+  `toolCallId` en `tool_start`/`tool_end` y empareja por id (antes por nombre);
+  `tool_update` acumula `partialResult` y `ToolCard` lo muestra en vivo (borde azul)
+  mientras el tool sigue running. Hoy pocos tools lo emiten (los built-in no); es
+  forward-compat para MCP/extensiones.
+- **Feedback de cancelación** (`message_end` con `stopReason:"aborted"`, #3): post
+  `info "Operación cancelada"`. Los errores de provider ya van por `agent_end`/
+  `auto_retry_end` (D17).
+- **Skill block colapsable** (#4): `parseSkillBlock` (regex del SDK) detecta
+  `<skill name=…>…</skill>` en el mensaje del usuario y `SkillBlockCard` lo colapsa
+  en `[skill] nombre` expandible (antes el SKILL.md crudo inundaba el transcript).
+- **Branch summary** (`role:"branchSummary"`, #5): `postHistory` ya no lo ignora;
+  `BranchSummaryCard` lo muestra colapsado al inicio del transcript (resumen del
+  contexto previo al bifurcar).
+- **Sync del thinking** (`thinking_level_changed`, #6): `sendModelInfo()` → el
+  selector del webview se actualiza si el thinking cambia fuera de él.
+
+**Descartado:** `queue_update` (#7) — Frida ya gestiona su `pendingQueue` sincronizada
+con `session.prompt({streamingBehavior})`; escucharlo sería doble-gestión redundante.
+`agent_settled` — sólo auto-shutdown del proceso TUI, no aplica a una extensión VS
+Code. Estado LSP por idioma — va por `ctx.ui` (`hasUI=false`, ver ADR-0008).
+
+**Punto frágil a regresar en cada bump de Pi:** los eventos `summarization_retry_*`,
+`tool_execution_update` (`{toolCallId, toolName, args, partialResult}`), el
+`toolCallId` en `tool_execution_start/end`, `message_end` (`{message}` con
+`stopReason`/`errorMessage`), `thinking_level_changed` (`{level}`), la regex de
+`parseSkillBlock` (`<skill name="…" location="…">…</skill>`), el `role:"branchSummary"`
+y el helper `sendModelInfo` (lee `session.thinkingLevel`).
 
 ---
 

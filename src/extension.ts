@@ -4,13 +4,30 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { createFridaSession, defaultAgentDir, FridaSession } from "./pi-session";
-import { ApprovalRequest } from "./approval-bridge";
+import {
+	createFridaSession,
+	defaultAgentDir,
+	type FridaSession,
+} from "./pi-session";
+import type { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
-import { SOFTTEK_MODEL_DISPLAY, SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_DISPLAY } from "./providers/softtek-provider";
+import {
+	SOFTTEK_PROVIDER,
+	SOFTTEK_PROVIDER_DISPLAY,
+} from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
 import { getTodoState } from "./todo-state";
-import { isAskUserQuestionEnabled, isTodoEnabled, readToolToggles, writeToolToggle } from "./settings";
+import {
+	isAskUserQuestionEnabled,
+	isTodoEnabled,
+	readGatePatterns,
+	readToolToggles,
+	writeToolToggle,
+} from "./settings";
+import {
+	classifySeverity,
+	type LensDiagnosticsPayload,
+} from "./lens-diagnostics-bridge";
 
 const execFileP = promisify(execFile);
 
@@ -19,32 +36,57 @@ const ACTIVE_MODEL_KEY = "frida.activeModel";
 const SUPPORTED_PROVIDERS = [SOFTTEK_PROVIDER, "github-copilot"];
 
 const BINARY_EXT = new Set([
-  "png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "pdf", "zip", "gz", "tar",
-  "woff", "woff2", "ttf", "otf", "node", "wasm", "mp3", "mp4", "class", "exe", "dll", "so", "dylib",
+	"png",
+	"jpg",
+	"jpeg",
+	"gif",
+	"webp",
+	"bmp",
+	"ico",
+	"pdf",
+	"zip",
+	"gz",
+	"tar",
+	"woff",
+	"woff2",
+	"ttf",
+	"otf",
+	"node",
+	"wasm",
+	"mp3",
+	"mp4",
+	"class",
+	"exe",
+	"dll",
+	"so",
+	"dylib",
 ]);
 
 /** Puntaje fuzzy (subsequence) para rankear archivos @. Mayor = mejor. */
 function fuzzyScore(text: string, query: string): number {
-  const t = text.toLowerCase();
-  const q = query.toLowerCase();
-  if (!q) return 0;
-  let score = 0, ti = 0, qi = 0, consecutive = 0;
-  while (ti < t.length && qi < q.length) {
-    if (t[ti] === q[qi]) {
-      consecutive++;
-      score += 1 + consecutive;
-      if (ti === 0 || /[\/._\- ]/.test(t[ti - 1])) score += 5; // inicio de palabra
-      qi++;
-    } else {
-      consecutive = 0;
-    }
-    ti++;
-  }
-  if (qi < q.length) return -1; // no es subsequence → descartar
-  const base = text.split("/").pop() ?? text;
-  if (base.toLowerCase().includes(q)) score += 10; // match en el nombre
-  score -= (text.match(/\//g)?.length ?? 0) * 0.5; // menos profundo = mejor
-  return score;
+	const t = text.toLowerCase();
+	const q = query.toLowerCase();
+	if (!q) return 0;
+	let score = 0,
+		ti = 0,
+		qi = 0,
+		consecutive = 0;
+	while (ti < t.length && qi < q.length) {
+		if (t[ti] === q[qi]) {
+			consecutive++;
+			score += 1 + consecutive;
+			if (ti === 0 || /[/._\- ]/.test(t[ti - 1])) score += 5; // inicio de palabra
+			qi++;
+		} else {
+			consecutive = 0;
+		}
+		ti++;
+	}
+	if (qi < q.length) return -1; // no es subsequence → descartar
+	const base = text.split("/").pop() ?? text;
+	if (base.toLowerCase().includes(q)) score += 10; // match en el nombre
+	score -= (text.match(/\//g)?.length ?? 0) * 0.5; // menos profundo = mejor
+	return score;
 }
 
 // Caché corto de la lista de archivos del repo (evita llamar a git en cada tecla).
@@ -52,1222 +94,1816 @@ let repoFilesCache: { cwd: string; files: string[]; at: number } | null = null;
 const REPO_FILES_TTL = 5000;
 
 // Carpetas que se ocultan al navegar directorios (además de las que empiezan con .).
-const SEARCH_HIDDEN_EXCLUDE = new Set(["node_modules", ".git", "dist", "dist-webview", ".vscode", ".next", ".cache", "build"]);
+const SEARCH_HIDDEN_EXCLUDE = new Set([
+	"node_modules",
+	".git",
+	"dist",
+	"dist-webview",
+	".vscode",
+	".next",
+	".cache",
+	"build",
+]);
 
 /** Lista los archivos del workspace respetando .gitignore (trackeados + no
  *  ignorados vía git), relativos al workspace folder. Fallback a findFiles. */
 async function listRepoFiles(cwd: string): Promise<string[]> {
-  if (repoFilesCache && repoFilesCache.cwd === cwd && Date.now() - repoFilesCache.at < REPO_FILES_TTL) {
-    return repoFilesCache.files;
-  }
-  let files: string[];
-  try {
-    const top = await execFileP("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 3000 });
-    const repoRoot = top.stdout.trim();
-    const wsRel = path.relative(repoRoot, cwd); // "" si el workspace es la raíz
-    const tracked = await execFileP("git", ["ls-files"], { cwd: repoRoot, timeout: 6000 });
-    const others = await execFileP("git", ["ls-files", "--others", "--exclude-standard"], { cwd: repoRoot, timeout: 6000 });
-    const all = (tracked.stdout + "\n" + others.stdout).split("\n").map((s) => s.trim()).filter(Boolean);
-    files = !wsRel ? all : all.filter((f) => f.startsWith(wsRel + "/")).map((f) => f.slice(wsRel.length + 1));
-  } catch {
-    // Sin git: findFiles con excludes típicos.
-    const exclude = "**/node_modules/**,**/.git/**,**/dist/**,**/dist-webview/**,**/.vscode/**";
-    const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(cwd, "**/*"), exclude, 300);
-    files = uris.map((u) => vscode.workspace.asRelativePath(u));
-  }
-  repoFilesCache = { cwd, files, at: Date.now() };
-  return files;
+	if (
+		repoFilesCache &&
+		repoFilesCache.cwd === cwd &&
+		Date.now() - repoFilesCache.at < REPO_FILES_TTL
+	) {
+		return repoFilesCache.files;
+	}
+	let files: string[];
+	try {
+		const top = await execFileP("git", ["rev-parse", "--show-toplevel"], {
+			cwd,
+			timeout: 3000,
+		});
+		const repoRoot = top.stdout.trim();
+		const wsRel = path.relative(repoRoot, cwd); // "" si el workspace es la raíz
+		const tracked = await execFileP("git", ["ls-files"], {
+			cwd: repoRoot,
+			timeout: 6000,
+		});
+		const others = await execFileP(
+			"git",
+			["ls-files", "--others", "--exclude-standard"],
+			{ cwd: repoRoot, timeout: 6000 },
+		);
+		const all = (tracked.stdout + "\n" + others.stdout)
+			.split("\n")
+			.map((s) => s.trim())
+			.filter(Boolean);
+		files = !wsRel
+			? all
+			: all
+					.filter((f) => f.startsWith(wsRel + "/"))
+					.map((f) => f.slice(wsRel.length + 1));
+	} catch {
+		// Sin git: findFiles con excludes típicos.
+		const exclude =
+			"**/node_modules/**,**/.git/**,**/dist/**,**/dist-webview/**,**/.vscode/**";
+		const uris = await vscode.workspace.findFiles(
+			new vscode.RelativePattern(cwd, "**/*"),
+			exclude,
+			300,
+		);
+		files = uris.map((u) => vscode.workspace.asRelativePath(u));
+	}
+	repoFilesCache = { cwd, files, at: Date.now() };
+	return files;
 }
 
 /** Navegación de carpeta: lista el contenido del directorio indicado por el
  *  prefijo (los directorios terminan en '/'). Filtra por el último segmento. */
 async function listDirectory(prefix: string, cwd: string): Promise<string[]> {
-  const hasSlash = prefix.endsWith("/");
-  const slashIdx = prefix.lastIndexOf("/");
-  const dir = hasSlash ? prefix.slice(0, -1) : prefix.slice(0, slashIdx);
-  const filter = (hasSlash ? "" : prefix.slice(slashIdx + 1)).toLowerCase();
-  const absDir = path.join(cwd, dir || ".");
-  let entries: any[];
-  try {
-    entries = await fs.readdir(absDir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries
-    .filter((e) => !e.name.startsWith(".") && !SEARCH_HIDDEN_EXCLUDE.has(e.name))
-    .filter((e) => filter === "" || e.name.toLowerCase().includes(filter))
-    .sort((a, b) => {
-      if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    })
-    .slice(0, 50)
-    .map((e) => (dir ? `${dir}/${e.name}` : e.name) + (e.isDirectory() ? "/" : ""));
+	const hasSlash = prefix.endsWith("/");
+	const slashIdx = prefix.lastIndexOf("/");
+	const dir = hasSlash ? prefix.slice(0, -1) : prefix.slice(0, slashIdx);
+	const filter = (hasSlash ? "" : prefix.slice(slashIdx + 1)).toLowerCase();
+	const absDir = path.join(cwd, dir || ".");
+	let entries: any[];
+	try {
+		entries = await fs.readdir(absDir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+	return entries
+		.filter(
+			(e) => !e.name.startsWith(".") && !SEARCH_HIDDEN_EXCLUDE.has(e.name),
+		)
+		.filter((e) => filter === "" || e.name.toLowerCase().includes(filter))
+		.sort((a, b) => {
+			if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+			return a.name.localeCompare(b.name);
+		})
+		.slice(0, 50)
+		.map(
+			(e) => (dir ? `${dir}/${e.name}` : e.name) + (e.isDirectory() ? "/" : ""),
+		);
 }
 
 /** Autocompletado de archivos @: navegación de carpetas si hay '/', si no fuzzy
  *  global respetando .gitignore. */
 async function searchFiles(query: string): Promise<string[]> {
-  const wf = vscode.workspace.workspaceFolders?.[0];
-  if (!wf) return [];
-  const cwd = wf.uri.fsPath;
-  const q = query.trim();
-  if (q.includes("/")) return listDirectory(q, cwd); // navegación
-  if (q.length === 0) return []; // '@' solo: no inundar
-  const files = await listRepoFiles(cwd);
-  return files
-    .map((rel) => ({ rel, score: fuzzyScore(rel, q) }))
-    .filter((x) => x.score >= 0)
-    .sort((a, b) => b.score - a.score || a.rel.length - b.rel.length || a.rel.localeCompare(b.rel))
-    .slice(0, 30)
-    .map((x) => x.rel);
+	const wf = vscode.workspace.workspaceFolders?.[0];
+	if (!wf) return [];
+	const cwd = wf.uri.fsPath;
+	const q = query.trim();
+	if (q.includes("/")) return listDirectory(q, cwd); // navegación
+	if (q.length === 0) return []; // '@' solo: no inundar
+	const files = await listRepoFiles(cwd);
+	return files
+		.map((rel) => ({ rel, score: fuzzyScore(rel, q) }))
+		.filter((x) => x.score >= 0)
+		.sort(
+			(a, b) =>
+				b.score - a.score ||
+				a.rel.length - b.rel.length ||
+				a.rel.localeCompare(b.rel),
+		)
+		.slice(0, 30)
+		.map((x) => x.rel);
 }
 
 /** Expande los tokens @ruta del prompt al contenido del archivo (texto), como Pi. */
 async function expandAtFiles(text: string, cwd: string): Promise<string> {
-  const re = /@(?:"([^"]+)"|([^\s@]+))/g;
-  const matches: { index: number; full: string; rel: string }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) matches.push({ index: m.index, full: m[0], rel: m[1] ?? m[2] });
-  if (matches.length === 0) return text;
-  let out = text;
-  for (const mt of matches.slice().reverse()) {
-    const ext = path.extname(mt.rel).slice(1).toLowerCase();
-    if (BINARY_EXT.has(ext)) continue; // binarios: se deja el token (no se adjunta)
-    const abs = path.join(cwd, mt.rel);
-    try {
-      const st = await fs.stat(abs);
-      if (!st.isFile()) continue;
-      const content = await fs.readFile(abs, "utf8");
-      const trunc = content.length > 200_000 ? content.slice(0, 200_000) + "\n…(truncado)" : content;
-      const block = `\n\n\`\`\`${ext} // @${mt.rel}\n${trunc}\n\`\`\`\n`;
-      out = out.slice(0, mt.index) + block + out.slice(mt.index + mt.full.length);
-    } catch {
-      /* no existe / no legible → se deja el token tal cual */
-    }
-  }
-  return out;
+	const re = /@(?:"([^"]+)"|([^\s@]+))/g;
+	const matches: { index: number; full: string; rel: string }[] = [];
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(text)) !== null)
+		matches.push({ index: m.index, full: m[0], rel: m[1] ?? m[2] });
+	if (matches.length === 0) return text;
+	let out = text;
+	for (const mt of matches.slice().reverse()) {
+		const ext = path.extname(mt.rel).slice(1).toLowerCase();
+		if (BINARY_EXT.has(ext)) continue; // binarios: se deja el token (no se adjunta)
+		const abs = path.join(cwd, mt.rel);
+		try {
+			const st = await fs.stat(abs);
+			if (!st.isFile()) continue;
+			const content = await fs.readFile(abs, "utf8");
+			const trunc =
+				content.length > 200_000
+					? content.slice(0, 200_000) + "\n…(truncado)"
+					: content;
+			const block = `\n\n\`\`\`${ext} // @${mt.rel}\n${trunc}\n\`\`\`\n`;
+			out =
+				out.slice(0, mt.index) + block + out.slice(mt.index + mt.full.length);
+		} catch {
+			/* no existe / no legible → se deja el token tal cual */
+		}
+	}
+	return out;
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
-  const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
-  let approvalMode: ApprovalMode = "manual";
-  let frida: FridaSession | undefined;
-  let activeModel: { provider: string; modelId: string } | undefined = context.globalState.get(ACTIVE_MODEL_KEY);
-  // Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
-  // de turnos dentro del agent run actual (para saber cuándo se entrega uno).
-  const pendingQueue: { text: string }[] = [];
-  let turnsInRun = 0;
+export async function activate(
+	context: vscode.ExtensionContext,
+): Promise<void> {
+	let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
+	const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
+	// Auditoría del gate de aprobación (Prioridad 2): JSONL append-only, chmod 0600.
+	// Vive junto a las sesiones en globalStorageUri (no bajo sync en nube: lleva
+	// comandos bash y paths potencialmente sensibles — ver D13).
+	const approvalLogPath = path.join(
+		context.globalStorageUri.fsPath,
+		"approval-logs",
+		"approvals.jsonl",
+	);
+	let approvalMode: ApprovalMode = "manual";
+	let frida: FridaSession | undefined;
+	let activeModel: { provider: string; modelId: string } | undefined =
+		context.globalState.get(ACTIVE_MODEL_KEY);
+	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
+	// de turnos dentro del agent run actual (para saber cuándo se entrega uno).
+	const pendingQueue: { text: string }[] = [];
+	let turnsInRun = 0;
 
-  let panel: vscode.WebviewPanel | undefined;
-  const post = (msg: unknown): void => {
-    panel?.webview.postMessage(msg);
-  };
+	let panel: vscode.WebviewPanel | undefined;
+	const post = (msg: unknown): void => {
+		panel?.webview.postMessage(msg);
+	};
 
-  function workspaceCwd(): string {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-  }
+	function workspaceCwd(): string {
+		return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+	}
 
-  async function ensureSession(): Promise<FridaSession> {
-    if (!frida) {
-      frida = await createFridaSession({
-        cwd: workspaceCwd(),
-        agentDir: defaultAgentDir(),
-        sessionDir: sessionDirPath,
-        activeModel,
-        getKey: () => keyCache,
-        onUnauthorized: () => {
-          keyCache = undefined;
-          void promptKey("unauthorized");
-        },
-        onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
-        onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
-        getMode: () => approvalMode,
-        askUserQuestionEnabled: isAskUserQuestionEnabled,
-        todoEnabled: isTodoEnabled,
-      });
-      wireSession(frida.session);
-      sendModelInfo();
-      postResources();
-      postModels();
-      void postWorkspace();
-      postTodos();
-      postToolToggles();
-      postUsage(frida.session);
-      // Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
-      // crear la sesión siempre permite elegir Copilot desde el onboarding).
-      const anyAuthed = SUPPORTED_PROVIDERS.some((id) => !!frida?.modelRuntime?.hasConfiguredAuth?.(id));
-      post({ type: anyAuthed ? "session_ready" : "need_key" });
-    }
-    return frida;
-  }
+	// D16 — diagnósticos de pi-lens: acumulador por turno + resumen al webview.
+	// No son squiggles del editor (eso lo cubre el LSP de VS Code); es visibilidad
+	// en el panel del feedback que pi-lens calcula y de otro modo viaja oculto.
+	type LensFileSummary = {
+		path: string;
+		errors: number;
+		warnings: number;
+		others: number;
+		truncated: boolean;
+	};
+	const lensAccum = new Map<string, LensFileSummary>();
+	let lensAnyTruncated = false;
+	let lensBusy = false;
+	let inRetry = false;
+	let lensActive = false;
 
-  // session.subscribe: observador para MOSTRAR (streaming + tarjetas de tool).
-  // El BLOQUEO de tools vive en la extensión de gates (createApprovalGates).
-  function postUsage(session: any): void {
-    try {
-      const msgs: any[] = session?.agent?.state?.messages ?? [];
-      let inputTotal = 0, outputTotal = 0, cacheRead = 0, cacheWrite = 0, cost = 0;
-      let lastInput = 0, lastCacheRead = 0, lastCacheWrite = 0;
-      for (const m of msgs) {
-        if (m?.role === "assistant" && m?.usage) {
-          const u = m.usage;
-          inputTotal += u.input ?? 0;
-          outputTotal += u.output ?? 0;
-          cacheRead += u.cacheRead ?? 0;
-          cacheWrite += u.cacheWrite ?? 0;
-          lastInput = u.input ?? 0; lastCacheRead = u.cacheRead ?? 0; lastCacheWrite = u.cacheWrite ?? 0;
-          if (typeof u.cost === "number") cost += u.cost;
-        }
-      }
-      // Cache hit rate del último request (como la TUI de pi).
-      const promptTokens = lastInput + lastCacheRead + lastCacheWrite;
-      const cacheHitRate =
-        promptTokens > 0 && (lastCacheRead > 0 || lastCacheWrite > 0)
-          ? (lastCacheRead / promptTokens) * 100
-          : undefined;
-      // Contexto ACTUAL: pi estima los tokens del contexto vivo (getContextUsage).
-      const ctx = session?.getContextUsage?.();
-      const contextTokens = ctx?.tokens ?? 0;
-      const contextWindow = ctx?.contextWindow ?? session?.model?.contextWindow ?? 0;
-      const contextPercent =
-        ctx?.percent ?? (contextWindow ? Math.min(100, (contextTokens / contextWindow) * 100) : 0);
-      post({
-        type: "usage",
-        inputTotal, outputTotal, cacheRead, cacheWrite, cacheHitRate, cost,
-        contextTokens, contextWindow, contextPercent,
-      });
-    } catch {
-      /* noop */
-    }
-  }
+	function lensRelative(p: string, cwd: string): string {
+		try {
+			return path.isAbsolute(p) ? path.relative(cwd, p) || p : p;
+		} catch {
+			return p;
+		}
+	}
 
-  function providerDisplayName(id: string): string {
-    if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
-    if (id === "github-copilot") return "GitHub Copilot";
-    return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
-  }
+	// Callback que la factory lens-diagnostics-bridge invoca por cada evento
+	// `pilens:diagnostics`. Acumula por archivo (paths relativos al cwd) y, si el
+	// agente NO está trabajando, publica de inmediato (cascade tardía).
+	// D16 badge: ¿pi-lens está cargado como extensión? (busca su tool always-active).
+	function isLensLoaded(): boolean {
+		const rl: any = frida?.session?.resourceLoader;
+		const exts = rl?.getExtensions?.()?.extensions ?? [];
+		return exts.some((e: any) =>
+			Array.from(e.tools?.keys?.() ?? []).includes("lens_diagnostics"),
+		);
+	}
 
-  function sendModelInfo(): void {
-    const m = frida?.session?.model;
-    if (m) {
-      post({ type: "model_info", provider: providerDisplayName(m.provider), model: m.name, thinking: frida?.session?.thinkingLevel ?? "medium" });
-    }
-  }
+	// Publica el estado del badge pi-lens al webview (cargado + activo).
+	function postLensStatus(): void {
+		post({ type: "lens_status", loaded: isLensLoaded(), active: lensActive });
+	}
 
-  // Catálogo de proveedores/modelos soportados para el selector del webview.
-  function postModels(): void {
-    if (!frida) return;
-    const mr = frida.modelRuntime;
-    const providers = SUPPORTED_PROVIDERS.map((id) => ({
-      id,
-      name: providerDisplayName(id),
-      oauth: !!mr.isUsingOAuth?.(id),
-      authed: !!mr.hasConfiguredAuth?.(id),
-      models: (mr.getModels?.(id) ?? []).map((mm: any) => ({ id: mm.id, name: mm.name })),
-    }));
-    const m = frida.session?.model;
-    post({
-      type: "models",
-      providers,
-      active: m ? { provider: m.provider, modelId: m.id } : undefined,
-    });
-  }
+	function mergeLens(payload: LensDiagnosticsPayload): void {
+		const cwd = payload.cwd || workspaceCwd();
+		for (const f of payload.files ?? []) {
+			if (!f || !f.path) continue;
+			const rel = lensRelative(f.path, cwd);
+			let errors = 0;
+			let warnings = 0;
+			let others = 0;
+			for (const d of f.diagnostics ?? []) {
+				const c = classifySeverity(d?.severity);
+				if (c === "error") errors++;
+				else if (c === "warning") warnings++;
+				else others++;
+			}
+			if (errors === 0 && warnings === 0 && others === 0) {
+				lensAccum.delete(rel); // el archivo quedó limpio
+			} else {
+				lensAccum.set(rel, {
+					path: rel,
+					errors,
+					warnings,
+					others,
+					truncated: !!f.truncated,
+				});
+			}
+			if (f.truncated) lensAnyTruncated = true;
+		}
+		if (!lensBusy) flushLens();
+		// Primer evento del bus ⇒ pi-lens está corriendo: marca activo y publica el badge.
+		if (!lensActive) {
+			lensActive = true;
+			postLensStatus();
+		}
+	}
 
-  async function selectModel(providerId: string, modelId: string): Promise<void> {
-    if (!frida) return;
-    const m = frida.modelRuntime.getModel?.(providerId, modelId);
-    if (!m) {
-      post({ type: "info", text: "Modelo no disponible." });
-      postModels();
-      return;
-    }
-    try {
-      await frida.session.setModel(m);
-      activeModel = { provider: providerId, modelId };
-      await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
-      sendModelInfo();
-      postModels();
-      postUsage(frida.session);
-    } catch (e: any) {
-      post({ type: "info", text: "No se pudo cambiar de modelo: " + String(e?.message ?? e) });
-    }
-  }
+	// Publica el resumen actual al webview (null si no hay diagnósticos → oculta).
+	function flushLens(): void {
+		const files = [...lensAccum.values()].sort(
+			(a, b) => b.errors - a.errors || b.warnings - a.warnings,
+		);
+		const totalErrors = files.reduce((s, f) => s + f.errors, 0);
+		const totalWarnings = files.reduce((s, f) => s + f.warnings, 0);
+		const totalOthers = files.reduce((s, f) => s + f.others, 0);
+		const summary =
+			files.length === 0
+				? null
+				: {
+						files,
+						totalErrors,
+						totalWarnings,
+						totalOthers,
+						fileCount: files.length,
+						truncated: lensAnyTruncated,
+					};
+		post({ type: "lens_diagnostics", summary });
+	}
 
-  // AuthInteraction (pi-ai): implementa prompt()/notify() para el login OAuth.
-  // notify({device_code}) abre el navegador y publica el userCode al webview.
-  function makeAuthInteraction(): any {
-    return {
-      prompt: async (p: any) => {
-        if (p.type === "select") {
-          const items = (p.options ?? []).map((o: any) => ({ label: o.label, description: o.description, id: o.id }));
-          const pick = (await vscode.window.showQuickPick(items as any, { placeHolder: p.message, ignoreFocusOut: true })) as any;
-          return pick?.id ?? "";
-        }
-        const val = await vscode.window.showInputBox({
-          prompt: p.message,
-          password: p.type === "secret",
-          placeHolder: p.placeholder,
-          ignoreFocusOut: true,
-        });
-        return val ?? "";
-      },
-      notify: (e: any) => {
-        if (e.type === "device_code") {
-          vscode.env.openExternal(vscode.Uri.parse(e.verificationUri));
-          post({ type: "oauth_device_code", userCode: e.userCode, verificationUri: e.verificationUri });
-        } else if (e.type === "auth_url") {
-          vscode.env.openExternal(vscode.Uri.parse(e.url));
-          post({ type: "info", text: "Abriendo el navegador para autenticación…" });
-        } else if (e.type === "info" || e.type === "progress") {
-          post({ type: "info", text: e.message });
-        }
-      },
-    };
-  }
+	async function ensureSession(): Promise<FridaSession> {
+		if (!frida) {
+			frida = await createFridaSession({
+				cwd: workspaceCwd(),
+				agentDir: defaultAgentDir(),
+				sessionDir: sessionDirPath,
+				approvalLogPath,
+				activeModel,
+				getKey: () => keyCache,
+				onUnauthorized: () => {
+					keyCache = undefined;
+					void promptKey("unauthorized");
+				},
+				onPendingApprovals: (reqs: ApprovalRequest[]) =>
+					post({ type: "approvals", approvals: reqs }),
+				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
+				getMode: () => approvalMode,
+				askUserQuestionEnabled: isAskUserQuestionEnabled,
+				todoEnabled: isTodoEnabled,
+				getGatePatterns: readGatePatterns,
+				onLensDiagnostics: mergeLens,
+			});
+			wireSession(frida.session);
+			sendModelInfo();
+			postResources();
+			postModels();
+			void postWorkspace();
+			postTodos();
+			postToolToggles();
+			postUsage(frida.session);
+			// Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
+			// crear la sesión siempre permite elegir Copilot desde el onboarding).
+			const anyAuthed = SUPPORTED_PROVIDERS.some(
+				(id) => !!frida?.modelRuntime?.hasConfiguredAuth?.(id),
+			);
+			post({ type: anyAuthed ? "session_ready" : "need_key" });
+		}
+		return frida;
+	}
 
-  function copilotDefaultModelId(): string | undefined {
-    const models: any[] = frida?.modelRuntime?.getModels?.("github-copilot") ?? [];
-    return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
-  }
+	// session.subscribe: observador para MOSTRAR (streaming + tarjetas de tool).
+	// El BLOQUEO de tools vive en la extensión de gates (createApprovalGates).
+	function postUsage(session: any): void {
+		try {
+			const msgs: any[] = session?.agent?.state?.messages ?? [];
+			let inputTotal = 0,
+				outputTotal = 0,
+				cacheRead = 0,
+				cacheWrite = 0,
+				cost = 0;
+			let lastInput = 0,
+				lastCacheRead = 0,
+				lastCacheWrite = 0;
+			for (const m of msgs) {
+				if (m?.role === "assistant" && m?.usage) {
+					const u = m.usage;
+					inputTotal += u.input ?? 0;
+					outputTotal += u.output ?? 0;
+					cacheRead += u.cacheRead ?? 0;
+					cacheWrite += u.cacheWrite ?? 0;
+					lastInput = u.input ?? 0;
+					lastCacheRead = u.cacheRead ?? 0;
+					lastCacheWrite = u.cacheWrite ?? 0;
+					if (typeof u.cost === "number") cost += u.cost;
+				}
+			}
+			// Cache hit rate del último request (como la TUI de pi).
+			const promptTokens = lastInput + lastCacheRead + lastCacheWrite;
+			const cacheHitRate =
+				promptTokens > 0 && (lastCacheRead > 0 || lastCacheWrite > 0)
+					? (lastCacheRead / promptTokens) * 100
+					: undefined;
+			// Contexto ACTUAL: pi estima los tokens del contexto vivo (getContextUsage).
+			const ctx = session?.getContextUsage?.();
+			const contextTokens = ctx?.tokens ?? 0;
+			const contextWindow =
+				ctx?.contextWindow ?? session?.model?.contextWindow ?? 0;
+			const contextPercent =
+				ctx?.percent ??
+				(contextWindow
+					? Math.min(100, (contextTokens / contextWindow) * 100)
+					: 0);
+			post({
+				type: "usage",
+				inputTotal,
+				outputTotal,
+				cacheRead,
+				cacheWrite,
+				cacheHitRate,
+				cost,
+				contextTokens,
+				contextWindow,
+				contextPercent,
+			});
+		} catch {
+			/* noop */
+		}
+	}
 
-  async function loginProvider(providerId: string): Promise<void> {
-    if (!frida) return;
-    try {
-      await frida.modelRuntime.login?.(providerId, "oauth", makeAuthInteraction());
-      post({ type: "info", text: `Sesión iniciada: ${providerDisplayName(providerId)}` });
-      post({ type: "oauth_clear" });
-      // Primer arranque (onboarding): activar el modelo default de Copilot.
-      if (!activeModel && providerId === "github-copilot") {
-        const defaultId = copilotDefaultModelId();
-        if (defaultId) await selectModel(providerId, defaultId);
-      }
-      postModels();
-      post({ type: "session_ready" }); // cierra el onboarding si estaba abierto
-    } catch (e: any) {
-      post({ type: "info", text: "Error al iniciar sesión: " + String(e?.message ?? e) });
-      post({ type: "oauth_clear" });
-    }
-  }
+	function providerDisplayName(id: string): string {
+		if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
+		if (id === "github-copilot") return "GitHub Copilot";
+		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
+	}
 
-  async function logoutProvider(providerId: string): Promise<void> {
-    if (!frida) return;
-    try {
-      await frida.modelRuntime.logout?.(providerId);
-      post({ type: "info", text: `Sesión cerrada: ${providerDisplayName(providerId)}` });
-      postModels();
-    } catch {
-      /* noop */
-    }
-  }
+	function sendModelInfo(): void {
+		const m = frida?.session?.model;
+		if (m) {
+			post({
+				type: "model_info",
+				provider: providerDisplayName(m.provider),
+				model: m.name,
+				thinking: frida?.session?.thinkingLevel ?? "medium",
+			});
+		}
+	}
 
-  // Recolecta los recursos cargados por el resourceLoader de pi (extensiones,
-  // skills, prompts, themes, archivos de contexto) para mostrarlos en el panel.
-  // Equivalente al showLoadedResources de la TUI. Los tipos internos de pi no se
-  // reexportan por el SDK, así que se tratan como any.
-  function collectResources(): any {
-    const session: any = frida?.session;
-    const rl: any = session?.resourceLoader;
-    if (!rl) return undefined;
-    const ext = rl.getExtensions?.() ?? { extensions: [], errors: [] };
-    const skills = rl.getSkills?.() ?? { skills: [], diagnostics: [] };
-    const prompts = rl.getPrompts?.() ?? { prompts: [], diagnostics: [] };
-    const themes = rl.getThemes?.() ?? { themes: [] };
-    const agents = rl.getAgentsFiles?.() ?? { agentsFiles: [] };
-    const errors: { path: string; error: string }[] = [];
-    for (const e of ext.errors ?? []) errors.push({ path: String(e.path), error: String(e.error) });
-    for (const d of [...(skills.diagnostics ?? []), ...(prompts.diagnostics ?? [])]) {
-      errors.push({ path: String(d?.path ?? d?.file ?? ""), error: String(d?.message ?? d) });
-    }
-    return {
-      extensions: (ext.extensions ?? [])
-        .filter((e: any) => !e.hidden)
-        .map((e: any) => {
-          const p = String(e.path ?? "");
-          return {
-            path: p,
-            // pi marca las factories registradas en código como "<inline:...>"
-            // (resource-loader.js). Las de disco tienen un path real de archivo.
-            inline: p.startsWith("<inline:"),
-            tools: Array.from(e.tools?.keys?.() ?? []),
-            commands: Array.from(e.commands?.keys?.() ?? []),
-          };
-        }),
-      skills: (skills.skills ?? []).map((s: any) => ({ name: String(s.name), description: String(s.description ?? "") })),
-      prompts: (prompts.prompts ?? []).map((p: any) => ({ name: String(p.name), description: String(p.description ?? "") })),
-      themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
-      contextFiles: (agents.agentsFiles ?? []).map((f: any) => ({ path: String(f.path) })),
-      errors,
-    };
-  }
+	// Catálogo de proveedores/modelos soportados para el selector del webview.
+	function postModels(): void {
+		if (!frida) return;
+		const mr = frida.modelRuntime;
+		const providers = SUPPORTED_PROVIDERS.map((id) => ({
+			id,
+			name: providerDisplayName(id),
+			oauth: !!mr.isUsingOAuth?.(id),
+			authed: !!mr.hasConfiguredAuth?.(id),
+			models: (mr.getModels?.(id) ?? []).map((mm: any) => ({
+				id: mm.id,
+				name: mm.name,
+			})),
+		}));
+		const m = frida.session?.model;
+		post({
+			type: "models",
+			providers,
+			active: m ? { provider: m.provider, modelId: m.id } : undefined,
+		});
+	}
 
-  function postResources(): void {
-    const data = collectResources();
-    if (data) post({ type: "resources", data });
-  }
+	async function selectModel(
+		providerId: string,
+		modelId: string,
+	): Promise<void> {
+		if (!frida) return;
+		const m = frida.modelRuntime.getModel?.(providerId, modelId);
+		if (!m) {
+			post({ type: "info", text: "Modelo no disponible." });
+			postModels();
+			return;
+		}
+		try {
+			await frida.session.setModel(m);
+			activeModel = { provider: providerId, modelId };
+			await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
+			sendModelInfo();
+			postModels();
+			postUsage(frida.session);
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "No se pudo cambiar de modelo: " + String(e?.message ?? e),
+			});
+		}
+	}
 
-  // Estado del tool `todo` → webview (panel de Tareas). Lee el holder en memoria,
-  // que pi-session reconstruye por replay al crear/abrir sesión. Se publica:
-  //  - al crear/abrir sesión (ensureSession/switchSession)
-  //  - tras cada `tool_execution_end` del tool "todo"
-  function postTodos(): void {
-    const s = getTodoState();
-    const tasks = s.tasks
-      .filter((t) => t.status !== "deleted")
-      .map((t) => ({
-        id: t.id,
-        subject: t.subject,
-        description: t.description,
-        activeForm: t.activeForm,
-        status: t.status,
-        blockedBy: t.blockedBy,
-        owner: t.owner,
-      }));
-    post({ type: "todos", tasks, nextId: s.nextId });
-  }
+	// AuthInteraction (pi-ai): implementa prompt()/notify() para el login OAuth.
+	// notify({device_code}) abre el navegador y publica el userCode al webview.
+	function makeAuthInteraction(): any {
+		return {
+			prompt: async (p: any) => {
+				if (p.type === "select") {
+					const items = (p.options ?? []).map((o: any) => ({
+						label: o.label,
+						description: o.description,
+						id: o.id,
+					}));
+					const pick = (await vscode.window.showQuickPick(items as any, {
+						placeHolder: p.message,
+						ignoreFocusOut: true,
+					})) as any;
+					return pick?.id ?? "";
+				}
+				const val = await vscode.window.showInputBox({
+					prompt: p.message,
+					password: p.type === "secret",
+					placeHolder: p.placeholder,
+					ignoreFocusOut: true,
+				});
+				return val ?? "";
+			},
+			notify: (e: any) => {
+				if (e.type === "device_code") {
+					vscode.env.openExternal(vscode.Uri.parse(e.verificationUri));
+					post({
+						type: "oauth_device_code",
+						userCode: e.userCode,
+						verificationUri: e.verificationUri,
+					});
+				} else if (e.type === "auth_url") {
+					vscode.env.openExternal(vscode.Uri.parse(e.url));
+					post({
+						type: "info",
+						text: "Abriendo el navegador para autenticación…",
+					});
+				} else if (e.type === "info" || e.type === "progress") {
+					post({ type: "info", text: e.message });
+				}
+			},
+		};
+	}
 
-  // Toggles de Configuración (tools activos) → webview, para la vista de
-  // Configuración. Se leen en vivo de los settings de VS Code.
-  function postToolToggles(): void {
-    post({ type: "tool_toggles", ...readToolToggles() });
-  }
+	function copilotDefaultModelId(): string | undefined {
+		const models: any[] =
+			frida?.modelRuntime?.getModels?.("github-copilot") ?? [];
+		return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
+	}
 
-  // Info del workspace: carpeta de trabajo + branch git (y si hay cambios
-  // sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
-  // pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
-  async function collectWorkspace(): Promise<{ cwd: string; branch?: string; dirty?: boolean; sessionName?: string }> {
-    const cwd = workspaceCwd();
-    const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
-    try {
-      const { stdout: branchOut } = await execFileP("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd, timeout: 3000 });
-      const branch = branchOut.trim();
-      let dirty = false;
-      try {
-        const { stdout: status } = await execFileP("git", ["status", "--porcelain"], { cwd, timeout: 3000 });
-        dirty = status.trim().length > 0;
-      } catch { /* ignore */ }
-      return { cwd, branch, dirty, sessionName };
-    } catch {
-      return { cwd, sessionName }; // no es repo o git no disponible
-    }
-  }
+	async function loginProvider(providerId: string): Promise<void> {
+		if (!frida) return;
+		try {
+			await frida.modelRuntime.login?.(
+				providerId,
+				"oauth",
+				makeAuthInteraction(),
+			);
+			post({
+				type: "info",
+				text: `Sesión iniciada: ${providerDisplayName(providerId)}`,
+			});
+			post({ type: "oauth_clear" });
+			// Primer arranque (onboarding): activar el modelo default de Copilot.
+			if (!activeModel && providerId === "github-copilot") {
+				const defaultId = copilotDefaultModelId();
+				if (defaultId) await selectModel(providerId, defaultId);
+			}
+			postModels();
+			post({ type: "session_ready" }); // cierra el onboarding si estaba abierto
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al iniciar sesión: " + String(e?.message ?? e),
+			});
+			post({ type: "oauth_clear" });
+		}
+	}
 
-  async function postWorkspace(): Promise<void> {
-    try {
-      const ws = await collectWorkspace();
-      post({ type: "workspace", ...ws });
-    } catch { /* ignore */ }
-  }
+	async function logoutProvider(providerId: string): Promise<void> {
+		if (!frida) return;
+		try {
+			await frida.modelRuntime.logout?.(providerId);
+			post({
+				type: "info",
+				text: `Sesión cerrada: ${providerDisplayName(providerId)}`,
+			});
+			postModels();
+		} catch {
+			/* noop */
+		}
+	}
 
-  // Crea la sesión en segundo plano (onboarding/listo/inicio) para poder mostrar
-  // los recursos cuanto antes. Captura errores para no dejar promesas sin manejar.
-  function bootstrapSession(): void {
-    void ensureSession().catch((e: any) => {
-      post({ type: "info", text: "No se pudo iniciar la sesión: " + String(e?.message ?? e) });
-    });
-  }
+	// Recolecta los recursos cargados por el resourceLoader de pi (extensiones,
+	// skills, prompts, themes, archivos de contexto) para mostrarlos en el panel.
+	// Equivalente al showLoadedResources de la TUI. Los tipos internos de pi no se
+	// reexportan por el SDK, así que se tratan como any.
+	function collectResources(): any {
+		const session: any = frida?.session;
+		const rl: any = session?.resourceLoader;
+		if (!rl) return undefined;
+		const ext = rl.getExtensions?.() ?? { extensions: [], errors: [] };
+		const skills = rl.getSkills?.() ?? { skills: [], diagnostics: [] };
+		const prompts = rl.getPrompts?.() ?? { prompts: [], diagnostics: [] };
+		const themes = rl.getThemes?.() ?? { themes: [] };
+		const agents = rl.getAgentsFiles?.() ?? { agentsFiles: [] };
+		const errors: { path: string; error: string }[] = [];
+		for (const e of ext.errors ?? [])
+			errors.push({ path: String(e.path), error: String(e.error) });
+		for (const d of [
+			...(skills.diagnostics ?? []),
+			...(prompts.diagnostics ?? []),
+		]) {
+			errors.push({
+				path: String(d?.path ?? d?.file ?? ""),
+				error: String(d?.message ?? d),
+			});
+		}
+		return {
+			extensions: (ext.extensions ?? [])
+				.filter((e: any) => !e.hidden)
+				.map((e: any) => {
+					const p = String(e.path ?? "");
+					return {
+						path: p,
+						// pi marca las factories registradas en código como "<inline:...>"
+						// (resource-loader.js). Las de disco tienen un path real de archivo.
+						inline: p.startsWith("<inline:"),
+						tools: Array.from(e.tools?.keys?.() ?? []),
+						commands: Array.from(e.commands?.keys?.() ?? []),
+					};
+				}),
+			skills: (skills.skills ?? []).map((s: any) => ({
+				name: String(s.name),
+				description: String(s.description ?? ""),
+			})),
+			prompts: (prompts.prompts ?? []).map((p: any) => ({
+				name: String(p.name),
+				description: String(p.description ?? ""),
+			})),
+			themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
+			contextFiles: (agents.agentsFiles ?? []).map((f: any) => ({
+				path: String(f.path),
+			})),
+			errors,
+		};
+	}
 
-  function postQueued(): void {
-    post({ type: "queued", items: pendingQueue.map((q) => q.text) });
-  }
+	function postResources(): void {
+		const data = collectResources();
+		if (data) post({ type: "resources", data });
+		// También refresca el badge pi-lens (el estado "cargado" depende de resources).
+		postLensStatus();
+	}
 
-  function resetQueue(): void {
-    pendingQueue.length = 0;
-    turnsInRun = 0;
-    postQueued();
-  }
+	// Estado del tool `todo` → webview (panel de Tareas). Lee el holder en memoria,
+	// que pi-session reconstruye por replay al crear/abrir sesión. Se publica:
+	//  - al crear/abrir sesión (ensureSession/switchSession)
+	//  - tras cada `tool_execution_end` del tool "todo"
+	function postTodos(): void {
+		const s = getTodoState();
+		const tasks = s.tasks
+			.filter((t) => t.status !== "deleted")
+			.map((t) => ({
+				id: t.id,
+				subject: t.subject,
+				description: t.description,
+				activeForm: t.activeForm,
+				status: t.status,
+				blockedBy: t.blockedBy,
+				owner: t.owner,
+			}));
+		post({ type: "todos", tasks, nextId: s.nextId });
+	}
 
-  function wireSession(session: any): void {
-    session.subscribe((event: any) => {
-      switch (event?.type) {
-        case "agent_start":
-          turnsInRun = 0;
-          post({ type: "agent_busy", busy: true });
-          post({ type: "turn_active" });
-          break;
-        case "agent_end":
-          postUsage(session);
-          post({ type: "agent_busy", busy: false });
-          break;
-        case "turn_start":
-          // turn_start tras el primero (turnsInRun>0) = entrega de un mensaje
-          // encolado: creamos su turno aquí para que los deltas caigan en él.
-          if (turnsInRun > 0 && pendingQueue.length > 0) {
-            const next = pendingQueue.shift()!;
-            post({ type: "user", text: next.text });
-            postQueued();
-          }
-          turnsInRun++;
-          post({ type: "turn_active" });
-          break;
-        case "message_update":
-          if (event.assistantMessageEvent?.type === "text_delta") {
-            post({ type: "delta", text: event.assistantMessageEvent.delta });
-          } else if (event.assistantMessageEvent?.type === "thinking_delta") {
-            post({ type: "thinking_delta", text: event.assistantMessageEvent.delta });
-          }
-          break;
-        case "tool_execution_start":
-          post({ type: "tool_start", tool: event.toolName, args: compactArgs(event.args) });
-          break;
-        case "tool_execution_end":
-          post({
-            type: "tool_end",
-            tool: event.toolName,
-            isError: !!event.isError,
-            result: summarizeResult(event.result),
-            diff: typeof event.result?.details?.diff === "string" ? event.result.details.diff : undefined,
-          });
-          // El tool `todo` mutó el holder; republica el estado al panel.
-          if (event.toolName === "todo" && !event.isError) postTodos();
-          break;
-        case "compaction_start":
-          post({ type: "compact_start", reason: event.reason });
-          break;
-        case "compaction_end":
-          post({
-            type: "compact_end",
-            reason: event.reason,
-            aborted: !!event.aborted,
-            tokensBefore: event.result?.tokensBefore,
-            summary: event.result?.summary,
-            errorMessage: event.errorMessage,
-          });
-          // La compactación reescribió los mensajes y el contexto.
-          postHistory();
-          postUsage(session);
-          void postWorkspace();
-          break;
-        case "session_info_changed":
-          // El nombre de sesión cambió (p. ej. auto-título) → refrescar la barra.
-          void postWorkspace();
-          break;
-      }
-    });
-  }
+	// Toggles de Configuración (tools activos) → webview, para la vista de
+	// Configuración. Se leen en vivo de los settings de VS Code.
+	function postToolToggles(): void {
+		post({ type: "tool_toggles", ...readToolToggles() });
+	}
 
-  async function openPanel(): Promise<void> {
-    if (panel) {
-      panel.reveal(vscode.ViewColumn.Two, true);
-      return;
-    }
-    panel = vscode.window.createWebviewPanel("frida", "Frida Code", vscode.ViewColumn.Two, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(context.extensionUri, "dist-webview"),
-        vscode.Uri.joinPath(context.extensionUri, "media"),
-      ],
-    });
-    panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
-    panel.onDidDispose(() => {
-      panel = undefined;
-    });
-    panel.onDidChangeViewState(() => {
-      if (panel?.visible) void postWorkspace();
-    });
-    panel.webview.onDidReceiveMessage((msg: any) => {
-      void handleWebviewMessage(msg);
-    });
-  }
+	// Info del workspace: carpeta de trabajo + branch git (y si hay cambios
+	// sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
+	// pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
+	async function collectWorkspace(): Promise<{
+		cwd: string;
+		branch?: string;
+		dirty?: boolean;
+		sessionName?: string;
+	}> {
+		const cwd = workspaceCwd();
+		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
+		try {
+			const { stdout: branchOut } = await execFileP(
+				"git",
+				["rev-parse", "--abbrev-ref", "HEAD"],
+				{ cwd, timeout: 3000 },
+			);
+			const branch = branchOut.trim();
+			let dirty = false;
+			try {
+				const { stdout: status } = await execFileP(
+					"git",
+					["status", "--porcelain"],
+					{ cwd, timeout: 3000 },
+				);
+				dirty = status.trim().length > 0;
+			} catch {
+				/* ignore */
+			}
+			return { cwd, branch, dirty, sessionName };
+		} catch {
+			return { cwd, sessionName }; // no es repo o git no disponible
+		}
+	}
 
-  async function handleWebviewMessage(msg: any): Promise<void> {
-    switch (msg?.type) {
-      case "webview_ready":
-        post({ type: "mode", mode: approvalMode });
-        postToolToggles();
-        postTodos();
-        bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
-        break;
-      case "submit":
-        await runPrompt(String(msg.text ?? ""), msg.mode === "followUp" ? "followUp" : "steer", msg.images);
-        break;
-      case "approval_response":
-        (await ensureSession()).bridge.resolve({
-          id: msg.id,
-          decision: msg.decision === "accept" ? "accept" : "reject",
-          acceptAll: !!msg.acceptAll,
-        });
-        break;
-      case "question_response":
-        (await ensureSession()).questionBridge.resolve({
-          id: msg.id,
-          answers: msg.answers ?? [],
-          cancelled: !!msg.cancelled,
-        });
-        break;
-      case "set_key":
-        await setKey(String(msg.key ?? ""));
-        break;
-      case "copy_text":
-        try { await vscode.env.clipboard.writeText(String(msg.text ?? "")); } catch { /* noop */ }
-        break;
-      case "rotate_key":
-        await promptKey("manual");
-        break;
-      case "compact":
-        await compactContext();
-        break;
-      case "cancel_compaction":
-        await cancelCompaction();
-        break;
-      case "abort":
-        await abortRun();
-        break;
-      case "reload":
-        await reloadResources();
-        break;
-      case "list_resources":
-        postResources();
-        break;
-      case "list_models":
-        postModels();
-        break;
-      case "select_model":
-        await selectModel(String(msg.provider ?? ""), String(msg.model ?? ""));
-        break;
-      case "login_provider":
-        await loginProvider(String(msg.provider ?? ""));
-        break;
-      case "logout_provider":
-        await logoutProvider(String(msg.provider ?? ""));
-        break;
-      case "fork":
-        await forkSession();
-        break;
-      case "fork_at":
-        await forkAt(String(msg.entryId ?? ""));
-        break;
-      case "workspace":
-        await postWorkspace();
-        break;
-      case "new_session":
-        await newSession();
-        break;
-      case "search_files": {
-        const q = String(msg.query ?? "");
-        const items = await searchFiles(q);
-        post({ type: "files", query: q, items });
-        break;
-      }
-      case "list_sessions":
-        await sendSessions();
-        break;
-      case "switch_session":
-        await switchSession(String(msg.path ?? ""));
-        break;
-      case "rename_session":
-        await renameSession(String(msg.path ?? ""), String(msg.name ?? ""));
-        break;
-      case "delete_session":
-        await deleteSession(String(msg.path ?? ""));
-        break;
-      case "set_mode":
-        approvalMode = msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
-        post({ type: "mode", mode: approvalMode });
-        break;
-      case "set_tool_toggle":
-        await writeToolToggle(msg.key, !!msg.enabled);
-        postToolToggles();
-        // Re-ejecuta las factories para activar/desactivar el tool en caliente
-        // (frida.askUserQuestion.enabled / frida.todo.enabled). Igual que /reload,
-        // no pierde el historial; el estado de `todo` se recupera por replay.
-        await reloadResources();
-        break;
-      case "set_thinking":
-        try { frida?.session?.setThinkingLevel?.(String(msg.level ?? "medium")); } catch { /* noop */ }
-        sendModelInfo();
-        break;
-    }
-  }
+	async function postWorkspace(): Promise<void> {
+		try {
+			const ws = await collectWorkspace();
+			post({ type: "workspace", ...ws });
+		} catch {
+			/* ignore */
+		}
+	}
 
-  // Built-in slash commands del composer (estilo TUI de pi). Se interceptan
-  // en runPrompt ANTES de enviar al agente.
-  const BUILTIN_SLASH = new Set([
-    "compact", "reload", "new", "model", "login", "logout", "name", "copy", "help", "clone", "fork", "todos",
-  ]);
+	// Crea la sesión en segundo plano (onboarding/listo/inicio) para poder mostrar
+	// los recursos cuanto antes. Captura errores para no dejar promesas sin manejar.
+	function bootstrapSession(): void {
+		void ensureSession().catch((e: any) => {
+			post({
+				type: "info",
+				text: "No se pudo iniciar la sesión: " + String(e?.message ?? e),
+			});
+		});
+	}
 
-  async function runBuiltinSlash(text: string): Promise<boolean> {
-    const m = text.match(/^\/(\w+)(?:\s+([\s\S]*))?$/);
-    if (!m) return false;
-    const cmd = m[1];
-    const arg = (m[2] ?? "").trim();
-    if (!BUILTIN_SLASH.has(cmd)) return false; // /skill:... y prompts → al agente
-    switch (cmd) {
-      case "compact": void compactContext(); break;
-      case "reload": void reloadResources(); break;
-      case "new": void newSession(); break;
-      case "model":
-        if (arg) {
-          const slash = arg.indexOf("/");
-          if (slash > 0) await selectModel(arg.slice(0, slash), arg.slice(slash + 1));
-          else post({ type: "info", text: "Uso: /model <provider/model>  (ej. github-copilot/gpt-5)" });
-        } else {
-          post({ type: "open_models" });
-        }
-        break;
-      case "login":
-        if (arg) void loginProvider(arg);
-        else post({ type: "info", text: "Uso: /login <provider>  (ej. github-copilot)" });
-        break;
-      case "logout":
-        if (arg) void logoutProvider(arg);
-        else post({ type: "info", text: "Uso: /logout <provider>  (ej. github-copilot)" });
-        break;
-      case "name":
-        if (arg) await renameCurrentSession(arg);
-        else post({ type: "info", text: "Uso: /name <nombre de la sesión>" });
-        break;
-      case "copy": await copyLastMessage(); break;
-      case "help": postHelp(); break;
-      case "clone": await cloneSession(); break;
-      case "fork": await forkSession(); break;
-      case "todos": postTodosCommand(); break;
-    }
-    return true;
-  }
+	function postQueued(): void {
+		post({ type: "queued", items: pendingQueue.map((q) => q.text) });
+	}
 
-  async function renameCurrentSession(name: string): Promise<void> {
-    const pathStr = frida?.session?.sessionFile;
-    if (!pathStr) { post({ type: "info", text: "No hay sesión activa para renombrar." }); return; }
-    await renameSession(pathStr, name);
-  }
+	function resetQueue(): void {
+		pendingQueue.length = 0;
+		turnsInRun = 0;
+		postQueued();
+	}
 
-  async function copyLastMessage(): Promise<void> {
-    const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
-    for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i]?.role === "assistant") {
-        const t = extractText(msgs[i]);
-        if (t) {
-          await vscode.env.clipboard.writeText(t);
-          post({ type: "info", text: "Último mensaje copiado al portapapeles." });
-          return;
-        }
-      }
-    }
-    post({ type: "info", text: "No hay mensaje del asistente para copiar." });
-  }
+	function wireSession(session: any): void {
+		session.subscribe((event: any) => {
+			switch (event?.type) {
+				case "agent_start":
+					turnsInRun = 0;
+					lensBusy = true;
+					post({ type: "agent_busy", busy: true });
+					post({ type: "turn_active" });
+					break;
+				case "agent_end":
+					postUsage(session);
+					post({ type: "agent_busy", busy: false });
+					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
+					if (event.errorMessage && !event.willRetry) {
+						post({ type: "error", text: String(event.errorMessage) });
+					}
+					// El agente terminó: a partir de aquí los diagnósticos tardíos (cascade)
+					// se publican solos (mergeLens comprueba lensBusy).
+					lensBusy = false;
+					flushLens();
+					break;
+				case "turn_start": {
+					// turn_start tras el primero (turnsInRun>0) = entrega de un mensaje
+					// encolado: creamos su turno aquí para que los deltas caigan en él.
+					if (turnsInRun > 0 && pendingQueue.length > 0) {
+						post({ type: "user", text: pendingQueue.shift()!.text });
+						postQueued();
+					}
+					turnsInRun++;
+					// Nuevo turno: reinicia el acumulador para reflejar solo lo que pi-lens
+					// encuentre en ESTE turno.
+					lensAccum.clear();
+					lensAnyTruncated = false;
+					post({ type: "turn_active" });
+					break;
+				}
+				case "turn_end":
+					// Fin de turno del agente: publica el resumen de diagnósticos acumulados.
+					flushLens();
+					break;
+				case "auto_retry_start":
+					// El provider falló con un error retriable: el SDK reintentará. Mostramos
+					// indicador + countdown (como el RetryStatusIndicator del TUI) y permitimos
+					// cancelar con abortRetry (doble Esc).
+					inRetry = true;
+					post({
+						type: "retry_start",
+						attempt: Number(event.attempt) || 1,
+						maxAttempts: Number(event.maxAttempts) || 3,
+						delayMs: Number(event.delayMs) || 0,
+					});
+					break;
+				case "auto_retry_end":
+					inRetry = false;
+					post({ type: "retry_end", success: !!event.success });
+					// Fallo final (reintentos agotados): muestra el error concreto del gateway.
+					if (!event.success) {
+						post({
+							type: "error",
+							text: `Reintento fallido tras ${Number(event.attempt) || 0} intento(s): ${event.finalError || "Error desconocido"}`,
+						});
+					}
+					break;
+				case "message_update":
+					if (event.assistantMessageEvent?.type === "text_delta") {
+						post({ type: "delta", text: event.assistantMessageEvent.delta });
+					} else if (event.assistantMessageEvent?.type === "thinking_delta") {
+						post({
+							type: "thinking_delta",
+							text: event.assistantMessageEvent.delta,
+						});
+					}
+					break;
+				case "message_end":
+					// Cancelación (abort): feedback sutil. Los errores de provider ya van por
+					// agent_end/auto_retry_end; aquí sólo el caso abort (TUI: "Operation aborted").
+					if (
+						event.message?.role === "assistant" &&
+						event.message?.stopReason === "aborted"
+					) {
+						post({ type: "info", text: "Operación cancelada" });
+					}
+					break;
+				case "tool_execution_start":
+					post({
+						type: "tool_start",
+						toolCallId: event.toolCallId,
+						tool: event.toolName,
+						args: compactArgs(event.args),
+					});
+					break;
+				case "tool_execution_update": {
+					// Progreso parcial de un tool largo (extensiones/MCP). Se acumula en el
+					// segmento del tool (por toolCallId) y se muestra mientras sigue running.
+					const partial = summarizeResult(event.partialResult);
+					if (partial) {
+						post({
+							type: "tool_update",
+							toolCallId: event.toolCallId,
+							tool: event.toolName,
+							partial,
+						});
+					}
+					break;
+				}
+				case "tool_execution_end":
+					post({
+						type: "tool_end",
+						toolCallId: event.toolCallId,
+						tool: event.toolName,
+						isError: !!event.isError,
+						result: summarizeResult(event.result),
+						diff:
+							typeof event.result?.details?.diff === "string"
+								? event.result.details.diff
+								: undefined,
+					});
+					// El tool `todo` mutó el holder; republica el estado al panel.
+					if (event.toolName === "todo" && !event.isError) postTodos();
+					break;
+				case "compaction_start":
+					post({ type: "compact_start", reason: event.reason });
+					break;
+				case "compaction_end":
+					post({
+						type: "compact_end",
+						reason: event.reason,
+						aborted: !!event.aborted,
+						tokensBefore: event.result?.tokensBefore,
+						summary: event.result?.summary,
+						errorMessage: event.errorMessage,
+					});
+					// La compactación reescribió los mensajes y el contexto.
+					postHistory();
+					postUsage(session);
+					void postWorkspace();
+					break;
+				case "summarization_retry_scheduled":
+					// La compactación (o branch-summary) falló con error retriable: el SDK
+					// reintentará tras el backoff. Reusamos el countdown del retry del agente
+					// (state.retry) — el proc-bar de compactación lo muestra apropiadamente.
+					post({
+						type: "retry_start",
+						attempt: Number(event.attempt) || 1,
+						maxAttempts: Number(event.maxAttempts) || 3,
+						delayMs: Number(event.delayMs) || 0,
+					});
+					break;
+				case "summarization_retry_attempt_start":
+					// Empieza el intento de sumarización: de vuelta a "Compactando…".
+					post({ type: "retry_end", success: true });
+					break;
+				case "summarization_retry_finished":
+					post({ type: "retry_end", success: true });
+					break;
+				case "session_info_changed":
+					// El nombre de sesión cambió (p. ej. auto-título) → refrescar la barra.
+					void postWorkspace();
+					break;
+				case "thinking_level_changed":
+					// El thinking cambió (selector o settings) → sincroniza el selector del webview.
+					sendModelInfo();
+					break;
+			}
+		});
+	}
 
-  function postHelp(): void {
-    post({
-      type: "info",
-      text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener",
-    });
-  }
+	async function openPanel(): Promise<void> {
+		if (panel) {
+			panel.reveal(vscode.ViewColumn.Two, true);
+			return;
+		}
+		panel = vscode.window.createWebviewPanel(
+			"frida",
+			"Frida Code",
+			vscode.ViewColumn.Two,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+				localResourceRoots: [
+					vscode.Uri.joinPath(context.extensionUri, "dist-webview"),
+					vscode.Uri.joinPath(context.extensionUri, "media"),
+				],
+			},
+		);
+		panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
+		panel.onDidDispose(() => {
+			panel = undefined;
+		});
+		panel.onDidChangeViewState(() => {
+			if (panel?.visible) void postWorkspace();
+		});
+		panel.webview.onDidReceiveMessage((msg: any) => {
+			void handleWebviewMessage(msg);
+		});
+	}
 
-  // /todos: imprime la lista de tareas agrupada por estado (estilo /todos de la
-  // TUI de pi/rpiv). Lee el holder en memoria del tool `todo`.
-  function postTodosCommand(): void {
-    const s = getTodoState();
-    const visible = s.tasks.filter((t) => t.status !== "deleted");
-    if (visible.length === 0) {
-      post({ type: "info", text: "No hay tareas todavía." });
-      return;
-    }
-    const fmt = (t: any) =>
-      `  #${t.id} ${t.subject}` +
-      (t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "") +
-      (t.blockedBy?.length ? ` ⛓ ${t.blockedBy.map((id: number) => `#${id}`).join(",")}` : "");
-    const pending = visible.filter((t) => t.status === "pending");
-    const inProg = visible.filter((t) => t.status === "in_progress");
-    const done = visible.filter((t) => t.status === "completed");
-    const lines: string[] = [`Tareas: ${done.length}/${visible.length}`];
-    if (inProg.length) { lines.push("── En progreso ──"); for (const t of inProg) lines.push(fmt(t)); }
-    if (pending.length) { lines.push("── Pendientes ──"); for (const t of pending) lines.push(fmt(t)); }
-    if (done.length) { lines.push("── Completadas ──"); for (const t of done) lines.push(fmt(t)); }
-    post({ type: "info", text: lines.join("\n") });
-  }
+	async function handleWebviewMessage(msg: any): Promise<void> {
+		switch (msg?.type) {
+			case "webview_ready":
+				post({ type: "mode", mode: approvalMode });
+				postToolToggles();
+				postTodos();
+				bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
+				break;
+			case "submit":
+				await runPrompt(
+					String(msg.text ?? ""),
+					msg.mode === "followUp" ? "followUp" : "steer",
+					msg.images,
+				);
+				break;
+			case "approval_response":
+				(await ensureSession()).bridge.resolve({
+					id: msg.id,
+					decision: msg.decision === "accept" ? "accept" : "reject",
+					acceptAll: !!msg.acceptAll,
+				});
+				break;
+			case "question_response":
+				(await ensureSession()).questionBridge.resolve({
+					id: msg.id,
+					answers: msg.answers ?? [],
+					cancelled: !!msg.cancelled,
+				});
+				break;
+			case "set_key":
+				await setKey(String(msg.key ?? ""));
+				break;
+			case "copy_text":
+				try {
+					await vscode.env.clipboard.writeText(String(msg.text ?? ""));
+				} catch {
+					/* noop */
+				}
+				break;
+			case "rotate_key":
+				await promptKey("manual");
+				break;
+			case "compact":
+				await compactContext();
+				break;
+			case "cancel_compaction":
+				await cancelCompaction();
+				break;
+			case "abort":
+				await abortRun();
+				break;
+			case "reload":
+				await reloadResources();
+				break;
+			case "list_resources":
+				postResources();
+				break;
+			case "list_models":
+				postModels();
+				break;
+			case "select_model":
+				await selectModel(String(msg.provider ?? ""), String(msg.model ?? ""));
+				break;
+			case "login_provider":
+				await loginProvider(String(msg.provider ?? ""));
+				break;
+			case "logout_provider":
+				await logoutProvider(String(msg.provider ?? ""));
+				break;
+			case "fork":
+				await forkSession();
+				break;
+			case "fork_at":
+				await forkAt(String(msg.entryId ?? ""));
+				break;
+			case "workspace":
+				await postWorkspace();
+				break;
+			case "new_session":
+				await newSession();
+				break;
+			case "search_files": {
+				const q = String(msg.query ?? "");
+				const items = await searchFiles(q);
+				post({ type: "files", query: q, items });
+				break;
+			}
+			case "list_sessions":
+				await sendSessions();
+				break;
+			case "switch_session":
+				await switchSession(String(msg.path ?? ""));
+				break;
+			case "rename_session":
+				await renameSession(String(msg.path ?? ""), String(msg.name ?? ""));
+				break;
+			case "delete_session":
+				await deleteSession(String(msg.path ?? ""));
+				break;
+			case "set_mode":
+				approvalMode =
+					msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
+				post({ type: "mode", mode: approvalMode });
+				break;
+			case "set_tool_toggle":
+				await writeToolToggle(msg.key, !!msg.enabled);
+				postToolToggles();
+				// Re-ejecuta las factories para activar/desactivar el tool en caliente
+				// (frida.askUserQuestion.enabled / frida.todo.enabled). Igual que /reload,
+				// no pierde el historial; el estado de `todo` se recupera por replay.
+				await reloadResources();
+				break;
+			case "set_thinking":
+				try {
+					frida?.session?.setThinkingLevel?.(String(msg.level ?? "medium"));
+				} catch {
+					/* noop */
+				}
+				sendModelInfo();
+				break;
+		}
+	}
 
-  // Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
-  // en la hoja actual = copia completa). Equivalente al /clone de la TUI.
-  async function cloneSession(): Promise<void> {
-    if (!frida) return;
-    const sm = frida.sessionManager;
-    const leafId = sm?.getLeafId?.();
-    if (!leafId) { post({ type: "info", text: "Nada que clonar todavía." }); return; }
-    const newPath = sm?.createBranchedSession?.(leafId);
-    if (!newPath) { post({ type: "info", text: "No se pudo clonar la sesión (espera al primer mensaje del asistente)." }); return; }
-    post({ type: "info", text: "Sesión clonada." });
-    await switchSession(newPath);
-  }
+	// Built-in slash commands del composer (estilo TUI de pi). Se interceptan
+	// en runPrompt ANTES de enviar al agente.
+	const BUILTIN_SLASH = new Set([
+		"compact",
+		"reload",
+		"new",
+		"model",
+		"login",
+		"logout",
+		"name",
+		"copy",
+		"help",
+		"clone",
+		"fork",
+		"todos",
+	]);
 
-  // Bifurcar desde un mensaje anterior: publica los puntos (mensajes del usuario)
-  // para que el webview muestre un selector. Equivalente al /fork de la TUI.
-  async function forkSession(): Promise<void> {
-    if (!frida) return;
-    const points: any[] = frida.session?.getUserMessagesForForking?.() ?? [];
-    if (points.length === 0) { post({ type: "info", text: "No hay mensajes para bifurcar." }); return; }
-    post({ type: "fork_points", points: points.map((p) => ({ entryId: p.entryId, text: p.text })) });
-  }
+	async function runBuiltinSlash(text: string): Promise<boolean> {
+		const m = text.match(/^\/(\w+)(?:\s+([\s\S]*))?$/);
+		if (!m) return false;
+		const cmd = m[1];
+		const arg = (m[2] ?? "").trim();
+		if (!BUILTIN_SLASH.has(cmd)) return false; // /skill:... y prompts → al agente
+		switch (cmd) {
+			case "compact":
+				void compactContext();
+				break;
+			case "reload":
+				void reloadResources();
+				break;
+			case "new":
+				void newSession();
+				break;
+			case "model": {
+				const slash = arg ? arg.indexOf("/") : -1;
+				if (arg) {
+					if (slash > 0)
+						await selectModel(arg.slice(0, slash), arg.slice(slash + 1));
+					else
+						post({
+							type: "info",
+							text: "Uso: /model <provider/model>  (ej. github-copilot/gpt-5)",
+						});
+				} else {
+					post({ type: "open_models" });
+				}
+				break;
+			}
+			case "login":
+				if (arg) void loginProvider(arg);
+				else
+					post({
+						type: "info",
+						text: "Uso: /login <provider>  (ej. github-copilot)",
+					});
+				break;
+			case "logout":
+				if (arg) void logoutProvider(arg);
+				else
+					post({
+						type: "info",
+						text: "Uso: /logout <provider>  (ej. github-copilot)",
+					});
+				break;
+			case "name":
+				if (arg) await renameCurrentSession(arg);
+				else post({ type: "info", text: "Uso: /name <nombre de la sesión>" });
+				break;
+			case "copy":
+				await copyLastMessage();
+				break;
+			case "help":
+				postHelp();
+				break;
+			case "clone":
+				await cloneSession();
+				break;
+			case "fork":
+				await forkSession();
+				break;
+			case "todos":
+				postTodosCommand();
+				break;
+		}
+		return true;
+	}
 
-  // Crea la rama desde el padre del mensaje elegido (igual que runtime.fork "before").
-  async function forkAt(entryId: string): Promise<void> {
-    if (!frida || !entryId) return;
-    const sm = frida.sessionManager;
-    const entry = sm?.getEntry?.(entryId);
-    if (!entry) { post({ type: "info", text: "Punto de bifurcación no encontrado." }); return; }
-    const target = entry.parentId ?? entryId;
-    const newPath = sm?.createBranchedSession?.(target);
-    if (!newPath) { post({ type: "info", text: "No se pudo bifurcar la sesión." }); return; }
-    post({ type: "info", text: "Sesión bifurcada desde el punto elegido." });
-    await switchSession(newPath);
-  }
+	async function renameCurrentSession(name: string): Promise<void> {
+		const pathStr = frida?.session?.sessionFile;
+		if (!pathStr) {
+			post({ type: "info", text: "No hay sesión activa para renombrar." });
+			return;
+		}
+		await renameSession(pathStr, name);
+	}
 
-  async function runPrompt(text: string, mode: "steer" | "followUp" = "steer", images?: { data: string; mimeType: string }[]): Promise<void> {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+	async function copyLastMessage(): Promise<void> {
+		const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
+		for (let i = msgs.length - 1; i >= 0; i--) {
+			if (msgs[i]?.role === "assistant") {
+				const t = extractText(msgs[i]);
+				if (t) {
+					await vscode.env.clipboard.writeText(t);
+					post({
+						type: "info",
+						text: "Último mensaje copiado al portapapeles.",
+					});
+					return;
+				}
+			}
+		}
+		post({ type: "info", text: "No hay mensaje del asistente para copiar." });
+	}
 
-    // Built-in slash commands (/compact, /reload, /model, /login, /name, …).
-    // Se interceptan ANTES de pedir auth: no todos requieren sesión/modelo.
-    if (trimmed.startsWith("/")) {
-      if (await runBuiltinSlash(trimmed)) return;
-    }
+	function postHelp(): void {
+		post({
+			type: "info",
+			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
+		});
+	}
 
-    // Modo bash del usuario: "!comando" ejecuta y envía el output al LLM;
-    // "!!comando" ejecuta sin enviarlo (solo se muestra en el panel).
-    // Es ejecución directa del usuario (no pasa por el gate de bash de D7).
-    if (trimmed.startsWith("!")) {
-      const exclude = trimmed.startsWith("!!");
-      const command = (exclude ? trimmed.slice(2) : trimmed.slice(1)).trim();
-      if (!command) return; // "!" a secas → se ignora
-      await runBashShortcut(command, exclude, trimmed);
-      return;
-    }
+	// /todos: imprime la lista de tareas agrupada por estado (estilo /todos de la
+	// TUI de pi/rpiv). Lee el holder en memoria del tool `todo`.
+	function postTodosCommand(): void {
+		const s = getTodoState();
+		const visible = s.tasks.filter((t) => t.status !== "deleted");
+		if (visible.length === 0) {
+			post({ type: "info", text: "No hay tareas todavía." });
+			return;
+		}
+		const fmt = (t: any) =>
+			`  #${t.id} ${t.subject}` +
+			(t.status === "in_progress" && t.activeForm ? ` (${t.activeForm})` : "") +
+			(t.blockedBy?.length
+				? ` ⛓ ${t.blockedBy.map((id: number) => `#${id}`).join(",")}`
+				: "");
+		const pending = visible.filter((t) => t.status === "pending");
+		const inProg = visible.filter((t) => t.status === "in_progress");
+		const done = visible.filter((t) => t.status === "completed");
+		const lines: string[] = [`Tareas: ${done.length}/${visible.length}`];
+		if (inProg.length) {
+			lines.push("── En progreso ──");
+			for (const t of inProg) lines.push(fmt(t));
+		}
+		if (pending.length) {
+			lines.push("── Pendientes ──");
+			for (const t of pending) lines.push(fmt(t));
+		}
+		if (done.length) {
+			lines.push("── Completadas ──");
+			for (const t of done) lines.push(fmt(t));
+		}
+		post({ type: "info", text: lines.join("\n") });
+	}
 
-    let session: FridaSession;
-    try {
-      session = await ensureSession();
-    } catch (e: any) {
-      post({ type: "error", text: String(e?.message ?? e) });
-      return;
-    }
-    // Auth global: API key de Softtek o login de suscripción (Copilot).
-    const anyAuthed = SUPPORTED_PROVIDERS.some((id) => !!session.modelRuntime?.hasConfiguredAuth?.(id));
-    if (!anyAuthed) {
-      post({ type: "need_key" });
-      return;
-    }
-    const expanded = await expandAtFiles(trimmed, workspaceCwd());
+	// Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
+	// en la hoja actual = copia completa). Equivalente al /clone de la TUI.
+	async function cloneSession(): Promise<void> {
+		if (!frida) return;
+		const sm = frida.sessionManager;
+		const leafId = sm?.getLeafId?.();
+		if (!leafId) {
+			post({ type: "info", text: "Nada que clonar todavía." });
+			return;
+		}
+		const newPath = sm?.createBranchedSession?.(leafId);
+		if (!newPath) {
+			post({
+				type: "info",
+				text: "No se pudo clonar la sesión (espera al primer mensaje del asistente).",
+			});
+			return;
+		}
+		post({ type: "info", text: "Sesión clonada." });
+		await switchSession(newPath);
+	}
 
-    // Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
-    const imgs = images && images.length > 0 ? images.map((i) => ({ type: "image" as const, data: i.data, mimeType: i.mimeType })) : undefined;
+	// Bifurcar desde un mensaje anterior: publica los puntos (mensajes del usuario)
+	// para que el webview muestre un selector. Equivalente al /fork de la TUI.
+	async function forkSession(): Promise<void> {
+		if (!frida) return;
+		const points: any[] = frida.session?.getUserMessagesForForking?.() ?? [];
+		if (points.length === 0) {
+			post({ type: "info", text: "No hay mensajes para bifurcar." });
+			return;
+		}
+		post({
+			type: "fork_points",
+			points: points.map((p) => ({ entryId: p.entryId, text: p.text })),
+		});
+	}
 
-    // Si el agente está ocupado, encolamos (Message Queue de pi): el turno de
-    // este mensaje NO se crea ahora, sino cuando el agente lo entregue
-    // (turn_start>0 en wireSession), para que los deltas del turno en curso
-    // sigan cayendo en su propio turno y no se mezclen.
-    if (session.session?.isStreaming) {
-      pendingQueue.push({ text: trimmed });
-      postQueued();
-      try {
-        await session.session.prompt(expanded, { streamingBehavior: mode, images: imgs });
-      } catch (e: any) {
-        const idx = pendingQueue.findIndex((q) => q.text === trimmed);
-        if (idx >= 0) pendingQueue.splice(idx, 1);
-        postQueued();
-        post({ type: "error", text: String(e?.message ?? e) });
-      }
-      return;
-    }
+	// Crea la rama desde el padre del mensaje elegido (igual que runtime.fork "before").
+	async function forkAt(entryId: string): Promise<void> {
+		if (!frida || !entryId) return;
+		const sm = frida.sessionManager;
+		const entry = sm?.getEntry?.(entryId);
+		if (!entry) {
+			post({ type: "info", text: "Punto de bifurcación no encontrado." });
+			return;
+		}
+		const target = entry.parentId ?? entryId;
+		const newPath = sm?.createBranchedSession?.(target);
+		if (!newPath) {
+			post({ type: "info", text: "No se pudo bifurcar la sesión." });
+			return;
+		}
+		post({ type: "info", text: "Sesión bifurcada desde el punto elegido." });
+		await switchSession(newPath);
+	}
 
-    // Agente libre: turno normal. El busy lo marcan los eventos agent_start/end
-    // reales de pi (no turn_start/turn_end manuales).
-    post({ type: "user", text: trimmed, images: imgs?.map((i) => ({ data: i.data, mimeType: i.mimeType })) });
-    try {
-      await session.session.prompt(expanded, imgs ? { images: imgs } : undefined);
-    } catch (e: any) {
-      post({ type: "error", text: String(e?.message ?? e) });
-    }
-  }
+	async function runPrompt(
+		text: string,
+		mode: "steer" | "followUp" = "steer",
+		images?: { data: string; mimeType: string }[],
+	): Promise<void> {
+		const trimmed = text.trim();
+		if (!trimmed) return;
 
-  // Ejecuta un atajo de bash del usuario (!comando / !!comando).
-  // Usa session.executeBash del SDK: si excludeFromContext=false, el resultado
-  // queda registrado en el contexto del LLM (igual que la TUI de pi).
-  async function runBashShortcut(command: string, exclude: boolean, raw: string): Promise<void> {
-    let session: FridaSession;
-    try {
-      session = await ensureSession();
-    } catch (e: any) {
-      post({ type: "error", text: String(e?.message ?? e) });
-      return;
-    }
-    if (session.session?.isBashRunning) {
-      post({ type: "error", text: "Ya hay un comando bash en ejecución. Cancela primero." });
-      return;
-    }
-    if (session.session?.isStreaming) {
-      // El atajo de bash directo del usuario compite con el agent run por el
-      // indicador de “busy”; pídele que espere (como hace pi con el bash).
-      post({ type: "error", text: "Espera a que Frida termine de procesar para ejecutar bash directo (!)." });
-      return;
-    }
-    post({ type: "user", text: raw });
-    post({ type: "bash_start", command, excludeFromContext: exclude });
-    try {
-      const result: any = await session.session.executeBash(
-        command,
-        (chunk: string) => post({ type: "bash_chunk", text: chunk }),
-        { excludeFromContext: exclude }
-      );
-      post({
-        type: "bash_end",
-        exitCode: result?.exitCode,
-        cancelled: !!result?.cancelled,
-        truncated: !!result?.truncated,
-        fullOutputPath: result?.fullOutputPath,
-      });
-    } catch (e: any) {
-      post({ type: "bash_end", exitCode: undefined, cancelled: false });
-      post({ type: "error", text: String(e?.message ?? e) });
-    }
-    // El comando pudo cambiar el branch/estado de git (p. ej. !git checkout).
-    void postWorkspace();
-  }
+		// Built-in slash commands (/compact, /reload, /model, /login, /name, …).
+		// Se interceptan ANTES de pedir auth: no todos requieren sesión/modelo.
+		if (trimmed.startsWith("/")) {
+			if (await runBuiltinSlash(trimmed)) return;
+		}
 
-  async function compactContext(): Promise<void> {
-    try {
-      const { session } = await ensureSession();
-      // El feedback (estado + resumen + tokens) lo dan los eventos
-      // compaction_start / compaction_end del SDK, tanto para la compactación
-      // manual como para la automática (threshold / overflow).
-      await session.compact();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al compactar: " + String(e?.message ?? e) });
-    }
-  }
+		// Modo bash del usuario: "!comando" ejecuta y envía el output al LLM;
+		// "!!comando" ejecuta sin enviarlo (solo se muestra en el panel).
+		// Es ejecución directa del usuario (no pasa por el gate de bash de D7).
+		if (trimmed.startsWith("!")) {
+			const exclude = trimmed.startsWith("!!");
+			const command = (exclude ? trimmed.slice(2) : trimmed.slice(1)).trim();
+			if (!command) return; // "!" a secas → se ignora
+			await runBashShortcut(command, exclude, trimmed);
+			return;
+		}
 
-  async function cancelCompaction(): Promise<void> {
-    try {
-      const { session } = await ensureSession();
-      session.abortCompaction?.();
-    } catch {
-      /* noop */
-    }
-  }
+		let session: FridaSession;
+		try {
+			session = await ensureSession();
+		} catch (e: any) {
+			post({ type: "error", text: String(e?.message ?? e) });
+			return;
+		}
+		// Auth global: API key de Softtek o login de suscripción (Copilot).
+		const anyAuthed = SUPPORTED_PROVIDERS.some(
+			(id) => !!session.modelRuntime?.hasConfiguredAuth?.(id),
+		);
+		if (!anyAuthed) {
+			post({ type: "need_key" });
+			return;
+		}
+		const expanded = await expandAtFiles(trimmed, workspaceCwd());
 
-  async function abortRun(): Promise<void> {
-    try {
-      const { session } = await ensureSession();
-      if (session.session?.isBashRunning) {
-        await session.session.abortBash?.();
-        return;
-      }
-      await session.session.abort();
-    } catch {
-      /* noop */
-    }
-  }
+		// Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
+		const imgs =
+			images && images.length > 0
+				? images.map((i) => ({
+						type: "image" as const,
+						data: i.data,
+						mimeType: i.mimeType,
+					}))
+				: undefined;
 
-  // Recarga en caliente de extensiones, skills, prompts, themes, archivos de
-  // contexto y settings (equivalente al /reload de la TUI de pi). No pierde el
-  // historial ni la sesión; re-ejecuta las factories (gates, provider hooks,
-  // ask_user_question) y reescanea el descubrimiento abierto (ADR-0005).
-  async function reloadResources(): Promise<void> {
-    let sess: FridaSession;
-    try {
-      sess = await ensureSession();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al recargar: " + String(e?.message ?? e) });
-      return;
-    }
-    const session = sess.session;
-    if (session?.isStreaming) {
-      post({ type: "info", text: "Espera a que termine la respuesta actual antes de recargar." });
-      return;
-    }
-    if (session?.isCompacting) {
-      post({ type: "info", text: "Espera a que termine la compactación antes de recargar." });
-      return;
-    }
-    post({ type: "info", text: "Recargando extensiones, skills, prompts, themes y contexto…" });
-    try {
-      await session.reload();
-      sendModelInfo(); // por si settings cambió el thinking level
-      // ⚠ Verificar en runtime: la key inyectada (setRuntimeApiKey) vive en el
-      // ModelRuntime, que el reload no toca; debería persistir. Si llegara a
-      // fallar la autenticación tras un reload, reinyectar con sess.setKey(keyCache).
-      const rl: any = session?.resourceLoader;
-      const extCount = rl?.getExtensions?.()?.extensions?.length;
-      const skillCount = rl?.getSkills?.()?.skills?.length;
-      const counts =
-        extCount !== undefined || skillCount !== undefined
-          ? ` · ${extCount ?? 0} extensiones, ${skillCount ?? 0} skills`
-          : "";
-      post({ type: "info", text: "Recarga completada" + counts });
-      postResources();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al recargar: " + String(e?.message ?? e) });
-    }
-  }
+		// Si el agente está ocupado, encolamos (Message Queue de pi): el turno de
+		// este mensaje NO se crea ahora, sino cuando el agente lo entregue
+		// (turn_start>0 en wireSession), para que los deltas del turno en curso
+		// sigan cayendo en su propio turno y no se mezclen.
+		if (session.session?.isStreaming) {
+			pendingQueue.push({ text: trimmed });
+			postQueued();
+			try {
+				await session.session.prompt(expanded, {
+					streamingBehavior: mode,
+					images: imgs,
+				});
+			} catch (e: any) {
+				const idx = pendingQueue.findIndex((q) => q.text === trimmed);
+				if (idx >= 0) pendingQueue.splice(idx, 1);
+				postQueued();
+				post({ type: "error", text: String(e?.message ?? e) });
+			}
+			return;
+		}
 
-  async function newSession(): Promise<void> {
-    if (frida) {
-      try {
-        await frida.session.dispose?.();
-      } catch {
-        /* noop */
-      }
-      frida = undefined;
-    }
-    post({ type: "cleared" });
-    resetQueue();
-    post({ type: "info", text: "Nueva sesión iniciada." });
-    if (keyCache) bootstrapSession(); // recrea la sesión para mostrar recursos
-  }
+		// Agente libre: turno normal. El busy lo marcan los eventos agent_start/end
+		// reales de pi (no turn_start/turn_end manuales).
+		post({
+			type: "user",
+			text: trimmed,
+			images: imgs?.map((i) => ({ data: i.data, mimeType: i.mimeType })),
+		});
+		try {
+			await session.session.prompt(
+				expanded,
+				imgs ? { images: imgs } : undefined,
+			);
+		} catch (e: any) {
+			post({ type: "error", text: String(e?.message ?? e) });
+		}
+	}
 
-  async function sendSessions(): Promise<void> {
-    try {
-      const infos = await SessionManager.listAll(sessionDirPath);
-      const items = infos
-        .map((i: any) => ({
-          path: String(i.path),
-          name: i.name as string | undefined,
-          firstMessage: String(i.firstMessage ?? "").slice(0, 160),
-          messageCount: Number(i.messageCount ?? 0),
-          modified: i.modified instanceof Date ? i.modified.getTime() : Number(i.modified) || 0,
-        }))
-        .sort((a: any, b: any) => b.modified - a.modified);
-      post({ type: "sessions", items, currentPath: frida?.session?.sessionFile });
-    } catch (e: any) {
-      post({ type: "info", text: "Error al listar sesiones: " + String(e?.message ?? e) });
-    }
-  }
+	// Ejecuta un atajo de bash del usuario (!comando / !!comando).
+	// Usa session.executeBash del SDK: si excludeFromContext=false, el resultado
+	// queda registrado en el contexto del LLM (igual que la TUI de pi).
+	async function runBashShortcut(
+		command: string,
+		exclude: boolean,
+		raw: string,
+	): Promise<void> {
+		let session: FridaSession;
+		try {
+			session = await ensureSession();
+		} catch (e: any) {
+			post({ type: "error", text: String(e?.message ?? e) });
+			return;
+		}
+		if (session.session?.isBashRunning) {
+			post({
+				type: "error",
+				text: "Ya hay un comando bash en ejecución. Cancela primero.",
+			});
+			return;
+		}
+		if (session.session?.isStreaming) {
+			// El atajo de bash directo del usuario compite con el agent run por el
+			// indicador de “busy”; pídele que espere (como hace pi con el bash).
+			post({
+				type: "error",
+				text: "Espera a que Frida termine de procesar para ejecutar bash directo (!).",
+			});
+			return;
+		}
+		post({ type: "user", text: raw });
+		post({ type: "bash_start", command, excludeFromContext: exclude });
+		try {
+			const result: any = await session.session.executeBash(
+				command,
+				(chunk: string) => post({ type: "bash_chunk", text: chunk }),
+				{ excludeFromContext: exclude },
+			);
+			post({
+				type: "bash_end",
+				exitCode: result?.exitCode,
+				cancelled: !!result?.cancelled,
+				truncated: !!result?.truncated,
+				fullOutputPath: result?.fullOutputPath,
+			});
+		} catch (e: any) {
+			post({ type: "bash_end", exitCode: undefined, cancelled: false });
+			post({ type: "error", text: String(e?.message ?? e) });
+		}
+		// El comando pudo cambiar el branch/estado de git (p. ej. !git checkout).
+		void postWorkspace();
+	}
 
-  async function switchSession(pathStr: string): Promise<void> {
-    if (!pathStr) return;
-    if (frida) {
-      try { await frida.session.dispose?.(); } catch { /* noop */ }
-      frida = undefined;
-    }
-    resetQueue();
-    try {
-      frida = await createFridaSession({
-        cwd: workspaceCwd(),
-        agentDir: defaultAgentDir(),
-        sessionDir: sessionDirPath,
-        openPath: pathStr,
-        getKey: () => keyCache,
-        onUnauthorized: () => { keyCache = undefined; void promptKey("unauthorized"); },
-        onPendingApprovals: (reqs: ApprovalRequest[]) => post({ type: "approvals", approvals: reqs }),
-        onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
-        getMode: () => approvalMode,
-        askUserQuestionEnabled: isAskUserQuestionEnabled,
-        todoEnabled: isTodoEnabled,
-      });
-      wireSession(frida.session);
-      postHistory();
-      sendModelInfo();
-      postResources();
-      postModels();
-      postUsage(frida.session);
-      void postWorkspace();
-      postTodos();
-      postToolToggles();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al abrir sesión: " + String(e?.message ?? e) });
-    }
-  }
+	async function compactContext(): Promise<void> {
+		try {
+			const { session } = await ensureSession();
+			// El feedback (estado + resumen + tokens) lo dan los eventos
+			// compaction_start / compaction_end del SDK, tanto para la compactación
+			// manual como para la automática (threshold / overflow).
+			await session.compact();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al compactar: " + String(e?.message ?? e),
+			});
+		}
+	}
 
-  async function renameSession(pathStr: string, name: string): Promise<void> {
-    const clean = name.trim();
-    if (!pathStr || !clean) return;
-    try {
-      if (frida && frida.session?.sessionFile === pathStr) {
-        frida.sessionManager?.appendSessionInfo?.(clean);
-      } else {
-        const sm = SessionManager.open(pathStr, sessionDirPath, workspaceCwd());
-        sm.appendSessionInfo(clean);
-      }
-      post({ type: "info", text: "Sesión renombrada: " + clean });
-      await sendSessions();
-      void postWorkspace();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al renombrar: " + String(e?.message ?? e) });
-    }
-  }
+	async function cancelCompaction(): Promise<void> {
+		try {
+			const { session } = await ensureSession();
+			session.abortCompaction?.();
+		} catch {
+			/* noop */
+		}
+	}
 
-  // Elimina una sesión borrando su archivo JSONL. SessionManager no expone
-  // delete, pero no hace falta: listAll lee los archivos del disco cada vez.
-  // La sesión activa se bloquea para no romper el agente en curso.
-  async function deleteSession(pathStr: string): Promise<void> {
-    if (!pathStr) return;
-    if (frida && frida.session?.sessionFile === pathStr) {
-      post({ type: "info", text: "No puedes eliminar la sesión activa." });
-      return;
-    }
-    try {
-      await fs.unlink(pathStr);
-      post({ type: "info", text: "Sesión eliminada." });
-      await sendSessions();
-    } catch (e: any) {
-      post({ type: "info", text: "Error al eliminar: " + String(e?.message ?? e) });
-    }
-  }
+	async function abortRun(): Promise<void> {
+		try {
+			const { session } = await ensureSession();
+			if (session.session?.isBashRunning) {
+				await session.session.abortBash?.();
+				return;
+			}
+			if (inRetry) {
+				await session.session.abortRetry?.();
+				return;
+			}
+			await session.session.abort();
+		} catch {
+			/* noop */
+		}
+	}
 
-  function postHistory(): void {
-    try {
-      const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
-      const items: any[] = [];
-      const pendingTools = new Map<string, any>(); // toolCallId → segment tool
-      for (const m of msgs) {
-        const role = String(m?.role ?? "");
-        const content = m?.content;
-        const parts: any[] = Array.isArray(content)
-          ? content
-          : typeof content === "string"
-          ? [{ type: "text", text: content }]
-          : [];
-        if (role === "user") {
-          items.push({ role: "user", text: extractText(m) });
-        } else if (role === "assistant") {
-          const segs: any[] = [];
-          for (const p of parts) {
-            if (p?.type === "text" && p.text) segs.push({ kind: "text", text: String(p.text) });
-            else if (p?.type === "thinking" && p.thinking) segs.push({ kind: "thinking", text: String(p.thinking) });
-            else if (p?.type === "toolCall") {
-              const seg: any = { kind: "tool", tool: String(p.name ?? ""), args: compactArgs(p.arguments), state: "running" };
-              segs.push(seg);
-              if (p.id) pendingTools.set(String(p.id), seg);
-            }
-          }
-          if (segs.length > 0) items.push({ role: "assistant", segments: segs });
-        } else if (role === "tool") {
-          // Empareja cada toolResult con su toolCall pendiente (por toolCallId).
-          for (const p of parts) {
-            if (p?.type === "toolResult") {
-              const seg = p.toolCallId ? pendingTools.get(String(p.toolCallId)) : null;
-              if (seg) {
-                seg.state = p.isError ? "error" : "ok";
-                seg.result = summarizeToolResultContent(p.content);
-                pendingTools.delete(String(p.toolCallId));
-              }
-            }
-          }
-        }
-      }
-      const name = frida?.sessionManager?.getSessionName?.();
-      post({ type: "history", name, items: items.slice(-200) });
-    } catch {
-      /* noop */
-    }
-  }
+	// Recarga en caliente de extensiones, skills, prompts, themes, archivos de
+	// contexto y settings (equivalente al /reload de la TUI de pi). No pierde el
+	// historial ni la sesión; re-ejecuta las factories (gates, provider hooks,
+	// ask_user_question) y reescanea el descubrimiento abierto (ADR-0005).
+	async function reloadResources(): Promise<void> {
+		let sess: FridaSession;
+		try {
+			sess = await ensureSession();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al recargar: " + String(e?.message ?? e),
+			});
+			return;
+		}
+		const session = sess.session;
+		if (session?.isStreaming) {
+			post({
+				type: "info",
+				text: "Espera a que termine la respuesta actual antes de recargar.",
+			});
+			return;
+		}
+		if (session?.isCompacting) {
+			post({
+				type: "info",
+				text: "Espera a que termine la compactación antes de recargar.",
+			});
+			return;
+		}
+		post({
+			type: "info",
+			text: "Recargando extensiones, skills, prompts, themes y contexto…",
+		});
+		try {
+			await session.reload();
+			sendModelInfo(); // por si settings cambió el thinking level
+			// ⚠ Verificar en runtime: la key inyectada (setRuntimeApiKey) vive en el
+			// ModelRuntime, que el reload no toca; debería persistir. Si llegara a
+			// fallar la autenticación tras un reload, reinyectar con sess.setKey(keyCache).
+			const rl: any = session?.resourceLoader;
+			const extCount = rl?.getExtensions?.()?.extensions?.length;
+			const skillCount = rl?.getSkills?.()?.skills?.length;
+			const counts =
+				extCount !== undefined || skillCount !== undefined
+					? ` · ${extCount ?? 0} extensiones, ${skillCount ?? 0} skills`
+					: "";
+			post({ type: "info", text: "Recarga completada" + counts });
+			postResources();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al recargar: " + String(e?.message ?? e),
+			});
+		}
+	}
 
-  async function setKey(key: string): Promise<void> {
-    const trimmed = key.trim();
-    if (!trimmed) return;
-    await context.secrets.store(SECRET_KEY, trimmed);
-    keyCache = trimmed;
-    if (frida) {
-      await frida.setKey(trimmed); // inyecta la key al runtime (setRuntimeApiKey)
-      postResources();
-    } else {
-      bootstrapSession(); // crea sesión y publica recursos al terminar el onboarding
-    }
-    post({ type: "key_set" });
-    post({ type: "session_ready" });
-  }
+	async function newSession(): Promise<void> {
+		if (frida) {
+			try {
+				await frida.session.dispose?.();
+			} catch {
+				/* noop */
+			}
+			frida = undefined;
+		}
+		post({ type: "cleared" });
+		lensActive = false;
+		lensAccum.clear();
+		lensAnyTruncated = false;
+		flushLens();
+		resetQueue();
+		post({ type: "info", text: "Nueva sesión iniciada." });
+		if (keyCache) bootstrapSession(); // recrea la sesión para mostrar recursos
+	}
 
-  async function promptKey(reason: "initial" | "manual" | "unauthorized" = "initial"): Promise<void> {
-    const messages = {
-      initial: "Introduce tu API key de DevEngine (se envía como X-Api-Key).",
-      manual: "Actualiza tu API key de DevEngine (se envía como X-Api-Key).",
-      unauthorized: "Tu API key de DevEngine fue rechazada o venció. Vuelve a introducirla.",
-    };
-    const key = await vscode.window.showInputBox({
-      prompt: messages[reason],
-      password: true,
-      ignoreFocusOut: true,
-    });
-    if (key) {
-      await setKey(key);
-    } else {
-      post({ type: "need_key" });
-    }
-  }
+	async function sendSessions(): Promise<void> {
+		try {
+			const infos = await SessionManager.listAll(sessionDirPath);
+			const items = infos
+				.map((i: any) => ({
+					path: String(i.path),
+					name: i.name as string | undefined,
+					firstMessage: String(i.firstMessage ?? "").slice(0, 160),
+					messageCount: Number(i.messageCount ?? 0),
+					modified:
+						i.modified instanceof Date
+							? i.modified.getTime()
+							: Number(i.modified) || 0,
+				}))
+				.sort((a: any, b: any) => b.modified - a.modified);
+			post({
+				type: "sessions",
+				items,
+				currentPath: frida?.session?.sessionFile,
+			});
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al listar sesiones: " + String(e?.message ?? e),
+			});
+		}
+	}
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
-    vscode.commands.registerCommand("frida.setKey", () => void promptKey("manual")),
-    vscode.commands.registerCommand("frida.compact", () => void compactContext()),
-    vscode.commands.registerCommand("frida.reload", () => void reloadResources()),
-    vscode.commands.registerCommand("frida.abort", () => void abortRun()),
-    vscode.commands.registerCommand("frida.newSession", () => void newSession()),
-    vscode.commands.registerCommand("frida.approvalMode", () => {
-      approvalMode = approvalMode === "manual" ? "auto-edit" : approvalMode === "auto-edit" ? "auto" : "manual";
-      post({ type: "mode", mode: approvalMode });
-    })
-  );
+	async function switchSession(pathStr: string): Promise<void> {
+		if (!pathStr) return;
+		if (frida) {
+			try {
+				await frida.session.dispose?.();
+			} catch {
+				/* noop */
+			}
+			frida = undefined;
+		}
+		resetQueue();
+		try {
+			frida = await createFridaSession({
+				cwd: workspaceCwd(),
+				agentDir: defaultAgentDir(),
+				sessionDir: sessionDirPath,
+				approvalLogPath,
+				openPath: pathStr,
+				getKey: () => keyCache,
+				onUnauthorized: () => {
+					keyCache = undefined;
+					void promptKey("unauthorized");
+				},
+				onPendingApprovals: (reqs: ApprovalRequest[]) =>
+					post({ type: "approvals", approvals: reqs }),
+				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
+				getMode: () => approvalMode,
+				askUserQuestionEnabled: isAskUserQuestionEnabled,
+				todoEnabled: isTodoEnabled,
+				getGatePatterns: readGatePatterns,
+				onLensDiagnostics: mergeLens,
+			});
+			wireSession(frida.session);
+			// Sesión abierta por switch: el acumulador lens es stale → limpiar y ocultar.
+			lensAccum.clear();
+			lensAnyTruncated = false;
+			flushLens();
+			postHistory();
+			sendModelInfo();
+			postResources();
+			postModels();
+			postUsage(frida.session);
+			void postWorkspace();
+			postTodos();
+			postToolToggles();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al abrir sesión: " + String(e?.message ?? e),
+			});
+		}
+	}
+
+	async function renameSession(pathStr: string, name: string): Promise<void> {
+		const clean = name.trim();
+		if (!pathStr || !clean) return;
+		try {
+			if (frida && frida.session?.sessionFile === pathStr) {
+				frida.sessionManager?.appendSessionInfo?.(clean);
+			} else {
+				const sm = SessionManager.open(pathStr, sessionDirPath, workspaceCwd());
+				sm.appendSessionInfo(clean);
+			}
+			post({ type: "info", text: "Sesión renombrada: " + clean });
+			await sendSessions();
+			void postWorkspace();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al renombrar: " + String(e?.message ?? e),
+			});
+		}
+	}
+
+	// Elimina una sesión borrando su archivo JSONL. SessionManager no expone
+	// delete, pero no hace falta: listAll lee los archivos del disco cada vez.
+	// La sesión activa se bloquea para no romper el agente en curso.
+	async function deleteSession(pathStr: string): Promise<void> {
+		if (!pathStr) return;
+		if (frida && frida.session?.sessionFile === pathStr) {
+			post({ type: "info", text: "No puedes eliminar la sesión activa." });
+			return;
+		}
+		try {
+			await fs.unlink(pathStr);
+			post({ type: "info", text: "Sesión eliminada." });
+			await sendSessions();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: "Error al eliminar: " + String(e?.message ?? e),
+			});
+		}
+	}
+
+	function postHistory(): void {
+		try {
+			const msgs: any[] = frida?.session?.agent?.state?.messages ?? [];
+			const items: any[] = [];
+			const branchSummaries: { summary: string }[] = [];
+			const pendingTools = new Map<string, any>(); // toolCallId → segment tool
+			for (const m of msgs) {
+				const role = String(m?.role ?? "");
+				const content = m?.content;
+				const parts: any[] = Array.isArray(content)
+					? content
+					: typeof content === "string"
+						? [{ type: "text", text: content }]
+						: [];
+				if (role === "user") {
+					items.push({ role: "user", text: extractText(m) });
+				} else if (role === "assistant") {
+					const segs: any[] = [];
+					for (const p of parts) {
+						if (p?.type === "text" && p.text)
+							segs.push({ kind: "text", text: String(p.text) });
+						else if (p?.type === "thinking" && p.thinking)
+							segs.push({ kind: "thinking", text: String(p.thinking) });
+						else if (p?.type === "toolCall") {
+							const seg: any = {
+								kind: "tool",
+								tool: String(p.name ?? ""),
+								args: compactArgs(p.arguments),
+								state: "running",
+							};
+							segs.push(seg);
+							if (p.id) pendingTools.set(String(p.id), seg);
+						}
+					}
+					if (segs.length > 0)
+						items.push({ role: "assistant", segments: segs });
+				} else if (role === "tool") {
+					// Empareja cada toolResult con su toolCall pendiente (por toolCallId).
+					for (const p of parts) {
+						if (p?.type === "toolResult") {
+							const seg = p.toolCallId
+								? pendingTools.get(String(p.toolCallId))
+								: null;
+							if (seg) {
+								seg.state = p.isError ? "error" : "ok";
+								seg.result = summarizeToolResultContent(p.content);
+								pendingTools.delete(String(p.toolCallId));
+							}
+						}
+					}
+				} else if (role === "branchSummary") {
+					branchSummaries.push({ summary: String(m?.summary ?? "") });
+				}
+			}
+			const name = frida?.sessionManager?.getSessionName?.();
+			post({
+				type: "history",
+				name,
+				items: items.slice(-200),
+				branchSummaries,
+			});
+		} catch {
+			/* noop */
+		}
+	}
+
+	async function setKey(key: string): Promise<void> {
+		const trimmed = key.trim();
+		if (!trimmed) return;
+		await context.secrets.store(SECRET_KEY, trimmed);
+		keyCache = trimmed;
+		if (frida) {
+			await frida.setKey(trimmed); // inyecta la key al runtime (setRuntimeApiKey)
+			postResources();
+		} else {
+			bootstrapSession(); // crea sesión y publica recursos al terminar el onboarding
+		}
+		post({ type: "key_set" });
+		post({ type: "session_ready" });
+	}
+
+	async function promptKey(
+		reason: "initial" | "manual" | "unauthorized" = "initial",
+	): Promise<void> {
+		const messages = {
+			initial: "Introduce tu API key de DevEngine (se envía como X-Api-Key).",
+			manual: "Actualiza tu API key de DevEngine (se envía como X-Api-Key).",
+			unauthorized:
+				"Tu API key de DevEngine fue rechazada o venció. Vuelve a introducirla.",
+		};
+		const key = await vscode.window.showInputBox({
+			prompt: messages[reason],
+			password: true,
+			ignoreFocusOut: true,
+		});
+		if (key) {
+			await setKey(key);
+		} else {
+			post({ type: "need_key" });
+		}
+	}
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
+		vscode.commands.registerCommand(
+			"frida.setKey",
+			() => void promptKey("manual"),
+		),
+		vscode.commands.registerCommand(
+			"frida.compact",
+			() => void compactContext(),
+		),
+		vscode.commands.registerCommand(
+			"frida.reload",
+			() => void reloadResources(),
+		),
+		vscode.commands.registerCommand("frida.abort", () => void abortRun()),
+		vscode.commands.registerCommand(
+			"frida.newSession",
+			() => void newSession(),
+		),
+		vscode.commands.registerCommand("frida.approvalMode", () => {
+			approvalMode =
+				approvalMode === "manual"
+					? "auto-edit"
+					: approvalMode === "auto-edit"
+						? "auto"
+						: "manual";
+			post({ type: "mode", mode: approvalMode });
+		}),
+	);
 }
 
 function extractText(m: any): string {
-  const c = m?.content;
-  if (typeof c === "string") return c;
-  if (Array.isArray(c)) return c.filter((b: any) => b?.type === "text").map((b: any) => b?.text ?? "").join("");
-  return "";
+	const c = m?.content;
+	if (typeof c === "string") return c;
+	if (Array.isArray(c))
+		return c
+			.filter((b: any) => b?.type === "text")
+			.map((b: any) => b?.text ?? "")
+			.join("");
+	return "";
 }
 
 // Compacta los args de un tool a un objeto legible, truncando strings largos
 // (content/oldText/newText…) para no inflar el postMessage. El webview usa
 // solo los campos clave (path, command, pattern, edits.length) para la cabecera.
 function compactArgs(args: unknown): unknown {
-  if (args == null || typeof args !== "object") return args;
-  try {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
-      if (typeof v === "string") {
-        out[k] = v.length > 120 ? v.slice(0, 120) + "…" : v;
-      } else if (Array.isArray(v)) {
-        out[k] = v.map((item) => (item && typeof item === "object" ? compactArgs(item) : item));
-      } else if (v && typeof v === "object") {
-        out[k] = compactArgs(v);
-      } else {
-        out[k] = v;
-      }
-    }
-    return out;
-  } catch {
-    return args;
-  }
+	if (args == null || typeof args !== "object") return args;
+	try {
+		const out: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+			if (typeof v === "string") {
+				out[k] = v.length > 120 ? v.slice(0, 120) + "…" : v;
+			} else if (Array.isArray(v)) {
+				out[k] = v.map((item) =>
+					item && typeof item === "object" ? compactArgs(item) : item,
+				);
+			} else if (v && typeof v === "object") {
+				out[k] = compactArgs(v);
+			} else {
+				out[k] = v;
+			}
+		}
+		return out;
+	} catch {
+		return args;
+	}
 }
 
 // Extrae el texto del resultado de un tool (result.content = bloques text/image)
 // y lo trunca para mostrarlo en el cuerpo plegable de la tarjeta.
 function summarizeResult(result: any): string {
-  if (!result) return "";
-  try {
-    let text = "";
-    const content = result.content;
-    if (Array.isArray(content)) {
-      text = content
-        .filter((b: any) => b?.type === "text")
-        .map((b: any) => String(b?.text ?? ""))
-        .join("");
-    } else if (typeof result === "string") {
-      text = result;
-    } else if (typeof result.details === "string") {
-      text = result.details;
-    }
-    // Límite alto: el webview hace scroll en vez de cortar a mitad línea.
-    return text.length > 100000 ? text.slice(0, 100000) : text;
-  } catch {
-    return "";
-  }
+	if (!result) return "";
+	try {
+		let text = "";
+		const content = result.content;
+		if (Array.isArray(content)) {
+			text = content
+				.filter((b: any) => b?.type === "text")
+				.map((b: any) => String(b?.text ?? ""))
+				.join("");
+		} else if (typeof result === "string") {
+			text = result;
+		} else if (typeof result.details === "string") {
+			text = result.details;
+		}
+		// Límite alto: el webview hace scroll en vez de cortar a mitad línea.
+		return text.length > 100000 ? text.slice(0, 100000) : text;
+	} catch {
+		return "";
+	}
 }
 
 // Texto del contenido de un toolResult (mensaje role "tool") para el historial.
 function summarizeToolResultContent(content: any): string {
-  if (!content) return "";
-  if (typeof content === "string") return content.slice(0, 100000);
-  if (Array.isArray(content)) {
-    const text = content
-      .filter((b: any) => b?.type === "text")
-      .map((b: any) => String(b?.text ?? ""))
-      .join("");
-    return text.slice(0, 100000);
-  }
-  return "";
+	if (!content) return "";
+	if (typeof content === "string") return content.slice(0, 100000);
+	if (Array.isArray(content)) {
+		const text = content
+			.filter((b: any) => b?.type === "text")
+			.map((b: any) => String(b?.text ?? ""))
+			.join("");
+		return text.slice(0, 100000);
+	}
+	return "";
 }
 
 export function deactivate(): void {
-  /* sin cleanup especial por ahora */
+	/* sin cleanup especial por ahora */
 }

@@ -90,6 +90,23 @@ const FEATURES: Feature[] = [
     ),
   },
   {
+    key: "gates",
+    title: "Aprobaciones y seguridad",
+    body: (
+      <>
+        Frida pide confirmar <strong>ediciones</strong>, <strong>bash</strong> y
+        tools desconocidos. Cambia de modo con el botón de modo:{" "}
+        <strong>manual</strong> (pregunta todo), <strong>auto-edit</strong> (deja
+        pasar ediciones) y <strong>auto</strong> (no pregunta… salvo lo crítico:
+        bloquea <code>.env</code>/claves y <code>rm -rf /</code>, y sigue pidiendo
+        para bash con <code>sudo</code>/<code>&&</code> o rutas fuera del
+        workspace). Cada decisión se <strong>audita</strong> en{" "}
+        <code>approval-logs/approvals.jsonl</code>. Patrones propios: settings{" "}
+        <code>frida.gates.*</code>.
+      </>
+    ),
+  },
+  {
     key: "esc",
     title: "Detener respuesta",
     body: (

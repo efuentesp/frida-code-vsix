@@ -102,7 +102,10 @@ export function createAskUserQuestion(bridge: QuestionBridge) {
 				"autorices como opción, ni «Otro»/«Escribe algo»/«Type something.»). Úsalo cuando una " +
 				"decisión tenga opciones reales (estrategia, alcance, convención, nombre, formato); no " +
 				"para confirmar pasos obvios ni pedir información que puedes deducir del contexto del " +
-				"proyecto. No apiles varias llamadas seguidas: agrupa todas las preguntas en una.",
+				"proyecto. No apiles varias llamadas seguidas: agrupa todas las preguntas en una. " +
+				"VE DIRECTO AL TOOL: no redactes las preguntas en tu texto antes ni después de llamarlo, " +
+				"porque el usuario las verá dos veces (en tu prosa y en la tarjeta) y puede responder " +
+				"dos veces, confundiéndote. Si necesitas contexto, di solo una frase corta y dispara el tool.",
 			promptSnippet: "Pregunta al usuario hasta 4 cosas con opciones concretas, en vez de adivinar",
 			parameters: askSchema,
 			async execute(toolCallId, params, signal) {

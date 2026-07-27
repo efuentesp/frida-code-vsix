@@ -47,6 +47,7 @@ export function Composer({
   commands,
   models,
   busy,
+  pendingDialog,
   onAbort,
 }: {
   onSubmit: (text: string, mode: "steer" | "followUp", images?: ImageAttachment[]) => void;
@@ -55,6 +56,10 @@ export function Composer({
   commands?: CommandItem[];
   models?: { providers: ProviderOption[] };
   busy?: boolean;
+  /** true cuando hay una pregunta o aprobación pendiente: el input se bloquea
+   *  para forzar al usuario a responder la tarjeta (evita responder por texto
+   *  que compite con el tool y confunde al modelo). */
+  pendingDialog?: boolean;
   onAbort?: () => void;
 }) {
   const [text, setText] = useState("");
@@ -428,10 +433,17 @@ export function Composer({
       <div className="input-row">
         <textarea
           ref={ref}
-          className="input"
+          className={"input" + (pendingDialog ? " input-blocked" : "")}
           rows={1}
-          placeholder={bashMode ? "$ ejecuta bash…" : "Pídele algo a Frida…"}
+          placeholder={
+            pendingDialog
+              ? "Frida espera tu respuesta en la tarjeta de arriba (o pulsa Detener para cancelarla)…"
+              : bashMode
+                ? "$ ejecuta bash…"
+                : "Pídele algo a Frida…"
+          }
           value={text}
+          readOnly={pendingDialog}
           onChange={(e) => {
             setText(e.target.value);
             recompute(e.target);
@@ -442,7 +454,7 @@ export function Composer({
           onKeyDown={onKeyDown}
         />
         <Tooltip label="Editor ampliado" side="top">
-          <button className="send-btn ghost" onClick={() => { setEditorText(text); setEditorOpen(true); }}>
+          <button className="send-btn ghost" disabled={pendingDialog} onClick={() => { setEditorText(text); setEditorOpen(true); }}>
             <Maximize2 size={15} />
           </button>
         </Tooltip>

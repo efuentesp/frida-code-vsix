@@ -3,7 +3,10 @@
 **/*.map
 **/tsconfig.json
 src/**
+test/**
 scripts/**
+vitest.config.ts
+tsconfig.test.json
 webview/**
 vite.config.ts
 tsconfig.webview.json

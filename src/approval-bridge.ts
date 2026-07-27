@@ -12,10 +12,15 @@ import { DialogBridge } from "./dialog-bridge";
 export interface ApprovalRequest {
 	id: string;
 	toolName: string;
-	kind: "diff" | "bash";
+	// "diff" = edit/write; "bash" = shell; "tool" = MCP/extension de terceros
+	// (desconocido) que pedimos aprobar explícitamente.
+	kind: "diff" | "bash" | "tool";
 	path?: string;
 	command?: string;
 	diff?: string;
+	// Aviso disuasivo (Prioridad 3): comando compuesto/wrapper o path fuera del
+	// workspace. La UI lo destaca para que el usuario preste atención.
+	warning?: string;
 }
 
 export interface ApprovalResponse {

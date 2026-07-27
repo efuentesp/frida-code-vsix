@@ -1,279 +1,498 @@
-import type { CompactionReason, InMessage, Segment, State, ToolState, Turn, Usage, WorkspaceInfo } from "./types";
+import type {
+	CompactionReason,
+	InMessage,
+	Segment,
+	State,
+	ToolState,
+	Turn,
+	Usage,
+	WorkspaceInfo,
+} from "./types";
 
 export const initialState: State = {
-  keyNeeded: false,
-  busy: false,
-  mode: "manual",
-  turns: [],
-  approvals: [],
-  questions: [],
-  queued: [],
-  isCompacting: false,
-  compactions: [],
-  usage: { inputTotal: 0, outputTotal: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, contextWindow: 0, contextPercent: 0 },
-  nextId: 1,
+	keyNeeded: false,
+	busy: false,
+	mode: "manual",
+	turns: [],
+	approvals: [],
+	questions: [],
+	queued: [],
+	isCompacting: false,
+	compactions: [],
+	branchSummaries: [],
+	usage: {
+		inputTotal: 0,
+		outputTotal: 0,
+		cacheRead: 0,
+		cacheWrite: 0,
+		cost: 0,
+		contextTokens: 0,
+		contextWindow: 0,
+		contextPercent: 0,
+	},
+	nextId: 1,
+	lens: null,
+	retry: null,
 };
 
 function withLast(turns: Turn[], fn: (t: Turn) => Turn): Turn[] {
-  if (turns.length === 0) return turns;
-  const last = turns[turns.length - 1];
-  return [...turns.slice(0, -1), fn(last)];
+	if (turns.length === 0) return turns;
+	const last = turns[turns.length - 1];
+	return [...turns.slice(0, -1), fn(last)];
+}
+
+// Helpers de segmentos (extraídos de los cases delta/thinking_delta/tool_end para
+// evitar declaraciones léxicas dentro de `case`, que disparan no-case-declarations).
+function appendSegment(t: Turn, text: string, kind: "text" | "thinking"): Turn {
+	const segs = [...t.segments];
+	const last = segs[segs.length - 1];
+	if (last && last.kind === kind) {
+		segs[segs.length - 1] = { ...last, text: last.text + text } as Segment;
+	} else {
+		segs.push({ kind, text } as Segment);
+	}
+	return { ...t, segments: segs };
+}
+
+function markToolResult(
+	t: Turn,
+	tool: string,
+	isError: boolean | undefined,
+	result: string | undefined,
+	diff: string | undefined,
+	toolCallId: string | undefined,
+): Turn {
+	let done = false;
+	const segments = t.segments.map((s) => {
+		// Match por toolCallId si ambos lo tienen (updates de tools largos); si no,
+		// por nombre (compat con historial reconstruido, que no lleva toolCallId).
+		const match =
+			s.kind === "tool" &&
+			s.state === "running" &&
+			(toolCallId && s.toolCallId
+				? s.toolCallId === toolCallId
+				: s.tool === tool);
+		if (!done && match) {
+			done = true;
+			return {
+				...s,
+				state: (isError ? "error" : "ok") as ToolState,
+				endedAt: Date.now(),
+				result,
+				diff,
+			};
+		}
+		return s;
+	});
+	// Tras un tool, el modelo vuelve a razonar sobre el resultado antes del siguiente
+	// paso → el indicador del footer refleja "Pensando…".
+	return { ...t, segments, status: "thinking", executingTool: undefined };
+}
+
+// Acumula el progreso parcial de un tool largo (tool_execution_update) en su
+// segmento running, identificado por toolCallId.
+function applyToolUpdate(
+	t: Turn,
+	toolCallId: string | undefined,
+	partial: string,
+): Turn {
+	let done = false;
+	const segments = t.segments.map((s) => {
+		if (
+			!done &&
+			s.kind === "tool" &&
+			s.state === "running" &&
+			toolCallId &&
+			s.toolCallId === toolCallId
+		) {
+			done = true;
+			return { ...s, partial } as Segment;
+		}
+		return s;
+	});
+	return { ...t, segments };
+}
+
+// Reconstruye la lista de turnos desde el historial (postHistory). Extraído del
+// case "history" por la misma razón (declaraciones léxicas en sub-bloques).
+function buildHistoryTurns(
+	items: { role: "user" | "assistant"; text?: string; segments?: unknown }[],
+): { turns: Turn[]; nextId: number } {
+	const turns: Turn[] = [];
+	let id = 1;
+	for (const it of items) {
+		if (it.role === "user") {
+			turns.push({ id: id++, user: it.text ?? "", segments: [], status: null });
+		} else if (it.role === "assistant") {
+			const raw = (it.segments ?? []) as Array<{
+				kind: "text" | "thinking" | "tool";
+				text?: string;
+				tool?: string;
+				args?: unknown;
+				state?: ToolState;
+				result?: string;
+				diff?: string;
+			}>;
+			const segs: Segment[] = raw.map((s): Segment => {
+				if (s.kind === "text") return { kind: "text", text: s.text ?? "" };
+				if (s.kind === "thinking")
+					return { kind: "thinking", text: s.text ?? "" };
+				return {
+					kind: "tool",
+					tool: s.tool ?? "",
+					args: s.args ?? {},
+					state: s.state ?? "ok",
+					startedAt: 0,
+					endedAt: 0,
+					result: s.result,
+					diff: s.diff,
+				};
+			});
+			const last = turns[turns.length - 1];
+			if (last) {
+				last.segments = [...last.segments, ...segs];
+			} else {
+				turns.push({ id: id++, user: "", segments: segs, status: null });
+			}
+		}
+	}
+	return { turns, nextId: id };
 }
 
 export function reduce(state: State, msg: InMessage): State {
-  switch (msg.type) {
-    case "need_key":
-      return { ...state, keyNeeded: true };
-    case "key_set":
-    case "session_ready":
-      return { ...state, keyNeeded: false };
+	switch (msg.type) {
+		case "need_key":
+			return { ...state, keyNeeded: true };
+		case "key_set":
+		case "session_ready":
+			return { ...state, keyNeeded: false };
 
-    case "user": {
-      const turn: Turn = { id: state.nextId, user: msg.text, images: msg.images, segments: [], status: null };
-      return { ...state, turns: [...state.turns, turn], nextId: state.nextId + 1, info: undefined };
-    }
-    case "agent_busy":
-      return { ...state, busy: msg.busy };
-    case "turn_active":
-      return { ...state, turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })) };
+		case "user": {
+			const turn: Turn = {
+				id: state.nextId,
+				user: msg.text,
+				images: msg.images,
+				segments: [],
+				status: null,
+			};
+			return {
+				...state,
+				turns: [...state.turns, turn],
+				nextId: state.nextId + 1,
+				info: undefined,
+			};
+		}
+		case "agent_busy":
+			return { ...state, busy: msg.busy };
+		case "turn_active":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })),
+			};
 
-    case "delta":
-      return {
-        ...state,
-        turns: withLast(state.turns, (t) => {
-          // Concatena al último segmento de texto; si no, crea uno nuevo (así
-          // se preserva el orden texto↔tool).
-          const segs = [...t.segments];
-          const last = segs[segs.length - 1];
-          if (last && last.kind === "text") {
-            segs[segs.length - 1] = { ...last, text: last.text + msg.text };
-          } else {
-            segs.push({ kind: "text", text: msg.text });
-          }
-          return { ...t, segments: segs };
-        }),
-      };
+		case "delta":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) => appendSegment(t, msg.text, "text")),
+			};
 
-    case "thinking_delta":
-      return {
-        ...state,
-        turns: withLast(state.turns, (t) => {
-          const segs = [...t.segments];
-          const last = segs[segs.length - 1];
-          if (last && last.kind === "thinking") {
-            segs[segs.length - 1] = { ...last, text: last.text + msg.text };
-          } else {
-            segs.push({ kind: "thinking", text: msg.text });
-          }
-          return { ...t, segments: segs };
-        }),
-      };
+		case "thinking_delta":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) =>
+					appendSegment(t, msg.text, "thinking"),
+				),
+			};
 
-    case "tool_start":
-      return {
-        ...state,
-        turns: withLast(state.turns, (t) => ({
-          ...t,
-          status: "executing",
-          executingTool: msg.tool,
-          segments: [...t.segments, { kind: "tool", tool: msg.tool, args: msg.args ?? {}, state: "running", startedAt: Date.now() }],
-        })),
-      };
+		case "tool_start":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) => ({
+					...t,
+					status: "executing",
+					executingTool: msg.tool,
+					segments: [
+						...t.segments,
+						{
+							kind: "tool",
+							tool: msg.tool,
+							args: msg.args ?? {},
+							state: "running",
+							startedAt: Date.now(),
+							toolCallId: msg.toolCallId,
+						},
+					],
+				})),
+			};
 
-    case "tool_end":
-      return {
-        ...state,
-        turns: withLast(state.turns, (t) => {
-          let done = false;
-          const segments = t.segments.map((s) => {
-            if (!done && s.kind === "tool" && s.state === "running" && s.tool === msg.tool) {
-              done = true;
-              return { ...s, state: (msg.isError ? "error" : "ok") as ToolState, endedAt: Date.now(), result: msg.result, diff: msg.diff };
-            }
-            return s;
-          });
-          // Tras un tool, el modelo vuelve a razonar sobre el resultado antes
-          // del siguiente paso → el indicador del footer refleja "Pensando…".
-          return { ...t, segments, status: "thinking", executingTool: undefined };
-        }),
-      };
+		case "tool_end":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) =>
+					markToolResult(
+						t,
+						msg.tool,
+						msg.isError,
+						msg.result,
+						msg.diff,
+						msg.toolCallId,
+					),
+				),
+			};
 
-    // Atajo de bash del usuario (!command / !!command). Se adjunta al turno
-    // creado por el mensaje "user" previo y se actualiza con chunks/end.
-    case "bash_start":
-      return {
-        ...state,
-        busy: true,
-        turns: withLast(state.turns, (t) => ({
-          ...t,
-          bash: {
-            command: msg.command,
-            excludeFromContext: msg.excludeFromContext,
-            output: "",
-            status: "running",
-          },
-        })),
-      };
+		case "tool_update":
+			// Progreso parcial de un tool largo (tool_execution_update): acumula en el
+			// segmento running por toolCallId. No cambia el estado del tool (sigue running).
+			return {
+				...state,
+				turns: withLast(state.turns, (t) =>
+					applyToolUpdate(t, msg.toolCallId, msg.partial),
+				),
+			};
 
-    case "bash_chunk":
-      return {
-        ...state,
-        turns: withLast(state.turns, (t) =>
-          t.bash ? { ...t, bash: { ...t.bash, output: t.bash.output + msg.text } } : t
-        ),
-      };
+		// Atajo de bash del usuario (!command / !!command). Se adjunta al turno
+		// creado por el mensaje "user" previo y se actualiza con chunks/end.
+		case "bash_start":
+			return {
+				...state,
+				busy: true,
+				turns: withLast(state.turns, (t) => ({
+					...t,
+					bash: {
+						command: msg.command,
+						excludeFromContext: msg.excludeFromContext,
+						output: "",
+						status: "running",
+					},
+				})),
+			};
 
-    case "bash_end": {
-      const status = msg.cancelled
-        ? "cancelled"
-        : msg.exitCode !== undefined && msg.exitCode !== 0
-        ? "error"
-        : "ok";
-      return {
-        ...state,
-        busy: false,
-        turns: withLast(state.turns, (t) =>
-          t.bash
-            ? {
-                ...t,
-                bash: {
-                  ...t.bash,
-                  status,
-                  exitCode: msg.exitCode,
-                  truncated: msg.truncated,
-                  fullOutputPath: msg.fullOutputPath,
-                },
-              }
-            : t
-        ),
-      };
-    }
+		case "bash_chunk":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) =>
+					t.bash
+						? { ...t, bash: { ...t.bash, output: t.bash.output + msg.text } }
+						: t,
+				),
+			};
 
-    case "approvals":
-      return { ...state, approvals: msg.approvals };
+		case "bash_end": {
+			const status = msg.cancelled
+				? "cancelled"
+				: msg.exitCode !== undefined && msg.exitCode !== 0
+					? "error"
+					: "ok";
+			return {
+				...state,
+				busy: false,
+				turns: withLast(state.turns, (t) =>
+					t.bash
+						? {
+								...t,
+								bash: {
+									...t.bash,
+									status,
+									exitCode: msg.exitCode,
+									truncated: msg.truncated,
+									fullOutputPath: msg.fullOutputPath,
+								},
+							}
+						: t,
+				),
+			};
+		}
 
-    case "questions":
-      return { ...state, questions: msg.items };
+		case "approvals":
+			return { ...state, approvals: msg.approvals };
 
-    case "info":
-      return { ...state, info: msg.text };
+		case "questions":
+			return { ...state, questions: msg.items };
 
-    case "cleared":
-      return { ...state, turns: [], approvals: [], questions: [], queued: [], busy: false, isCompacting: false, compactReason: undefined, compactions: [], info: undefined, usage: { inputTotal: 0, outputTotal: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, contextWindow: 0, contextPercent: 0 }, resources: undefined };
+		case "info":
+			return { ...state, info: msg.text };
 
-    case "usage": {
-      const { type: _t, ...rest } = msg;
-      return { ...state, usage: rest as Usage };
-    }
+		case "cleared":
+			return {
+				...state,
+				turns: [],
+				approvals: [],
+				questions: [],
+				queued: [],
+				busy: false,
+				isCompacting: false,
+				compactReason: undefined,
+				compactions: [],
+				branchSummaries: [],
+				info: undefined,
+				usage: {
+					inputTotal: 0,
+					outputTotal: 0,
+					cacheRead: 0,
+					cacheWrite: 0,
+					cost: 0,
+					contextTokens: 0,
+					contextWindow: 0,
+					contextPercent: 0,
+				},
+				resources: undefined,
+				lens: null,
+				retry: null,
+			};
 
-    case "files":
-      return { ...state, files: { query: msg.query, items: msg.items } };
+		case "usage": {
+			const { type: _t, ...rest } = msg;
+			return { ...state, usage: rest as Usage };
+		}
 
-    case "sessions":
-      return { ...state, sessions: { items: msg.items, currentPath: msg.currentPath } };
+		case "files":
+			return { ...state, files: { query: msg.query, items: msg.items } };
 
-    case "resources":
-      return { ...state, resources: msg.data };
+		case "sessions":
+			return {
+				...state,
+				sessions: { items: msg.items, currentPath: msg.currentPath },
+			};
 
-    case "queued":
-      return { ...state, queued: msg.items };
+		case "resources":
+			return { ...state, resources: msg.data };
 
-    case "workspace": {
-      const { type: _t, ...rest } = msg;
-      return { ...state, workspace: rest as WorkspaceInfo };
-    }
+		case "queued":
+			return { ...state, queued: msg.items };
 
-    case "models":
-      return { ...state, models: { providers: msg.providers, active: msg.active } };
+		case "workspace": {
+			const { type: _t, ...rest } = msg;
+			return { ...state, workspace: rest as WorkspaceInfo };
+		}
 
-    case "oauth_device_code":
-      return { ...state, oauthDeviceCode: { userCode: msg.userCode, verificationUri: msg.verificationUri } };
+		case "models":
+			return {
+				...state,
+				models: { providers: msg.providers, active: msg.active },
+			};
 
-    case "oauth_clear":
-      return { ...state, oauthDeviceCode: undefined };
+		case "oauth_device_code":
+			return {
+				...state,
+				oauthDeviceCode: {
+					userCode: msg.userCode,
+					verificationUri: msg.verificationUri,
+				},
+			};
 
-    case "fork_points":
-      return { ...state, forkPoints: msg.points };
+		case "oauth_clear":
+			return { ...state, oauthDeviceCode: undefined };
 
-    case "mode":
-      return { ...state, mode: msg.mode };
+		case "fork_points":
+			return { ...state, forkPoints: msg.points };
 
-    case "model_info":
-      return { ...state, model: msg.model, provider: msg.provider, thinking: msg.thinking };
+		case "mode":
+			return { ...state, mode: msg.mode };
 
-    case "todos":
-      return { ...state, todos: { tasks: msg.tasks, nextId: msg.nextId } };
+		case "model_info":
+			return {
+				...state,
+				model: msg.model,
+				provider: msg.provider,
+				thinking: msg.thinking,
+			};
 
-    case "tool_toggles":
-      return { ...state, toolToggles: { askUserQuestion: msg.askUserQuestion, todo: msg.todo } };
+		case "todos":
+			return { ...state, todos: { tasks: msg.tasks, nextId: msg.nextId } };
 
-    case "history": {
-      const turns: Turn[] = [];
-      let id = 1;
-      for (const it of msg.items) {
-        if (it.role === "user") {
-          turns.push({ id: id++, user: it.text, segments: [], status: null });
-        } else if (it.role === "assistant") {
-          const segs = (it.segments ?? []).map((s): Segment => {
-            if (s.kind === "text") return { kind: "text", text: s.text };
-            if (s.kind === "thinking") return { kind: "thinking", text: s.text };
-            return {
-              kind: "tool",
-              tool: s.tool,
-              args: s.args ?? {},
-              state: s.state ?? "ok",
-              startedAt: 0,
-              endedAt: 0,
-              result: s.result,
-              diff: s.diff,
-            };
-          });
-          const last = turns[turns.length - 1];
-          if (last) {
-            last.segments = [...last.segments, ...segs];
-          } else {
-            turns.push({ id: id++, user: "", segments: segs, status: null });
-          }
-        }
-      }
-      return {
-        ...state,
-        turns,
-        approvals: [],
-        busy: false,
-        isCompacting: false,
-        compactions: [],
-        info: msg.name ? `Sesión: ${msg.name}` : state.info,
-        nextId: id,
-      };
-    }
+		case "tool_toggles":
+			return {
+				...state,
+				toolToggles: { askUserQuestion: msg.askUserQuestion, todo: msg.todo },
+			};
 
-    case "compact_start":
-      return { ...state, isCompacting: true, compactReason: msg.reason as CompactionReason };
+		// D16 — resumen de diagnósticos de pi-lens del turno (null → oculta el panel).
+		case "lens_diagnostics":
+			return { ...state, lens: msg.summary };
 
-    case "compact_end": {
-      let compactions = state.compactions;
-      if (!msg.aborted && msg.tokensBefore != null && msg.summary) {
-        const afterTurnId = state.turns.length ? state.turns[state.turns.length - 1].id : null;
-        compactions = [
-          ...compactions,
-          { id: state.nextId, afterTurnId, tokensBefore: msg.tokensBefore, summary: msg.summary, reason: msg.reason as CompactionReason },
-        ];
-      }
-      const info = msg.aborted
-        ? "Compactación cancelada"
-        : msg.errorMessage
-        ? "Error al compactar: " + msg.errorMessage
-        : msg.tokensBefore != null && msg.summary
-        ? `Contexto compactado desde ${msg.tokensBefore.toLocaleString()} tokens`
-        : state.info;
-      return { ...state, isCompacting: false, compactReason: undefined, compactions, info, nextId: state.nextId + 1 };
-    }
+		// Reintento automático del provider (auto_retry_start/end del SDK).
+		case "retry_start":
+			return {
+				...state,
+				retry: {
+					attempt: msg.attempt,
+					maxAttempts: msg.maxAttempts,
+					delayMs: msg.delayMs,
+				},
+			};
+		case "retry_end":
+			return { ...state, retry: null };
 
-    case "error":
-      return { ...state, turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })) };
+		// Badge de pi-lens: cargado (extensión presente) + activo (emitió diagnósticos).
+		case "lens_status":
+			return {
+				...state,
+				lensStatus: { loaded: msg.loaded, active: msg.active },
+			};
 
-    default:
-      return state;
-  }
+		case "history": {
+			const { turns, nextId } = buildHistoryTurns(msg.items);
+			return {
+				...state,
+				turns,
+				approvals: [],
+				busy: false,
+				isCompacting: false,
+				compactions: [],
+				branchSummaries: msg.branchSummaries ?? [],
+				info: msg.name ? `Sesión: ${msg.name}` : state.info,
+				nextId,
+			};
+		}
+
+		case "compact_start":
+			return {
+				...state,
+				isCompacting: true,
+				compactReason: msg.reason as CompactionReason,
+			};
+
+		case "compact_end": {
+			const afterTurnId = state.turns.length
+				? state.turns[state.turns.length - 1].id
+				: null;
+			let compactions = state.compactions;
+			if (!msg.aborted && msg.tokensBefore != null && msg.summary) {
+				compactions = [
+					...compactions,
+					{
+						id: state.nextId,
+						afterTurnId,
+						tokensBefore: msg.tokensBefore,
+						summary: msg.summary,
+						reason: msg.reason as CompactionReason,
+					},
+				];
+			}
+			const info = msg.aborted
+				? "Compactación cancelada"
+				: msg.errorMessage
+					? "Error al compactar: " + msg.errorMessage
+					: msg.tokensBefore != null && msg.summary
+						? `Contexto compactado desde ${msg.tokensBefore.toLocaleString()} tokens`
+						: state.info;
+			return {
+				...state,
+				isCompacting: false,
+				compactReason: undefined,
+				compactions,
+				info,
+				nextId: state.nextId + 1,
+			};
+		}
+
+		case "error":
+			return {
+				...state,
+				turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })),
+			};
+
+		default:
+			return state;
+	}
 }
