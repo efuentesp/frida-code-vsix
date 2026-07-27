@@ -1,5 +1,6 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
@@ -368,6 +369,50 @@ export async function activate(
 		post({ type: "lens_diagnostics", summary });
 	}
 
+	// DevEngine no devuelve body en el 500 → el error es opaco. Dumpea el request
+	// completo a disco y da un resumen en el panel para diagnosticar qué campo lo
+	// rechaza (típicamente reasoning_content — ver ADR-0009).
+	function onProviderError(payload: unknown, status: number): void {
+		const dir = context.globalStorageUri.fsPath;
+		const dumpPath = path.join(dir, "devengine-last-error-request.json");
+		try {
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(dumpPath, JSON.stringify(payload ?? null, null, 2));
+		} catch {
+			/* noop */
+		}
+		post({
+			type: "error",
+			text: `DevEngine respondió ${status}. ${summarizeRequestPayload(payload)}Request completo: ${dumpPath}`,
+		});
+	}
+
+	function summarizeRequestPayload(payload: unknown): string {
+		const p = payload as any;
+		if (!p || typeof p !== "object") return "";
+		const msgs: any[] = Array.isArray(p.messages) ? p.messages : [];
+		let withReasoning = 0;
+		let withImages = 0;
+		let withToolCalls = 0;
+		for (const m of msgs) {
+			if (m && typeof m === "object") {
+				if (m.reasoning_content) withReasoning++;
+				const c = m.content;
+				if (Array.isArray(c) && c.some((b: any) => b?.type === "image_url"))
+					withImages++;
+				if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0)
+					withToolCalls++;
+			}
+		}
+		const parts = [`${msgs.length} mensajes`];
+		if (withReasoning) parts.push(`${withReasoning} con reasoning_content`);
+		if (withImages) parts.push(`${withImages} con imágenes`);
+		if (withToolCalls) parts.push(`${withToolCalls} con tool_calls`);
+		if (Array.isArray(p.tools) && p.tools.length > 0)
+			parts.push(`${p.tools.length} tools`);
+		return `(${parts.join(" · ")}). `;
+	}
+
 	async function ensureSession(): Promise<FridaSession> {
 		if (!frida) {
 			frida = await createFridaSession({
@@ -389,6 +434,7 @@ export async function activate(
 				todoEnabled: isTodoEnabled,
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
+				onProviderError,
 			});
 			wireSession(frida.session);
 			sendModelInfo();
@@ -1632,6 +1678,7 @@ export async function activate(
 				todoEnabled: isTodoEnabled,
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
+				onProviderError,
 			});
 			wireSession(frida.session);
 			// Sesión abierta por switch: el acumulador lens es stale → limpiar y ocultar.

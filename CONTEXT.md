@@ -136,6 +136,7 @@ el resto son reversibles o el camino obvio y se detallan aquí.
 | 16 | pi-lens: capa semántica del *agente* | Distinto del LSP de VS Code (que sirve al *humano* que edita). Se aprovechan los tools de pi-lens orientados al modelo (ast_grep, funnel, blast-radius, read-guard); **no** se publican squiggles/formato en el editor (redundante con VS Code); auto-format/autofix de pi-lens desactivados y diagnósticos visibles como resumen por turno en el panel (ver ADR-0008) — *detalle D16*
 | 17 | Reintentos del provider | Cuando el gateway devuelve un error retriable, el SDK reintenta (maxRetries:3) y Frida lo muestra como el TUI: countdown "Reintentando (n/3)…", doble Esc para cancelar (abortRetry) y error final si todos fallan — *detalle D17*
 | 18 | Alineación con el TUI de pi | Paridad de eventos que el TUI cubría y Frida no: reintentos de compactación, progreso de tools (toolCallId), feedback de abort, skill blocks colapsables, branch summary y sync de thinking — *detalle D18*
+| 19 | DevEngine: round-trip de `reasoning_content` | El gateway devuelve reasoning pero lo rechaza de vuelta → 500 al continuar sesiones con razonamiento. Workaround `requiresThinkingAsText: true` (reenvía thinking como texto); **quitarlo** cuando DevEngine arregle el round-trip — *ver [ADR-0009](./docs/adr/0009-devengine-reasoning-roundtrip.md)*
 
 ### D6 — Conexión / proveedor
 

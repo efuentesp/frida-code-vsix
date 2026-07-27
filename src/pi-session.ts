@@ -67,6 +67,9 @@ export interface CreateFridaSessionOptions {
 	/** Cache síncrono de la key (before_provider_headers es síncrono). */
 	getKey: () => string | undefined;
 	onUnauthorized: () => void;
+	/** Dumpea el request al gateway ante un 4xx/5xx (DevEngine no devuelve body en
+	 *  el 500; el request nos dice qué campo lo rechaza). Ver ADR-0009. */
+	onProviderError?: (payload: unknown, status: number) => void;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
 	onPendingQuestions: (reqs: QuestionRequest[]) => void;
 	getMode: () => ApprovalMode;
@@ -135,6 +138,7 @@ export async function createFridaSession(
 				factory: createSofttekProviderHooks({
 					getKey: () => keyHolder.current,
 					onUnauthorized: opts.onUnauthorized,
+					onProviderError: opts.onProviderError,
 				}),
 			},
 			{
