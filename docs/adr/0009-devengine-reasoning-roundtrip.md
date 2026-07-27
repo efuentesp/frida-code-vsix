@@ -1,16 +1,11 @@
-# DevEngine: round-trip de `reasoning_content` (workaround temporal)
+# DevEngine: issues de formato de mensajes (workarounds temporales)
 
-**Estado:** aceptado (workaround activo; revertible cuando DevEngine arregle el round-trip).
+**Estado:** aceptado (workarounds activos; revertibles cuando DevEngine arregle el round-trip).
 
-El gateway Softtek DevEngine (`api: "openai-completions"`) **devuelve** `reasoning_content`
-en el stream de respuesta cuando se le pide `reasoning_effort`, pero **no lo acepta de
-vuelta** como campo de un mensaje `assistant` en el array `messages` del request →
-responde **500 Internal Server Error**. El síntoma: una **sesión nueva** funciona, pero
-**continuar una sesión grabada** que tenga razonamiento previo falla (3 reintentos → fail).
-No es un bug de Frida ni de pi: es un round-trip inconsistente del gateway (lo que emite,
-lo rechaza de vuelta). Los providers oficiales no lo sufren (OpenAI Responses →
-`reasoning.encrypted`; Anthropic → thinking signatures; DeepSeek → acepta `reasoning_content`
-de vuelta).
+El gateway Softtek DevEngine (`api: "openai-completions"`) tiene **dos** inconsistencias
+con el formato de mensajes OpenAI que provocan **500 Internal Server Error** (3 reintentos →
+fail) al **continuar una sesión grabada** (las nuevas funcionan). Ninguna es bug de Frida ni
+de pi: el gateway rechaza mensajes que el estándar OpenAI acepta.
 
 ## Decisión: workaround `requiresThinkingAsText: true`
 
@@ -36,21 +31,49 @@ generación de reasoning en turnos nuevos (`reasoning_effort` sigue enviándose)
 - **Peor continuidad semántica**: el modelo lee el razonamiento previo como texto suelto, no
   como razonamiento nativo (pérdida menor vs. DeepSeek-style).
 
+## Segundo issue: `content: null` en assistant con tool_calls
+
+El gateway **rechaza** mensajes `assistant` con `"content": null` y `tool_calls` (es
+**estándar OpenAI**: cuando hay `tool_calls`, `content` puede ser `null`). Síntoma: las
+primeras interacciones (texto puro, `content` string) funcionan; en cuanto el agente hace
+un tool_call (`edit`/`write`/`bash`), ese mensaje viaja con `content: null` y la siguiente
+petición 500. Confirmado con el dump: 84 mensajes, 20 assistant con `content: null` +
+`tool_calls`.
+
+## Workaround: `requiresAssistantAfterToolResult: true`
+
+Registrar el modelo con `compat.requiresAssistantAfterToolResult: true`. Es la perilla de
+pi-ai (`convertMessages`) que cambia el `content` default del assistant de `null` a `""`
+(string vacío), que el gateway sí acepta.
+
+**Efecto colateral menor**: ese flag también inserta un mensaje `assistant` puente
+(`"I have processed the tool results."`) entre un `toolResult` y el siguiente `user`
+(para providers que lo exigen). Es benigno para DevEngine (un assistant con texto).
+
 ## Fix de fondo (equipo DevEngine) — fuera de Frida
 
-Hacer el round-trip consistente, en orden de preferencia:
+Dos inconsistencias a corregir, en orden de preferencia:
 
 1. **Aceptar `reasoning_content` en mensajes `assistant` del historial** (como DeepSeek).
-2. **Proxy tolerante**: ignorar campos no reconocidos en `messages` en vez de 500.
-3. Confirmar la causa exacta en los logs del proxy (el 500 es genérico).
+2. **Aceptar `content: null`** en mensajes `assistant` con `tool_calls` (estándar OpenAI:
+   cuando hay `tool_calls`, `content` puede ser `null`).
+3. **Proxy tolerante**: ignorar campos/valores no reconocidos en `messages` en vez de 500.
+4. Confirmar la causa exacta en los logs del proxy (el 500 es genérico; Frida dumpea el
+   request en `<globalStorage>/devengine-last-request.json` y, al fallar, en
+   `devengine-errors/<fecha>__<sesión>.json`).
 
-## Cambio en Frida cuando DevEngine arregle el round-trip
+## Cambio en Frida cuando DevEngine arregle ambos issues
 
-**Quitar `requiresThinkingAsText: true`** del `compat` del modelo Softtek (volver a
-`compat: { supportsReasoningEffort: true }`). Recupera reenvío nativo de `reasoning_content`
-(menos tokens, mejor continuidad). **Tras quitarlo, validar** continuando una sesión
-grabada con razonamiento previo: si vuelve el 500, el fix del gateway no está completo y se
-restaura el workaround.
+Quitar del `compat` del modelo Softtek **ambos** flags y volver a
+`compat: { supportsReasoningEffort: true }`:
+
+- `requiresThinkingAsText: true` → recupera reenvío nativo de `reasoning_content`
+  (menos tokens, mejor continuidad).
+- `requiresAssistantAfterToolResult: true` → deja de insertar `content: ""` y el mensaje
+  puente tras tool results.
+
+**Tras quitarlos, validar** continuando una sesión grabada con tool_calls y razonamiento
+previo: si vuelve el 500, algún fix del gateway no está completo y se restauran los flags.
 
 ## Por qué no otras opciones
 

@@ -1,6 +1,6 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
@@ -13,6 +13,7 @@ import {
 import type { ApprovalRequest } from "./approval-bridge";
 import type { ApprovalMode } from "./gates/approval-gates";
 import {
+	DEVENGINE_BASE_URL,
 	SOFTTEK_PROVIDER,
 	SOFTTEK_PROVIDER_DISPLAY,
 } from "./providers/softtek-provider";
@@ -253,6 +254,11 @@ export async function activate(
 		"approval-logs",
 		"approvals.jsonl",
 	);
+	// Dump del último request enviado a DevEngine (para diagnosticar 500 sin body).
+	const requestDumpPath = path.join(
+		context.globalStorageUri.fsPath,
+		"devengine-last-request.json",
+	);
 	let approvalMode: ApprovalMode = "manual";
 	let frida: FridaSession | undefined;
 	let activeModel: { provider: string; modelId: string } | undefined =
@@ -413,6 +419,30 @@ export async function activate(
 		return `(${parts.join(" · ")}). `;
 	}
 
+	// Copia el último dump (devengine-last-request.json) a
+	// devengine-errors/<fecha-hora>__<sesión>.json para conservar los requests que
+	// fallaron, identificables por cuándo y qué sesión. Ver ADR-0009.
+	function rotateErrorDump(): string {
+		try {
+			const dir = path.join(
+				context.globalStorageUri.fsPath,
+				"devengine-errors",
+			);
+			mkdirSync(dir, { recursive: true });
+			const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+			const rawName = frida?.sessionManager?.getSessionName?.() ?? "sesion";
+			const safeName =
+				String(rawName)
+					.replace(/[^a-zA-Z0-9_-]/g, "_")
+					.slice(0, 40) || "sesion";
+			const namedPath = path.join(dir, `${ts}__${safeName}.json`);
+			copyFileSync(requestDumpPath, namedPath);
+			return namedPath;
+		} catch {
+			return requestDumpPath;
+		}
+	}
+
 	async function ensureSession(): Promise<FridaSession> {
 		if (!frida) {
 			frida = await createFridaSession({
@@ -435,6 +465,7 @@ export async function activate(
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
 				onProviderError,
+				requestDumpPath,
 			});
 			wireSession(frida.session);
 			sendModelInfo();
@@ -886,7 +917,7 @@ export async function activate(
 					if (!event.success) {
 						post({
 							type: "error",
-							text: `Reintento fallido tras ${Number(event.attempt) || 0} intento(s): ${event.finalError || "Error desconocido"}`,
+							text: `Reintento fallido tras ${Number(event.attempt) || 0} intento(s): ${event.finalError || "Error desconocido"}. Request completo: ${rotateErrorDump()}`,
 						});
 					}
 					break;
@@ -1679,6 +1710,7 @@ export async function activate(
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
 				onProviderError,
+				requestDumpPath,
 			});
 			wireSession(frida.session);
 			// Sesión abierta por switch: el acumulador lens es stale → limpiar y ocultar.
@@ -1845,8 +1877,145 @@ export async function activate(
 		}
 	}
 
+	// Diagnóstico del gateway DevEngine: prueba los endpoints de descubrimiento
+	// (/models, /v1/models, /models/{id}) con la key en memoria y vuelca el resultado
+	// a un canal de salida — sin exponer la key. Útil para verificar qué expone el
+	// router (modelos, context_window) y depurar 500s. Ver fix-frida-gateway.md.
+	const diagChannel = vscode.window.createOutputChannel("Frida DevEngine");
+	async function diagnoseGateway(): Promise<void> {
+		const key = keyCache;
+		diagChannel.clear();
+		diagChannel.show(true);
+		diagChannel.appendLine(
+			"=== Diagnóstico del gateway DevEngine (compat OpenAI/OpenRouter) ===",
+		);
+		diagChannel.appendLine(`Base URL: ${DEVENGINE_BASE_URL}`);
+		if (!key) {
+			diagChannel.appendLine(
+				"No hay API key configurada (usa 'Frida: Actualizar API key').",
+			);
+			return;
+		}
+		diagChannel.appendLine(
+			`API key: presente (longitud ${key.length}, no se imprime)`,
+		);
+
+		// Probes para verificar compatibilidad OpenAI/OpenRouter.
+		type Probe = {
+			label: string;
+			method: "GET" | "POST";
+			path: string;
+			body?: unknown;
+			expectFields?: string[]; // campos esperados en la respuesta (check ✅/❌)
+		};
+		const probes: Probe[] = [
+			{
+				label: "Listar modelos",
+				method: "GET",
+				path: "/models",
+				expectFields: ["context_length", "context_window"],
+			},
+			{
+				label: "Detalle por alias (gpt-5.4-mini)",
+				method: "GET",
+				path: "/models/gpt-5.4-mini",
+			},
+			{
+				label: "Detalle por id (azure-chat-default)",
+				method: "GET",
+				path: "/models/azure-chat-default",
+			},
+			{ label: "Info de la key (cuota)", method: "GET", path: "/key" },
+			{ label: "Créditos (OpenRouter)", method: "GET", path: "/credits" },
+			{
+				label: "Chat (ping, consume ~1 token)",
+				method: "POST",
+				path: "/chat/completions",
+				body: {
+					model: "gpt-5.4-mini",
+					messages: [{ role: "user", content: "ping" }],
+					max_tokens: 1,
+					stream: false,
+				},
+			},
+			{
+				label: "Embeddings (ping)",
+				method: "POST",
+				path: "/embeddings",
+				body: { model: "azure-embeddings-default", input: "ping" },
+			},
+		];
+
+		const summary: string[] = [];
+		for (const p of probes) {
+			diagChannel.appendLine("");
+			diagChannel.appendLine(`--- ${p.method} ${p.path}  (${p.label}) ---`);
+			try {
+				const ctrl = new AbortController();
+				const timer = setTimeout(() => ctrl.abort(), 15000);
+				const headers: Record<string, string> = { "X-Api-Key": key };
+				if (p.method === "POST") headers["Content-Type"] = "application/json";
+				const init: RequestInit = {
+					method: p.method,
+					headers,
+					signal: ctrl.signal,
+				};
+				if (p.body !== undefined) init.body = JSON.stringify(p.body);
+				const r = await fetch(`${DEVENGINE_BASE_URL}${p.path}`, init);
+				clearTimeout(timer);
+				const body = await r.text();
+				diagChannel.appendLine(
+					`HTTP ${r.status}  (${r.headers.get("content-type") ?? "?"})`,
+				);
+				diagChannel.appendLine(body.slice(0, 2000));
+				let check = "";
+				if (p.expectFields && body) {
+					try {
+						const j = JSON.parse(body);
+						const arr: unknown[] = Array.isArray((j as any)?.data)
+							? (j as any).data
+							: [j];
+						const hit = arr.some((m: any) =>
+							p.expectFields!.some((f) => m && typeof m === "object" && f in m),
+						);
+						check = hit
+							? `  ✅ incluye ${p.expectFields.join("/")}`
+							: `  ❌ falta ${p.expectFields.join("/")}`;
+					} catch {
+						check = `  ❌ (respuesta no JSON; no se pudo verificar ${p.expectFields.join("/")})`;
+					}
+				}
+				summary.push(
+					`${r.status === 200 ? "✅" : "❌"} ${p.method} ${p.path} → ${r.status}${check}`,
+				);
+			} catch (e: any) {
+				diagChannel.appendLine(`ERROR: ${String(e?.message ?? e)}`);
+				summary.push(
+					`❌ ${p.method} ${p.path} → ERROR (${String(e?.message ?? e)})`,
+				);
+			}
+		}
+		diagChannel.appendLine("");
+		diagChannel.appendLine(
+			"=== RESUMEN DE COMPATIBILIDAD (objetivo: OpenAI/OpenRouter) ===",
+		);
+		for (const s of summary) diagChannel.appendLine(s);
+		diagChannel.appendLine("");
+		diagChannel.appendLine(
+			"Para 100% compat faltaría: /models con context_length, /models/{id} con aliases,",
+		);
+		diagChannel.appendLine(
+			"manejo de overflow como 400 (no 500), y aceptar content:null + reasoning_content.",
+		);
+		diagChannel.appendLine("Ver fix-frida-gateway.md.");
+	}
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
+		vscode.commands.registerCommand(
+			"frida.diagnoseGateway",
+			() => void diagnoseGateway(),
+		),
 		vscode.commands.registerCommand(
 			"frida.setKey",
 			() => void promptKey("manual"),

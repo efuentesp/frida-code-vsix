@@ -43,6 +43,10 @@
       {
         "command": "frida.approvalMode",
         "title": "Frida: Cambiar modo de aprobación"
+      },
+      {
+        "command": "frida.diagnoseGateway",
+        "title": "Frida: Diagnosticar gateway DevEngine"
       }
     ],
     "configuration": {
@@ -81,6 +85,16 @@
           "items": { "type": "string" },
           "default": [],
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
+        },
+        "frida.devengine.contextWindow": {
+          "type": "number",
+          "default": 300000,
+          "markdownDescription": "Ventana de contexto (tokens) declarada para el modelo del gateway DevEngine. Pi la usa para decidir cuándo compactar. Si el gateway/modelo real aguanta menos de lo declarado, **bájalo** para que pi compacte antes (evita `500` por historial demasiado grande). Aplica al crear/abrir sesión (o `/reload` + sesión nueva). Ver ADR-0009."
+        },
+        "frida.devengine.maxTokens": {
+          "type": "number",
+          "default": 128000,
+          "markdownDescription": "Máximo de tokens de salida (`max_tokens`) para el modelo DevEngine. Aplica al crear/abrir sesión."
         }
       }
     }

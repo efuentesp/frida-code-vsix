@@ -12,12 +12,16 @@ export const CONFIG_SECTION = "frida";
 
 /** ¿Está activo el tool `ask_user_question`? Default: true. */
 export function isAskUserQuestionEnabled(): boolean {
-	return vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>("askUserQuestion.enabled", true);
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("askUserQuestion.enabled", true);
 }
 
 /** ¿Está activo el tool `todo`? Default: true. */
 export function isTodoEnabled(): boolean {
-	return vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>("todo.enabled", true);
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("todo.enabled", true);
 }
 
 /** Snapshot de ambos toggles para publicar al webview. */
@@ -25,10 +29,30 @@ export function readToolToggles(): { askUserQuestion: boolean; todo: boolean } {
 	return { askUserQuestion: isAskUserQuestionEnabled(), todo: isTodoEnabled() };
 }
 
+/** Lee la config del modelo DevEngine (ventana de contexto + maxTokens) ajustable
+ *  desde settings (frida.devengine.*). Sin validación estricta: si el valor es
+ *  inválido, cae al default. */
+export function readDevengineConfig(): {
+	contextWindow: number;
+	maxTokens: number;
+} {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const cw = Number(cfg.get<number>("devengine.contextWindow", 300000));
+	const mt = Number(cfg.get<number>("devengine.maxTokens", 128000));
+	return {
+		contextWindow: Number.isFinite(cw) && cw > 0 ? cw : 300000,
+		maxTokens: Number.isFinite(mt) && mt > 0 ? mt : 128000,
+	};
+}
+
 /** Lee un array de strings de la config (default []) de forma defensiva. */
 function readStringArray(key: string): string[] {
-	const v = vscode.workspace.getConfiguration(CONFIG_SECTION).get<string[]>(key, []);
-	return Array.isArray(v) ? v.filter((s) => typeof s === "string" && s.length > 0) : [];
+	const v = vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string[]>(key, []);
+	return Array.isArray(v)
+		? v.filter((s) => typeof s === "string" && s.length > 0)
+		: [];
 }
 
 /**
@@ -55,7 +79,9 @@ export function readGatePatterns(): GatePatterns {
 		sensitiveExtensions: readStringArray("gates.sensitiveExtensions"),
 		sensitiveBasenames: readStringArray("gates.sensitiveBasenames"),
 		sensitiveAllowBasenames: readStringArray("gates.sensitiveAllowBasenames"),
-		dangerousCommandSubstrings: readStringArray("gates.dangerousCommandSubstrings"),
+		dangerousCommandSubstrings: readStringArray(
+			"gates.dangerousCommandSubstrings",
+		),
 	};
 }
 
@@ -72,7 +98,8 @@ export async function writeToolToggle(
 	key: "askUserQuestion" | "todo",
 	enabled: boolean,
 ): Promise<void> {
-	const settingKey = key === "askUserQuestion" ? "askUserQuestion.enabled" : "todo.enabled";
+	const settingKey =
+		key === "askUserQuestion" ? "askUserQuestion.enabled" : "todo.enabled";
 	await vscode.workspace
 		.getConfiguration(CONFIG_SECTION)
 		.update(settingKey, enabled, vscode.ConfigurationTarget.Global);

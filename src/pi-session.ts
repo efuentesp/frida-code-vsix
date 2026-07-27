@@ -9,16 +9,16 @@ import {
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import {
+	buildSofttekProviderConfig,
 	createSofttekProviderHooks,
 	SOFTTEK_MODEL,
 	SOFTTEK_PROVIDER,
-	SOFTTEK_PROVIDER_CONFIG,
 } from "./providers/softtek-provider";
 import { createApprovalGates } from "./gates/approval-gates";
 import type { ApprovalMode } from "./gates/approval-gates";
 import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
-import type { GatePatterns } from "./settings";
+import { readDevengineConfig, type GatePatterns } from "./settings";
 import { createAskUserQuestion } from "./tools/ask-user-question";
 import { createTodoTool } from "./tools/todo/todo";
 import { replayFromBranch } from "./tools/todo/replay";
@@ -70,6 +70,8 @@ export interface CreateFridaSessionOptions {
 	/** Dumpea el request al gateway ante un 4xx/5xx (DevEngine no devuelve body en
 	 *  el 500; el request nos dice qué campo lo rechaza). Ver ADR-0009. */
 	onProviderError?: (payload: unknown, status: number) => void;
+	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
+	requestDumpPath?: string;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
 	onPendingQuestions: (reqs: QuestionRequest[]) => void;
 	getMode: () => ApprovalMode;
@@ -114,7 +116,10 @@ export async function createFridaSession(
 	// ModelRuntime por defecto usa ~/.pi/agent (= agentDir), alineado con ADR-0005.
 	const modelRuntime = await ModelRuntime.create();
 	// Registramos el proveedor DIRECTAMENTE en ModelRuntime para que getModel lo vea.
-	modelRuntime.registerProvider(SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_CONFIG);
+	modelRuntime.registerProvider(
+		SOFTTEK_PROVIDER,
+		buildSofttekProviderConfig(readDevengineConfig()),
+	);
 	// Si ya hay key (onboarding previo), la fijamos en el runtime para que getAuth
 	// resuelva y Pi NO bloquee con "No API key found". El X-Api-Key real lo inyecta
 	// before_provider_headers (authHeader:false ⇒ Pi no manda Authorization: Bearer).
@@ -139,6 +144,7 @@ export async function createFridaSession(
 					getKey: () => keyHolder.current,
 					onUnauthorized: opts.onUnauthorized,
 					onProviderError: opts.onProviderError,
+					requestDumpPath: opts.requestDumpPath,
 				}),
 			},
 			{

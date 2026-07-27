@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { writeFileSync } from "node:fs";
 
 export const SOFTTEK_PROVIDER = "softtek-devengine";
 export const SOFTTEK_MODEL = "gpt-5.4-mini";
@@ -11,33 +12,45 @@ export const DEVENGINE_BASE_URL = "https://mywork.softtek.com/apg/devengine";
  * ModelRuntime (vía registerProvider), NO en la factory, para que
  * modelRuntime.getModel(...) lo resuelva. (Riesgo #1 del PoC, ya resuelto.)
  */
-export const SOFTTEK_PROVIDER_CONFIG = {
-	name: "Softtek DevEngine Gateway",
-	baseUrl: DEVENGINE_BASE_URL,
-	api: "openai-completions", // ⚠️ Pi añade /chat/completions — verificar el path en runtime
-	authHeader: false, // el gateway NO usa Authorization: Bearer; la key va como X-Api-Key
-	// vía before_provider_headers. Esto además evita el gate "No API key".
-	models: [
-		{
-			id: SOFTTEK_MODEL,
-			name: SOFTTEK_MODEL_DISPLAY,
-			reasoning: true, // habilita niveles de thinking → reasoning_effort (low/medium/high)
-			input: ["text", "image"] as ("text" | "image")[],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 400_000,
-			maxTokens: 128_000,
-			compat: {
-				supportsReasoningEffort: true, // DevEngine acepta reasoning_effort (low/medium/high)
-				// El gateway DEVUELVE reasoning_content en el stream, pero NO lo acepta de vuelta
-				// como campo de un mensaje assistant del historial (responde 500 al continuar una
-				// sesión con razonamiento previo). requiresThinkingAsText hace que pi reenvíe el
-				// thinking como TEXTO plano en `content` (estándar OpenAI) en vez de como el campo
-				// `reasoning_content` → el gateway lo acepta. Fix de fondo: ver ADR-0008 / DevEngine.
-				requiresThinkingAsText: true,
+export function buildSofttekProviderConfig(opts: {
+	contextWindow: number;
+	maxTokens: number;
+}) {
+	return {
+		name: "Softtek DevEngine Gateway",
+		baseUrl: DEVENGINE_BASE_URL,
+		api: "openai-completions", // ⚠️ Pi añade /chat/completions — verificar el path en runtime
+		authHeader: false, // el gateway NO usa Authorization: Bearer; la key va como X-Api-Key
+		// vía before_provider_headers. Esto además evita el gate "No API key".
+		models: [
+			{
+				id: SOFTTEK_MODEL,
+				name: SOFTTEK_MODEL_DISPLAY,
+				reasoning: true, // habilita niveles de thinking → reasoning_effort (low/medium/high)
+				input: ["text", "image"] as ("text" | "image")[],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				// Ajustables desde settings (frida.devengine.contextWindow / maxTokens).
+				contextWindow: opts.contextWindow,
+				maxTokens: opts.maxTokens,
+				compat: {
+					supportsReasoningEffort: true, // DevEngine acepta reasoning_effort (low/medium/high)
+					// El gateway DEVUELVE reasoning_content en el stream, pero NO lo acepta de vuelta
+					// como campo de un mensaje assistant del historial (responde 500 al continuar una
+					// sesión con razonamiento previo). requiresThinkingAsText hace que pi reenvíe el
+					// thinking como TEXTO plano en `content` (estándar OpenAI) en vez de como el campo
+					// `reasoning_content` → el gateway lo acepta. Fix de fondo: ver ADR-0009.
+					requiresThinkingAsText: true,
+					// El gateway rechaza `content: null` en mensajes assistant con tool_calls
+					// (responde 500). requiresAssistantAfterToolResult hace que pi envíe
+					// `content: ""` (string vacío) en vez de `null`. Efecto colateral menor:
+					// inserta un assistant puente ("I have processed the tool results.") entre
+					// toolResult y user; benigno. Fix de fondo: ver ADR-0009.
+					requiresAssistantAfterToolResult: true,
+				},
 			},
-		},
-	],
-};
+		],
+	};
+}
 
 export interface SofttekProviderDeps {
 	/** Lee la key del cache en memoria (síncrono). */
@@ -48,6 +61,10 @@ export interface SofttekProviderDeps {
 	 *  (DevEngine no devuelve body en el 500, así que el error es opaco; el
 	 *  request nos dice qué campo lo rechaza). Ver ADR-0009. */
 	onProviderError?: (payload: unknown, status: number) => void;
+	/** Path donde dumpear cada request enviado (overwrite). El último request queda
+	 *  disponible cuando el gateway responde 500 (after_provider_response no se
+	 *  dispara para 500, así que se dumpea ANTES de enviar). Ver ADR-0009. */
+	requestDumpPath?: string;
 }
 /**
  * Factory de la extensión de Pi con SOLO los hooks. NO registra el provider
@@ -72,6 +89,16 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 		let lastPayload: unknown = null;
 		pi.on("before_provider_request", (event: any) => {
 			lastPayload = event?.payload;
+			if (deps.requestDumpPath) {
+				try {
+					writeFileSync(
+						deps.requestDumpPath,
+						JSON.stringify(event?.payload ?? null, null, 2),
+					);
+				} catch {
+					/* noop */
+				}
+			}
 			return event?.payload;
 		});
 		// 401/403 → re-onboarding de la key (D6). 4xx/5xx → dumpea el request.
