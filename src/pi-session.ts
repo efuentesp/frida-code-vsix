@@ -52,7 +52,8 @@ export interface FridaSession {
 export interface CreateFridaSessionOptions {
 	/** cwd de trabajo = carpeta del workspace (donde el agente lee/edita archivos). */
 	cwd: string;
-	/** agentDir del dev (~/.pi/agent) para honrar el descubrimiento abierto (ADR-0005). */
+	/** agentDir PROPIO de Frida (~/.frida): extensiones/skills/auth/models
+	 *  desacoplados de ~/.pi (CLI pi). Ver ADR-0010. */
 	agentDir: string;
 	/** Dónde guardar sesiones (globalStorageUri/sessions) — desacoplado del agentDir (D13). */
 	sessionDir: string;
@@ -109,12 +110,20 @@ export async function createFridaSession(
 
 	const keyHolder: { current?: string } = { current: opts.getKey() };
 
+	// ADR-0010: agentDir propio (~/.frida); asegurarlo antes de usarlo (auth/models/loader).
+	fs.mkdirSync(opts.agentDir, { recursive: true });
 	const settingsManager = SettingsManager.create(opts.cwd, opts.agentDir);
 	// D11 — apagar la telemetría de instalación (el update-check ya está off vía env).
 	settingsManager.applyOverrides({ enableInstallTelemetry: false });
 
-	// ModelRuntime por defecto usa ~/.pi/agent (= agentDir), alineado con ADR-0005.
-	const modelRuntime = await ModelRuntime.create();
+	// ADR-0010: ModelRuntime operando en NUESTRO agentDir (~/.frida): auth/models
+	// propios, desacoplados de ~/.pi (donde vive el CLI pi). Así no leemos ni pisamos
+	// la config/auth del `pi` de consola.
+	const modelRuntime = await ModelRuntime.create({
+		authPath: path.join(opts.agentDir, "auth.json"),
+		modelsPath: path.join(opts.agentDir, "models.json"),
+		modelsStorePath: path.join(opts.agentDir, "models-store.json"),
+	});
 	// Registramos el proveedor DIRECTAMENTE en ModelRuntime para que getModel lo vea.
 	modelRuntime.registerProvider(
 		SOFTTEK_PROVIDER,
@@ -133,11 +142,36 @@ export async function createFridaSession(
 	// escribe JSONL append-only con chmod 0600/0700 y nunca lanza.
 	const approvalLogger = new ApprovalLogger(opts.approvalLogPath);
 
+	// Fase 2: cargar frida-lens (pi-lens) desde ~/.frida vía import() nativo (no
+	// jiti, para evitar el bug de import.meta.url bajo jiti en módulos ESM).
+	// Si no está instalado, se omite silenciosamente.
+	let fridaLensFactory: ((pi: any) => void) | undefined;
+	const fridaLensEntry = path.join(
+		opts.agentDir,
+		"npm",
+		"node_modules",
+		"pi-lens",
+		"dist",
+		"index.js",
+	);
+	if (fs.existsSync(fridaLensEntry)) {
+		try {
+			const fridaLensEntryPath = fridaLensEntry;
+			const mod = await import(fridaLensEntryPath);
+			fridaLensFactory = (mod as any).default ?? (mod as any);
+		} catch (e: any) {
+			console.warn("[frida-lens] No se pudo cargar:", e?.message ?? e);
+		}
+	}
+
 	const loader = new DefaultResourceLoader({
 		cwd: opts.cwd,
 		agentDir: opts.agentDir,
 		settingsManager,
 		extensionFactories: [
+			...(fridaLensFactory
+				? [{ name: "frida-lens", factory: fridaLensFactory }]
+				: []),
 			{
 				name: "softtek-provider",
 				factory: createSofttekProviderHooks({
@@ -231,5 +265,9 @@ export async function createFridaSession(
 }
 
 export function defaultAgentDir(): string {
-	return path.join(os.homedir(), ".pi", "agent");
+	// ADR-0010: agentDir PROPIO de Frida (~/.frida), desacoplado de ~/.pi (config y
+	// extensiones del CLI pi). Evita choques y errores de carga: las extensiones de
+	// pi asumen runtime Node CLI y fallan en el extension host de VS Code (p. ej.
+	// import.meta.resolve). Las skills/extensiones de Frida viven aquí.
+	return path.join(os.homedir(), ".frida");
 }

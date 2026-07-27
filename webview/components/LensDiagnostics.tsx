@@ -43,7 +43,7 @@ export function LensDiagnostics({
 				title={open ? "Contraer" : "Expandir"}
 			>
 				<span className="lens-head-icon">🔍</span>
-				<span className="lens-head-label">pi-lens</span>
+				<span className="lens-head-label">frida-lens</span>
 				{head}
 				<span className="lens-caret">{open ? "▾" : "▸"}</span>
 			</button>

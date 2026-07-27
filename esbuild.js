@@ -5,39 +5,46 @@ const esbuild = require("esbuild");
 // Nativos de Pi que NO se bundleean (se shipean como archivos en el .vsix).
 // Ver ADR-0002 / D5: tarea de empaquetado del MVP.
 const external = [
-  "vscode", // provisto por el extension host en runtime
-  "@silvia-odwyer/photon-node",
-  "@mariozechner/clipboard-*", // comodín: cubre todas las plataformas (.node)
+	"vscode", // provisto por el extension host en runtime
+	"@silvia-odwyer/photon-node",
+	"@mariozechner/clipboard-*", // comodín: cubre todas las plataformas (.node)
 ];
 
 const watch = process.argv.includes("--watch");
 
 /** @type {import('esbuild').BuildOptions} */
 const options = {
-  entryPoints: ["src/extension.ts"],
-  bundle: true,
-  outfile: "dist/extension.js",
-  platform: "node",
-  format: "cjs",
-  target: "node18",
-  sourcemap: true,
-  external,
-  // Pi (ESM) usa import.meta.url; en CJS esbuild lo deja como {}. Lo shimamos
-  // desde __filename del bundle.
-  banner: {
-    js: `var __import_meta_url = require("url").pathToFileURL(__filename).href;`,
-  },
-  define: {
-    "import.meta.url": "__import_meta_url",
-  },
-  logLevel: "info",
+	entryPoints: ["src/extension.ts"],
+	bundle: true,
+	outfile: "dist/extension.js",
+	platform: "node",
+	format: "cjs",
+	target: "node18",
+	sourcemap: true,
+	external,
+	// Pi (ESM) usa import.meta.url e import.meta.resolve; en CJS esbuild los deja
+	// como {}. Los shimamos desde __filename del bundle.
+	banner: {
+		js: `
+var __import_meta_url = require("url").pathToFileURL(__filename).href;
+var __import_meta_resolve = function(specifier, parent) {
+  try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
+  catch { return specifier; }
+};
+`,
+	},
+	define: {
+		"import.meta.url": "__import_meta_url",
+		"import.meta.resolve": "__import_meta_resolve",
+	},
+	logLevel: "info",
 };
 
 (async () => {
-  if (watch) {
-    const ctx = await esbuild.context(options);
-    await ctx.watch();
-  } else {
-    await esbuild.build(options);
-  }
+	if (watch) {
+		const ctx = await esbuild.context(options);
+		await ctx.watch();
+	} else {
+		await esbuild.build(options);
+	}
 })();

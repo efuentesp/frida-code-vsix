@@ -443,8 +443,8 @@ export function App() {
 					<Tooltip
 						label={
 							state.lensStatus.active
-								? "pi-lens activo (emitiendo diagnósticos)"
-								: "pi-lens cargado (sin actividad aún este turno)"
+								? "frida-lens activo (emitiendo diagnósticos)"
+								: "frida-lens cargado (sin actividad aún este turno)"
 						}
 						side="bottom"
 					>
@@ -453,7 +453,7 @@ export function App() {
 								"lens-badge" + (state.lensStatus.active ? " active" : "")
 							}
 						>
-							{state.lensStatus.active ? "✓" : "○"} pi-lens
+							{state.lensStatus.active ? "✓" : "○"} frida-lens
 						</span>
 					</Tooltip>
 				)}
