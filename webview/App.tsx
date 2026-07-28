@@ -14,6 +14,8 @@ import { ApprovalCard } from "./components/ApprovalCard";
 import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
 import { QuestionCard } from "./components/QuestionCard";
+import { UiDialog } from "./components/UiDialog";
+import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
@@ -546,6 +548,29 @@ export function App() {
 							}
 						/>
 					))}
+					{state.uiRequests.map((r) => (
+						<UiDialog
+							key={r.id}
+							request={r}
+							onRespond={(value, cancelled) =>
+								post({ type: "ui_response", id: r.id, value, cancelled })
+							}
+						/>
+					))}
+					{state.webRoot && state.webRoot.tree ? (
+						<RemoteRoot
+							tree={state.webRoot.tree}
+							rootId={state.webRoot.rootId}
+							onEvent={(handlerId, payload) =>
+								post({
+									type: "web_event",
+									rootId: state.webRoot?.rootId ?? "",
+									handlerId,
+									payload,
+								})
+							}
+						/>
+					) : null}
 				</div>
 			</div>
 			<div className="footer">

@@ -47,6 +47,14 @@
       {
         "command": "frida.diagnoseGateway",
         "title": "Frida: Diagnosticar gateway DevEngine"
+      },
+      {
+        "command": "frida.demoWebReact",
+        "title": "Frida: Demo Remote React (UI web de extensión)"
+      },
+      {
+        "command": "frida.demoWebQuestionnaire",
+        "title": "Frida: Demo WebQuestionnaire (ask_user_question web)"
       }
     ],
     "configuration": {
@@ -64,25 +72,33 @@
         },
         "frida.gates.sensitiveExtensions": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Extensiones de archivo adicionales que el gate de aprobación bloquea sin preguntar (sin el punto). Ej.: `[properties, keystore]`. Se suman a las incluidas por defecto (`.env`, `.pem`, `.key`, `.p12`, …). Aplica en vivo, sin recargar."
         },
         "frida.gates.sensitiveBasenames": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Nombres de archivo exactos adicionales que el gate bloquea sin preguntar. Ej.: `[credentials.json, service-account.json]`. Se comparan sin distinguir mayúsculas. Aplica en vivo."
         },
         "frida.gates.sensitiveAllowBasenames": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Nombres de archivo a PERMITIR aunque coincidan con un patrón sensible (allowlist propia). Ej.: `[.env.local.dev]`. Se suman al allowlist por defecto (`.env.example`, `.env.sample`, …) y se comprueban antes que cualquier bloqueo. Aplica en vivo."
         },
         "frida.gates.dangerousCommandSubstrings": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
         },
@@ -112,6 +128,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.81.1",
+    "react-reconciler": "^0.29.2",
     "typebox": "1.1.38"
   },
   "devDependencies": {

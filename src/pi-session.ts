@@ -19,10 +19,14 @@ import type { ApprovalMode } from "./gates/approval-gates";
 import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
 import { readDevengineConfig, type GatePatterns } from "./settings";
-import { createAskUserQuestion } from "./tools/ask-user-question";
+import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createTodoTool } from "./tools/todo/todo";
 import { replayFromBranch } from "./tools/todo/replay";
 import { QuestionBridge, type QuestionRequest } from "./question-bridge";
+import { UiBridge, type UiRequest } from "./ui-bridge";
+import { createFridaUiContext } from "./extension-ui-context";
+import { WebBridge } from "./web-bridge";
+import type { WebNode } from "./web-protocol";
 import { resetTodoState, setTodoState } from "./todo-state";
 import { preparePiLensConfig } from "./pilens-config";
 import {
@@ -45,6 +49,8 @@ export interface FridaSession {
 	modelRuntime: any;
 	bridge: ApprovalBridge;
 	questionBridge: QuestionBridge;
+	uiBridge: UiBridge;
+	webBridge: WebBridge;
 	sessionManager: any;
 	setKey: (key: string) => Promise<void>;
 }
@@ -75,6 +81,15 @@ export interface CreateFridaSessionOptions {
 	requestDumpPath?: string;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
 	onPendingQuestions: (reqs: QuestionRequest[]) => void;
+	/** ExtensionUIContext (Fase de extensibilidad web): diálogos select/input/confirm
+	 *  que las extensiones nativas (rpiv-ask-user-question en modo RPC) enrutan al
+	 *  webview. El host publica los pendientes aquí; el webview responde vía ui_response. */
+	onUiRequest: (reqs: UiRequest[]) => void;
+	/** ui.notify() de las extensiones → toast/info en el webview (fire-and-forget). */
+	onUiNotify: (message: string, level: "info" | "warning" | "error") => void;
+	/** Remote React (opción A): el host publica cada commit del árbol aquí; el
+	 *  webview lo materializa. tree:null = desmontar la UI remota. */
+	onWebCommit: (rootId: string, tree: WebNode | null) => void;
 	getMode: () => ApprovalMode;
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
@@ -138,6 +153,14 @@ export async function createFridaSession(
 
 	const bridge = new ApprovalBridge(opts.onPendingApprovals);
 	const questionBridge = new QuestionBridge(opts.onPendingQuestions);
+	// Fase de extensibilidad web: ExtensionUIContext de Frida. Implementa el slice
+	// data-oriented (select/input/confirm) del contrato `pi.ui` del SDK y lo enruta
+	// al webview. Cableado: session.bindExtensions({ uiContext, mode: 'rpc' }) más
+	// abajo. Así las extensiones nativas que respetan el patrón RPC (rpiv-
+	// ask-user-question) funcionan en el web sin su factory Ink del TUI.
+	const uiBridge = new UiBridge(opts.onUiRequest);
+	const webBridge = new WebBridge(opts.onWebCommit);
+	const uiContext = createFridaUiContext(uiBridge, opts.onUiNotify, webBridge);
 	// Logger de auditoría del gate (Prioridad 2). Una instancia por sesión;
 	// escribe JSONL append-only con chmod 0600/0700 y nunca lanza.
 	const approvalLogger = new ApprovalLogger(opts.approvalLogPath);
@@ -162,6 +185,26 @@ export async function createFridaSession(
 		} catch (e: any) {
 			console.warn("[frida-lens] No se pudo cargar:", e?.message ?? e);
 		}
+	}
+
+	// Fase de extensibilidad web: si la extensión nativa rpiv-ask-user-question está
+	// declarada en settings.json packages (la cargaría el resourceLoader vía jiti),
+	// desactivamos el ask_user_question EMPOTRADO (web) para evitar un tool duplicado.
+	// OJO: se detecta por settings.json (no por el directorio en npm/node_modules, que
+	// puede quedar tras un uninstall y daría falso positivo → el web se desactivaría
+	// sin que rpiv cargue → nadie provee ask_user_question).
+	let rpivAskPresent = false;
+	try {
+		const settingsRaw = fs.readFileSync(
+			path.join(opts.agentDir, "settings.json"),
+			"utf8",
+		);
+		const settings = JSON.parse(settingsRaw) as { packages?: string[] };
+		rpivAskPresent =
+			Array.isArray(settings.packages) &&
+			settings.packages.some((p) => p.includes("rpiv-ask-user-question"));
+	} catch {
+		// settings.json ausente o inválido → rpiv no carga → web activo.
 	}
 
 	const loader = new DefaultResourceLoader({
@@ -194,11 +237,14 @@ export async function createFridaSession(
 			// Tools conmutables desde la Configuración (frida.askUserQuestion.enabled /
 			// frida.todo.enabled). El getter se re-evalúa en cada session.reload(), así
 			// un cambio de toggle se aplica en caliente sin perder el historial.
+			// ask_user_question usa Remote React (fridaWeb, ADR-0012): WebQuestionnaire con
+			// estado en el host serializado al webview. Si rpiv está instalada en ~/.frida,
+			// se omite esta para evitar duplicar el tool (rpiv cae al modo RPC).
 			{
 				name: "ask-user-question",
 				factory: toggleable(
-					opts.askUserQuestionEnabled,
-					createAskUserQuestion(questionBridge),
+					() => opts.askUserQuestionEnabled() && !rpivAskPresent,
+					createAskUserQuestionWeb(),
 				),
 			},
 			{ name: "todo", factory: toggleable(opts.todoEnabled, createTodoTool()) },
@@ -251,11 +297,20 @@ export async function createFridaSession(
 		cwd: opts.cwd,
 	} as any);
 
+	// Fase de extensibilidad web: inyectar el ExtensionUIContext de Frida como
+	// `pi.ui` y fijar mode='rpc'. El runner lo expone a las extensiones; las que
+	// detectan ctx.mode==='rpc' + hasDialogUI(ctx.ui) enrutan por diálogos
+	// (select/input) en vez de la factory Ink del TUI. Debe ir TRAS crear la
+	// sesión: bindExtensions propaga uiContext+mode al ExtensionRunner.
+	await session.bindExtensions({ uiContext, mode: "rpc" });
+
 	return {
 		session,
 		modelRuntime,
 		bridge,
 		questionBridge,
+		uiBridge,
+		webBridge,
 		sessionManager,
 		setKey: async (key: string) => {
 			keyHolder.current = key;

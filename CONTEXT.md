@@ -455,6 +455,68 @@ Code. Estado LSP por idioma — va por `ctx.ui` (`hasUI=false`, ver ADR-0008).
 `parseSkillBlock` (`<skill name="…" location="…">…</skill>`), el `role:"branchSummary"`
 y el helper `sendModelInfo` (lee `session.thinkingLevel`).
 
+### D19 — ExtensionUIContext web: el mismo mecanismo de extensión del TUI (ADR-0011)
+
+Frida implementa el slice **data-oriented** del `ExtensionUIContext` del SDK
+(`pi.ui.select`/`input`/`confirm`/`notify`) y lo inyecta vía
+`session.bindExtensions({ uiContext, mode: "rpc" })`. Así las **extensiones nativas de
+pi que respetan el patrón RPC** funcionan en el webview **sin modificaciones**, usando
+diálogos en vez de la factory Ink del TUI. El SDK ya separa «qué pide la extensión» de
+«cómo lo muestra el cliente» (modo RPC de `rpc-mode.js`); `rpiv-ask-user-question` lo
+explota con `runRpcQuestionnaire` (camina preguntas con `select`/`input` cuando
+`ctx.mode==="rpc"` y `hasDialogUI(ctx.ui)`).
+
+- **`src/ui-bridge.ts`** (`UiBridge extends DialogBridge`) + **`src/extension-ui-context.ts`**
+  (`createFridaUiContext`): `select`/`input`/`confirm`/`editor` al webview; factories Ink
+  (`setFooter`/`custom`/…) como **no-op**. `custom()` resuelve `undefined` a propósito →
+  backstop de rpiv al dialog walker.
+- **Cableado:** `await session.bindExtensions({ uiContext, mode: "rpc" })` tras
+  `createAgentSession`. Antes Frida **no** llamaba `bindExtensions` → `pi.ui` era no-op.
+- **Webview:** `UiDialog.tsx` (select/input/confirm) + estado `uiRequests`; mensajes
+  `ui_requests`/`ui_notify`/`ui_response`.
+- **`rpiv-ask-user-question`** se instala en `~/.frida/npm` y se declara en
+  `settings.json` → el resourceLoader la carga con jiti (es `.ts`, no `import()` nativo).
+- **Transición:** el `ask_user_question` **empotrado** sigue como **fallback** y se
+desactiva (`!rpivAskPresent`) si rpiv está instalada (evita tool duplicado). Se elimina
+  (464 líneas) cuando se confirme rpiv en runtime.
+
+**No portado:** factories Ink (`setFooter`/`setHeader`/`custom(factory)`/`renderCall`) —
+Ink (terminal) y web (navegador) son incompatibles; no-op como el propio RPC del SDK.
+Trade-offs RPC: sin preview side-by-side, sin tabs, multi-select como texto `"1,3"`.
+
+**Punto frágil a regresar en cada bump de Pi:** `AgentSession.bindExtensions({uiContext,
+mode})` (agent-session.js), el contrato `ExtensionUIContext`/`ExtensionUIDialogOptions`
+(`{signal?, timeout?}`), y la detección de modo en `ctx` (`ctx.mode`, `ctx.hasUI`,
+`ctx.ui`) que consume `rpiv-ask-user-question/ask-user-question.ts`.
+
+### D20 — frida-webview: Remote React para UI rica de extensiones (opción A, ADR-0012)
+
+Las extensiones escriben UI con **JSX + React + estado** que corre en el **host**, y un
+custom renderer (`react-reconciler`) **serializa** cada commit a un árbol `WebNode` que
+el webview materializa. Es la opción A (frente a B = extensión-en-webview, descartada; y
+C = declarativo, descartada por gestión manual de estado). No reusa `pi.ui.custom()`
+(devuelve `Component` pi-tui, no React) — Frida añade su canal `pi.ui.fridaWeb(factory)`.
+
+- **`src/frida-webview/index.ts`** — catálogo de tags intrinsic (`fbox`/`ftext`/
+  `fbutton`/`finput`/`fselect`) tipados vía `declare global JSX.IntrinsicElements`.
+- **`src/web-renderer.ts`** — custom renderer `react-reconciler@0.29.2` (LegacyRoot,
+  mutation mode). `createWebRenderer(el, send)`; serializa snapshots por commit.
+- **`src/web-bridge.ts`** — `WebBridge`: `render(factory)→Promise<T>` (resuelve al
+  `done(result)`), `fireEvent` enruta `web_event`→handler.
+- **`webview/components/RemoteRoot.tsx`** — espejo: `WebNode`→DOM, handlerIds→`web_event`.
+- **Demo validado** (`src/demo/web-demo.tsx` + cmd `frida.demoWebReact`): contador con
+  `useState`; ciclo commit↔event↔re-render funciona end-to-end.
+
+**Gotcha crítico (bug real encontrado):** React pasa los children **dos veces** al host
+config — en `props.children` (como elementos React con `_owner: FiberNode`) y vía
+`appendChild`. Si `createInstance` copia `props` enteros, `JSON.stringify` del `web_commit`
+choca con la circular `_owner→props→children`. **Fix:** `createInstance`/`commitUpdate`
+excluyen `children` de los props serializados. Mantener al extender el host config.
+
+**No cubierto aún:** catálogo limitado (falta Markdown/SelectList rica/Editor); snapshot
+completo por commit (no diffing); rpiv sigue en modo RPC (reescribirlo con `fridaWeb`
+recuperaría tabs/preview side-by-side). React+reconciler en el bundle host (+~500 KB).
+
 ---
 
 ## 5. Hechos a verificar (antes/durante la implementación)

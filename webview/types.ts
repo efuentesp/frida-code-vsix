@@ -122,6 +122,29 @@ export interface QuestionRequest {
 	questions: QuestionSpec[];
 }
 
+/** Nodo del árbol Remote React (opción A). El host serializa cada commit; el
+ *  webview lo materializa en RemoteRoot. Los handlers viajan como IDs "h#N". */
+export interface WebNode {
+	type: string;
+	props: Record<string, unknown>;
+	children: Array<WebNode | string>;
+}
+
+/** Diálogo data-oriented del ExtensionUIContext (pi.ui.select/input/confirm).
+ *  Las extensiones nativas en modo RPC (rpiv-ask-user-question) las enrutan aquí
+ *  en vez de la factory Ink del TUI. El webview renderiza según `method`. */
+export interface UiRequest {
+	id: string;
+	method: "select" | "input" | "confirm";
+	title: string;
+	/** select: opciones ya formateadas por la extensión. */
+	options?: string[];
+	/** input: placeholder/prefill. */
+	placeholder?: string;
+	/** confirm: cuerpo del mensaje. */
+	message?: string;
+}
+
 export interface Usage {
 	// Tokens acumulados de la sesión (estilo pi: ↑/↓/R/W/CH)
 	inputTotal: number; // ↑ input acumulado
@@ -246,6 +269,9 @@ export interface State {
 	turns: Turn[];
 	approvals: ApprovalRequest[];
 	questions: QuestionRequest[];
+	uiRequests: UiRequest[];
+	/** Árbol Remote React actual (null = sin UI remota activa). */
+	webRoot?: { rootId: string; tree: WebNode | null } | null;
 	usage?: Usage;
 	files?: { query: string; items: string[] };
 	sessions?: { items: SessionItem[]; currentPath?: string };
@@ -302,6 +328,9 @@ export type InMessage =
 	| { type: "queued"; items: string[] }
 	| { type: "approvals"; approvals: ApprovalRequest[] }
 	| { type: "questions"; items: QuestionRequest[] }
+	| { type: "ui_requests"; items: UiRequest[] }
+	| { type: "ui_notify"; message: string; level: "info" | "warning" | "error" }
+	| { type: "web_commit"; rootId: string; tree: WebNode | null }
 	| { type: "info"; text: string }
 	| { type: "cleared" }
 	| ({ type: "usage" } & Usage)
@@ -368,6 +397,18 @@ export type OutMessage =
 			id: string;
 			answers: QuestionAnswer[];
 			cancelled: boolean;
+	  }
+	| {
+			type: "ui_response";
+			id: string;
+			value?: string;
+			cancelled: boolean;
+	  }
+	| {
+			type: "web_event";
+			rootId: string;
+			handlerId: string;
+			payload: { value?: string; checked?: boolean };
 	  }
 	| { type: "set_key"; key: string }
 	| { type: "rotate_key" }

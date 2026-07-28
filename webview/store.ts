@@ -16,6 +16,7 @@ export const initialState: State = {
 	turns: [],
 	approvals: [],
 	questions: [],
+	uiRequests: [],
 	queued: [],
 	isCompacting: false,
 	compactions: [],
@@ -309,6 +310,16 @@ export function reduce(state: State, msg: InMessage): State {
 		case "questions":
 			return { ...state, questions: msg.items };
 
+		case "ui_requests":
+			return { ...state, uiRequests: msg.items };
+
+		case "ui_notify":
+			// MVP: mapear notify al banner info existente. Un toast dedicado es mejora futura.
+			return { ...state, info: msg.message };
+
+		case "web_commit":
+			return { ...state, webRoot: { rootId: msg.rootId, tree: msg.tree } };
+
 		case "info":
 			return { ...state, info: msg.text };
 
@@ -318,6 +329,8 @@ export function reduce(state: State, msg: InMessage): State {
 				turns: [],
 				approvals: [],
 				questions: [],
+				uiRequests: [],
+				webRoot: null,
 				queued: [],
 				busy: false,
 				isCompacting: false,
@@ -436,6 +449,7 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				turns,
 				approvals: [],
+				uiRequests: [],
 				busy: false,
 				isCompacting: false,
 				compactions: [],

@@ -19,6 +19,8 @@ import {
 } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
 import { getTodoState } from "./todo-state";
+import { createWebDemoElement } from "./demo/web-demo";
+import { createWebQuestionnaireElement } from "./web-questionnaire";
 import {
 	isAskUserQuestionEnabled,
 	isTodoEnabled,
@@ -292,6 +294,13 @@ export async function activate(
 	let lensBusy = false;
 	let inRetry = false;
 	let lensActive = false;
+	// Fix UX #1: detectar runs que terminan SIN respuesta visible (ni texto ni
+	// tools). Caso típico: el gateway DevEngine rechaza con 401 (key vencida) y el
+	// SDK openai lanza AuthenticationError ANTES de onResponse → after_provider_response
+	// no dispara → el 401 queda invisible y el agente cierra con mensajes vacíos.
+	// Sin esto, el usuario ve "silencio" en vez de "API key inválida".
+	let hadText = false;
+	let hadToolCall = false;
 
 	function lensRelative(p: string, cwd: string): string {
 		try {
@@ -459,6 +468,11 @@ export async function activate(
 				onPendingApprovals: (reqs: ApprovalRequest[]) =>
 					post({ type: "approvals", approvals: reqs }),
 				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
+				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
+				onUiNotify: (message, level) =>
+					post({ type: "ui_notify", message, level }),
+				onWebCommit: (rootId, tree) =>
+					post({ type: "web_commit", rootId, tree }),
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
@@ -863,6 +877,8 @@ export async function activate(
 			switch (event?.type) {
 				case "agent_start":
 					turnsInRun = 0;
+					hadText = false;
+					hadToolCall = false;
 					lensBusy = true;
 					post({ type: "agent_busy", busy: true });
 					post({ type: "turn_active" });
@@ -873,6 +889,18 @@ export async function activate(
 					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
 					if (event.errorMessage && !event.willRetry) {
 						post({ type: "error", text: String(event.errorMessage) });
+					} else if (!hadText && !hadToolCall) {
+						// Fix UX #1: el agente terminó sin generar texto ni llamar tools, y sin
+						// errorMessage explícito. El caso más común es un 401 del gateway
+						// (API key vencida/inválida) que el SDK openai lanza antes de
+						// onResponse, así que after_provider_response no lo atrapa y queda
+						// invisible. Avisamos al usuario en vez de dejarlo en silencio.
+						post({
+							type: "error",
+							text:
+								"El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el gateway DevEngine no respondió. " +
+								"Renueva tu API key o ejecuta “Frida: Diagnosticar gateway DevEngine”.",
+						});
 					}
 					// El agente terminó: a partir de aquí los diagnósticos tardíos (cascade)
 					// se publican solos (mergeLens comprueba lensBusy).
@@ -921,19 +949,20 @@ export async function activate(
 						});
 					}
 					break;
-				case "message_update":
-					if (event.assistantMessageEvent?.type === "text_delta") {
-						post({ type: "delta", text: event.assistantMessageEvent.delta });
-					} else if (event.assistantMessageEvent?.type === "thinking_delta") {
+				case "message_update": {
+					const ae = event.assistantMessageEvent;
+					if (ae?.type === "text_delta") {
+						hadText = true;
+						post({ type: "delta", text: ae.delta });
+					} else if (ae?.type === "thinking_delta") {
 						post({
 							type: "thinking_delta",
-							text: event.assistantMessageEvent.delta,
+							text: ae.delta,
 						});
 					}
 					break;
+				}
 				case "message_end":
-					// Cancelación (abort): feedback sutil. Los errores de provider ya van por
-					// agent_end/auto_retry_end; aquí sólo el caso abort (TUI: "Operation aborted").
 					if (
 						event.message?.role === "assistant" &&
 						event.message?.stopReason === "aborted"
@@ -942,6 +971,7 @@ export async function activate(
 					}
 					break;
 				case "tool_execution_start":
+					hadToolCall = true;
 					post({
 						type: "tool_start",
 						toolCallId: event.toolCallId,
@@ -1083,6 +1113,32 @@ export async function activate(
 					answers: msg.answers ?? [],
 					cancelled: !!msg.cancelled,
 				});
+				break;
+			case "ui_response":
+				// Respuesta del webview a un diálogo ExtensionUIContext (select/input/confirm).
+				(await ensureSession()).uiBridge.resolve({
+					id: String(msg.id ?? ""),
+					value: typeof msg.value === "string" ? msg.value : undefined,
+					cancelled: !!msg.cancelled,
+				});
+				break;
+			case "web_event":
+				// Remote React (opción A): el usuario interactuó con la UI remota → disparar
+				// el handler del renderer activo, que re-renderiza y publica un nuevo commit.
+				(await ensureSession()).webBridge.fireEvent(
+					String(msg.rootId ?? ""),
+					String(msg.handlerId ?? ""),
+					{
+						value:
+							typeof msg.payload?.value === "string"
+								? msg.payload.value
+								: undefined,
+						checked:
+							typeof msg.payload?.checked === "boolean"
+								? msg.payload.checked
+								: undefined,
+					},
+				);
 				break;
 			case "set_key":
 				await setKey(String(msg.key ?? ""));
@@ -1704,6 +1760,11 @@ export async function activate(
 				onPendingApprovals: (reqs: ApprovalRequest[]) =>
 					post({ type: "approvals", approvals: reqs }),
 				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
+				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
+				onUiNotify: (message, level) =>
+					post({ type: "ui_notify", message, level }),
+				onWebCommit: (rootId, tree) =>
+					post({ type: "web_commit", rootId, tree }),
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
@@ -2041,6 +2102,76 @@ export async function activate(
 						? "auto"
 						: "manual";
 			post({ type: "mode", mode: approvalMode });
+		}),
+		vscode.commands.registerCommand("frida.demoWebReact", async () => {
+			// Demo Remote React (opción A): monta un contador interactivo en el host,
+			// lo serializa al webview y re-renderiza ante cada click. Valida el ciclo
+			// completo commit↔event↔re-render.
+			try {
+				const s = await ensureSession();
+				const result = await s.webBridge.render<number>((done) =>
+					createWebDemoElement(done),
+				);
+				post({
+					type: "info",
+					text: `Demo Remote React: resultado final ${result}`,
+				});
+			} catch (e) {
+				console.error("[frida-web] demoWebReact ERROR:", e);
+				post({
+					type: "error",
+					text: `Demo Remote React falló: ${e instanceof Error ? e.message : String(e)}`,
+				});
+			}
+		}),
+		vscode.commands.registerCommand("frida.demoWebQuestionnaire", async () => {
+			// Demo del ask_user_question sobre Remote React: monta el WebQuestionnaire con
+			// datos de prueba, sin depender del modelo ni del gateway (útil para validar la
+			// UI rica: tabs, opciones, texto libre, multiSelect).
+			const sample = [
+				{
+					question: "¿Qué stack prefieres para el backend?",
+					header: "Stack",
+					options: [
+						{ label: "Node + Express", description: "JS/TS, ecosistema npm" },
+						{
+							label: "Python + FastAPI",
+							description: "Rápido para APIs, tipado opcional",
+						},
+						{
+							label: "Go + Chi",
+							description: "Rendimiento, concurrencia nativa",
+						},
+					],
+				},
+				{
+					question: "¿Qué características activas?",
+					header: "Features",
+					multiSelect: true,
+					options: [
+						{ label: "Auth", description: "Login/OAuth" },
+						{ label: "WebSockets", description: "Tiempo real" },
+						{ label: "Cache Redis", description: "Cache de respuestas" },
+					],
+				},
+			];
+			try {
+				const s = await ensureSession();
+				const result = await s.webBridge.render<{
+					answers: unknown[];
+					cancelled: boolean;
+				}>((done) => createWebQuestionnaireElement(sample, done));
+				post({
+					type: "info",
+					text: `WebQuestionnaire: ${JSON.stringify(result)}`,
+				});
+			} catch (e) {
+				console.error("[frida-web] demoWebQuestionnaire ERROR:", e);
+				post({
+					type: "error",
+					text: `Demo WebQuestionnaire falló: ${e instanceof Error ? e.message : String(e)}`,
+				});
+			}
 		}),
 	);
 }

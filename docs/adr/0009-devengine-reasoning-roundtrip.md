@@ -50,6 +50,50 @@ pi-ai (`convertMessages`) que cambia el `content` default del assistant de `null
 (`"I have processed the tool results."`) entre un `toolResult` y el siguiente `user`
 (para providers que lo exigen). Es benigno para DevEngine (un assistant con texto).
 
+## Tercer issue: 401 invisible (API key vencida) — fallback de UX
+
+DevEngine responde **401 estándar** (`{"error":{"code":"invalid_api_key"}}`) cuando la
+API key es inválida o vencida. **No es un bug del gateway.** El problema es que Frida **no lo
+mostraba**: el agente cerraba con mensajes vacíos (silencio) en vez de un cartel claro, lo
+que confundía al usuario (parecía "no responde" en vez de "key inválida").
+
+### Causa: el SDK oficial `openai` lanza antes de `onResponse`
+
+El hook `after_provider_response` (que en Frida dispara `onUnauthorized`/`onProviderError`
+para 401/403) **no se ejecuta para errores 4xx**. En `pi-ai/api/openai-completions.js`:
+
+```js
+const { data, response } = await client.chat.completions.create(params).withResponse(); // l.138
+await options?.onResponse?.({ status: response.status, ... });                          // l.139
+```
+
+Para un **401**, el SDK oficial `openai` lanza `AuthenticationError` **dentro del `await`
+de la l.138** → la l.139 (`onResponse`, que dispara `after_provider_response`) **nunca se
+ejecuta** → el hook de Frida no actúa → el 401 queda invisible. El error del SDK se propaga
+por el agent loop, pero sin `errorMessage` explícito en `agent_end`, el resultado eran
+`message_start`→`message_end` vacíos.
+
+### Workaround: fallback en `agent_end` (no depende del hook)
+
+`wireSession` trackea si el run generó **algo visible**: `hadText` (algún `text_delta`) y
+`hadToolCall` (algún `tool_execution_start`), reseteados en `agent_start`. En `agent_end`, si
+**no hubo texto, ni tools, ni `errorMessage` explícito**, se publica:
+
+> ⚠️ El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el
+> gateway DevEngine no respondió. Renueva tu API key o ejecuta "Frida: Diagnosticar gateway
+> DevEngine".
+
+Es robusto porque `agent_end` **sí** se ejecuta siempre (a diferencia de
+`after_provider_response` para 4xx). Cubre el 401 y otros casos de "silencio" del modelo.
+
+### Fix de fondo (cuando se quiera precisión)
+
+Idealmente, capturar el `AuthenticationError` del provider **antes** de que se trague, para
+mostrar "API key inválida (401)" y disparar el re-onboarding automáticamente. Eso requiere un
+punto de extensión que pi-ai exponga para errores del provider (hoy `after_provider_response`
+no sirve para 4xx por el orden del `onResponse`). Mientras tanto, el fallback de `agent_end`
+es la red de seguridad.
+
 ## Fix de fondo (equipo DevEngine) — fuera de Frida
 
 Dos inconsistencias a corregir, en orden de preferencia:
@@ -89,3 +133,7 @@ previo: si vuelve el 500, algún fix del gateway no está completo y se restaura
   (`api/openai-completions.js`): si pi-ai cambia el nombre/semántica del flag o el default,
   revisar. Hoy (pi-ai actual) `requiresThinkingAsText: true` convierte los thinking blocks a
   texto plano en `content`.
+- **401 invisible**: el orden `create().withResponse()` (l.138) → `onResponse` (l.139) en
+  `openai-completions.js` — si pi-ai mueve `onResponse` **antes** del await o expone un hook
+  de error de provider, el fallback de `agent_end` puede afinarse a un cartel específico de
+  401 + re-onboarding. Hoy el fallback genérico cubre el caso.

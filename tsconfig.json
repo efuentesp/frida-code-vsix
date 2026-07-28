@@ -10,8 +10,9 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "sourceMap": true,
+    "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
