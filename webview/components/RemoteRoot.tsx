@@ -1,5 +1,6 @@
 import type { ReactNode, CSSProperties } from "react";
 import type { WebNode } from "../types";
+import { Markdown } from "./Markdown";
 
 // Renderer espejo de Remote React (opción A). Recibe el árbol WebNode serializado
 // por el host (web-renderer.ts) y lo materializa en DOM real, mapeando tipos de
@@ -29,6 +30,13 @@ export function RemoteRoot({ tree, onEvent }: RemoteRootProps): ReactNode {
 
 function isHandlerId(v: unknown): v is string {
 	return typeof v === "string" && v.startsWith("h#");
+}
+
+/** Aplana children (strings/WebNode anidados) a un solo string — para fmarkdown. */
+function flattenText(children: Array<WebNode | string>): string {
+	return children
+		.map((c) => (typeof c === "string" ? c : flattenText(c.children)))
+		.join("");
 }
 
 /** Convierte las props serializadas en props DOM, envolviendo los handlerId. */
@@ -63,6 +71,7 @@ function materializeProps(
 function flexStyle(props: Record<string, unknown>): CSSProperties {
 	const s: CSSProperties = { display: "flex" };
 	s.flexDirection = props.flexDirection === "row" ? "row" : "column";
+	if (typeof props.flex === "number") s.flex = props.flex;
 	if (typeof props.gap === "number") s.gap = props.gap;
 	if (typeof props.padding === "number") s.padding = props.padding;
 	if (typeof props.margin === "number") s.margin = props.margin;
@@ -147,6 +156,11 @@ function renderNode(
 					))}
 				</ul>
 			);
+		}
+		case "fmarkdown": {
+			// children del WebNode son strings/arrays; los aplanamos a un string markdown
+			// y lo delegamos al renderer del webview (react-markdown + gfm + highlight).
+			return <Markdown>{flattenText(node.children)}</Markdown>;
 		}
 		default:
 			return (

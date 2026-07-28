@@ -517,6 +517,31 @@ excluyen `children` de los props serializados. Mantener al extender el host conf
 completo por commit (no diffing); rpiv sigue en modo RPC (reescribirlo con `fridaWeb`
 recuperaría tabs/preview side-by-side). React+reconciler en el bundle host (+~500 KB).
 
+### D21 — ask_user_question reimplementado sobre fridaWeb (fmarkdown, previews, checkbox)
+
+El tool `ask_user_question` dejó de pasar por el `DialogBridge` (diálogos secuenciales) y
+ahora se monta como **UI React en el host** vía `fridaWeb(factory)` (D20), igual que una
+extensión nativa del TUI. Recupera la fidelidad completa del cuestionario del TUI:
+
+- **`src/web-questionnaire.tsx`** — `WebQuestionnaire`: tabs (multi-pregunta), opciones
+  con descripción, **multiSelect con checkbox visual ☑/☐**, **texto libre**, y
+  **preview markdown side-by-side** cuando una opción single-select trae `preview`
+  (layout 2 columnas; el preview sigue a la opción seleccionada o la primera con preview).
+- **`fmarkdown`** en el catálogo (`src/frida-webview/index.ts` + `RemoteRoot.tsx`): reusa el
+  renderer del webview (`react-markdown` + gfm + highlight). Sin deps nuevas.
+- **`flex`** en `fbox` para repartir columnas.
+- Reemplazó a `QuestionBridge`/`QuestionCard` y al modo RPC de rpiv (desactivado).
+
+**Bug intermedio resuelto — `rpivAskPresent`:** la detección de rpiv miraba si existía el
+**directorio** en `~/.frida/npm/node_modules` (queda tras un uninstall) → falso positivo →
+la factory web se auto-desactivaba → `ask_user_question` **no figuraba en el `tools` del
+request** y el modelo respondía en texto. **Fix:** detectar por `settings.json` packages
+(lo que realmente carga el resourceLoader). El directorio se limpió con `npm uninstall`.
+
+**Pendiente (paso 5 sobrante):** empaquetar `web-questionnaire.tsx` + `ask-user-question-web.ts`
+como **extensión externa en `~/.frida`** (hoy son factory inline en el bundle del host) para
+reducir el vsix. La UI está validada; el movimiento es puramente de empaquetado.
+
 ---
 
 ## 5. Hechos a verificar (antes/durante la implementación)

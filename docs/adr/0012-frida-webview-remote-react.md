@@ -60,13 +60,18 @@ custom renderers y debe mantenerse al extender el host config.
 
 ## Lo que NO cubre (todavía)
 
-- **Catálogo limitado**: `fbox`/`ftext`/`fbutton`/`finput`/`fselect`. Falta `Markdown`, `SelectList`
-  rica, `Image`, `Editor` (este último queda como `<textarea>` salvo vim-mode).
+- **Catálogo**: `fbox`/`ftext`/`fbutton`/`finput`/`fselect`/`fmarkdown`. Este último se
+  añadió reusando el renderer del webview (`react-markdown` + gfm + highlight), y habilita
+  **previews markdown side-by-side** en opciones single-select. A `fbox` se le añadió prop
+  `flex` para layouts de columnas. Falta `SelectList` rica, `Image`, `Editor` (queda
+  como `<textarea>` salvo vim-mode).
 - **Snapshot completo por commit** (no diffing). Suficiente para UIs de extensión (pequeñas); si una
   UI grande parpadea, migrar a diffing incremental.
-- **rpiv no usa fridaWeb**: sigue en modo RPC (diálogos secuenciales). Reescribir su
-  `QuestionnaireSession` con `fridaWeb` recuperaría la UI rica (tabs, preview side-by-side) — es el
-  caso de uso real pendiente.
+- **`ask_user_question` reimplementado sobre fridaWeb** (`src/web-questionnaire.tsx`, D21):
+  recupera la UI rica del TUI (tabs, opciones con descripción, **multiSelect con checkbox
+  visual ☑/☐**, **preview side-by-side**, texto libre). Reemplazó a `QuestionBridge`/
+  `QuestionCard` y al modo RPC de rpiv (que se desactivó). El bug `rpivAskPresent` (detección
+  por directorio vs. `settings.json`) dejó el tool fuera del request hasta su fix.
 
 ## Consecuencias
 

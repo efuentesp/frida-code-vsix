@@ -23,6 +23,7 @@ export interface BoxProps {
 	children?: import("react").ReactNode;
 	key?: string | number;
 	flexDirection?: "row" | "column";
+	flex?: number;
 	gap?: number;
 	padding?: number;
 	margin?: number;
@@ -63,6 +64,12 @@ export interface SelectProps {
 	onSelect?: (value: string) => void;
 }
 
+/** Props de bloque markdown (fmarkdown → react-markdown). children es el fuente markdown. */
+export interface MarkdownProps {
+	children?: string;
+	key?: string | number;
+}
+
 // Tipos de host (strings). Se usan como tags intrinsic en JSX (`<fbox>`), pero los
 // exponemos también como constantes por si una extensión los necesita dinámicamente.
 export const HOST = {
@@ -86,6 +93,7 @@ declare global {
 			fbutton: ButtonProps;
 			finput: InputProps;
 			fselect: SelectProps;
+			fmarkdown: MarkdownProps;
 		}
 	}
 }

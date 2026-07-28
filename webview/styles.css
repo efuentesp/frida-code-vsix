@@ -2715,6 +2715,15 @@ kbd {
 	border-radius: 8px;
 	background: var(--vscode-list-hoverBackground);
 }
+/* fmarkdown: contenedor con borde + scroll para previews side-by-side */
+.fbox .md {
+	max-height: 320px;
+	overflow: auto;
+	padding: 8px;
+	border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder));
+	border-radius: 6px;
+	background: var(--vscode-textCodeBlock-background, transparent);
+}
 .ftext {
 	white-space: pre-wrap;
 	word-break: break-word;

@@ -2130,17 +2130,24 @@ export async function activate(
 			// UI rica: tabs, opciones, texto libre, multiSelect).
 			const sample = [
 				{
-					question: "¿Qué stack prefieres para el backend?",
-					header: "Stack",
+					question: "¿Qué layout de UI prefieres?",
+					header: "Layout",
 					options: [
-						{ label: "Node + Express", description: "JS/TS, ecosistema npm" },
 						{
-							label: "Python + FastAPI",
-							description: "Rápido para APIs, tipado opcional",
+							label: "Lista vertical",
+							description: "Opciones apiladas, simple",
+							preview: "# Lista vertical\n\n```\n[ A ]\n[ B ]\n[ C ]\n```",
 						},
 						{
-							label: "Go + Chi",
-							description: "Rendimiento, concurrencia nativa",
+							label: "Grid 2 columnas",
+							description: "Más denso, usa el ancho",
+							preview: "# Grid\n\n```\n[ A ] [ B ]\n[ C ] [ D ]\n```",
+						},
+						{
+							label: "Tarjetas",
+							description: "Cada opción como card",
+							preview:
+								"# Tarjetas\n\n```\n┌───┐ ┌───┐\n│ A │ │ B │\n└───┘ └───┘\n```",
 						},
 					],
 				},
