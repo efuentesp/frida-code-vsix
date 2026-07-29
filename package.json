@@ -55,6 +55,10 @@
       {
         "command": "frida.demoWebQuestionnaire",
         "title": "Frida: Demo WebQuestionnaire (ask_user_question web)"
+      },
+      {
+        "command": "frida.demoWebPersistent",
+        "title": "Frida: Demo Web Persistente (panel que vive toda la sesión)"
       }
     ],
     "configuration": {

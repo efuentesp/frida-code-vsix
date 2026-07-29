@@ -24,6 +24,11 @@ export interface WebNode {
 	children: Array<WebNode | string>;
 }
 
+/** Dónde materializa el webview un root remoto: "overlay" (cuerpo, ej. diálogos
+ *  efímeros como ask_user_question) o "footer" (panel inferior junto al Composer,
+ *  ej. el panel persistente del tool `todo`). */
+export type WebPlacement = "overlay" | "footer";
+
 /** Host → webview: un commit es el árbol raíz completo (snapshot). El webview
  *  reemplaza su subárbol remoto por completo. Suficiente para UIs de extensión
  *  (pequeñas); el diffing incremental es mejora futura si el parpadeo molesta. */
@@ -33,6 +38,8 @@ export interface WebCommitMessage {
 	rootId: string;
 	/** null = desmontar (la factory resolvió done() o se canceló). */
 	tree: WebNode | null;
+	/** Zona del webview donde vive el root (default "overlay"). */
+	placement?: WebPlacement;
 }
 
 /** Webview → host: el usuario disparó un evento sobre un elemento con handler. */

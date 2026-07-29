@@ -244,6 +244,14 @@ Post-MVP **implementado**: validación runtime exhaustiva + reserved labels (`Ot
 **No reabre ADR-0005:** es código propio en `src/`, no una extensión ajena
 descubierta.
 
+**Migración a fridaWeb (D21/ADR-0012):** la implementación web dejó de usar
+`QuestionBridge`+`QuestionCard` (puente propio + `postMessage`) y ahora se monta como
+UI React en el host vía `fridaWeb(factory)` → **`WebQuestionnaire`** (tabs, multiSelect
+con checkbox visual ☑/☐, preview markdown side-by-side, texto libre).
+`QuestionBridge`/`QuestionCard`/`question-bridge.ts`/`ask-user-question.ts` fueron
+**retirados** en la limpieza. La decisión del tool dedicado se mantiene; migró solo el
+canal de UI.
+
 ### D15 — Lista de tareas (`todo`) + Configuración
 
 Herramienta para que el modelo **planee y siga trabajo multi-paso** (máquina
@@ -538,9 +546,59 @@ la factory web se auto-desactivaba → `ask_user_question` **no figuraba en el `
 request** y el modelo respondía en texto. **Fix:** detectar por `settings.json` packages
 (lo que realmente carga el resourceLoader). El directorio se limpió con `npm uninstall`.
 
-**Pendiente (paso 5 sobrante):** empaquetar `web-questionnaire.tsx` + `ask-user-question-web.ts`
-como **extensión externa en `~/.frida`** (hoy son factory inline en el bundle del host) para
-reducir el vsix. La UI está validada; el movimiento es puramente de empaquetado.
+**Empaquetado como extensión externa — descartado (evaluado):** se consideró mover
+`web-questionnaire.tsx` + `ask-user-question-web.ts` a `~/.frida/npm` (paridad con
+pi-lens), pero el análisis mostró que `react` + `react-reconciler` (~500 KB) **deben
+quedar en el bundle del host** (el renderer vive ahí), y `WebQuestionnaire` (~5 KB)
+usa `useState` → requiere el **mismo** React que el reconciler, así que una extensión
+externa necesitaría react inyectado vía `make(React)` + pragma `/** @jsx React.createElement */`.
+Complejidad alta, ahorro de vsix nulo → se deja como factory inline.
+
+### D22 — CONFIG_DIR_NAME de proyecto: posponer el aislamiento (`.pi` → `.frida`)
+
+Evaluado y **pospuesto** (ADR-0013). `CONFIG_DIR_NAME` (const `.pi`) tiene dos niveles:
+el **global** (`~/.pi/agent`) ya está aislado por ADR-0010 (pasamos `agentDir: ~/.frida`
+explícito); el **de proyecto** (`<cwd>/.pi/{skills,prompts,themes,extensions}`) lo
+consume `DefaultResourceLoader` sin override. Se consideró simetrizar (un `<cwd>/.frida`),
+pero el SDK no expone override (es `export const`); las salidas son feature request
+upstream (limpio), monkey-patch (frágil) o subclass del loader (deuda alta). Valor hoy
+medio-bajo (las extensions de proyecto son raras y compatibles), costo medio-alto →
+posponer y registrar como feature request a pi (`DefaultResourceLoader.projectDirs`).
+
+### D23 — Tool `todo` como extensión web persistente (Remote React, ADR-0014)
+
+El `todo` dejó de ser un porte **nativo** inline (`src/tools/todo/todo.ts` + panel
+nativo `TodoPanel.tsx` + conducto `post {type:"todos"}`) y pasó a ser una
+**extensión** con UI en frida-webview, reescrita a partir de `rpiv-todo` pero con UI
+web. Segunda extensión web (tras `ask_user_question`, D21) y **primera con UI
+persistente** (no diálogo).
+
+- **Salto diálogo→persistente**: `fridaWeb` (bloquea hasta `done()`) no servía. Se
+  añadió `WebBridge.mountPersistent(factory): {unmount}` (no bloquea) + un **store
+  reactivo** (`todo-web/store`: `setTodoState` **emite**) que el componente consume
+  con `useSyncExternalStore` → re-renderiza solo ante cada mutation. El host ya no
+  publica nada.
+- **Handshake recarga**: `WebBridge.republish()` (cachea el último árbol por rootId)
+  se llama en `webview_ready` para re-publicar los roots persistentes ya montados
+  cuando el webview se recarga (sesión existente → no hay `session_start` nuevo).
+- **Extensión** (`todo-web/index.ts`): registra el tool + monta el panel al
+  `session_start` + replay en session_compact + unmount en session_shutdown.
+- **Reutilizado** intacto: `state-reducer`, `types`, `replay`, `response-envelope`,
+  `task-graph`, `invariants`. **Eliminado**: `todo.ts`, `todo-state.ts`,
+  `TodoPanel.tsx`, `postTodos()`, reducer/estado/tipos `todos` del webview, CSS
+  `.todo-*`. **Preservado**: comando `/todos` (lee del nuevo store).
+- **Inline** en `src/` (paridad D21: `useSyncExternalStore` exige el mismo React
+  que el reconciler → extensión externa requeriría react inyectado).
+- **Validado aislado** primero con `frida.demoWebPersistent` (timer + botón +
+  `useSyncExternalStore`) antes de tocar el todo.
+- **Placement footer + coexistencia**: el panel vive en el footer (no como overlay
+  en el cuerpo), paridad con el `TodoPanel` nativo. Para eso se añadió
+  `WebPlacement` ("overlay"|"footer") en `WebCommitMessage`, `mountPersistent(factory,
+  placement)`, y `state.webRoot` → **`webRoots: Record<rootId,{tree,placement}>`**
+  (antes era un solo root → panel persistente + diálogo se habrían pisado). `App.tsx`
+  particiona por placement; `.web-footer` da el marco.
+- `mountPersistent`/`republish` son **infraestructura reusable** para futuros paneles
+  de extensión que vivan toda la sesión.
 
 ---
 

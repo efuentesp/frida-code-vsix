@@ -23,6 +23,14 @@ export function TurnView({
 		.trim();
 	// /skill:nombre → pi expande el mensaje a un <skill> block; lo colapsamos.
 	const skill = parseSkillBlock(turn.user);
+	// Mensaje del sistema (ej. /todos): bloque multiline sin avatares.
+	if (turn.notice) {
+		return (
+			<div className="turn">
+				<div className="notice-block">{turn.notice}</div>
+			</div>
+		);
+	}
 	return (
 		<div className="turn">
 			<div className="row">

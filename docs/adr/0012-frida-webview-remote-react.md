@@ -63,8 +63,13 @@ custom renderers y debe mantenerse al extender el host config.
 - **Catálogo**: `fbox`/`ftext`/`fbutton`/`finput`/`fselect`/`fmarkdown`. Este último se
   añadió reusando el renderer del webview (`react-markdown` + gfm + highlight), y habilita
   **previews markdown side-by-side** en opciones single-select. A `fbox` se le añadió prop
-  `flex` para layouts de columnas. Falta `SelectList` rica, `Image`, `Editor` (queda
-  como `<textarea>` salvo vim-mode).
+  `flex` para layouts de columnas y **event handlers** (`onMouseEnter`/`onMouseLeave`):
+  la serialización de handlers es **genérica** (cualquier prop función → `h#N` en
+  `web-renderer.ts:71`), así que `fbutton` los hereda vía `domProps` y `fbox` vía
+  `pickEventHandlers` (filtra claves `on*` para no pisar el `style` de layout).
+  `WebQuestionnaire` los usa para **preview-en-hover** (prioridad hover > selección >
+  primera; `onMouseLeave` en el contenedor vuelve a la selección). Falta `SelectList`
+  rica, `Image`, `Editor` (queda como `<textarea>` salvo vim-mode).
 - **Snapshot completo por commit** (no diffing). Suficiente para UIs de extensión (pequeñas); si una
   UI grande parpadea, migrar a diffing incremental.
 - **`ask_user_question` reimplementado sobre fridaWeb** (`src/web-questionnaire.tsx`, D21):

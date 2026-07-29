@@ -29,6 +29,8 @@ export interface BoxProps {
 	margin?: number;
 	alignItems?: "flex-start" | "center" | "flex-end" | "stretch";
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";
+	onMouseEnter?: () => void;
+	onMouseLeave?: () => void;
 }
 
 /** Props de texto (ftext → <span>). */
@@ -48,6 +50,8 @@ export interface ButtonProps {
 	onClick?: () => void;
 	disabled?: boolean;
 	variant?: "primary" | "secondary" | "danger";
+	onMouseEnter?: () => void;
+	onMouseLeave?: () => void;
 }
 
 /** Props de input de texto (finput → <input>). */

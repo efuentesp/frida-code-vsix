@@ -1,6 +1,6 @@
 // Puente genérico host↔webview para diálogos bloqueantes: aprobaciones (D7) y
 // preguntas al usuario (ADR-0006). Reúne el patrón que antes vivía duplicado en
-// ApprovalBridge y QuestionBridge (Map de pendientes + race con el AbortSignal
+// ApprovalBridge y WebBridge (Map de pendientes + race con el AbortSignal
 // del turn + emisión de cambios), ahora una sola vez (ADR-0006,
 // "Patrón reutilizable").
 //
@@ -33,7 +33,10 @@ interface Pending<TReq, TResp> {
  * Clase base de los puentes de diálogo. `TReq`/`TResp` deben llevar `id`.
  * Las subclases solo implementan `cancelledResponse` (la forma de "abortado").
  */
-export abstract class DialogBridge<TReq extends DialogRequest, TResp extends DialogResponse> {
+export abstract class DialogBridge<
+	TReq extends DialogRequest,
+	TResp extends DialogResponse,
+> {
 	private pending = new Map<string, Pending<TReq, TResp>>();
 
 	constructor(protected readonly onChange: (reqs: TReq[]) => void) {}
@@ -77,7 +80,8 @@ export abstract class DialogBridge<TReq extends DialogRequest, TResp extends Dia
 		const entry = this.pending.get(resp.id);
 		if (!entry) return;
 		this.pending.delete(resp.id);
-		if (entry.signal && entry.onAbort) entry.signal.removeEventListener("abort", entry.onAbort);
+		if (entry.signal && entry.onAbort)
+			entry.signal.removeEventListener("abort", entry.onAbort);
 		entry.resolve(resp);
 		this.emit();
 	}

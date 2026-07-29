@@ -109,7 +109,16 @@ export function createFridaUiContext(
 		// factory recibe done(result) y devuelve el ReactElement raíz a renderizar.
 		fridaWeb: (<T = void>(
 			factory: (done: (result: T) => void) => ReactElement,
-		) => webBridge.render(factory)) as any,
+			placement?: import("./web-protocol").WebPlacement,
+		) => webBridge.render(factory, placement)) as any,
+		// Variante PERSISTENTE de fridaWeb (ADR-0014): para paneles que viven toda
+		// la sesión y se re-renderizan ante estado cambiante (tool `todo`), no
+		// diálogos. Devuelve un handle para desmontar. El componente se suscribe a
+		// su fuente de estado (useState/useSyncExternalStore) y cada commit se publica.
+		fridaWebMount: ((
+			factory: () => ReactElement,
+			placement?: import("./web-protocol").WebPlacement,
+		) => webBridge.mountPersistent(factory, placement)) as any,
 	};
 
 	return ctx as unknown as ExtensionUIContext;

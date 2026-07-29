@@ -20,14 +20,11 @@ import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
 import { readDevengineConfig, type GatePatterns } from "./settings";
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
-import { createTodoTool } from "./tools/todo/todo";
-import { replayFromBranch } from "./tools/todo/replay";
-import { QuestionBridge, type QuestionRequest } from "./question-bridge";
+import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
 import { WebBridge } from "./web-bridge";
-import type { WebNode } from "./web-protocol";
-import { resetTodoState, setTodoState } from "./todo-state";
+import type { WebNode, WebPlacement } from "./web-protocol";
 import { preparePiLensConfig } from "./pilens-config";
 import {
 	createLensDiagnosticsBridge,
@@ -48,7 +45,6 @@ export interface FridaSession {
 	session: any;
 	modelRuntime: any;
 	bridge: ApprovalBridge;
-	questionBridge: QuestionBridge;
 	uiBridge: UiBridge;
 	webBridge: WebBridge;
 	sessionManager: any;
@@ -80,7 +76,6 @@ export interface CreateFridaSessionOptions {
 	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
 	requestDumpPath?: string;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
-	onPendingQuestions: (reqs: QuestionRequest[]) => void;
 	/** ExtensionUIContext (Fase de extensibilidad web): diálogos select/input/confirm
 	 *  que las extensiones nativas (rpiv-ask-user-question en modo RPC) enrutan al
 	 *  webview. El host publica los pendientes aquí; el webview responde vía ui_response. */
@@ -89,7 +84,11 @@ export interface CreateFridaSessionOptions {
 	onUiNotify: (message: string, level: "info" | "warning" | "error") => void;
 	/** Remote React (opción A): el host publica cada commit del árbol aquí; el
 	 *  webview lo materializa. tree:null = desmontar la UI remota. */
-	onWebCommit: (rootId: string, tree: WebNode | null) => void;
+	onWebCommit: (
+		rootId: string,
+		tree: WebNode | null,
+		placement: WebPlacement,
+	) => void;
 	getMode: () => ApprovalMode;
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
@@ -152,7 +151,6 @@ export async function createFridaSession(
 	}
 
 	const bridge = new ApprovalBridge(opts.onPendingApprovals);
-	const questionBridge = new QuestionBridge(opts.onPendingQuestions);
 	// Fase de extensibilidad web: ExtensionUIContext de Frida. Implementa el slice
 	// data-oriented (select/input/confirm) del contrato `pi.ui` del SDK y lo enruta
 	// al webview. Cableado: session.bindExtensions({ uiContext, mode: 'rpc' }) más
@@ -247,7 +245,10 @@ export async function createFridaSession(
 					createAskUserQuestionWeb(),
 				),
 			},
-			{ name: "todo", factory: toggleable(opts.todoEnabled, createTodoTool()) },
+			// todo usa Remote React PERSISTENTE (fridaWebMount, ADR-0014): el panel se
+			// monta al session_start y se re-renderiza solo ante cada mutation del store
+			// reactivo; el host no publica nada (postTodos quedó obsoleto).
+			{ name: "todo", factory: toggleable(opts.todoEnabled, createTodoWeb()) },
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens
 			//  no está presente, el callback nunca se invoca.
@@ -280,12 +281,8 @@ export async function createFridaSession(
 		? SessionManager.open(opts.openPath, opts.sessionDir, opts.cwd)
 		: SessionManager.create(opts.cwd, opts.sessionDir);
 
-	// Reconstruir el estado del tool `todo` desde el historial de la sesión (cada
-	// toolResult "todo" lleva el snapshot en details). Al crear sesión nueva el
-	// branch está vacío → EMPTY_STATE. resetTodoState() garantiza un punto de
-	// partida limpio antes del replay (no pisa sesiones anteriores en memoria).
-	resetTodoState();
-	setTodoState(replayFromBranch({ sessionManager }));
+	// El estado del tool `todo` lo reconstruye la propia extensión (todo-web) al
+	// session_start vía replay, y monta el panel persistente. Aquí no se toca.
 
 	const { session } = await createAgentSession({
 		resourceLoader: loader,
@@ -308,7 +305,6 @@ export async function createFridaSession(
 		session,
 		modelRuntime,
 		bridge,
-		questionBridge,
 		uiBridge,
 		webBridge,
 		sessionManager,

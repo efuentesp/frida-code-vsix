@@ -18,8 +18,9 @@ import {
 	SOFTTEK_PROVIDER_DISPLAY,
 } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
-import { getTodoState } from "./todo-state";
+import { getTodoState } from "./tools/todo-web/store";
 import { createWebDemoElement } from "./demo/web-demo";
+import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { createWebQuestionnaireElement } from "./web-questionnaire";
 import {
 	isAskUserQuestionEnabled,
@@ -263,6 +264,11 @@ export async function activate(
 	);
 	let approvalMode: ApprovalMode = "manual";
 	let frida: FridaSession | undefined;
+	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
+	// onboarding al arrancar), sin esto ambas ven `!frida` y crean sesiones
+	// duplicadas — la perdedora se pierde sin dispose y su WebBridge vive publicando
+	// roots al webview para siempre (paneles duplicados). Ver ADR-0014.
+	let fridaPromise: Promise<FridaSession> | undefined;
 	let activeModel: { provider: string; modelId: string } | undefined =
 		context.globalState.get(ACTIVE_MODEL_KEY);
 	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
@@ -397,7 +403,7 @@ export async function activate(
 			/* noop */
 		}
 		post({
-			type: "error",
+			type: "provider_error",
 			text: `DevEngine respondió ${status}. ${summarizeRequestPayload(payload)}Request completo: ${dumpPath}`,
 		});
 	}
@@ -453,50 +459,58 @@ export async function activate(
 	}
 
 	async function ensureSession(): Promise<FridaSession> {
-		if (!frida) {
-			frida = await createFridaSession({
-				cwd: workspaceCwd(),
-				agentDir: defaultAgentDir(),
-				sessionDir: sessionDirPath,
-				approvalLogPath,
-				activeModel,
-				getKey: () => keyCache,
-				onUnauthorized: () => {
-					keyCache = undefined;
-					void promptKey("unauthorized");
-				},
-				onPendingApprovals: (reqs: ApprovalRequest[]) =>
-					post({ type: "approvals", approvals: reqs }),
-				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
-				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
-				onUiNotify: (message, level) =>
-					post({ type: "ui_notify", message, level }),
-				onWebCommit: (rootId, tree) =>
-					post({ type: "web_commit", rootId, tree }),
-				getMode: () => approvalMode,
-				askUserQuestionEnabled: isAskUserQuestionEnabled,
-				todoEnabled: isTodoEnabled,
-				getGatePatterns: readGatePatterns,
-				onLensDiagnostics: mergeLens,
-				onProviderError,
-				requestDumpPath,
+		if (frida) return frida;
+		if (!fridaPromise) {
+			// Creación en vuelo: las llamadas concurrentes esperan la MISMA promesa
+			// (anti-race). Si falla, se descarta para permitir reintentar.
+			fridaPromise = (async () => {
+				const s = await createFridaSession({
+					cwd: workspaceCwd(),
+					agentDir: defaultAgentDir(),
+					sessionDir: sessionDirPath,
+					approvalLogPath,
+					activeModel,
+					getKey: () => keyCache,
+					onUnauthorized: () => {
+						keyCache = undefined;
+						void promptKey("unauthorized");
+					},
+					onPendingApprovals: (reqs: ApprovalRequest[]) =>
+						post({ type: "approvals", approvals: reqs }),
+					onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
+					onUiNotify: (message, level) =>
+						post({ type: "ui_notify", message, level }),
+					onWebCommit: (rootId, tree, placement) =>
+						post({ type: "web_commit", rootId, tree, placement }),
+					getMode: () => approvalMode,
+					askUserQuestionEnabled: isAskUserQuestionEnabled,
+					todoEnabled: isTodoEnabled,
+					getGatePatterns: readGatePatterns,
+					onLensDiagnostics: mergeLens,
+					onProviderError,
+					requestDumpPath,
+				});
+				frida = s;
+				wireSession(s.session);
+				sendModelInfo();
+				postResources();
+				postModels();
+				void postWorkspace();
+				postToolToggles();
+				postUsage(s.session);
+				// Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
+				// crear la sesión siempre permite elegir Copilot desde el onboarding).
+				const anyAuthed = SUPPORTED_PROVIDERS.some(
+					(id) => !!s?.modelRuntime?.hasConfiguredAuth?.(id),
+				);
+				post({ type: anyAuthed ? "session_ready" : "need_key" });
+				return s;
+			})().catch((e) => {
+				fridaPromise = undefined;
+				throw e;
 			});
-			wireSession(frida.session);
-			sendModelInfo();
-			postResources();
-			postModels();
-			void postWorkspace();
-			postTodos();
-			postToolToggles();
-			postUsage(frida.session);
-			// Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
-			// crear la sesión siempre permite elegir Copilot desde el onboarding).
-			const anyAuthed = SUPPORTED_PROVIDERS.some(
-				(id) => !!frida?.modelRuntime?.hasConfiguredAuth?.(id),
-			);
-			post({ type: anyAuthed ? "session_ready" : "need_key" });
 		}
-		return frida;
+		return fridaPromise;
 	}
 
 	// session.subscribe: observador para MOSTRAR (streaming + tarjetas de tool).
@@ -781,26 +795,6 @@ export async function activate(
 		postLensStatus();
 	}
 
-	// Estado del tool `todo` → webview (panel de Tareas). Lee el holder en memoria,
-	// que pi-session reconstruye por replay al crear/abrir sesión. Se publica:
-	//  - al crear/abrir sesión (ensureSession/switchSession)
-	//  - tras cada `tool_execution_end` del tool "todo"
-	function postTodos(): void {
-		const s = getTodoState();
-		const tasks = s.tasks
-			.filter((t) => t.status !== "deleted")
-			.map((t) => ({
-				id: t.id,
-				subject: t.subject,
-				description: t.description,
-				activeForm: t.activeForm,
-				status: t.status,
-				blockedBy: t.blockedBy,
-				owner: t.owner,
-			}));
-		post({ type: "todos", tasks, nextId: s.nextId });
-	}
-
 	// Toggles de Configuración (tools activos) → webview, para la vista de
 	// Configuración. Se leen en vivo de los settings de VS Code.
 	function postToolToggles(): void {
@@ -888,7 +882,7 @@ export async function activate(
 					post({ type: "agent_busy", busy: false });
 					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
 					if (event.errorMessage && !event.willRetry) {
-						post({ type: "error", text: String(event.errorMessage) });
+						post({ type: "provider_error", text: String(event.errorMessage) });
 					} else if (!hadText && !hadToolCall) {
 						// Fix UX #1: el agente terminó sin generar texto ni llamar tools, y sin
 						// errorMessage explícito. El caso más común es un 401 del gateway
@@ -896,7 +890,7 @@ export async function activate(
 						// onResponse, así que after_provider_response no lo atrapa y queda
 						// invisible. Avisamos al usuario en vez de dejarlo en silencio.
 						post({
-							type: "error",
+							type: "provider_error",
 							text:
 								"El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el gateway DevEngine no respondió. " +
 								"Renueva tu API key o ejecuta “Frida: Diagnosticar gateway DevEngine”.",
@@ -944,7 +938,7 @@ export async function activate(
 					// Fallo final (reintentos agotados): muestra el error concreto del gateway.
 					if (!event.success) {
 						post({
-							type: "error",
+							type: "provider_error",
 							text: `Reintento fallido tras ${Number(event.attempt) || 0} intento(s): ${event.finalError || "Error desconocido"}. Request completo: ${rotateErrorDump()}`,
 						});
 					}
@@ -1005,8 +999,8 @@ export async function activate(
 								? event.result.details.diff
 								: undefined,
 					});
-					// El tool `todo` mutó el holder; republica el estado al panel.
-					if (event.toolName === "todo" && !event.isError) postTodos();
+					// El tool `todo` muta el store reactivo y el panel Remote React se
+					// re-renderiza solo (ADR-0014): nada que publicar aquí.
 					break;
 				case "compaction_start":
 					post({ type: "compact_start", reason: event.reason });
@@ -1090,8 +1084,11 @@ export async function activate(
 			case "webview_ready":
 				post({ type: "mode", mode: approvalMode });
 				postToolToggles();
-				postTodos();
 				bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
+				// Re-publicar los roots Remote React persistentes ya montados (ej:
+				// panel del tool `todo`): el webview recargado perdió su estado y, al
+				// existir ya la sesión, no llega un session_start nuevo que los monte.
+				(await ensureSession()).webBridge.republish();
 				break;
 			case "submit":
 				await runPrompt(
@@ -1105,13 +1102,6 @@ export async function activate(
 					id: msg.id,
 					decision: msg.decision === "accept" ? "accept" : "reject",
 					acceptAll: !!msg.acceptAll,
-				});
-				break;
-			case "question_response":
-				(await ensureSession()).questionBridge.resolve({
-					id: msg.id,
-					answers: msg.answers ?? [],
-					cancelled: !!msg.cancelled,
 				});
 				break;
 			case "ui_response":
@@ -1356,12 +1346,12 @@ export async function activate(
 	}
 
 	// /todos: imprime la lista de tareas agrupada por estado (estilo /todos de la
-	// TUI de pi/rpiv). Lee el holder en memoria del tool `todo`.
+	// TUI de pi/rpiv). Lee el store reactivo del tool `todo` (todo-web/store).
 	function postTodosCommand(): void {
 		const s = getTodoState();
 		const visible = s.tasks.filter((t) => t.status !== "deleted");
 		if (visible.length === 0) {
-			post({ type: "info", text: "No hay tareas todavía." });
+			post({ type: "notice", text: "No hay tareas todavía." });
 			return;
 		}
 		const fmt = (t: any) =>
@@ -1386,7 +1376,7 @@ export async function activate(
 			lines.push("── Completadas ──");
 			for (const t of done) lines.push(fmt(t));
 		}
-		post({ type: "info", text: lines.join("\n") });
+		post({ type: "notice", text: lines.join("\n") });
 	}
 
 	// Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
@@ -1694,7 +1684,12 @@ export async function activate(
 			} catch {
 				/* noop */
 			}
+			// El dispose del SDK NO emite session_shutdown → los paneles web persistentes
+			// (todo) no se desmontan solos. Limpiar los roots del WebBridge viejo antes
+			// de soltar la referencia, y resetear la Promise anti-race.
+			frida.webBridge.dispose();
 			frida = undefined;
+			fridaPromise = undefined;
 		}
 		post({ type: "cleared" });
 		lensActive = false;
@@ -1742,7 +1737,9 @@ export async function activate(
 			} catch {
 				/* noop */
 			}
+			frida.webBridge.dispose();
 			frida = undefined;
+			fridaPromise = undefined;
 		}
 		resetQueue();
 		try {
@@ -1759,12 +1756,11 @@ export async function activate(
 				},
 				onPendingApprovals: (reqs: ApprovalRequest[]) =>
 					post({ type: "approvals", approvals: reqs }),
-				onPendingQuestions: (reqs) => post({ type: "questions", items: reqs }),
 				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
 				onUiNotify: (message, level) =>
 					post({ type: "ui_notify", message, level }),
-				onWebCommit: (rootId, tree) =>
-					post({ type: "web_commit", rootId, tree }),
+				onWebCommit: (rootId, tree, placement) =>
+					post({ type: "web_commit", rootId, tree, placement }),
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
@@ -1784,7 +1780,6 @@ export async function activate(
 			postModels();
 			postUsage(frida.session);
 			void postWorkspace();
-			postTodos();
 			postToolToggles();
 		} catch (e: any) {
 			post({
@@ -2121,6 +2116,26 @@ export async function activate(
 				post({
 					type: "error",
 					text: `Demo Remote React falló: ${e instanceof Error ? e.message : String(e)}`,
+				});
+			}
+		}),
+		vscode.commands.registerCommand("frida.demoWebPersistent", async () => {
+			// Demo Remote React PERSISTENTE (Fase A, ADR-0014): valida montaje
+			// no-bloqueante + re-render ante un STORE EXTERNO (timer 2s + botón).
+			// A diferencia de demoWebReact, no bloquea ni devuelve resultado: el panel
+			// vive hasta que el usuario hace clic en "Detener demo" o se recarga la
+			// ventana. Patrón exacto del tool `todo` (store reactivo + panel).
+			try {
+				const s = await ensureSession();
+				let handle!: { unmount: () => void };
+				handle = s.webBridge.mountPersistent(() =>
+					createPersistentDemoElement(() => handle.unmount()),
+				);
+			} catch (e) {
+				console.error("[frida-web] demoWebPersistent ERROR:", e);
+				post({
+					type: "error",
+					text: `Demo Persistente falló: ${e instanceof Error ? e.message : String(e)}`,
 				});
 			}
 		}),

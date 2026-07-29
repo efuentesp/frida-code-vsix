@@ -5,7 +5,7 @@
 // La lógica compartida (Map de pendientes + race con el AbortSignal del turn +
 // emisión de cambios) vive en DialogBridge<T> (ADR-0006, "Patrón
 // reutilizable"). Aquí solo queda la forma específica de "abortado": reject
-// (la acción no procede). Mismo race+limpieza que QuestionBridge.
+// (la acción no procede). Mismo race+limpieza que WebBridge.
 
 import { DialogBridge } from "./dialog-bridge";
 
@@ -29,7 +29,10 @@ export interface ApprovalResponse {
 	acceptAll?: boolean;
 }
 
-export class ApprovalBridge extends DialogBridge<ApprovalRequest, ApprovalResponse> {
+export class ApprovalBridge extends DialogBridge<
+	ApprovalRequest,
+	ApprovalResponse
+> {
 	constructor(onChange: (reqs: ApprovalRequest[]) => void) {
 		super(onChange);
 	}

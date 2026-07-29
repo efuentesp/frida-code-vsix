@@ -13,7 +13,6 @@ import { TurnView } from "./components/Turn";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
-import { QuestionCard } from "./components/QuestionCard";
 import { UiDialog } from "./components/UiDialog";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
@@ -26,7 +25,6 @@ import { WorkspaceBar } from "./components/WorkspaceBar";
 import {
 	Bot,
 	Brain,
-	CircleHelp,
 	CircleStop,
 	CornerDownRight,
 	History,
@@ -46,7 +44,6 @@ import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
 import { ModelPanel } from "./components/ModelPanel";
 import { ForkPanel } from "./components/ForkPanel";
-import { TodoPanel } from "./components/TodoPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
@@ -103,13 +100,13 @@ export function App() {
 	}, []);
 
 	useEffect(() => {
-		if (state.approvals.length > 0 || state.questions.length > 0) {
+		if (state.approvals.length > 0) {
 			approvalsRef.current?.scrollIntoView({
 				behavior: "smooth",
 				block: "end",
 			});
 		}
-	}, [state.approvals, state.questions]);
+	}, [state.approvals]);
 
 	// Auto-scroll: mantiene la vista en la última respuesta salvo que el usuario
 	// haya subido a leer (stick-to-bottom). Se dispara con cada delta/tool/turno.
@@ -534,20 +531,6 @@ export function App() {
 							}
 						/>
 					))}
-					{state.questions.length > 0 && (
-						<div className="approvals-banner">
-							<CircleHelp size={12} /> Frida necesita tu respuesta:
-						</div>
-					)}
-					{state.questions.map((q) => (
-						<QuestionCard
-							key={q.id}
-							request={q}
-							onRespond={(r) =>
-								post({ type: "question_response", id: q.id, ...r })
-							}
-						/>
-					))}
 					{state.uiRequests.map((r) => (
 						<UiDialog
 							key={r.id}
@@ -557,23 +540,26 @@ export function App() {
 							}
 						/>
 					))}
-					{state.webRoot && state.webRoot.tree ? (
-						<RemoteRoot
-							tree={state.webRoot.tree}
-							rootId={state.webRoot.rootId}
-							onEvent={(handlerId, payload) =>
-								post({
-									type: "web_event",
-									rootId: state.webRoot?.rootId ?? "",
-									handlerId,
-									payload,
-								})
-							}
-						/>
-					) : null}
+					{Object.entries(state.webRoots ?? {})
+						.filter(([, r]) => r.placement !== "footer" && r.tree)
+						.map(([id, r]) => (
+							<RemoteRoot
+								key={id}
+								tree={r.tree!}
+								rootId={id}
+								onEvent={(handlerId, payload) =>
+									post({ type: "web_event", rootId: id, handlerId, payload })
+								}
+							/>
+						))}
 				</div>
 			</div>
 			<div className="footer">
+				{state.providerError && (
+					<div className="provider-error-bar">
+						<TriangleAlert size={12} /> {state.providerError}
+					</div>
+				)}
 				{state.isCompacting ? (
 					<div className="proc-bar">
 						<Spinner size={14} />
@@ -594,9 +580,20 @@ export function App() {
 						</div>
 					)
 				)}
-				{state.todos && state.toolToggles?.todo !== false && (
-					<TodoPanel todos={state.todos} />
-				)}
+				<div className="web-footer">
+					{Object.entries(state.webRoots ?? {})
+						.filter(([, r]) => r.placement === "footer" && r.tree)
+						.map(([id, r]) => (
+							<RemoteRoot
+								key={id}
+								tree={r.tree!}
+								rootId={id}
+								onEvent={(handlerId, payload) =>
+									post({ type: "web_event", rootId: id, handlerId, payload })
+								}
+							/>
+						))}
+				</div>
 				<LensDiagnostics lens={state.lens} />
 				<Composer
 					onSubmit={(text, mode, images) =>
@@ -607,9 +604,7 @@ export function App() {
 					commands={commands}
 					models={state.models}
 					busy={state.busy}
-					pendingDialog={
-						state.questions.length > 0 || state.approvals.length > 0
-					}
+					pendingDialog={state.approvals.length > 0}
 					onAbort={() => post({ type: "abort" })}
 				/>
 				<WorkspaceBar

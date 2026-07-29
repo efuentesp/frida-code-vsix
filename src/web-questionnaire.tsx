@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 // WebQuestionnaire — reimplementación de ask_user_question sobre Remote React
@@ -51,6 +51,10 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 	const [tab, setTab] = useState(0);
 	const [drafts, setDrafts] = useState<Record<number, WebQuestionAnswer>>({});
 	const [customText, setCustomText] = useState<Record<number, string>>({});
+	// Preview-en-hover: al pasar el mouse sobre una opción con preview, este la
+	// muestra (prioridad sobre la seleccionada). Se resetea al cambiar de pregunta.
+	const [hoverLabel, setHoverLabel] = useState<string | undefined>();
+	useEffect(() => setHoverLabel(undefined), [tab]);
 
 	const q = questions[tab];
 	const isLast = tab === questions.length - 1;
@@ -62,14 +66,16 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 		!q.multiSelect &&
 		q.options.some((o) => (o.preview ?? "").trim().length > 0);
 
-	// Opción cuyo preview se muestra: la seleccionada (si tiene preview), si no la
-	// primera con preview. Derivado del draft → sin estado extra, se resetea solo al
-	// cambiar de pregunta.
+	// Opción cuyo preview se muestra, por prioridad: la hovered > la seleccionada >
+	// la primera con preview. Sin hover, sigue a la selección (se resetea solo al
+	// cambiar de pregunta vía el effect de arriba).
 	const selectedLabel = draft?.kind === "option" ? draft.answer : undefined;
+	const withPreview = (o: WebQuestionOption) =>
+		(o.preview ?? "").trim().length > 0;
 	const activePreviewOpt =
-		q.options.find(
-			(o) => o.label === selectedLabel && (o.preview ?? "").trim(),
-		) ?? q.options.find((o) => (o.preview ?? "").trim());
+		q.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
+		q.options.find((o) => o.label === selectedLabel && withPreview(o)) ??
+		q.options.find(withPreview);
 
 	function isOptionSelected(label: string): boolean {
 		if (q.multiSelect) return !!draft?.selected?.includes(label);
@@ -128,6 +134,7 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 			<fbutton
 				key={`${opt.label}-${i}`}
 				variant={selected ? "primary" : "secondary"}
+				onMouseEnter={() => setHoverLabel(opt.label)}
 				onClick={() =>
 					q.multiSelect ? toggleMulti(opt.label) : chooseSingle(opt.label)
 				}
@@ -140,7 +147,11 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 
 	// Columna de opciones (común con/sin preview).
 	const optionsColumn = (
-		<fbox flexDirection="column" gap={4}>
+		<fbox
+			flexDirection="column"
+			gap={4}
+			onMouseLeave={() => setHoverLabel(undefined)}
+		>
 			{q.options.map(renderOption)}
 		</fbox>
 	);
@@ -156,7 +167,12 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 			{/* Opciones (+ preview side-by-side si aplica) */}
 			{hasPreviews ? (
 				<fbox flexDirection="row" gap={10}>
-					<fbox flexDirection="column" gap={4} flex={1}>
+					<fbox
+						flexDirection="column"
+						gap={4}
+						flex={1}
+						onMouseLeave={() => setHoverLabel(undefined)}
+					>
 						{q.options.map(renderOption)}
 					</fbox>
 					<fbox flexDirection="column" gap={4} flex={1}>

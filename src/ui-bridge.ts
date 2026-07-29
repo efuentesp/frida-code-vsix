@@ -1,7 +1,7 @@
 // Puente host↔webview para los diálogos data-oriented de ExtensionUIContext
 // (select/input/confirm). Es el slice que el modo RPC del SDK usa y que la
 // extensión nativa rpiv-ask-user-question consume vía runRpcQuestionnaire()
-// (hasDialogUI(ui) ⇒ select + input). Mismo patrón que QuestionBridge/
+// (hasDialogUI(ui) ⇒ select + input). Mismo patrón que WebBridge/
 // ApprovalBridge: el execute de un tool llama request() y queda en await; el
 // webview responde vía resolve() cuando el usuario elige o cancela.
 //

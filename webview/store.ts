@@ -15,7 +15,6 @@ export const initialState: State = {
 	mode: "manual",
 	turns: [],
 	approvals: [],
-	questions: [],
 	uiRequests: [],
 	queued: [],
 	isCompacting: false,
@@ -181,6 +180,24 @@ export function reduce(state: State, msg: InMessage): State {
 				turns: [...state.turns, turn],
 				nextId: state.nextId + 1,
 				info: undefined,
+				providerError: undefined,
+			};
+		}
+		case "notice": {
+			// Mensaje del sistema (ej. /todos) como turn en el flujo: bloque multiline
+			// sin avatares. Persiste en el historial (paridad con rpiv-todo /todos).
+			const noticeTurn: Turn = {
+				id: state.nextId,
+				user: "",
+				segments: [],
+				status: null,
+				notice: msg.text,
+			};
+			return {
+				...state,
+				turns: [...state.turns, noticeTurn],
+				nextId: state.nextId + 1,
+				info: undefined,
 			};
 		}
 		case "agent_busy":
@@ -189,12 +206,15 @@ export function reduce(state: State, msg: InMessage): State {
 			return {
 				...state,
 				turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })),
+				providerError: undefined,
 			};
 
 		case "delta":
+			// El modelo está respondiendo → limpiar el error efímero del provider.
 			return {
 				...state,
 				turns: withLast(state.turns, (t) => appendSegment(t, msg.text, "text")),
+				providerError: undefined,
 			};
 
 		case "thinking_delta":
@@ -307,9 +327,6 @@ export function reduce(state: State, msg: InMessage): State {
 		case "approvals":
 			return { ...state, approvals: msg.approvals };
 
-		case "questions":
-			return { ...state, questions: msg.items };
-
 		case "ui_requests":
 			return { ...state, uiRequests: msg.items };
 
@@ -317,8 +334,16 @@ export function reduce(state: State, msg: InMessage): State {
 			// MVP: mapear notify al banner info existente. Un toast dedicado es mejora futura.
 			return { ...state, info: msg.message };
 
-		case "web_commit":
-			return { ...state, webRoot: { rootId: msg.rootId, tree: msg.tree } };
+		case "web_commit": {
+			const webRoots = { ...(state.webRoots ?? {}) };
+			if (msg.tree === null) delete webRoots[msg.rootId];
+			else
+				webRoots[msg.rootId] = {
+					tree: msg.tree,
+					placement: msg.placement ?? "overlay",
+				};
+			return { ...state, webRoots };
+		}
 
 		case "info":
 			return { ...state, info: msg.text };
@@ -328,9 +353,8 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				turns: [],
 				approvals: [],
-				questions: [],
 				uiRequests: [],
-				webRoot: null,
+				webRoots: {},
 				queued: [],
 				busy: false,
 				isCompacting: false,
@@ -338,6 +362,7 @@ export function reduce(state: State, msg: InMessage): State {
 				compactions: [],
 				branchSummaries: [],
 				info: undefined,
+				providerError: undefined,
 				usage: {
 					inputTotal: 0,
 					outputTotal: 0,
@@ -409,9 +434,6 @@ export function reduce(state: State, msg: InMessage): State {
 				provider: msg.provider,
 				thinking: msg.thinking,
 			};
-
-		case "todos":
-			return { ...state, todos: { tasks: msg.tasks, nextId: msg.nextId } };
 
 		case "tool_toggles":
 			return {
@@ -505,6 +527,11 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })),
 			};
+		case "provider_error":
+			// Error efímero del provider (401/500/sin respuesta): banner en el footer, no
+			// en la conversación. Se limpia al recibir respuesta (delta/turn_active) o
+			// un nuevo mensaje (user). Ver ADR-0009 (401 invisible).
+			return { ...state, providerError: msg.text };
 
 		default:
 			return state;

@@ -4,7 +4,7 @@
  * pi-lens emite `pilens:diagnostics` en el bus de eventos de Pi (EventBus) cada
  * vez que recalcula diagnósticos (tras writes/edits del agente). Esta factory se
  * suscribe a ese canal y reenvía el payload al host por callback, igual que los
- * gates (ApprovalBridge) y ask_user_question (QuestionBridge) — patrón de ADR-0006.
+ * gates (ApprovalBridge) y ask_user_question (WebBridge) — patrón de ADR-0006.
  *
  * A diferencia del editor de VS Code (squiggles), aquí NO publicamos al editor
  * (redundante con su LSP): publicamos un RESUMEN agregado al webview, para dar

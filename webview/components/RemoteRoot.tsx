@@ -68,6 +68,25 @@ function materializeProps(
 	return out;
 }
 
+/** Sólo los event handlers (claves on* que son handlerIds) — para fbox, que ya
+ *  aplica su style de layout aparte y no quiere que los props de layout pisén el DOM. */
+function pickEventHandlers(
+	props: Record<string, unknown>,
+	onEvent: (
+		handlerId: string,
+		payload: { value?: string; checked?: boolean },
+	) => void,
+): Record<string, () => void> {
+	const out: Record<string, () => void> = {};
+	for (const [k, v] of Object.entries(props)) {
+		if (k.startsWith("on") && isHandlerId(v)) {
+			const handlerId = v;
+			out[k] = () => onEvent(handlerId, {});
+		}
+	}
+	return out;
+}
+
 function flexStyle(props: Record<string, unknown>): CSSProperties {
 	const s: CSSProperties = { display: "flex" };
 	s.flexDirection = props.flexDirection === "row" ? "row" : "column";
@@ -107,12 +126,16 @@ function renderNode(
 	));
 
 	switch (node.type) {
-		case "fbox":
+		case "fbox": {
+			// style de layout va aparte (flexDirection/gap/...); los handlers (onMouseEnter,
+			// etc.) viajan en props como handlerIds → los extraemos sin pisar el style.
+			const handlers = pickEventHandlers(node.props, onEvent);
 			return (
-				<div className="fbox" style={flexStyle(node.props)}>
+				<div className="fbox" style={flexStyle(node.props)} {...handlers}>
 					{children}
 				</div>
 			);
+		}
 		case "ftext":
 			return (
 				<span className="ftext" style={textStyle(node.props)}>

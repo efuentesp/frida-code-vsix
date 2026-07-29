@@ -50,6 +50,7 @@ const askSchema = Type.Object({
 type FridaWebUI = {
 	fridaWeb: <T = void>(
 		factory: (done: (result: T) => void) => ReactElement,
+		placement?: import("../web-protocol").WebPlacement,
 	) => Promise<T>;
 };
 
@@ -145,8 +146,10 @@ export function createAskUserQuestionWeb() {
 					);
 				}
 
-				const result = await ui.fridaWeb<WebQuestionnaireResult>((done) =>
-					createWebQuestionnaireElement(raw as WebQuestionSpec[], done),
+				const result = await ui.fridaWeb<WebQuestionnaireResult>(
+					(done) =>
+						createWebQuestionnaireElement(raw as WebQuestionSpec[], done),
+					"footer",
 				);
 
 				if (result.cancelled) return declined();

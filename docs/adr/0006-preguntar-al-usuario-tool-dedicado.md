@@ -2,6 +2,14 @@
 
 **Estado:** aceptado.
 
+> **Actualización (D21 / ADR-0012):** la *implementación web* migró de
+> `QuestionBridge`+`QuestionCard` (puente propio + `postMessage`) a **`WebQuestionnaire`
+> sobre Remote React** (`fridaWeb`): tabs, multiSelect con checkbox visual, preview
+> markdown side-by-side y texto libre, con estado en el host serializado al webview.
+> `QuestionBridge`/`QuestionCard`/`question-bridge.ts`/`ask-user-question.ts` fueron
+> **retirados** en la limpieza. La *decisión* (tool dedicado `ask_user_question`, no
+> `ExtensionUIContext` general) se mantiene; cambió solo el canal de UI. Ver D21.
+
 Damos al modelo una herramienta `ask_user_question` —equivalente en **idea** a
 `@juicesharp/rpiv-ask-user-question`— para que, ante una decisión real (estrategia,
 alcance, convención), **pregunte con opciones concretas** en el panel en vez de
@@ -49,7 +57,7 @@ hoy. Consecuencia inmediata: el host sigue reportando `ctx.mode = "print"` y
 - **MVP frente a fidelidad:** el MVP cubre 1-4 preguntas, 2-4 opciones cada una,
   `multiSelect`, texto libre por pregunta y nota opcional. Los items Post-MVP diferidos
   ya están implementados (ver "Post-MVP resuelto" abajo): validación runtime exhaustiva
-  + reserved labels, previews markdown en la UI, pestañas tipo rpiv + Submit/Review, y
+  - reserved labels, previews markdown en la UI, pestañas tipo rpiv + Submit/Review, y
   el refactor `DialogBridge<T>`. Queda pendiente: i18n.
 - **Abort del turn (decisión A, resuelta):** el `execute` de un tool recibe
   `signal: AbortSignal`. Pi **no** hace `Promise.race` con él
@@ -80,7 +88,7 @@ Los items que la sección "Consecuencias" difería como reversibles ya están
 implementados (código propio en `src/`/`webview/`, sin reabrir ADRs). Estado:
 
 | Item | Archivos | Estado |
-|---|---|---|
+| --- | --- | --- |
 | Validación runtime exhaustiva + reserved labels + echo de preview | `src/tools/types.ts`, `src/tools/validate.ts`, `src/tools/ask-user-question.ts` | ✅ |
 | Previews markdown en la UI (side-by-side en single-select; apilado en panel estrecho) | `webview/components/QuestionCard.tsx`, `webview/styles.css` | ✅ |
 | Refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`) | `src/dialog-bridge.ts`, `src/{approval,question}-bridge.ts` | ✅ |

@@ -84,6 +84,9 @@ export interface Turn {
 	executingTool?: string;
 	bash?: BashRun;
 	error?: string;
+	/** Mensaje del sistema (ej. salida de /todos): bloque multiline en el flujo,
+	 *  sin avatares user/assistant. */
+	notice?: string;
 }
 
 export interface ApprovalRequest {
@@ -96,32 +99,6 @@ export interface ApprovalRequest {
 	warning?: string;
 }
 
-export interface QuestionOption {
-	label: string;
-	description: string;
-	preview?: string;
-}
-
-export interface QuestionSpec {
-	question: string;
-	header: string;
-	multiSelect?: boolean;
-	options: QuestionOption[];
-}
-
-export interface QuestionAnswer {
-	questionIndex: number;
-	kind: "option" | "custom" | "multi";
-	answer: string | null;
-	selected?: string[];
-	notes?: string;
-}
-
-export interface QuestionRequest {
-	id: string;
-	questions: QuestionSpec[];
-}
-
 /** Nodo del árbol Remote React (opción A). El host serializa cada commit; el
  *  webview lo materializa en RemoteRoot. Los handlers viajan como IDs "h#N". */
 export interface WebNode {
@@ -129,6 +106,9 @@ export interface WebNode {
 	props: Record<string, unknown>;
 	children: Array<WebNode | string>;
 }
+
+/** Dónde materializa el webview un root remoto (espejo de src/web-protocol.ts). */
+export type WebPlacement = "overlay" | "footer";
 
 /** Diálogo data-oriented del ExtensionUIContext (pi.ui.select/input/confirm).
  *  Las extensiones nativas en modo RPC (rpiv-ask-user-question) las enrutan aquí
@@ -205,18 +185,6 @@ export interface ProviderOption {
 
 export type ApprovalMode = "manual" | "auto-edit" | "auto";
 
-// Tareas del tool `todo` (host publica solo las no eliminadas).
-export type TaskStatus = "pending" | "in_progress" | "completed";
-export interface TodoTask {
-	id: number;
-	subject: string;
-	description?: string;
-	activeForm?: string;
-	status: TaskStatus;
-	blockedBy?: number[];
-	owner?: string;
-}
-
 // Toggles de la Configuración (qué tools del agente están activos).
 export interface ToolToggles {
 	askUserQuestion: boolean;
@@ -268,10 +236,11 @@ export interface State {
 	thinking?: string;
 	turns: Turn[];
 	approvals: ApprovalRequest[];
-	questions: QuestionRequest[];
 	uiRequests: UiRequest[];
 	/** Árbol Remote React actual (null = sin UI remota activa). */
-	webRoot?: { rootId: string; tree: WebNode | null } | null;
+	/** Roots Remote React activos, keyados por rootId, cada uno con su zona
+	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
+	webRoots?: Record<string, { tree: WebNode | null; placement: WebPlacement }>;
 	usage?: Usage;
 	files?: { query: string; items: string[] };
 	sessions?: { items: SessionItem[]; currentPath?: string };
@@ -288,10 +257,12 @@ export interface State {
 	compactReason?: CompactionReason;
 	compactions: CompactionEntry[];
 	branchSummaries: BranchSummaryEntry[];
-	todos?: { tasks: TodoTask[]; nextId: number };
 	toolToggles?: ToolToggles;
 	lens?: LensSummary | null;
 	retry?: RetryState | null;
+	/** Error efímero del provider (401/500/"sin respuesta"): banner en el footer,
+	 *  NO en la conversación. Se limpia al recibir respuesta exitosa o nuevo run. */
+	providerError?: string;
 	lensStatus?: LensStatus;
 	nextId: number;
 }
@@ -327,11 +298,17 @@ export type InMessage =
 	  }
 	| { type: "queued"; items: string[] }
 	| { type: "approvals"; approvals: ApprovalRequest[] }
-	| { type: "questions"; items: QuestionRequest[] }
 	| { type: "ui_requests"; items: UiRequest[] }
 	| { type: "ui_notify"; message: string; level: "info" | "warning" | "error" }
-	| { type: "web_commit"; rootId: string; tree: WebNode | null }
+	| {
+			type: "web_commit";
+			rootId: string;
+			tree: WebNode | null;
+			placement?: WebPlacement;
+	  }
 	| { type: "info"; text: string }
+	| { type: "notice"; text: string }
+	| { type: "provider_error"; text: string }
 	| { type: "cleared" }
 	| ({ type: "usage" } & Usage)
 	| { type: "compact_start"; reason: CompactionReason }
@@ -364,7 +341,6 @@ export type InMessage =
 	  }
 	| { type: "mode"; mode: ApprovalMode }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
-	| { type: "todos"; tasks: TodoTask[]; nextId: number }
 	| { type: "tool_toggles"; askUserQuestion: boolean; todo: boolean }
 	| { type: "lens_diagnostics"; summary: LensSummary | null }
 	| {
@@ -391,12 +367,6 @@ export type OutMessage =
 			id: string;
 			decision: "accept" | "reject";
 			acceptAll?: boolean;
-	  }
-	| {
-			type: "question_response";
-			id: string;
-			answers: QuestionAnswer[];
-			cancelled: boolean;
 	  }
 	| {
 			type: "ui_response";

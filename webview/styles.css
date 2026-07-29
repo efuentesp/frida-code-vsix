@@ -2436,8 +2436,45 @@ kbd {
 	vertical-align: middle;
 }
 
-/* Panel de Tareas (tool `todo`) — en el footer, entre el proc-bar y el Composer; auto-oculto si vacío. */
-.todo-panel {
+/* Error efímero del provider (401/500/"sin respuesta"): banner en el footer,
+   NO en la conversación. Se limpia al recibir respuesta exitosa o un nuevo run. */
+.provider-error-bar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 12px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	color: var(--vscode-editorWarning-foreground, #d29922);
+	background: var(
+		--vscode-inputOption-warningBackground,
+		rgba(210, 153, 34, 0.1)
+	);
+	border: 1px solid var(--vscode-editorWarning-foreground, #d29922);
+}
+
+/* Mensaje del sistema en el flujo (ej. salida de /todos): bloque multiline,
+   sin avatares. white-space:pre-line respeta los \n; cota + scroll si es largo. */
+.notice-block {
+	margin: 4px 12px;
+	padding: 8px 12px;
+	border-left: 3px solid var(--vscode-textLink-foreground, #4daafc);
+	background: var(
+		--vscode-textBlockQuote-background,
+		rgba(127, 127, 127, 0.06)
+	);
+	border-radius: 4px;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-line;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+/* Roots Remote React en el footer (ej. panel del tool `todo`): marco de panel
+   compacto, hermano del .lens-panel. Auto-oculto si vacío (no hay footer-roots). */
+.web-footer {
 	margin: 6px 12px;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 8px;
@@ -2445,89 +2482,18 @@ kbd {
 		--vscode-textBlockQuote-background,
 		rgba(127, 127, 127, 0.06)
 	);
-	overflow: hidden;
-}
-.todo-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
 	padding: 6px 10px;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	font-size: 11px;
-}
-.todo-head-icon {
-	color: var(--vscode-descriptionForeground);
-}
-.todo-head-icon.active {
-	color: var(--vscode-textLink-foreground, #4daafc);
-}
-.todo-head-label {
-	font-weight: 600;
-}
-.todo-head-count {
-	color: var(--vscode-descriptionForeground);
-}
-.todo-list {
-	list-style: none;
-	margin: 0;
-	padding: 4px 0;
-	max-height: 180px;
+	/* El footer puede alojar UIs altas (cuestionario ask_user_question con tabs +
+	   previews). Cota para no empujar el Composer fuera de vista; scroll interno. */
+	max-height: 60vh;
 	overflow-y: auto;
 }
-.todo-item {
-	display: flex;
-	align-items: baseline;
-	gap: 6px;
-	padding: 2px 10px;
-	font-size: 12px;
-	line-height: 1.5;
-}
-.todo-item.completed {
-	opacity: 0.6;
-}
-.todo-item.completed .todo-subject {
-	text-decoration: line-through;
-}
-.todo-item.in_progress {
-	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.08));
-}
-.todo-glyph {
-	width: 1em;
-	flex: 0 0 auto;
-	text-align: center;
-	font-variant-emoji: text;
-}
-.todo-item.pending .todo-glyph {
-	color: var(--vscode-descriptionForeground);
-}
-.todo-item.in_progress .todo-glyph {
-	color: var(--vscode-editorWarning-foreground, #d29922);
-	font-weight: 700;
-}
-.todo-item.in_progress .todo-subject {
-	font-weight: 600;
-}
-.todo-item.completed .todo-glyph {
-	color: var(--vscode-testing-iconPassed, #3fb950);
-}
-.todo-subject {
-	color: var(--vscode-foreground);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.todo-form {
-	color: var(--vscode-descriptionForeground);
-	font-size: 11px;
-}
-.todo-blocks {
-	color: var(--vscode-descriptionForeground);
-	font-size: 11px;
-	margin-left: 2px;
+.web-footer:empty {
+	display: none;
 }
 
-/* Panel de diagnósticos de pi-lens (D16): resumen post-turno. Estilo hermano
-   del .todo-panel, con cuentas semánticas error/warning. */
+/* Panel de diagnósticos de pi-lens (D16): resumen post-turno, con cuentas
+   semánticas error/warning. */
 .lens-panel {
 	margin: 6px 12px;
 	border: 1px solid var(--vscode-panel-border);

@@ -86,6 +86,19 @@ por el agent loop, pero sin `errorMessage` explícito en `agent_end`, el resulta
 Es robusto porque `agent_end` **sí** se ejecuta siempre (a diferencia de
 `after_provider_response` para 4xx). Cubre el 401 y otros casos de "silencio" del modelo.
 
+### UX: error efímero en el footer (no en la conversación)
+
+Este mensaje, junto con los demás errores del provider (`onProviderError`, retry
+agotado 500, `errorMessage` terminal), antes se publicaban como `post({type:"error"})`
+→ el reducer los clavaba al **último turn** como `turn.error`, y quedaban pegados en
+la conversación para siempre. Como el gateway suele recuperar tras un reintento, el
+usuario veía un error antiguo que confundía (creía que el problema persistía).
+
+Ahora esos 4 errores van por `post({type:"provider_error"})` → `state.providerError`,
+un **banner efímero en el footer** (`.provider-error-bar`) que **se limpia solo** al
+recibir respuesta exitosa (`delta`/`turn_active`) o un nuevo mensaje (`user`). Los
+errores de comandos/demos siguen como `error` (en el turn, persistentes).
+
 ### Fix de fondo (cuando se quiera precisión)
 
 Idealmente, capturar el `AuthenticationError` del provider **antes** de que se trague, para

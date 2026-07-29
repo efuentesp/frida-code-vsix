@@ -5,7 +5,7 @@ import { HelpCircle, Send, X } from "lucide-react";
 // Renderiza un diálogo data-oriented del ExtensionUIContext (pi.ui.select/input/
 // confirm). Son los diálogos que las extensiones nativas en modo RPC usan cuando
 // no hay TUI (rpiv-ask-user-question vía runRpcQuestionnaire). Mucho más simple
-// que QuestionCard: sin previews/tabs — el protocolo select/input es solo texto.
+// que WebQuestionnaire: sin previews/tabs — el protocolo select/input es solo texto.
 //
 // El contrato (rpiv rpc-fallback.ts):
 //  - select(title, options[]) → string elegido | undefined (cancelado)
