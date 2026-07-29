@@ -52,8 +52,8 @@ function TodoWebPanel(): ReactElement | null {
 	const showIds = tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
 	return (
-		<fbox flexDirection="column">
-			<fbox flexDirection="row" gap={6} alignItems="center" padding={6}>
+		<fbox flexDirection="column" padding={6}>
+			<fbox flexDirection="row" gap={6} alignItems="center">
 				<ftext>{hasActive ? "●" : "○"}</ftext>
 				<ftext bold>Todos</ftext>
 				<ftext>
@@ -87,7 +87,6 @@ function TaskRow({
 			flexDirection="row"
 			gap={6}
 			alignItems="center"
-			padding={6}
 			tone={active ? "active" : "default"}
 		>
 			{/* Rama de árbol (paridad rpiv-todo overlay): ├─ intermedia, └─ última. */}
