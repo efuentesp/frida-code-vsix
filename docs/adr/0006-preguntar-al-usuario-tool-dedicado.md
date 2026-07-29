@@ -9,6 +9,14 @@
 > `QuestionBridge`/`QuestionCard`/`question-bridge.ts`/`ask-user-question.ts` fueron
 > **retirados** en la limpieza. La *decisión* (tool dedicado `ask_user_question`, no
 > `ExtensionUIContext` general) se mantiene; cambió solo el canal de UI. Ver D21.
+>
+> **Actualización (D24):** paridad con rpiv sobre cuándo mostrar el preview. (1) La
+> descripción del tool + el schema TypeBox ahora guía al modelo a **no** usar
+> `preview` para preguntas simples de preferencia (causa raíz: antes el modelo abusaba
+> del preview). (2) El pane sigue al focus **sin fallback** — antes siempre caía a la
+> primera opción con preview y mostraba algo aunque no correspondiera. (3) Gate
+> `inputMode`: el preview se oculta mientras se escribe respuesta custom. Ver
+> "Paridad con rpiv" abajo.
 
 Damos al modelo una herramienta `ask_user_question` —equivalente en **idea** a
 `@juicesharp/rpiv-ask-user-question`— para que, ante una decisión real (estrategia,
@@ -89,10 +97,10 @@ implementados (código propio en `src/`/`webview/`, sin reabrir ADRs). Estado:
 
 | Item | Archivos | Estado |
 | --- | --- | --- |
-| Validación runtime exhaustiva + reserved labels + echo de preview | `src/tools/types.ts`, `src/tools/validate.ts`, `src/tools/ask-user-question.ts` | ✅ |
-| Previews markdown en la UI (side-by-side en single-select; apilado en panel estrecho) | `webview/components/QuestionCard.tsx`, `webview/styles.css` | ✅ |
+| Validación runtime exhaustiva + reserved labels + echo de preview | `src/tools/types.ts`, `src/tools/validate.ts`, `src/tools/ask-user-question-web.ts` | ✅ |
+| Previews markdown en la UI (side-by-side en single-select; apilado en panel estrecho) | `src/web-questionnaire.tsx` (Remote React) | ✅ |
 | Refactor `DialogBridge<T>` (base común de `ApprovalBridge`/`QuestionBridge`) | `src/dialog-bridge.ts`, `src/{approval,question}-bridge.ts` | ✅ |
-| Pestañas tipo rpiv + Submit/Review (multregunta tabbed; layout simple para 1 pregunta) | `webview/components/QuestionCard.tsx`, `webview/styles.css` | ✅ |
+| Pestañas tipo rpiv + Submit/Review (multregunta tabbed; layout simple para 1 pregunta) | `src/web-questionnaire.tsx` (Remote React) | ✅ |
 | i18n | — | ⬜ pendiente |
 
 Notas de implementación:
@@ -103,8 +111,36 @@ Notas de implementación:
   `duplicate_option_label`.
 - **Echo de preview:** el HOST resuelve el markdown de la opción elegida desde
   `params.questions` y lo devuelve al modelo en el envelope (paridad rpiv).
-- **Previews en la UI:** solo single-select (paridad rpiv); siguen al hover/foco de la
-  opción, con fallback a la seleccionada y a la primera con preview. `flex-wrap` da
-  side-by-side / apilado según el ancho del panel, sin JS.
+- **Previews en la UI:** solo single-select (paridad rpiv); el pane sigue al
+  hover/foco de la opción **sin fallback** — si la opción enfocada no trae `preview`, el
+  pane queda vacío ("Vista previa no disponible") en vez de mostrar el de otra opción.
+  Además se oculta mientras el usuario escribe respuesta custom (gate `inputMode`).
+  Ver "Paridad con rpiv" abajo.
 - **Abort del turn:** sigue residiendo en `DialogBridge.request(id, signal)` (ver
   arriba); las subclases no lo reimplantan.
+
+## Paridad con rpiv: cuándo mostrar el preview (D24)
+
+Revisión de `@juicesharp/rpiv-ask-user-question` reveló que `WebQuestionnaire`
+mostraba el preview **siempre**, a diferencia de rpiv. Tres correcciones alinean el
+comportamiento (código: `src/web-questionnaire.tsx`, `src/tools/ask-user-question-web.ts`):
+
+1. **Guía del tool + schema (causa raíz).** La descripción del tool y el campo
+   `options[].preview` del schema TypeBox ahora dicen explícitamente *"úsalo SOLO para
+   artefactos concretos a comparar (mockups/código/diagramas/configs); NO para preguntas
+   simples de preferencia donde label+description bastan"*. rpiv lo dice en su
+   descripción; el tool de Frida lo omitía y el modelo abusaba del preview.
+2. **Sin fallback agresivo.** `activePreviewOpt` ya no cae a la primera opción con
+   `preview`. El pane sigue al focus (hover > selección); si la opción enfocada no
+   trae `preview`, queda vacío (`NO_PREVIEW_TEXT` de rpiv: *"Vista previa no
+   disponible"*). Antes Frida "inventaba" un preview de otra opción.
+3. **Gate `inputMode`.** Mientras el usuario escribe respuesta custom
+   (`customText[tab]` no vacío), el preview side-by-side se oculta y opciones+input
+   toman ancho completo. rpiv hace lo mismo (`PreviewPane.render`:
+   `if (inputMode) return optionList.render(width)`): el preview es irrelevante al
+   teclear la propia respuesta.
+
+rpiv oculta además el pane en `multiSelect` y cuando **ninguna** opción trae
+`preview` (`!hasAnyPreview()`) — ambos casos ya cubiertos por `hasPreviews`. El gate
+de ancho de rpiv (≥100 cols → side-by-side, si no stacked) no aplica: el webview es
+flexible y no tiene restricción de columnas de terminal.

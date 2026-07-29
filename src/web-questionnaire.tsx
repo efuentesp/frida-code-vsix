@@ -66,16 +66,21 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 		!q.multiSelect &&
 		q.options.some((o) => (o.preview ?? "").trim().length > 0);
 
-	// Opción cuyo preview se muestra, por prioridad: la hovered > la seleccionada >
-	// la primera con preview. Sin hover, sigue a la selección (se resetea solo al
-	// cambiar de pregunta vía el effect de arriba).
+	// inputMode: el usuario está escribiendo respuesta custom. Paridad con rpiv:
+	// ocultamos el preview side-by-side para dar ancho completo a opciones + input
+	// (el preview es irrelevante mientras se teclea la propia respuesta).
+	const inputMode = (customText[tab] ?? "").trim().length > 0;
+
+	// Opción cuyo preview se muestra: la hovered > la seleccionada, SIN fallback.
+	// Paridad con rpiv: el pane sigue al focus; si la opción enfocada no trae
+	// `preview`, el pane queda vacío (NO_PREVIEW_TEXT) en vez de mostrar el preview
+	// de otra opción. No distrae con contenido que no corresponde a lo elegido.
 	const selectedLabel = draft?.kind === "option" ? draft.answer : undefined;
 	const withPreview = (o: WebQuestionOption) =>
 		(o.preview ?? "").trim().length > 0;
 	const activePreviewOpt =
 		q.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
-		q.options.find((o) => o.label === selectedLabel && withPreview(o)) ??
-		q.options.find(withPreview);
+		q.options.find((o) => o.label === selectedLabel && withPreview(o));
 
 	function isOptionSelected(label: string): boolean {
 		if (q.multiSelect) return !!draft?.selected?.includes(label);
@@ -157,15 +162,15 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 	);
 
 	return (
-		<fbox flexDirection="column" gap={8} padding={10}>
+		<fbox flexDirection="column" gap={8} padding={10} bordered>
 			<ftext bold>
 				{`Pregunta ${tab + 1}/${questions.length}`}
 				{q.header ? ` · ${q.header}` : ""}
 			</ftext>
 			<ftext>{q.question}</ftext>
 
-			{/* Opciones (+ preview side-by-side si aplica) */}
-			{hasPreviews ? (
+			{/* Opciones (+ preview side-by-side si aplica y no se está escribiendo custom) */}
+			{hasPreviews && !inputMode ? (
 				<fbox flexDirection="row" gap={10}>
 					<fbox
 						flexDirection="column"
@@ -179,9 +184,15 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 						<ftext bold>
 							{activePreviewOpt
 								? `Preview · ${activePreviewOpt.label}`
-								: "Preview"}
+								: "Vista previa"}
 						</ftext>
-						<fmarkdown>{activePreviewOpt?.preview ?? ""}</fmarkdown>
+						{activePreviewOpt ? (
+							<fmarkdown>{activePreviewOpt.preview ?? ""}</fmarkdown>
+						) : (
+							<ftext color="var(--vscode-descriptionForeground)">
+								Vista previa no disponible para esta opción.
+							</ftext>
+						)}
 					</fbox>
 				</fbox>
 			) : (

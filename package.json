@@ -59,6 +59,10 @@
       {
         "command": "frida.demoWebPersistent",
         "title": "Frida: Demo Web Persistente (panel que vive toda la sesión)"
+      },
+      {
+        "command": "frida.diagnoseThinking",
+        "title": "Frida: Diagnosticar thinking del proveedor"
       }
     ],
     "configuration": {

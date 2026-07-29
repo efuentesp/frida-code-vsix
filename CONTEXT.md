@@ -600,6 +600,63 @@ persistente** (no diálogo).
 - `mountPersistent`/`republish` son **infraestructura reusable** para futuros paneles
   de extensión que vivan toda la sesión.
 
+### D24 — ask_user_question: paridad con rpiv sobre cuándo mostrar el preview
+
+Revisión de `@juicesharp/rpiv-ask-user-question` reveló que `WebQuestionnaire`
+mostraba el preview **siempre**, a diferencia de rpiv nativo. Tres correcciones
+(código: `src/web-questionnaire.tsx`, `src/tools/ask-user-question-web.ts`):
+
+1. **Guía del tool + schema (causa raíz):** la descripción del tool y el campo
+   `options[].preview` del schema TypeBox ahora dicen *"úsalo SOLO para artefactos
+   concretos a comparar (mockups/código/diagramas/configs); NO para preguntas simples
+   de preferencia"*. rpiv lo dice; Frida lo omitía → el modelo abusaba del preview.
+2. **Sin fallback agresivo:** `activePreviewOpt` ya no cae a la primera opción con
+   `preview`. El pane sigue al focus; opción sin `preview` → "Vista previa no
+   disponible" (`NO_PREVIEW_TEXT` de rpiv).
+3. **Gate `inputMode`:** el preview se oculta mientras se escribe respuesta custom
+   (`customText[tab]` no vacío) — opciones+input toman ancho completo. rpiv hace lo
+   mismo (`PreviewPane.render`: `if (inputMode) return optionList.render(width)`).
+
+rpiv oculta además el pane en `multiSelect` y cuando ninguna opción trae `preview`
+(`!hasAnyPreview()`) — ambos ya cubiertos por `hasPreviews`. El gate de ancho (≥100
+cols) no aplica: el webview es flexible. ADR-0006 §"Paridad con rpiv".
+
+### D25 — Tool `todo`: paridad rpiv-todo en el render del tool call
+
+El header de la tarjeta del tool `todo` (ToolCard del webview) ahora sigue el formato
+de rpiv-todo (`view/format.ts`: `renderTodoCall` + `renderTodoResult`):
+
+- **Glyph de acción + subject resuelto** (antes `create "…"` / `update #id` sin
+  subject): `+ Subject` (create), `→ #id Subject` (update), `× #id Subject` (delete),
+  `› #id Subject` (get), `☰ status` (list), `∅` (clear).
+- **Status echo como badge** en el header: `○ pendiente` / `◐ en progreso` /
+  `✓ completado` / `✗ eliminado`, coloreado, parseado del `content` del resultado.
+
+**Obstáculo:** el `ToolCard` (webview) no ve el store del todo (vive en el host,
+consumido por el `TodoWebPanel` vía Remote React). Para resolver el subject de
+update/get/delete, el host **enriquece los args** con `_subject` desde `getTodoState()`
+— en `tool_execution_start` (sesión viva) y `postHistory` (tras recarga). ADR-0014
+§"Render del tool call".
+
+### D26 — Panel del todo: árbol de tareas (paridad rpiv-todo overlay)
+
+El `TodoWebPanel` ahora renderiza las tareas como un **árbol** con ramas (paridad con
+el overlay de rpiv-todo, `todo-overlay.ts:177-194`):
+
+```
+● Todos (0/3)
+├─ ○ Eliminar ask-user-question propio de Frida (464 líneas)
+├─ ◐ Revisar cómo lo hace pi
+└─ ✓ Aplicar ajustes a frida
+```
+
+- **Ramas `├─`/`└─`**: cada `TaskRow` lleva `├─` (intermedia) o `└─` (última) en color
+  tenue antes del glyph de status — agrupa las tareas bajo el heading como un árbol,
+  más legible que las filas planas.
+- **"Tareas" → "Todos"** (paridad rpiv-todo, `OVERLAY_HEADING`).
+- Antes las filas eran planas (sin ramas). Código: `src/tools/todo-web/todo-web.tsx`.
+  ADR-0014 §"Render del panel".
+
 ---
 
 ## 5. Hechos a verificar (antes/durante la implementación)

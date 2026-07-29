@@ -31,6 +31,10 @@ export interface BoxProps {
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
+	/** Dibuja borde + radio + fondo (look de tarjeta). Por defecto sin borde (layout plano). */
+	bordered?: boolean;
+	/** Tono de fondo: "active" destaca la fila (ej. tarea en progreso). */
+	tone?: "default" | "active";
 }
 
 /** Props de texto (ftext → <span>). */

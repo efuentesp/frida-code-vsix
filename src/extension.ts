@@ -970,7 +970,7 @@ export async function activate(
 						type: "tool_start",
 						toolCallId: event.toolCallId,
 						tool: event.toolName,
-						args: compactArgs(event.args),
+						args: compactArgs(enrichTodoArgs(event.args)),
 					});
 					break;
 				case "tool_execution_update": {
@@ -1858,7 +1858,7 @@ export async function activate(
 							const seg: any = {
 								kind: "tool",
 								tool: String(p.name ?? ""),
-								args: compactArgs(p.arguments),
+								args: compactArgs(enrichTodoArgs(p.arguments)),
 								state: "running",
 							};
 							segs.push(seg);
@@ -1867,19 +1867,18 @@ export async function activate(
 					}
 					if (segs.length > 0)
 						items.push({ role: "assistant", segments: segs });
-				} else if (role === "tool") {
-					// Empareja cada toolResult con su toolCall pendiente (por toolCallId).
-					for (const p of parts) {
-						if (p?.type === "toolResult") {
-							const seg = p.toolCallId
-								? pendingTools.get(String(p.toolCallId))
-								: null;
-							if (seg) {
-								seg.state = p.isError ? "error" : "ok";
-								seg.result = summarizeToolResultContent(p.content);
-								pendingTools.delete(String(p.toolCallId));
-							}
-						}
+				} else if (role === "toolResult") {
+					// ToolResultMessage (pi-ai): role "toolResult" con toolCallId/isError/content
+					// a nivel de MENSAJE (no como content part). Empareja con su toolCall pendiente.
+					// (Antes se checaba role==="tool" + part type==="toolResult" → nunca matcheaba
+					// → los tools cargados quedaban en state "running" para siempre.)
+					const tcId = String(m?.toolCallId ?? "");
+					const seg = tcId ? pendingTools.get(tcId) : null;
+					if (seg) {
+						seg.state = m?.isError ? "error" : "ok";
+						seg.result = summarizeToolResultContent(m?.content);
+						if (typeof m?.details?.diff === "string") seg.diff = m.details.diff;
+						pendingTools.delete(tcId);
 					}
 				} else if (role === "branchSummary") {
 					branchSummaries.push({ summary: String(m?.summary ?? "") });
@@ -2139,6 +2138,72 @@ export async function activate(
 				});
 			}
 		}),
+		vscode.commands.registerCommand("frida.diagnoseThinking", async () => {
+			// Diagnóstico del thinking del proveedor (ADR-0009): envía un mensaje de
+			// prueba que debe elicitar razonamiento y mide si el gateway devuelve
+			// reasoning (thinking_delta en el stream + usage.reasoning). Reporta ✅/❌.
+			// Útil para confirmar cuándo el proveedor corrige el round-trip de
+			// reasoning_content: al correr esta demo se verá ✅.
+			try {
+				const s = await ensureSession();
+				const anyAuthed = SUPPORTED_PROVIDERS.some(
+					(id) => !!s.modelRuntime?.hasConfiguredAuth?.(id),
+				);
+				if (!anyAuthed) {
+					post({ type: "need_key" });
+					return;
+				}
+				post({
+					type: "notice",
+					text: "🧪 Diagnosticando thinking: envío un mensaje de prueba al proveedor y mido si devuelve razonamiento…",
+				});
+				let thinkingDeltas = 0;
+				let settled = false;
+				const cleanup = s.session.subscribe((event: any) => {
+					if (
+						event?.type === "message_update" &&
+						event.assistantMessageEvent?.type === "thinking_delta"
+					) {
+						thinkingDeltas++;
+					}
+					if (event?.type === "agent_end" && !settled) {
+						settled = true;
+						queueMicrotask(() => cleanup());
+						if (event.errorMessage) {
+							post({
+								type: "notice",
+								text: `⚠️ El mensaje de prueba falló (${event.errorMessage}); no se pudo medir el razonamiento.`,
+							});
+							return;
+						}
+						const msgs: any[] = s.session?.agent?.state?.messages ?? [];
+						const last = [...msgs]
+							.reverse()
+							.find((m: any) => m?.role === "assistant");
+						const reasoning = last?.usage?.reasoning;
+						const ok =
+							thinkingDeltas > 0 ||
+							(typeof reasoning === "number" && reasoning > 0);
+						post({
+							type: "notice",
+							text: ok
+								? `✅ El proveedor SÍ devuelve razonamiento (thinking_deltas=${thinkingDeltas}, usage.reasoning=${reasoning ?? "n/a"}). El botón "ver razonamiento" debería mostrarlo.`
+								: `❌ El proveedor NO devuelve razonamiento (thinking_deltas=${thinkingDeltas}, usage.reasoning=${reasoning ?? "n/a"}). No es un bug de Frida: el gateway/modelo no genera reasoning_content.`,
+						});
+					}
+				});
+				// Mensaje de prueba (aparece en la conversación): fuerza razonamiento.
+				await runPrompt(
+					"Razona paso a paso mostrando tu razonamiento, y responde al final: ¿cuánto es 17 × 3?",
+					"steer",
+				);
+			} catch (e) {
+				post({
+					type: "provider_error",
+					text: `Diagnóstico de thinking falló: ${e instanceof Error ? e.message : String(e)}`,
+				});
+			}
+		}),
 		vscode.commands.registerCommand("frida.demoWebQuestionnaire", async () => {
 			// Demo del ask_user_question sobre Remote React: monta el WebQuestionnaire con
 			// datos de prueba, sin depender del modelo ni del gateway (útil para validar la
@@ -2212,6 +2277,26 @@ function extractText(m: any): string {
 // Compacta los args de un tool a un objeto legible, truncando strings largos
 // (content/oldText/newText…) para no inflar el postMessage. El webview usa
 // solo los campos clave (path, command, pattern, edits.length) para la cabecera.
+/** Enriquece los args del tool `todo` con el subject resuelto del store, para que
+ *  el ToolCard del webview muestre `→ #id Subject` (paridad renderTodoCall de
+ *  rpiv-todo). El store del todo vive en el host; el webview no tiene acceso. */
+function enrichTodoArgs(args: unknown): unknown {
+	if (args == null || typeof args !== "object") return args;
+	const a = args as Record<string, unknown>;
+	const action = String(a.action ?? "");
+	const id = a.id;
+	if (
+		(action === "update" || action === "get" || action === "delete") &&
+		id != null
+	) {
+		const subject = getTodoState().tasks.find(
+			(t) => t.id === Number(id),
+		)?.subject;
+		if (subject) return { ...a, _subject: subject };
+	}
+	return args;
+}
+
 function compactArgs(args: unknown): unknown {
 	if (args == null || typeof args !== "object") return args;
 	try {

@@ -22,7 +22,7 @@ function WebDemo({ done }: { done: (result: number) => void }): ReactElement {
 	const [n, setN] = useState(0);
 
 	return (
-		<fbox flexDirection="column" gap={8} padding={12}>
+		<fbox flexDirection="column" gap={8} padding={12} bordered>
 			<ftext bold>🧪 Demo Remote React — contador: {n}</ftext>
 			<fbox flexDirection="row" gap={8}>
 				<fbutton onClick={() => setN(n - 1)}>−1</fbutton>

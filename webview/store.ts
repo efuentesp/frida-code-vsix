@@ -201,7 +201,16 @@ export function reduce(state: State, msg: InMessage): State {
 			};
 		}
 		case "agent_busy":
-			return { ...state, busy: msg.busy };
+			return {
+				...state,
+				busy: msg.busy,
+				// Al terminar el agente (busy=false) cerramos el status del último turn:
+				// turn_active/appendSegment lo dejan en "thinking"/"executing" y ningún
+				// evento lo limpiaba → el turn quedaba "pensando" para siempre.
+				turns: msg.busy
+					? state.turns
+					: withLast(state.turns, (t) => ({ ...t, status: null })),
+			};
 		case "turn_active":
 			return {
 				...state,

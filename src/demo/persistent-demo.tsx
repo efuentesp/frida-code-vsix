@@ -67,7 +67,7 @@ function PersistentDemo({ onClose }: { onClose: () => void }): ReactElement {
 		demoPersistentStore.getSnapshot,
 	);
 	return (
-		<fbox flexDirection="column" gap={8} padding={12}>
+		<fbox flexDirection="column" gap={8} padding={12} bordered>
 			<ftext bold>🧪 Demo Persistente — contador: {value}</ftext>
 			<ftext>Sube solo cada 2s (timer) o con el botón. Sin diálogo.</ftext>
 			<fbox flexDirection="row" gap={8}>

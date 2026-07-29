@@ -667,6 +667,12 @@ body {
 	opacity: 0.85;
 	flex: none;
 }
+.tc-name {
+	font-weight: 600;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	flex: none;
+}
 .tc-label {
 	font-family: var(--vscode-editor-font-family, monospace);
 	font-size: 0.9em;
@@ -676,6 +682,43 @@ body {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--vscode-foreground);
+}
+.tc-diffstats {
+	display: inline-flex;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	flex: none;
+}
+.tc-diffstats .add {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #3fb950);
+}
+.tc-diffstats .del {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, #f85149);
+}
+.tc-linestats {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+	flex: none;
+}
+.tc-todostatus {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	flex: none;
+}
+.tc-todostatus.pending {
+	color: var(--vscode-descriptionForeground);
+}
+.tc-todostatus.in_progress {
+	color: var(--vscode-list-warningForeground, #cca700);
+}
+.tc-todostatus.completed {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #3fb950);
+}
+.tc-todostatus.deleted {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, #f85149);
 }
 .tc-status {
 	margin-left: auto;
@@ -2482,11 +2525,15 @@ kbd {
 		--vscode-textBlockQuote-background,
 		rgba(127, 127, 127, 0.06)
 	);
-	padding: 6px 10px;
-	/* El footer puede alojar UIs altas (cuestionario ask_user_question con tabs +
-	   previews). Cota para no empujar el Composer fuera de vista; scroll interno. */
+	/* Sin padding: el contenido (panel del todo, cuestionario) aporta el suyo.
+	   overflow:auto para que el destaque .tone-active respete el radio y haya scroll. */
+	overflow: auto;
 	max-height: 60vh;
-	overflow-y: auto;
+}
+/* Divisor entre filas (fbox) del panel del todo dentro del footer: cualquier fbox
+   con un hermano fbox previo (filas tras el header). */
+.web-footer .fbox > .fbox + .fbox {
+	border-top: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.15));
 }
 .web-footer:empty {
 	display: none;
@@ -2676,10 +2723,17 @@ kbd {
 
 /* frida-webview — componentes Remote React (opción A) */
 .fbox {
+	/* Layout plano por defecto (display:flex lo da el style inline de flexStyle).
+	   La decoración es opt-in: .bordered (tarjeta) y .tone-active (destaque). */
+}
+.fbox.bordered {
 	border: 1px solid
 		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
 	border-radius: 8px;
 	background: var(--vscode-list-hoverBackground);
+}
+.fbox.tone-active {
+	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.08));
 }
 /* fmarkdown: contenedor con borde + scroll para previews side-by-side */
 .fbox .md {

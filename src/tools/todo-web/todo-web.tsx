@@ -47,30 +47,58 @@ function TodoWebPanel(): ReactElement | null {
 	const hasActive = tasks.some(
 		(t) => t.status === "in_progress" || t.status === "pending",
 	);
+	// Mostrar #id en cada fila sólo si alguna tarea tiene dependencias (blockedBy),
+	// para anclar las referencias ⛓ #N (paridad con rpiv-todo selectShowTaskIds).
+	const showIds = tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
 	return (
-		<fbox flexDirection="column" gap={2}>
-			<fbox flexDirection="row" gap={6} alignItems="center">
+		<fbox flexDirection="column">
+			<fbox flexDirection="row" gap={6} alignItems="center" padding={6}>
 				<ftext>{hasActive ? "●" : "○"}</ftext>
-				<ftext bold>Tareas</ftext>
+				<ftext bold>Todos</ftext>
 				<ftext>
 					({completed}/{tasks.length})
 				</ftext>
 			</fbox>
-			<fbox flexDirection="column" gap={1}>
-				{tasks.map((t) => (
-					<TaskRow key={t.id} task={t} />
-				))}
-			</fbox>
+			{tasks.map((t, i) => (
+				<TaskRow
+					key={t.id}
+					task={t}
+					showIds={showIds}
+					isLast={i === tasks.length - 1}
+				/>
+			))}
 		</fbox>
 	);
 }
 
-function TaskRow({ task }: { task: Task }): ReactElement {
+function TaskRow({
+	task,
+	showIds,
+	isLast,
+}: {
+	task: Task;
+	showIds: boolean;
+	isLast: boolean;
+}): ReactElement {
+	const active = task.status === "in_progress";
 	return (
-		<fbox flexDirection="row" gap={6} alignItems="center">
+		<fbox
+			flexDirection="row"
+			gap={6}
+			alignItems="center"
+			padding={6}
+			tone={active ? "active" : "default"}
+		>
+			{/* Rama de árbol (paridad rpiv-todo overlay): ├─ intermedia, └─ última. */}
+			<ftext color="var(--vscode-descriptionForeground)">
+				{isLast ? "└─" : "├─"}
+			</ftext>
 			<ftext>{GLYPH[task.status]}</ftext>
-			<ftext>{task.subject}</ftext>
+			{showIds ? (
+				<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
+			) : null}
+			<ftext bold={active}>{task.subject}</ftext>
 			{task.status === "in_progress" && task.activeForm ? (
 				<ftext>({task.activeForm})</ftext>
 			) : null}

@@ -162,6 +162,44 @@ El `todo-web` monta con `placement: "footer"`; `ask_user_question` pasa
   en `newSession`/`switchSession` antes de soltar la referencia. Antes no se notaba
   porque el `TodoPanel` nativo leía de un único holder de módulo.
 
+## Render del tool call: paridad rpiv-todo (D25)
+
+El header de la tarjeta del tool `todo` (en el `ToolCard` del webview) ahora sigue el
+formato de rpiv-todo (`view/format.ts`: `renderTodoCall` + `renderTodoResult`):
+
+- **Glyph de acción + subject resuelto** (antes `create "…"` / `update #id` sin
+  subject): `+ Subject` (create), `→ #id Subject` (update), `× #id Subject` (delete),
+  `› #id Subject` (get), `☰ status` (list), `∅` (clear).
+- **Status echo como badge** en el header: `○ pendiente` / `◐ en progreso` /
+  `✓ completado` / `✗ eliminado`, coloreado, parseado del `content` del resultado
+  (`todoStatusEcho` en `webview/components/ToolCard.tsx`).
+
+**Obstáculo y solución:** el `ToolCard` (webview) no ve el store del todo (vive en el
+host, consumido por el `TodoWebPanel` vía Remote React). Para resolver el subject de
+update/get/delete, el host **enriquece los args** con `_subject` resuelto desde
+`getTodoState()` — tanto en `tool_execution_start` (sesión viva) como en `postHistory`
+(tras recarga, para que el header siga resolviendo). El webview sólo lee
+`args._subject`. Sin esto, `update` mostraría sólo `#id` (como antes).
+
+## Render del panel: árbol de tareas (D26)
+
+El `TodoWebPanel` ahora renderiza las tareas como un **árbol** con ramas (paridad con
+el overlay de rpiv-todo, `todo-overlay.ts:177-194`):
+
+```
+● Todos (0/3)
+├─ ○ Eliminar ask-user-question propio de Frida (464 líneas)
+├─ ◐ Revisar cómo lo hace pi
+└─ ✓ Aplicar ajustes a frida
+```
+
+- **Ramas `├─`/`└─`**: cada `TaskRow` recibe `isLast` y antepone `├─` (intermedia) o `└─`
+  (última) en `descriptionForeground` antes del glyph de status. Agrupa las tareas bajo
+  el heading como un árbol, más legible que las filas planas.
+- **"Tareas" → "Todos"** (paridad `OVERLAY_HEADING` de rpiv-todo).
+
+Antes las filas eran planas (sin indentación), y el heading decía "Tareas".
+
 ## Referencias
 
 - [ADR-0012](./0012-frida-webview-remote-react.md) — Remote React (diálogo efímero);

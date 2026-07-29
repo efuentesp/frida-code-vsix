@@ -26,7 +26,12 @@ import {
 const optionSchema = Type.Object({
 	label: Type.String({ maxLength: MAX_LABEL_LENGTH }),
 	description: Type.String(),
-	preview: Type.Optional(Type.String()),
+	preview: Type.Optional(
+		Type.String({
+			description:
+				"Contenido markdown opcional mostrado al enfocar esta opción. Úsalo SOLO para artefactos concretos que el usuario deba comparar visualmente (mockups ASCII, snippets de código, diagramas, ejemplos de configuración). NO lo uses para preguntas simples de preferencia donde label + description bastan — sólo sobrecargan la pantalla. Sólo aplica en single-select (se ignora en multiSelect).",
+		}),
+	),
 });
 
 const questionSchema = Type.Object({
@@ -119,7 +124,12 @@ export function createAskUserQuestionWeb() {
 				"Cada pregunta lleva 2-4 opciones con su descripción; el usuario siempre puede escribir " +
 				"su propia respuesta en el campo de texto libre. Úsalo cuando una decisión tenga opciones " +
 				"reales; no para confirmar pasos obvios. No apiles varias llamadas: agrupa todas las " +
-				"preguntas en una. VE DIRECTO AL TOOL: no redactes las preguntas en tu texto antes.",
+				"preguntas en una. VE DIRECTO AL TOOL: no redactes las preguntas en tu texto antes. " +
+				"Vista previa (preview): usa el campo opcional `preview` de las opciones SOLO para " +
+				"artefactos concretos que el usuario deba comparar visualmente (mockups ASCII, código, " +
+				"diagramas, ejemplos de configuración). NO uses previews para preguntas simples de " +
+				"preferencia donde el label y la descripción bastan — sólo sobrecargan y distraen. " +
+				"Los previews sólo aplican en single-select (se ignoran en multiSelect).",
 			promptSnippet: "Pregunta al usuario hasta 4 cosas con opciones concretas",
 			parameters: askSchema,
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

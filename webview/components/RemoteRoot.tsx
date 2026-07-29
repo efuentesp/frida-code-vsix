@@ -129,9 +129,14 @@ function renderNode(
 		case "fbox": {
 			// style de layout va aparte (flexDirection/gap/...); los handlers (onMouseEnter,
 			// etc.) viajan en props como handlerIds → los extraemos sin pisar el style.
+			// bordered/tone controlan la decoración (tarjeta / destaque) sin pisar el layout.
 			const handlers = pickEventHandlers(node.props, onEvent);
+			const cls =
+				"fbox" +
+				(node.props.bordered ? " bordered" : "") +
+				(node.props.tone === "active" ? " tone-active" : "");
 			return (
-				<div className="fbox" style={flexStyle(node.props)} {...handlers}>
+				<div className={cls} style={flexStyle(node.props)} {...handlers}>
 					{children}
 				</div>
 			);
