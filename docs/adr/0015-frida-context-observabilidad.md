@@ -116,20 +116,49 @@ presión 52% · headroom 128k · sin compactar · compaction on (reserve 30k)
 **Tool `context({mode:"full"})`** devuelve el mismo análisis serializado en JSON al
 agente (diagnóstico de atribución).
 
-**Análisis** (`frida-context/analysis.ts`, porte simplificado de supi `analysis.ts`):
+**Análisis** (`frida-context/analysis.ts` + `prompt-inference.ts`, paridad con supi-context):
 
-- `estimateTextTokens` (`Math.ceil(len/4)`), `computeMessageCategories` (por rol),
-  `applyScaling` (escala a tokens medidos si los hay), `computeSystemPromptBreakdown`
-  (base/guidelines/toolSnippets/skills/contextFiles/appendText).
+- `estimateTextTokens`, `computeMessageCategories` (por rol), `applyScaling`.
+- `computeSystemPromptBreakdown` con **atribución detallada**: base, **instruction
+  files** (AGENTS.md/CLAUDE.md separados, con origin global/project), **skills** (tokens
+  por skill vía `formatSkillsForPrompt`), **guidelines** (bullets + fuente: default /
+  tool built-in / extensions, vía `classifyGuidelines` parseando la sección
+  `"Guidelines:"` del systemPrompt), **tool snippets** (tokens por tool), appendText.
+- `computeToolDefinitions` (count + tokens + descripción por tool) vía
+  `pi.getAllTools()` + `pi.getActiveTools()`.
 - Datos: `ctx.getContextUsage()`, `buildSessionContext(branch).messages`,
-  `ctx.getSystemPrompt()`, `systemPromptOptions` (cacheado en `before_agent_start`,
-  `store.ts`).
+  `ctx.getSystemPrompt()`, `systemPromptOptions` + `allTools`/`activeTools` (cacheados).
+
+El ContextReport muestra ahora: barra segmentada + métricas + **Uso por categoría** +
+**Composición del system prompt** (sub-desglose) + **Instruction files** + **Skills** +
+**Guidelines** (fuentes + ejemplos) + **Tool definitions** (activos).
+
+**Conectores de árbol (├/└):** todas las listas indentan sus items con conectores
+(`├` intermedio, `└` último) vía un componente `TreeItem`, dejando el header de sección
+(bold, sin conector) claramente distinguible de los items. El "… y N más" de
+truncamiento cierra el árbol con `└`.
 
 **Mejora del `ContextBar` (implementada):** la barra ahora usa `pressurePercent`
 (ajustado por reserve) en vez de `usagePercent` simple → anticipa la compactación. El
 host calcula `pressurePercent` + `reserveTokens` en `postUsage` (reserve cacheado vía
 `SettingsManager`) y los envía al webview; `ContextBar` los consume con fallback a la
 bruta (`usage.contextPercent`).
+
+### Corrección — `/context` lee el systemPrompt en tiempo real (no del cache)
+
+Originalmente `postContextCommand` leía `systemPrompt` + `options` + `tools` de un
+**cache module-level** poblado en `before_agent_start` (solo dispara en un turno del
+agente). Si el usuario daba `/context` **sin un turno del agente en la instancia
+actual** (reabrir VS Code + sesión existente), el cache estaba vacío y la "Composición
+del system prompt" salía toda en 0, aunque el uso total sí viniera de
+`frida.session.getContextUsage()`.
+
+**Fix:** `postContextCommand` ahora lee en **tiempo real de `frida.session`** (con
+fallback al cache): `.systemPrompt` (getter público), `.getAllTools()` (público),
+`._baseSystemPromptOptions` y `.getActiveToolNames()` (internos). Ya están poblados al
+configurar los tools (`setActiveToolsByName` → `_rebuildSystemPrompt`), antes del primer
+turno. Optional chaining en todo → si un campo interno cambia en el SDK, cae al cache sin
+romper. El tool `context` ya usaba `ctx.getSystemPrompt()` en runtime y no se ve afectado.
 
 ## Referencias
 

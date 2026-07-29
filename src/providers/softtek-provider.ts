@@ -7,14 +7,99 @@ export const SOFTTEK_MODEL_DISPLAY = "GPT-5.4 Mini";
 export const SOFTTEK_PROVIDER_DISPLAY = "Softtek DevEngine";
 export const DEVENGINE_BASE_URL = "https://mywork.softtek.com/apg/devengine";
 
+/** Metadatos del modelo resueltos del catálogo canónico de pi-ai (modelo NATIVO,
+ *  no del gateway). */
+export interface CanonicalModelMeta {
+	contextWindow?: number;
+	maxTokens?: number;
+	reasoning: boolean;
+	input: ("text" | "image")[];
+	thinkingLevelMap?: Record<string, string | null>;
+}
+
+/** Proveedores canónicos donde buscar el modelo base (priorizamos Azure porque
+ *  DevEngine enruta a Azure; luego openai/copilot/opencode). Excluimos openai-codex
+ *  (su contexto es de codificación, 272000, no el general). */
+const CANONICAL_LOOKUP_PROVIDERS = [
+	"azure-openai-responses",
+	"openai",
+	"github-copilot",
+	"opencode",
+];
+
+/** Busca `modelId` en los catálogos canónicos de pi-ai y devuelve sus metadatos
+ *  (contextWindow/maxTokens/reasoning/input/thinkingLevelMap). undefined si no aparece. */
+export function lookupCanonicalModelMeta(
+	mr: any,
+	modelId: string,
+): CanonicalModelMeta | undefined {
+	for (const providerId of CANONICAL_LOOKUP_PROVIDERS) {
+		const m = mr
+			?.getModels?.(providerId)
+			?.find?.((mm: any) => mm.id === modelId);
+		if (m) {
+			return {
+				contextWindow: m.contextWindow,
+				maxTokens: m.maxTokens,
+				reasoning: m.reasoning ?? true,
+				input: Array.isArray(m.input) ? m.input : ["text", "image"],
+				thinkingLevelMap: m.thinkingLevelMap,
+			};
+		}
+	}
+	return undefined;
+}
+
+/** Auto-detect del contextWindow REAL del gateway DevEngine vía GET /models.
+ *  Best-effort (timeout 10s): lee context_window/context_length del modelo; si no lo
+ *  expone o falla, devuelve undefined y el caller hace fallback. Reutiliza el patrón
+ *  de diagnoseGateway (X-Api-Key, probe /models). */
+export async function fetchDevengineContextWindow(
+	baseUrl: string,
+	key: string,
+	modelId: string,
+): Promise<number | undefined> {
+	const ctrl = new AbortController();
+	const timer = setTimeout(() => ctrl.abort(), 10000);
+	try {
+		const res = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
+			method: "GET",
+			headers: { "X-Api-Key": key },
+			signal: ctrl.signal,
+		});
+		if (!res.ok) return undefined;
+		const json = (await res.json()) as any;
+		// Formato OpenAI {data:[{id,…}]} o variante del gateway; buscamos por id.
+		const list: any[] = Array.isArray(json?.data)
+			? json.data
+			: Array.isArray(json)
+				? json
+				: [];
+		const match = list.find((m) => m?.id === modelId) ?? list[0];
+		const cw =
+			match?.context_window ?? match?.context_length ?? match?.contextWindow;
+		return typeof cw === "number" && cw > 0 ? cw : undefined;
+	} catch {
+		return undefined;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 /**
  * Config del proveedor (ProviderConfigInput). Se registra DIRECTAMENTE en el
  * ModelRuntime (vía registerProvider), NO en la factory, para que
  * modelRuntime.getModel(...) lo resuelva. (Riesgo #1 del PoC, ya resuelto.)
+ *
+ *  `meta` (opcional) trae los metadatos del catálogo canónico (reasoning/input/
+ *  thinkingLevelMap del modelo nativo). El contextWindow/maxTokens vienen ya
+ *  RESUELTOS por el caller (override > gateway > catálogo > default). El `compat`
+ *  (requiresThinkingAsText etc.) es específico del bug de DevEngine (ADR-0009).
  */
 export function buildSofttekProviderConfig(opts: {
 	contextWindow: number;
 	maxTokens: number;
+	meta?: CanonicalModelMeta;
 }) {
 	return {
 		name: "Softtek DevEngine Gateway",
@@ -26,8 +111,11 @@ export function buildSofttekProviderConfig(opts: {
 			{
 				id: SOFTTEK_MODEL,
 				name: SOFTTEK_MODEL_DISPLAY,
-				reasoning: true, // habilita niveles de thinking → reasoning_effort (low/medium/high)
-				input: ["text", "image"] as ("text" | "image")[],
+				reasoning: opts.meta?.reasoning ?? true,
+				input: (opts.meta?.input ?? ["text", "image"]) as ("text" | "image")[],
+				...(opts.meta?.thinkingLevelMap
+					? { thinkingLevelMap: opts.meta.thinkingLevelMap }
+					: {}),
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 				// Ajustables desde settings (frida.devengine.contextWindow / maxTokens).
 				contextWindow: opts.contextWindow,

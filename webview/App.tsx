@@ -10,7 +10,6 @@ import { reduce, initialState } from "./store";
 import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
-import { ApprovalCard } from "./components/ApprovalCard";
 import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
 import { UiDialog } from "./components/UiDialog";
@@ -19,7 +18,6 @@ import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
-import { ResourcesBar } from "./components/ResourcesBar";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import {
@@ -114,6 +112,26 @@ export function App() {
 		const el = logRef.current;
 		if (el && stickRef.current) el.scrollTop = el.scrollHeight;
 	}, [state.turns, state.queued]);
+
+	// Auto-scroll al MONTAR un panel overlay-body nuevo (/context, /gates,
+	// ApprovalDialog): son resultados de comandos del usuario que espera ver. A
+	// diferencia del de turnos, aquí forzamos el scroll al final aunque el usuario
+	// hubiera subido a leer (el comando es explícito). No dispara en updates del
+	// mismo root (re-render del panel) — sólo en montajes nuevos.
+	const prevOverlayRootsRef = useRef<string[]>([]);
+	useEffect(() => {
+		const overlayIds = Object.entries(state.webRoots ?? {})
+			.filter(([, r]) => r.placement !== "footer" && r.tree)
+			.map(([id]) => id);
+		const hasNew = overlayIds.some(
+			(id) => !prevOverlayRootsRef.current.includes(id),
+		);
+		prevOverlayRootsRef.current = overlayIds;
+		if (hasNew) {
+			const el = logRef.current;
+			if (el) el.scrollTop = el.scrollHeight;
+		}
+	}, [state.webRoots]);
 
 	// Doble Escape (mientras responde) → abort, como el botón Detener.
 	useEffect(() => {
@@ -224,6 +242,18 @@ export function App() {
 			},
 			{
 				kind: "builtin",
+				label: "/gates",
+				name: "gates",
+				description: "Auditoría de permisos (decisiones allow/block del gate)",
+			},
+			{
+				kind: "builtin",
+				label: "/gates-config",
+				name: "gates-config",
+				description: "Editor de permisos (allow/ask/deny por tool)",
+			},
+			{
+				kind: "builtin",
 				label: "/help",
 				name: "help",
 				description: "Mostrar atajos y comandos",
@@ -291,7 +321,7 @@ export function App() {
 		return (
 			<Onboarding
 				deviceCode={state.oauthDeviceCode}
-				onSubmit={(key) => post({ type: "set_key", key })}
+				onSubmit={(provider, key) => post({ type: "set_key", provider, key })}
 				onLoginCopilot={() =>
 					post({ type: "login_provider", provider: "github-copilot" })
 				}
@@ -399,6 +429,21 @@ export function App() {
 							}
 						>
 							<ShieldCheck size={14} /> {labelMode(state.mode)}
+							{state.gateStats &&
+							state.gateStats.allow +
+								state.gateStats.block +
+								state.gateStats.autoAllow >
+								0 ? (
+								<span className="gate-stats">
+									<span className="gs-allow">✓{state.gateStats.allow}</span>
+									<span className="gs-block">✗{state.gateStats.block}</span>
+									{state.gateStats.autoAllow > 0 ? (
+										<span className="gs-auto">
+											⚡{state.gateStats.autoAllow}
+										</span>
+									) : null}
+								</span>
+							) : null}
 						</button>
 					</Tooltip>
 				</span>
@@ -482,8 +527,7 @@ export function App() {
 					<CircleStop size={12} /> Presiona Esc de nuevo para detener…
 				</div>
 			)}
-			{!escHint && state.info && <div className="info-bar">{state.info}</div>}
-			{state.resources && <ResourcesBar res={state.resources} />}
+			{!escHint && <InfoToast info={state.info} />}
 
 			<div
 				className="log"
@@ -529,15 +573,9 @@ export function App() {
 							<Pause size={12} /> Frida espera tu aprobación:
 						</div>
 					)}
-					{state.approvals.map((a) => (
-						<ApprovalCard
-							key={a.id}
-							approval={a}
-							onRespond={(r) =>
-								post({ type: "approval_response", id: a.id, ...r })
-							}
-						/>
-					))}
+					{/* Fase 6: el diálogo de aprobación ahora es Remote React (ApprovalDialog),
+				    montado por el host como root overlay. Aquí sólo queda el banner; el
+				    ApprovalCard nativo ya no se renderiza. */}
 					{state.uiRequests.map((r) => (
 						<UiDialog
 							key={r.id}
@@ -645,6 +683,8 @@ export function App() {
 				<ModelPanel
 					providers={state.models.providers}
 					active={state.models.active}
+					refreshing={state.models.refreshing}
+					refreshErrors={state.models.refreshErrors}
 					deviceCode={state.oauthDeviceCode}
 					onClose={() => setModelsOpen(false)}
 					onSelect={(provider, model) =>
@@ -652,6 +692,10 @@ export function App() {
 					}
 					onLogin={(provider) => post({ type: "login_provider", provider })}
 					onLogout={(provider) => post({ type: "logout_provider", provider })}
+					onSetKey={(provider) => post({ type: "rotate_key", provider })}
+					onDiscoverModels={(provider) =>
+						post({ type: "discover_models", provider })
+					}
 				/>
 			)}
 			{forkOpen && state.forkPoints && state.forkPoints.length > 0 && (
@@ -720,4 +764,23 @@ export function App() {
 			)}
 		</div>
 	);
+}
+
+/** Toast efímero para `state.info`: muestra el mensaje flotante y se auto-oculta
+ *  tras ~4.5s. Si llega un mensaje nuevo mientras está visible, reinicia el timer.
+ *  Reemplaza al info-bar persistente (MVP → toast, como marcaba store.ts). Los
+ *  avisos de modo (auto-edit/auto) y el hint de Esc siguen como info-bar
+ *  (persistentes, arriba) porque son contexto operativo, no notificaciones. */
+function InfoToast({ info }: { info: string | undefined }) {
+	const [visible, setVisible] = useState(false);
+	const [text, setText] = useState("");
+	useEffect(() => {
+		if (!info) return;
+		setText(info);
+		setVisible(true);
+		const t = setTimeout(() => setVisible(false), 4500);
+		return () => clearTimeout(t);
+	}, [info]);
+	if (!visible || !text) return null;
+	return <div className="info-toast">{text}</div>;
 }

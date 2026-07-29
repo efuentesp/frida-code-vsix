@@ -415,7 +415,12 @@ export function reduce(state: State, msg: InMessage): State {
 		case "models":
 			return {
 				...state,
-				models: { providers: msg.providers, active: msg.active },
+				models: {
+					providers: msg.providers,
+					active: msg.active,
+					refreshing: msg.refreshing,
+					refreshErrors: msg.refreshErrors,
+				},
 			};
 
 		case "oauth_device_code":
@@ -435,6 +440,9 @@ export function reduce(state: State, msg: InMessage): State {
 
 		case "mode":
 			return { ...state, mode: msg.mode };
+
+		case "gate_stats":
+			return { ...state, gateStats: msg.stats };
 
 		case "model_info":
 			return {

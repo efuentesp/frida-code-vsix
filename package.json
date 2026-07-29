@@ -22,7 +22,7 @@
       },
       {
         "command": "frida.setKey",
-        "title": "Frida: Actualizar API key (DevEngine)"
+        "title": "Frida: Actualizar API key"
       },
       {
         "command": "frida.compact",
@@ -116,14 +116,29 @@
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
         },
         "frida.devengine.contextWindow": {
-          "type": "number",
-          "default": 300000,
-          "markdownDescription": "Ventana de contexto (tokens) declarada para el modelo del gateway DevEngine. Pi la usa para decidir cuándo compactar. Si el gateway/modelo real aguanta menos de lo declarado, **bájalo** para que pi compacte antes (evita `500` por historial demasiado grande). Aplica al crear/abrir sesión (o `/reload` + sesión nueva). Ver ADR-0009."
+          "type": ["number", "null"],
+          "default": null,
+          "markdownDescription": "Override manual de la ventana de contexto (tokens) del modelo DevEngine. Si se omite (null), Frida la resuelve automáticamente por prioridad: (1) `GET /models` del gateway DevEngine (context_window real), (2) catálogo canónico del modelo (gpt-5.4-mini → 400000), (3) 300000 conservador. Pon un número SÓLO si quieres forzar un límite (ej. el gateway da `500` con historial grande). Ver ADR-0019."
         },
         "frida.devengine.maxTokens": {
+          "type": ["number", "null"],
+          "default": null,
+          "markdownDescription": "Override manual del máximo de tokens de salida (`max_tokens`) del modelo DevEngine. Si se omite (null), se usa el del catálogo canónico (128000). Ver ADR-0019."
+        },
+        "frida.zai.baseUrl": {
+          "type": "string",
+          "default": "https://api.z.ai/api/coding/paas/v4",
+          "markdownDescription": "Base URL del proveedor Z.ai (API compatible OpenAI, Authorization: Bearer). ADR-0017."
+        },
+        "frida.zai.contextWindow": {
           "type": "number",
-          "default": 128000,
-          "markdownDescription": "Máximo de tokens de salida (`max_tokens`) para el modelo DevEngine. Aplica al crear/abrir sesión."
+          "default": 200000,
+          "markdownDescription": "Ventana de contexto (tokens) por defecto para los modelos Z.ai descubiertos que no estén en la tabla conocida (GLM-4.6, etc.). ADR-0017."
+        },
+        "frida.zai.maxTokens": {
+          "type": "number",
+          "default": 16000,
+          "markdownDescription": "Máximo de tokens de salida (`max_tokens`) por defecto para los modelos Z.ai descubiertos. ADR-0017."
         }
       }
     }

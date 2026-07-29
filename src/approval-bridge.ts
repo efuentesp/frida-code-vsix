@@ -21,12 +21,18 @@ export interface ApprovalRequest {
 	// Aviso disuasivo (Prioridad 3): comando compuesto/wrapper o path fuera del
 	// workspace. La UI lo destaca para que el usuario preste atención.
 	warning?: string;
+	/** Patrón sugerido para aprobar por sesión (Fase 4): el gate lo calcula
+	 *  (bash → `npm *`, diff → `src/*`) y la UI lo ofrece como botón. */
+	suggestedPattern?: string;
 }
 
 export interface ApprovalResponse {
 	id: string;
 	decision: "accept" | "reject";
 	acceptAll?: boolean;
+	/** Patrón a aprobar para la sesión (Fase 4): el gate lo registra y las próximas
+	 *  llamadas que matcheen pasan sin diálogo. Ej. `npm *`, `src/*`. */
+	pattern?: string;
 }
 
 export class ApprovalBridge extends DialogBridge<

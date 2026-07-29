@@ -14,16 +14,28 @@ import {
 	type FridaSession,
 } from "./pi-session";
 import type { ApprovalRequest } from "./approval-bridge";
-import type { ApprovalMode } from "./gates/approval-gates";
+import type { PermissionMode } from "./tools/frida-permission-system";
+import { readAuditLog } from "./tools/frida-permission-system/audit-log";
+import { createAuditPanelElement } from "./tools/frida-permission-system/AuditPanel";
+import { createConfigPanelElement } from "./tools/frida-permission-system/ConfigPanel";
+import { createApprovalDialogElement } from "./tools/frida-permission-system/ApprovalDialog";
 import {
 	DEVENGINE_BASE_URL,
 	SOFTTEK_PROVIDER,
 	SOFTTEK_PROVIDER_DISPLAY,
 } from "./providers/softtek-provider";
+import {
+	API_KEY_PROVIDERS,
+	API_KEY_PROVIDER_IDS,
+	getApiKeyProvider,
+} from "./providers/api-key-providers";
+import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
 import { getWebviewHtml } from "./webview-html";
 import { analyzeContext } from "./tools/frida-context/analysis";
 import { createContextReportElement } from "./tools/frida-context/ContextReport";
 import {
+	getCachedActiveTools,
+	getCachedAllTools,
 	getCachedPromptOptions,
 	getCachedSystemPrompt,
 } from "./tools/frida-context/store";
@@ -46,9 +58,10 @@ import {
 
 const execFileP = promisify(execFile);
 
-const SECRET_KEY = "frida.devengineKey";
 const ACTIVE_MODEL_KEY = "frida.activeModel";
-const SUPPORTED_PROVIDERS = [SOFTTEK_PROVIDER, "github-copilot"];
+// ADR-0017: secret por proveedor (itera el registry de API-key providers). El id
+// de Copilot se añade por separado (OAuth, sin secret propio).
+const SUPPORTED_PROVIDERS = [...API_KEY_PROVIDER_IDS, "github-copilot"];
 
 const BINARY_EXT = new Set([
 	"png",
@@ -257,7 +270,13 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 export async function activate(
 	context: vscode.ExtensionContext,
 ): Promise<void> {
-	let keyCache: string | undefined = await context.secrets.get(SECRET_KEY);
+	// ADR-0017: keys POR proveedor cargadas del SecretStorage al arrancar. El mapa
+	// vive en memoria y se sincroniza con el runtime vía frida.setKey(id, key).
+	const keyCaches: Record<string, string> = {};
+	for (const def of API_KEY_PROVIDERS) {
+		const k = await context.secrets.get(def.secretKey);
+		if (k) keyCaches[def.id] = k;
+	}
 	const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
 	// Auditoría del gate de aprobación (Prioridad 2): JSONL append-only, chmod 0600.
 	// Vive junto a las sesiones en globalStorageUri (no bajo sync en nube: lleva
@@ -272,13 +291,39 @@ export async function activate(
 		context.globalStorageUri.fsPath,
 		"devengine-last-request.json",
 	);
-	let approvalMode: ApprovalMode = "manual";
+	let approvalMode: PermissionMode = "manual";
 	let frida: FridaSession | undefined;
 	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
 	// onboarding al arrancar), sin esto ambas ven `!frida` y crean sesiones
 	// duplicadas — la perdedora se pierde sin dispose y su WebBridge vive publicando
 	// roots al webview para siempre (paneles duplicados). Ver ADR-0014.
 	let fridaPromise: Promise<FridaSession> | undefined;
+	// Fase 6 — roots Remote React de los diálogos de aprobación pendientes (uno por
+	// req.id). Se sincronizan con la lista del ApprovalBridge: montar nuevas,
+	// desmontar resueltas. Reemplazan a la ApprovalCard nativa del webview.
+	const approvalDialogRoots = new Map<string, { unmount: () => void }>();
+	function syncApprovalDialogs(reqs: ApprovalRequest[]): void {
+		if (!frida) return;
+		const incoming = new Set(reqs.map((r) => r.id));
+		for (const [id, handle] of approvalDialogRoots) {
+			if (!incoming.has(id)) {
+				handle.unmount();
+				approvalDialogRoots.delete(id);
+			}
+		}
+		const bridge = frida.bridge;
+		for (const req of reqs) {
+			if (approvalDialogRoots.has(req.id)) continue;
+			const handle = frida.webBridge.mountPersistent(
+				() =>
+					createApprovalDialogElement(req, (r) =>
+						bridge.resolve({ id: req.id, ...r }),
+					),
+				"overlay",
+			);
+			approvalDialogRoots.set(req.id, handle);
+		}
+	}
 	let activeModel: { provider: string; modelId: string } | undefined =
 		context.globalState.get(ACTIVE_MODEL_KEY);
 	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
@@ -480,10 +525,10 @@ export async function activate(
 					sessionDir: sessionDirPath,
 					approvalLogPath,
 					activeModel,
-					getKey: () => keyCache,
-					onUnauthorized: () => {
-						keyCache = undefined;
-						void promptKey("unauthorized");
+					getKeyFor: (id: string) => keyCaches[id],
+					onUnauthorized: (id: string) => {
+						delete keyCaches[id];
+						void promptKey(id, "unauthorized");
 					},
 					onPendingApprovals: (reqs: ApprovalRequest[]) =>
 						post({ type: "approvals", approvals: reqs }),
@@ -618,6 +663,7 @@ export async function activate(
 
 	function providerDisplayName(id: string): string {
 		if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
+		if (id === ZAI_PROVIDER) return ZAI_PROVIDER_DISPLAY;
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
 	}
@@ -635,17 +681,24 @@ export async function activate(
 	}
 
 	// Catálogo de proveedores/modelos soportados para el selector del webview.
-	function postModels(): void {
+	function postModels(
+		opts: { refreshing?: boolean; refreshErrors?: string[] } = {},
+	): void {
 		if (!frida) return;
 		const mr = frida.modelRuntime;
 		const providers = SUPPORTED_PROVIDERS.map((id) => ({
 			id,
 			name: providerDisplayName(id),
 			oauth: !!mr.isUsingOAuth?.(id),
+			apiKey: !!getApiKeyProvider(id),
 			authed: !!mr.hasConfiguredAuth?.(id),
 			models: (mr.getModels?.(id) ?? []).map((mm: any) => ({
 				id: mm.id,
 				name: mm.name,
+				contextWindow: mm.contextWindow,
+				maxTokens: mm.maxTokens,
+				reasoning: mm.reasoning,
+				input: mm.input,
 			})),
 		}));
 		const m = frida.session?.model;
@@ -653,7 +706,32 @@ export async function activate(
 			type: "models",
 			providers,
 			active: m ? { provider: m.provider, modelId: m.id } : undefined,
+			refreshing: opts.refreshing,
+			refreshErrors: opts.refreshErrors,
 		});
+	}
+
+	/** ADR-0018 Fase B: refresh asíncrono de catálogos. Publica el snapshot cacheado
+	 *  inmediatamente (refreshing:true), ejecuta refresh() en background (timeout 15s,
+	 *  degradación por proveedor) y publica el resultado. */
+	async function refreshModelsAsync(): Promise<void> {
+		if (!frida) return;
+		postModels({ refreshing: true });
+		const ctrl = new AbortController();
+		const timer = setTimeout(() => ctrl.abort(), 15000);
+		try {
+			const result = await frida.modelRuntime.refresh({
+				allowNetwork: true,
+				signal: ctrl.signal,
+			});
+			const errors = [...(result?.errors?.keys?.() ?? [])];
+			postModels({ refreshing: false, refreshErrors: errors });
+		} catch {
+			// Timeout/abort: dejamos el snapshot cacheado, sin alardear el error.
+			postModels({ refreshing: false });
+		} finally {
+			clearTimeout(timer);
+		}
 	}
 
 	async function selectModel(
@@ -1146,6 +1224,7 @@ export async function activate(
 					id: msg.id,
 					decision: msg.decision === "accept" ? "accept" : "reject",
 					acceptAll: !!msg.acceptAll,
+					pattern: typeof msg.pattern === "string" ? msg.pattern : undefined,
 				});
 				break;
 			case "ui_response":
@@ -1175,7 +1254,13 @@ export async function activate(
 				);
 				break;
 			case "set_key":
-				await setKey(String(msg.key ?? ""));
+				await setKey(
+					String(msg.provider ?? SOFTTEK_PROVIDER),
+					String(msg.key ?? ""),
+				);
+				break;
+			case "discover_models":
+				await discoverModels(String(msg.provider ?? ""));
 				break;
 			case "copy_text":
 				try {
@@ -1184,9 +1269,15 @@ export async function activate(
 					/* noop */
 				}
 				break;
-			case "rotate_key":
-				await promptKey("manual");
+			case "rotate_key": {
+				const pid =
+					typeof msg.provider === "string" && msg.provider
+						? msg.provider
+						: undefined;
+				if (pid) await promptKey(pid, "manual");
+				else await pickApiKeyProvider();
 				break;
+			}
 			case "compact":
 				await compactContext();
 				break;
@@ -1204,6 +1295,10 @@ export async function activate(
 				break;
 			case "list_models":
 				postModels();
+				void refreshModelsAsync(); // Fase B: refresh en background al abrir el selector
+				break;
+			case "refresh_models":
+				void refreshModelsAsync();
 				break;
 			case "select_model":
 				await selectModel(String(msg.provider ?? ""), String(msg.model ?? ""));
@@ -1284,10 +1379,12 @@ export async function activate(
 		"fork",
 		"todos",
 		"context",
+		"gates",
+		"gates-config",
 	]);
 
 	async function runBuiltinSlash(text: string): Promise<boolean> {
-		const m = text.match(/^\/(\w+)(?:\s+([\s\S]*))?$/);
+		const m = text.match(/^\/([\w-]+)(?:\s+([\s\S]*))?$/);
 		if (!m) return false;
 		const cmd = m[1];
 		const arg = (m[2] ?? "").trim();
@@ -1355,6 +1452,12 @@ export async function activate(
 			case "context":
 				postContextCommand(arg);
 				break;
+			case "gates":
+				postGatesCommand();
+				break;
+			case "gates-config":
+				postGatesConfigCommand();
+				break;
 		}
 		return true;
 	}
@@ -1389,7 +1492,7 @@ export async function activate(
 	function postHelp(): void {
 		post({
 			type: "info",
-			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /context /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
+			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /context /gates /gates-config /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
 		});
 	}
 
@@ -1443,17 +1546,27 @@ export async function activate(
 			const wsCwd =
 				vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 			const settings = SettingsManager.create(wsCwd, defaultAgentDir());
+			// ADR-0015 fix: leer systemPrompt/options/tools EN TIEMPO REAL de la sesión
+			// (con fallback al cache de before_agent_start). El cache sólo se puebla en
+			// un turno del agente; si el usuario da /context sin turno previo (ej. reabre
+			// VS Code + sesión existente), el cache estaba vacío y la composición del SP
+			// salía toda en 0. La sesión expone `systemPrompt` (getter público),
+			// `getAllTools()` (público), `_baseSystemPromptOptions` y `getActiveToolNames()`
+			// (internos) — ya poblados al configurar los tools, antes del primer turno.
+			const ctxSess: any = frida.session;
 			const analysis = analyzeContext({
-				usage: frida.session.getContextUsage?.(),
+				usage: ctxSess?.getContextUsage?.(),
 				branch: frida.sessionManager?.getBranch?.() ?? [],
-				systemPromptText: getCachedSystemPrompt(),
-				options: getCachedPromptOptions(),
+				systemPromptText: ctxSess?.systemPrompt ?? getCachedSystemPrompt(),
+				options: ctxSess?._baseSystemPromptOptions ?? getCachedPromptOptions(),
 				modelName:
 					frida.session.model?.name ??
 					frida.session.model?.id ??
 					"No model selected",
 				compactionEnabled: settings.getCompactionEnabled(),
 				reserveTokens: settings.getCompactionReserveTokens(),
+				allTools: ctxSess?.getAllTools?.() ?? getCachedAllTools(),
+				activeTools: ctxSess?.getActiveToolNames?.() ?? getCachedActiveTools(),
 			});
 			// Reemplaza el reporte anterior si aún está abierto.
 			contextReportHandle?.unmount();
@@ -1467,6 +1580,50 @@ export async function activate(
 		} catch (e) {
 			post({ type: "info", text: `No se pudo analizar el contexto: ${e}` });
 		}
+	}
+
+	// /gates: auditoría navegable de permisos (overlay Remote React, ADR-0016 Fase 2).
+	// Lee el JSONL de approvals y lo muestra con filtros + colores. Snapshot puntual
+	// (no streaming): re-ejecutar /gates refresca.
+	let auditPanelHandle: { unmount: () => void } | undefined;
+	function postGatesCommand(): void {
+		if (!frida) {
+			post({
+				type: "info",
+				text: "No hay sesión activa. La auditoría necesita una sesión iniciada.",
+			});
+			return;
+		}
+		try {
+			const entries = readAuditLog(approvalLogPath);
+			auditPanelHandle?.unmount();
+			auditPanelHandle = frida.webBridge.mountPersistent(
+				() =>
+					createAuditPanelElement(entries, () => auditPanelHandle?.unmount()),
+				"overlay",
+			);
+		} catch (e) {
+			post({ type: "info", text: `No se pudo leer la auditoría: ${e}` });
+		}
+	}
+
+	// /gates-config: editor visual de permisos (overlay Remote React, ADR-0016 Fase 5).
+	// El panel edita la política allow/ask/deny por tool y guarda en permission.json;
+	// el gate lee la policy fresca del config-store en el próximo tool_call.
+	let configPanelHandle: { unmount: () => void } | undefined;
+	function postGatesConfigCommand(): void {
+		if (!frida) {
+			post({
+				type: "info",
+				text: "No hay sesión activa para editar permisos.",
+			});
+			return;
+		}
+		configPanelHandle?.unmount();
+		configPanelHandle = frida.webBridge.mountPersistent(
+			() => createConfigPanelElement(() => configPanelHandle?.unmount()),
+			"overlay",
+		);
 	}
 
 	// Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
@@ -1777,7 +1934,10 @@ export async function activate(
 			// El dispose del SDK NO emite session_shutdown → los paneles web persistentes
 			// (todo) no se desmontan solos. Limpiar los roots del WebBridge viejo antes
 			// de soltar la referencia, y resetear la Promise anti-race.
+			frida.gateStats.reset(); // Fase 3: contadores a cero en el webview.
+			frida.sessionApprovals.clear(); // Fase 4: olvida patrones aprobados.
 			frida.webBridge.dispose();
+			approvalDialogRoots.clear(); // Fase 6: dispose ya desmontó los roots.
 			frida = undefined;
 			fridaPromise = undefined;
 		}
@@ -1788,7 +1948,7 @@ export async function activate(
 		flushLens();
 		resetQueue();
 		post({ type: "info", text: "Nueva sesión iniciada." });
-		if (keyCache) bootstrapSession(); // recrea la sesión para mostrar recursos
+		if (Object.keys(keyCaches).length > 0) bootstrapSession(); // recrea la sesión para mostrar recursos
 	}
 
 	async function sendSessions(): Promise<void> {
@@ -1839,18 +1999,21 @@ export async function activate(
 				sessionDir: sessionDirPath,
 				approvalLogPath,
 				openPath: pathStr,
-				getKey: () => keyCache,
-				onUnauthorized: () => {
-					keyCache = undefined;
-					void promptKey("unauthorized");
+				getKeyFor: (id: string) => keyCaches[id],
+				onUnauthorized: (id: string) => {
+					delete keyCaches[id];
+					void promptKey(id, "unauthorized");
 				},
-				onPendingApprovals: (reqs: ApprovalRequest[]) =>
-					post({ type: "approvals", approvals: reqs }),
+				onPendingApprovals: (reqs: ApprovalRequest[]) => {
+					post({ type: "approvals", approvals: reqs });
+					syncApprovalDialogs(reqs);
+				},
 				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
 				onUiNotify: (message, level) =>
 					post({ type: "ui_notify", message, level }),
 				onWebCommit: (rootId, tree, placement) =>
 					post({ type: "web_commit", rootId, tree, placement }),
+				onGateStats: (s) => post({ type: "gate_stats", stats: s }),
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
@@ -1987,13 +2150,20 @@ export async function activate(
 		}
 	}
 
-	async function setKey(key: string): Promise<void> {
+	async function setKey(providerId: string, key: string): Promise<void> {
 		const trimmed = key.trim();
 		if (!trimmed) return;
-		await context.secrets.store(SECRET_KEY, trimmed);
-		keyCache = trimmed;
+		const def = getApiKeyProvider(providerId);
+		if (!def) return; // provider desconocido: no-op
+		await context.secrets.store(def.secretKey, trimmed);
+		keyCaches[providerId] = trimmed;
 		if (frida) {
-			await frida.setKey(trimmed); // inyecta la key al runtime (setRuntimeApiKey)
+			await frida.setKey(providerId, trimmed); // setRuntimeApiKey en el runtime
+			// z.ai: explorar modelos tras autenticar. Si el fetch falla, se queda con
+			// los defaults (best-effort). Refresca el selector del webview.
+			if (providerId === ZAI_PROVIDER) {
+				void frida.discoverModels(providerId).finally(postModels);
+			}
 			postResources();
 		} else {
 			bootstrapSession(); // crea sesión y publica recursos al terminar el onboarding
@@ -2003,13 +2173,17 @@ export async function activate(
 	}
 
 	async function promptKey(
+		providerId: string,
 		reason: "initial" | "manual" | "unauthorized" = "initial",
 	): Promise<void> {
+		const def = getApiKeyProvider(providerId);
+		const display = def?.displayName ?? providerId;
+		const authLabel =
+			def?.authMode === "x-api-key" ? "X-Api-Key" : "Authorization: Bearer";
 		const messages = {
-			initial: "Introduce tu API key de DevEngine (se envía como X-Api-Key).",
-			manual: "Actualiza tu API key de DevEngine (se envía como X-Api-Key).",
-			unauthorized:
-				"Tu API key de DevEngine fue rechazada o venció. Vuelve a introducirla.",
+			initial: `Introduce tu API key de ${display} (se envía como ${authLabel}).`,
+			manual: `Actualiza tu API key de ${display} (se envía como ${authLabel}).`,
+			unauthorized: `Tu API key de ${display} fue rechazada o venció. Vuelve a introducirla.`,
 		};
 		const key = await vscode.window.showInputBox({
 			prompt: messages[reason],
@@ -2017,9 +2191,44 @@ export async function activate(
 			ignoreFocusOut: true,
 		});
 		if (key) {
-			await setKey(key);
+			await setKey(providerId, key);
 		} else {
 			post({ type: "need_key" });
+		}
+	}
+
+	/** QuickPick del proveedor de API-key (DevEngine / z.ai) → luego pide la key.
+	 *  Para el comando `frida.setKey` cuando hay más de un proveedor. */
+	async function pickApiKeyProvider(): Promise<void> {
+		if (API_KEY_PROVIDERS.length === 1) {
+			void promptKey(API_KEY_PROVIDERS[0].id, "manual");
+			return;
+		}
+		const pick = await vscode.window.showQuickPick(
+			API_KEY_PROVIDERS.map((p) => ({
+				label: p.displayName,
+				description: p.id,
+				id: p.id,
+			})),
+			{
+				placeHolder: "Selecciona el proveedor cuya API key quieres actualizar",
+			},
+		);
+		if (pick) void promptKey(pick.id, "manual");
+	}
+
+	/** Explora modelos del proveedor (GET {baseUrl}/models) y re-registra el
+	 *  ProviderConfig con los descubiertos (ADR-0017). Refresca el selector. */
+	async function discoverModels(providerId: string): Promise<void> {
+		if (!frida) return;
+		try {
+			await frida.discoverModels(providerId);
+			postModels();
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: `No se pudieron explorar los modelos: ${e?.message ?? e}`,
+			});
 		}
 	}
 
@@ -2029,7 +2238,7 @@ export async function activate(
 	// router (modelos, context_window) y depurar 500s. Ver fix-frida-gateway.md.
 	const diagChannel = vscode.window.createOutputChannel("Frida DevEngine");
 	async function diagnoseGateway(): Promise<void> {
-		const key = keyCache;
+		const key = keyCaches[SOFTTEK_PROVIDER];
 		diagChannel.clear();
 		diagChannel.show(true);
 		diagChannel.appendLine(
@@ -2164,7 +2373,7 @@ export async function activate(
 		),
 		vscode.commands.registerCommand(
 			"frida.setKey",
-			() => void promptKey("manual"),
+			() => void pickApiKeyProvider(),
 		),
 		vscode.commands.registerCommand(
 			"frida.compact",

@@ -23,6 +23,7 @@ export function ApprovalCard({
 	onRespond: (r: {
 		decision: "accept" | "reject";
 		acceptAll?: boolean;
+		pattern?: string;
 	}) => void;
 }) {
 	const isBash = approval.kind === "bash";
@@ -66,6 +67,21 @@ export function ApprovalCard({
 				>
 					Rechazar
 				</button>
+				{/* Aprobar un patrón para la sesión (Fase 4): el gate sugiere (bash →
+			    `npm *`, diff → `src/*`); próximas llamadas que matcheen pasan solas. */}
+				{approval.suggestedPattern && (
+					<button
+						className="sec"
+						onClick={() =>
+							onRespond({
+								decision: "accept",
+								pattern: approval.suggestedPattern,
+							})
+						}
+					>
+						Aprobar «{approval.suggestedPattern}» (esta sesión)
+					</button>
+				)}
 				{/* "Aceptar todas" solo para diffs: bash siempre pide, y un tool
             desconocido no debe silenciarse para toda la sesión. */}
 				{isDiff && (

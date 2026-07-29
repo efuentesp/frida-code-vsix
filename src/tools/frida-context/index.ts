@@ -22,9 +22,12 @@ import {
 import { Type } from "typebox";
 import { analyzeContext, buildSnapshot } from "./analysis";
 import {
+	getCachedActiveTools,
+	getCachedAllTools,
 	getCachedPromptOptions,
 	setCachedPromptOptions,
 	setCachedSystemPrompt,
+	setCachedTools,
 } from "./store";
 import type { ContextPressureSnapshot } from "./types";
 
@@ -52,6 +55,7 @@ export function createFridaContext() {
 		pi.on("before_agent_start", async (event, ctx) => {
 			setCachedPromptOptions(event.systemPromptOptions);
 			setCachedSystemPrompt(ctx?.getSystemPrompt());
+			setCachedTools(pi.getAllTools(), pi.getActiveTools());
 		});
 
 		pi.registerTool({
@@ -93,6 +97,8 @@ export function createFridaContext() {
 					modelName,
 					compactionEnabled,
 					reserveTokens,
+					allTools: getCachedAllTools(),
+					activeTools: getCachedActiveTools(),
 				});
 				return {
 					content: [{ type: "text", text: JSON.stringify(analysis) }],

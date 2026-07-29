@@ -97,6 +97,8 @@ export interface ApprovalRequest {
 	command?: string;
 	diff?: string;
 	warning?: string;
+	/** Patrón sugerido para aprobar por sesión (Fase 4): la UI lo ofrece como botón. */
+	suggestedPattern?: string;
 }
 
 /** Nodo del árbol Remote React (opción A). El host serializa cada commit; el
@@ -178,16 +180,29 @@ export interface WorkspaceInfo {
 export interface ModelOption {
 	id: string;
 	name: string;
+	/** Metadatos del modelo del SDK (ADR-0018 Fase C: info rica en el selector). */
+	contextWindow?: number;
+	maxTokens?: number;
+	reasoning?: boolean;
+	input?: ("text" | "image")[];
 }
 export interface ProviderOption {
 	id: string;
 	name: string;
 	oauth: boolean; // autenticación por suscripción (OAuth) vs API key
+	apiKey: boolean; // autenticación por API key (DevEngine/z.ai) → botón "Key"
 	authed: boolean; // ¿tiene credenciales válidas?
 	models: ModelOption[];
 }
 
 export type ApprovalMode = "manual" | "auto-edit" | "auto";
+
+/** Stats footer (Fase 3): contadores del gate de la sesión actual. */
+export interface GateStats {
+	allow: number;
+	block: number;
+	autoAllow: number;
+}
 
 // Toggles de la Configuración (qué tools del agente están activos).
 export interface ToolToggles {
@@ -234,6 +249,8 @@ export interface State {
 	keyNeeded: boolean;
 	busy: boolean;
 	mode: ApprovalMode;
+	/** Stats footer (Fase 3): contadores del gate (✓N aprobadas / ✗M bloqueadas / ⚡Z auto). */
+	gateStats?: GateStats;
 	info?: string;
 	model?: string;
 	provider?: string;
@@ -253,6 +270,9 @@ export interface State {
 	models?: {
 		providers: ProviderOption[];
 		active?: { provider: string; modelId: string };
+		/** ADR-0018 Fase B: estado del refresh asíncrono de catálogos. */
+		refreshing?: boolean;
+		refreshErrors?: string[];
 	};
 	forkPoints?: { entryId: string; text: string }[];
 	oauthDeviceCode?: { userCode: string; verificationUri: string };
@@ -332,8 +352,11 @@ export type InMessage =
 			type: "models";
 			providers: ProviderOption[];
 			active?: { provider: string; modelId: string };
+			refreshing?: boolean;
+			refreshErrors?: string[];
 	  }
 	| { type: "open_models" }
+	| { type: "refresh_models" }
 	| { type: "oauth_device_code"; userCode: string; verificationUri: string }
 	| { type: "oauth_clear" }
 	| { type: "fork_points"; points: { entryId: string; text: string }[] }
@@ -344,6 +367,7 @@ export type InMessage =
 			branchSummaries?: BranchSummaryEntry[];
 	  }
 	| { type: "mode"; mode: ApprovalMode }
+	| { type: "gate_stats"; stats: GateStats }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
 	| { type: "tool_toggles"; askUserQuestion: boolean; todo: boolean }
 	| { type: "lens_diagnostics"; summary: LensSummary | null }
@@ -371,6 +395,7 @@ export type OutMessage =
 			id: string;
 			decision: "accept" | "reject";
 			acceptAll?: boolean;
+			pattern?: string;
 	  }
 	| {
 			type: "ui_response";
@@ -384,8 +409,9 @@ export type OutMessage =
 			handlerId: string;
 			payload: { value?: string; checked?: boolean };
 	  }
-	| { type: "set_key"; key: string }
-	| { type: "rotate_key" }
+	| { type: "set_key"; provider: string; key: string }
+	| { type: "rotate_key"; provider?: string }
+	| { type: "discover_models"; provider: string }
 	| { type: "copy_text"; text: string }
 	| { type: "compact" }
 	| { type: "cancel_compaction" }

@@ -676,14 +676,164 @@ agente YA NO es ciego a su propia presión de contexto:
   todo/ask_user_question.
 - **Fase B (reporte detallado):** comando `/context` → overlay Remote React (barra
   segmentada estilo Claude Code + leyenda coloreada + métricas; `ContextReport.tsx`, vía
-  `mountPersistent(…,"overlay")`) con categorías de uso
-  (system prompt/user/assistant/toolCalls/toolResults) + composición del system prompt
-  (base/guidelines/toolSnippets/skills/contextFiles). Tool `context({mode:"full"})` →
-  mismo análisis en JSON. Análisis porteado de supi (`analysis.ts`:
-  estimateTextTokens, computeMessageCategories, applyScaling,
-  computeSystemPromptBreakdown). `before_agent_start` cachea `systemPromptOptions`
-  - `systemPromptText` (`store.ts`). Filosofía compartida: snapshot=operativo (al
-  agente), reporte=diagnóstico (al humano, fuera del LLM). ADR-0015.
+  `mountPersistent(…,"overlay")`) con categorías de uso + composición del system
+  prompt con **atribución detallada** (paridad supi-context): instruction files
+  (AGENTS/CLAUDE separados, origin global/project), skills (tokens por skill vía
+  formatSkillsForPrompt), guidelines (bullets + fuente default/tool/extensions vía
+  `classifyGuidelines` parseando la sección "Guidelines:"), tool snippets (por tool) y
+  **tool definitions** (count + tokens + descripción, vía `pi.getAllTools()`/
+  `getActiveTools()` cacheados en `before_agent_start`). `prompt-inference.ts` porta
+  extractGuidelinesSection/classifyGuidelines/determineOrigin. Tool
+  `context({mode:"full"})` → mismo análisis en JSON. Filosofía: snapshot=operativo
+  (al agente), reporte=diagnóstico (al humano, fuera del LLM). ADR-0015.
+- **Fix `/context` systemPrompt en tiempo real:** el comando leía systemPrompt +
+  options + tools de un cache poblado en `before_agent_start` (solo dispara en un
+  turno del agente). Si dabas `/context` sin turno previo (reabrir VS Code + sesión
+  existente), el cache estaba vacío → "Composición del system prompt" toda en 0 (aunque
+  el uso total sí venía de `getContextUsage()`). Ahora `postContextCommand` lee en
+  tiempo real de `frida.session` (`.systemPrompt`, `.getAllTools()`,
+  `._baseSystemPromptOptions`, `.getActiveToolNames()`) con fallback al cache. ADR-0015.
+
+### D28 — frida-permission-system: permisos declarativos + webcontent (ADR-0016)
+
+Migrar los gates de aprobación (`src/gates/approval-gates.ts`, política hardcodeada
+en sets de TS + 3 modos) a una **extensión independiente** `frida-permission-system`
+(mismo patrón que `todo-web` y `frida-context`) con **política declarativa**
+(`~/.frida/permission.json`, estados `allow`/`ask`/`deny` por superficie `tool`/`path`/
+`bash`/`external_directory`, paridad adaptada de `@gotgenes/pi-permission-system`).
+
+- **Modelo:** declarativo + los 3 modos (`manual`/`auto-edit`/`auto`) como **override**
+  rápido. `deny` siempre gana (como yoloMode de gotgenes). Evaluación en 4 capas
+  (most-restrictive-wins): `path` → `external_directory` → per-tool → `bash`.
+- **force-ask** (heredado del diseño actual): bash compuesto/wrapper
+  (`hasShellIndirection`) o path externo (`isExternalPath`) → marca `forceAsk: true`,
+  que **sobrevive al modo `auto`** (preserva el disuasivo: en auto el usuario no mira).
+- **Filosofía disuasiva, NO candado** (ADR-0001): sin symlink-resolve ni project-trust
+  (gotgenes sí los tiene). El operador puede evadir; lo que evitamos son accidentes
+  del modelo.
+- **DEFAULT_POLICY = behavior actual** → Fase 0-1 es migración sin surprise (126 tests
+  en verde, logger + fail-closed intactos).
+- **Webcontent (Remote React):** AuditPanel (`/gates`, JSONL navegable), Stats footer
+  (modo + contadores ✓N ✗M ⚡Z), ApprovalDialog (reemplaza ApprovalCard nativo),
+  ConfigPanel (`/gates-config`, editor visual allow/ask/deny).
+- **Plan por fases:** 0 estructura+config · 1 evaluación declarativa (core) · 2
+  AuditPanel · 3 Stats · 4 session approvals por patrón · 5 ConfigPanel · 6
+  ApprovalDialog · 7 hide-tools deny (requiere investigar API del SDK).
+- **Helpers** (`sensitive-paths`, `dangerous-commands`, `bash-indirection`,
+  `external-paths`) se quedan en `src/gates/` en Fase 0-1 (sus tests los importan);
+  `policy.ts` los consume. Moverlos a `surfaces/` es cleanup posterior.
+- **Estado:** Fases 0-7 + 5b **todas implementadas — extensión completa**
+  (declarativo + `createPermissionSystem` + AuditPanel `/gates` + Stats footer
+  ✓N/✗M/⚡Z + Session approvals por patrón + ConfigPanel `/gates-config` con las 3
+  superficies tool/path/bash + ApprovalDialog Remote React + hide-tools deny +
+  editor de wildcards: evaluate() aplica policy.path/bash most-restrictive-wins).
+  163 tests.
+
+---
+
+### D29 — Proveedor Z.ai + registry de API-key providers (ADR-0017)
+
+Añadir **Z.ai** (Zhipu AI / GLM) como tercer proveedor (con DevEngine y GitHub
+Copilot), con API key como DevEngine, y **explorar dinámicamente** los modelos
+expuestos por su endpoint `GET /models`. Antes el manejo de API key estaba
+**acoplado a DevEngine** (`SECRET_KEY` único, `keyCache` único, `setKey(key)` que
+siempre llamaba `setRuntimeApiKey(SOFTTEK_PROVIDER,…)`).
+
+- **Decisión: generalizar** (no duplicar). Registry `src/providers/api-key-providers.ts`
+  con `API_KEY_PROVIDERS` (`id` → `{secretKey, authMode}`): DevEngine
+  (`frida.devengineKey`, `x-api-key`) + Z.ai (`frida.zaiKey`, `bearer`). Añadir un
+  4º proveedor = 1 entrada + 1 archivo `providers/<id>-provider.ts`.
+- **Hallazgo clave: z.ai es un provider BUILT-IN de pi-ai** (`providers/zai` +
+  `data/zai.json`): id `"zai"`, baseUrl `https://api.z.ai/api/coding/paas/v4`
+  (endpoint de CODING), modelos `glm-4.5-air`/`glm-4.7`/`glm-5.x`, y sobre todo
+  `compat.thinkingFormat:"zai"` → el SDK inyecta el `thinking` de GLM, así que el
+  **razonamiento funciona nativamente** (sin el workaround de DevEngine). Por eso NO
+  se hace `registerProvider` de z.ai ni se define su config: el `ModelRuntime` ya lo
+  carga; sólo falta la API key (`setRuntimeApiKey("zai",key)`).
+- **Exploración de modelos:** `discoverZaiModels(baseUrl,key)` → `GET /models` →
+  `buildZaiCatalogOverride(builtin, ids)` **preserva los modelos built-in completos**
+  (con `thinkingFormat:"zai"`) + añade los descubiertos nuevos (vía `ZAI_MODEL_META`);
+  `registerProvider("zai",{models})` sólo si hay nuevos (si no, el built-in queda
+  intacto). Crítico: `applyExtension` del SDK **reemplaza** el array y los override sólo
+  heredan api/baseUrl (no `compat`) → sin preservar thinkingFormat, el thinking se
+  rompería. Se dispara al setKey(zai) **y** con botón ⟳ "Explorar modelos" en el
+  ModelPanel. Best-effort (si falla, built-in intacto).
+- **El bug `requiresThinkingAsText`/`requiresAssistantAfterToolResult` es EXCLUSIVO
+  de DevEngine** (sin thinkingFormat, rechaza reasoning al reanudar sesión — ADR-0009).
+  z.ai NO lo necesita: el thinking va por `thinkingFormat:"zai"` y se permite para
+  todos los modelos GLM que lo soportan.
+- **Generalización del flujo:** `getKey`→`getKeyFor(id)`, `onUnauthorized`→`(id)`,
+  `setKey`→`(id,key)`+`discoverModels(id)`, `promptKey`→`(id,reason)`, comando
+  `frida.setKey`→`pickApiKeyProvider()` (QuickPick si >1).
+- **UI:** `Onboarding.tsx` 3 opciones (softtek/z.ai/copilot); `ModelPanel` botón
+  **Key** para providers `apiKey` + **Explorar** (z.ai) + (Copilot) login OAuth.
+- **Settings** `frida.zai.{baseUrl,contextWindow,maxTokens}`.
+- DevEngine NO cambia (su `X-Api-Key`+dump requests+compat intactos; sólo `getKey`→
+  `getKeyFor`). 163 tests en verde.
+
+---
+
+### D30 — Selector de modelos: refresh asíncrono + info rica (ADR-0018)
+
+Revisión del **TUI de pi**: refresca catálogos **en background** con degradación por
+proveedor y muestra info rica por modelo. Frida tiene un selector **estático** (botón
+"Explorar" manual sólo para z.ai; filas con sólo `name`). La API del ModelRuntime
+necesaria **ya está disponible**; la exploración Fase 0 (`explore-providers.mjs`)
+confirmó 39 built-ins y que `zai` aparece solo.
+
+- **Decisión de producto: lista EXPLÍCITA del registry (NO discovery de los 39).** El
+  selector lista sólo los proveedores del registry de Frida (ampliable editando el
+  vsix), no los 39 built-ins. Añadir un built-in = **1 entrada** en `API_KEY_PROVIDERS`
+  (`{id, secretKey, authMode}`) — sin `providers/<id>.ts` ni `registerProvider`, sólo
+  `setRuntimeApiKey`. `zai` ya no necesita el registry para el registro (sólo conserva
+  `z-ai-provider.ts` para `discoverZaiModels`). **Auth:** SecretStorage de VS Code para
+  TODOS los API-key providers (consistencia + aislamiento; la key no vive en auth.json
+  plano).
+- **B — Refresh asíncrono (Fase 2):** al abrir el ModelPanel, `getAvailableSnapshot()`
+  render inmediato + `refresh({allowNetwork})` en background → refresca los catálogos
+  de TODOS los proveedores configurados del registry, no sólo z.ai. Degradación por
+  proveedor (`{aborted, errors:Map}`), timeout 15s. Reemplaza el botón "Explorar".
+- **C — Info rica por modelo (Fase 1):** filas pasan de `name` a
+  `glm-4.7 [zai] · 200K · ✓thinking · 🖼️` (`contextWindow`/`maxTokens`/`reasoning`/
+  `input` del `Model` del SDK).
+- **Plan por fases:** 0 ✅ exploración · 1 C info rica · 2 B refresh asíncrono ·
+  3 A simplificar añadir built-ins al registry.
+- DevEngine NO cambia (sigue en el registry como excepción con sus hooks).
+
+---
+
+### D31 — Resolución del contextWindow del modelo DevEngine (ADR-0019)
+
+DevEngine expone `gpt-5.4-mini` pero no provee fiablemente su ventana de contexto;
+Frida la **hardcodeaba** en 300000 (conservador, por los `500` del gateway con
+historial grande — ADR-0009). El SDK pi-ai **ya conoce** gpt-5.4-mini: está en 5
+catálogos built-in con `contextWindow=400000` (azure/openai/copilot/opencode); el TUI
+lo obtiene del **catálogo** (dato estático), no de una consulta en vivo.
+
+- **Decisión: resolver por prioridad** (dejar de hardcodear):
+  `1) override settings (si ≠ null)` > `2) gateway (GET /models DevEngine → context_window)`
+  > `3) catálogo canónico (azure/openai → 400000)` > `4) default 300000`. El override
+  del usuario **siempre gana** (control total).
+- **`lookupCanonicalModelMeta(mr, modelId)`** (`softtek-provider.ts`): busca gpt-5.4-mini
+  en azure-openai-responses → openai → copilot → opencode (prioriza Azure porque
+  DevEngine enruta a Azure; excluye openai-codex por su contexto de codificación
+  272000). Devuelve contextWindow/maxTokens/reasoning/input/thinkingLevelMap del modelo
+  **nativo**.
+- **`fetchDevengineContextWindow(baseUrl, key, modelId)`**: `GET /models` con X-Api-Key
+  (reutiliza el patrón de diagnoseGateway), lee context_window/context_length.
+  Best-effort (timeout 10s); si DevEngine no lo expone o falla, fallback al catálogo.
+- **Metadatos canónicos** (reasoning/input/thinkingLevelMap/maxTokens) del catálogo;
+  `buildSofttekProviderConfig({meta})`. El `compat` de DevEngine
+  (`requiresThinkingAsText`/`requiresAssistantAfterToolResult`) **se conserva intacto**
+  (bug del gateway, ADR-0009; NO se toma del catálogo).
+- **Settings:** `frida.devengine.contextWindow`/`maxTokens` ahora **nullables** (default
+  `null` = sin override → el caller resuelve). Cambio de behavior: quien no los tocó
+  pasa de 300000 al valor resuelto (gateway o 400000).
+- **Resolución** en `pi-session.ts` antes de `registerProvider(SOFTTEK_PROVIDER,…)`.
+- **El `GET /models` a DevEngine SÓLO se llama si DevEngine va a ser el modelo usado**
+  en la sesión (`willUseDevengine`: es el activo, o el fallback si el activo no está
+  autenticado). Así no se llama al gateway cuando el usuario usa z.ai/Copilot pero
+  tiene la key de DevEngine guardada.
 
 ---
 

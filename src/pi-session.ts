@@ -11,14 +11,33 @@ import {
 import {
 	buildSofttekProviderConfig,
 	createSofttekProviderHooks,
+	DEVENGINE_BASE_URL,
+	fetchDevengineContextWindow,
+	lookupCanonicalModelMeta,
 	SOFTTEK_MODEL,
 	SOFTTEK_PROVIDER,
 } from "./providers/softtek-provider";
-import { createApprovalGates } from "./gates/approval-gates";
-import type { ApprovalMode } from "./gates/approval-gates";
+import {
+	buildZaiCatalogOverride,
+	createZaiProviderHooks,
+	discoverZaiModels,
+	ZAI_PROVIDER,
+} from "./providers/z-ai-provider";
+import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
+import { createPermissionSystem } from "./tools/frida-permission-system";
+import { GateStatsStore } from "./tools/frida-permission-system/session-store";
+import { SessionApprovals } from "./tools/frida-permission-system/session-approvals";
+import type {
+	GateStats,
+	PermissionMode,
+} from "./tools/frida-permission-system";
 import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
-import { readDevengineConfig, type GatePatterns } from "./settings";
+import {
+	readDevengineConfig,
+	readZaiConfig,
+	type GatePatterns,
+} from "./settings";
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createTodoWeb } from "./tools/todo-web";
@@ -48,8 +67,16 @@ export interface FridaSession {
 	bridge: ApprovalBridge;
 	uiBridge: UiBridge;
 	webBridge: WebBridge;
+	/** Stats footer (Fase 3): contadores de la sesión. El host llama reset() al /new. */
+	gateStats: GateStatsStore;
+	/** Patrones aprobados por sesión (Fase 4): el host llama clear() al /new. */
+	sessionApprovals: SessionApprovals;
 	sessionManager: any;
-	setKey: (key: string) => Promise<void>;
+	setKey: (providerId: string, key: string) => Promise<void>;
+	/** Explora modelos del proveedor vía su endpoint /models y re-registra el
+	 *  ProviderConfig con los descubiertos (ADR-0017). Best-effort: si falla, no
+	 *  cambia el catálogo. */
+	discoverModels: (providerId: string) => Promise<void>;
 }
 
 export interface CreateFridaSessionOptions {
@@ -68,15 +95,19 @@ export interface CreateFridaSessionOptions {
 	/** Proveedor/modelo activo persistido por el host. Si no resuelve o no está
 	 * autenticado, cae al default (Softtek DevEngine). */
 	activeModel?: { provider: string; modelId: string };
-	/** Cache síncrono de la key (before_provider_headers es síncrono). */
-	getKey: () => string | undefined;
-	onUnauthorized: () => void;
+	/** Cache síncrono de la key POR proveedor (before_provider_headers es síncrono).
+	 *  ADR-0017: generalizado del getKey() único de DevEngine. */
+	getKeyFor: (providerId: string) => string | undefined;
+	onUnauthorized: (providerId: string) => void;
 	/** Dumpea el request al gateway ante un 4xx/5xx (DevEngine no devuelve body en
 	 *  el 500; el request nos dice qué campo lo rechaza). Ver ADR-0009. */
 	onProviderError?: (payload: unknown, status: number) => void;
 	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
 	requestDumpPath?: string;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
+	/** Stats footer (Fase 3): el gate cuenta decisiones de la sesión y las publica
+	 *  aquí para el webview (✓N aprobadas / ✗M bloqueadas / ⚡Z auto-allow). */
+	onGateStats?: (s: GateStats) => void;
 	/** ExtensionUIContext (Fase de extensibilidad web): diálogos select/input/confirm
 	 *  que las extensiones nativas (rpiv-ask-user-question en modo RPC) enrutan al
 	 *  webview. El host publica los pendientes aquí; el webview responde vía ui_response. */
@@ -90,7 +121,7 @@ export interface CreateFridaSessionOptions {
 		tree: WebNode | null,
 		placement: WebPlacement,
 	) => void;
-	getMode: () => ApprovalMode;
+	getMode: () => PermissionMode;
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
 	todoEnabled: () => boolean;
@@ -125,7 +156,13 @@ export async function createFridaSession(
 		path.dirname(opts.sessionDir),
 	);
 
-	const keyHolder: { current?: string } = { current: opts.getKey() };
+	// Cache de keys POR proveedor (ADR-0017). El host carga las keys del
+	// SecretStorage al arrancar y las pasa vía getKeyFor; las mantiene sincronizadas.
+	const keyHolders: Record<string, string> = {};
+	for (const id of API_KEY_PROVIDER_IDS) {
+		const k = opts.getKeyFor(id);
+		if (k) keyHolders[id] = k;
+	}
 
 	// ADR-0010: agentDir propio (~/.frida); asegurarlo antes de usarlo (auth/models/loader).
 	fs.mkdirSync(opts.agentDir, { recursive: true });
@@ -141,16 +178,59 @@ export async function createFridaSession(
 		modelsPath: path.join(opts.agentDir, "models.json"),
 		modelsStorePath: path.join(opts.agentDir, "models-store.json"),
 	});
-	// Registramos el proveedor DIRECTAMENTE en ModelRuntime para que getModel lo vea.
+	// Registramos los proveedores DIRECTAMENTE en ModelRuntime para que getModel los
+	// vea. ADR-0017: cada proveedor de API-key trae su config y su auth.
+	// ADR-0019: el contextWindow/maxTokens del modelo DevEngine se RESUELVEN por
+	// prioridad: override (settings) > gateway (GET /models real) > catálogo canónico
+	// (gpt-5.4-mini en azure/openai → 400000) > default. Los demás metadatos
+	// (reasoning/input/thinkingLevelMap) del catálogo canónico; el compat
+	// (requiresThinkingAsText etc.) es específico del bug de DevEngine (ADR-0009).
+	const devCfg = readDevengineConfig();
+	const canonicalMeta = lookupCanonicalModelMeta(modelRuntime, SOFTTEK_MODEL);
+	// El GET /models a DevEngine SÓLO si DevEngine va a ser el modelo usado en esta
+	// sesión (el activo, o el fallback si el activo no está autenticado). Así no
+	// llamamos al gateway cuando el usuario usa z.ai/Copilot pero tiene la key de
+	// DevEngine guardada. La resolución del modelo usa hasConfiguredAuth (no el
+	// contextWindow), así que podemos pre-calcularlo aquí.
+	const activeProvider = opts.activeModel?.provider;
+	const willUseDevengine =
+		!opts.activeModel ||
+		activeProvider === SOFTTEK_PROVIDER ||
+		(activeProvider != null && !modelRuntime.hasConfiguredAuth(activeProvider));
+	let gatewayCtx: number | undefined;
+	const devKey = keyHolders[SOFTTEK_PROVIDER];
+	if (devKey && willUseDevengine) {
+		gatewayCtx = await fetchDevengineContextWindow(
+			DEVENGINE_BASE_URL,
+			devKey,
+			SOFTTEK_MODEL,
+		);
+	}
+	const contextWindow =
+		devCfg.contextWindow ??
+		gatewayCtx ??
+		canonicalMeta?.contextWindow ??
+		300000;
+	const maxTokens = devCfg.maxTokens ?? canonicalMeta?.maxTokens ?? 128000;
 	modelRuntime.registerProvider(
 		SOFTTEK_PROVIDER,
-		buildSofttekProviderConfig(readDevengineConfig()),
+		buildSofttekProviderConfig({
+			contextWindow,
+			maxTokens,
+			meta: canonicalMeta,
+		}),
 	);
-	// Si ya hay key (onboarding previo), la fijamos en el runtime para que getAuth
-	// resuelva y Pi NO bloquee con "No API key found". El X-Api-Key real lo inyecta
-	// before_provider_headers (authHeader:false ⇒ Pi no manda Authorization: Bearer).
-	if (keyHolder.current) {
-		await modelRuntime.setRuntimeApiKey(SOFTTEK_PROVIDER, keyHolder.current);
+	// Z.ai es un provider BUILT-IN de pi-ai (`providers/zai`): NO se registra aquí.
+	// El ModelRuntime ya lo carga con baseUrl, modelos oficiales (glm-4.5-air / 4.7 /
+	// 5.x) y compat.thinkingFormat:"zai" (el SDK inyecta el `thinking` de GLM → el
+	// razonamiento funciona nativamente, sin el workaround de DevEngine). Sólo falta
+	// la API key (setRuntimeApiKey abajo).
+	// Si ya hay keys (onboarding previo), las fijamos en el runtime para que getAuth
+	// resuelva y Pi NO bloquee con "No API key found". El X-Api-Key de DevEngine lo
+	// inyecta before_provider_headers (authHeader:false); el Bearer de z.ai lo inyecta
+	// el built-in (authHeader nativo de pi-ai).
+	for (const [id, key] of Object.entries(keyHolders)) {
+		await modelRuntime.setRuntimeApiKey(id, key);
 	}
 
 	const bridge = new ApprovalBridge(opts.onPendingApprovals);
@@ -165,6 +245,11 @@ export async function createFridaSession(
 	// Logger de auditoría del gate (Prioridad 2). Una instancia por sesión;
 	// escribe JSONL append-only con chmod 0600/0700 y nunca lanza.
 	const approvalLogger = new ApprovalLogger(opts.approvalLogPath);
+	// Fase 3 — contadores de la sesión para el Stats footer (en memoria, se resetea
+	// por sesión). El gate los alimenta vía stats.record() en cada decisión.
+	const gateStats = new GateStatsStore(opts.onGateStats ?? (() => {}));
+	// Fase 4 — patrones aprobados por sesión (en memoria, se resetea por sesión).
+	const sessionApprovals = new SessionApprovals();
 
 	// Fase 2: cargar frida-lens (pi-lens) desde ~/.frida vía import() nativo (no
 	// jiti, para evitar el bug de import.meta.url bajo jiti en módulos ESM).
@@ -219,20 +304,28 @@ export async function createFridaSession(
 			{
 				name: "softtek-provider",
 				factory: createSofttekProviderHooks({
-					getKey: () => keyHolder.current,
-					onUnauthorized: opts.onUnauthorized,
+					getKey: () => keyHolders[SOFTTEK_PROVIDER],
+					onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
 					onProviderError: opts.onProviderError,
 					requestDumpPath: opts.requestDumpPath,
 				}),
 			},
 			{
-				name: "approval-gates",
-				factory: createApprovalGates(
+				name: "z-ai-provider",
+				factory: createZaiProviderHooks({
+					onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+				}),
+			},
+			{
+				name: "frida-permission-system",
+				factory: createPermissionSystem(
 					bridge,
 					opts.getMode,
 					approvalLogger,
 					() => opts.cwd,
 					opts.getGatePatterns,
+					gateStats,
+					sessionApprovals,
 				),
 			},
 			// Tools conmutables desde la Configuración (frida.askUserQuestion.enabled /
@@ -317,10 +410,34 @@ export async function createFridaSession(
 		bridge,
 		uiBridge,
 		webBridge,
+		gateStats,
+		sessionApprovals,
 		sessionManager,
-		setKey: async (key: string) => {
-			keyHolder.current = key;
-			await modelRuntime.setRuntimeApiKey(SOFTTEK_PROVIDER, key);
+		setKey: async (providerId: string, key: string) => {
+			keyHolders[providerId] = key;
+			await modelRuntime.setRuntimeApiKey(providerId, key);
+		},
+		discoverModels: async (providerId: string) => {
+			if (providerId === ZAI_PROVIDER) {
+				const key = keyHolders[ZAI_PROVIDER];
+				if (!key) return; // sin key, no hay nada que explorar
+				const { baseUrl, contextWindow, maxTokens } = readZaiConfig();
+				const ids = await discoverZaiModels(baseUrl, key);
+				// Override que PRESERVA los modelos built-in (con thinkingFormat:"zai") +
+				// añade los descubiertos nuevos. Si /models no trajo nada nuevo, no
+				// tocamos el catálogo (el built-in queda intacto).
+				const builtin = (modelRuntime.getModels?.(ZAI_PROVIDER) ??
+					[]) as unknown as Array<Record<string, unknown>>;
+				const override = buildZaiCatalogOverride(builtin, ids, {
+					contextWindow,
+					maxTokens,
+				});
+				if ((override.models as unknown[]).length > builtin.length) {
+					modelRuntime.registerProvider(ZAI_PROVIDER, override as any);
+				}
+			}
+			// DevEngine no expone discovery útil (los modelos son alias internos del
+			// gateway); se omite. Otros proveedores aquí cuando se añadan.
 		},
 	};
 }

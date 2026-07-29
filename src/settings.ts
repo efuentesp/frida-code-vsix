@@ -37,19 +37,41 @@ export function readToolToggles(): { askUserQuestion: boolean; todo: boolean } {
 	return { askUserQuestion: isAskUserQuestionEnabled(), todo: isTodoEnabled() };
 }
 
-/** Lee la config del modelo DevEngine (ventana de contexto + maxTokens) ajustable
- *  desde settings (frida.devengine.*). Sin validación estricta: si el valor es
- *  inválido, cae al default. */
+/** Lee la config de DevEngine. `contextWindow`/`maxTokens` son **null si el usuario
+ *  no los puso explícitamente** (override) → el caller los resuelve por prioridad
+ *  (gateway > catálogo > default). ADR-0019. */
 export function readDevengineConfig(): {
+	contextWindow: number | null;
+	maxTokens: number | null;
+} {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const cwRaw = cfg.get<number | null>("devengine.contextWindow", null);
+	const mtRaw = cfg.get<number | null>("devengine.maxTokens", null);
+	const cw = cwRaw == null ? null : Number(cwRaw);
+	const mt = mtRaw == null ? null : Number(mtRaw);
+	return {
+		contextWindow: cw != null && Number.isFinite(cw) && cw > 0 ? cw : null,
+		maxTokens: mt != null && Number.isFinite(mt) && mt > 0 ? mt : null,
+	};
+}
+
+/** Lee la config del proveedor Z.ai (baseUrl + ventana de contexto + maxTokens)
+ *  ajustable desde settings (frida.zai.*). ADR-0017. */
+export function readZaiConfig(): {
+	baseUrl: string;
 	contextWindow: number;
 	maxTokens: number;
 } {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	const cw = Number(cfg.get<number>("devengine.contextWindow", 300000));
-	const mt = Number(cfg.get<number>("devengine.maxTokens", 128000));
+	const baseUrl = String(
+		cfg.get<string>("zai.baseUrl", "https://api.z.ai/api/coding/paas/v4"),
+	);
+	const cw = Number(cfg.get<number>("zai.contextWindow", 200000));
+	const mt = Number(cfg.get<number>("zai.maxTokens", 16000));
 	return {
-		contextWindow: Number.isFinite(cw) && cw > 0 ? cw : 300000,
-		maxTokens: Number.isFinite(mt) && mt > 0 ? mt : 128000,
+		baseUrl,
+		contextWindow: Number.isFinite(cw) && cw > 0 ? cw : 200000,
+		maxTokens: Number.isFinite(mt) && mt > 0 ? mt : 16000,
 	};
 }
 
