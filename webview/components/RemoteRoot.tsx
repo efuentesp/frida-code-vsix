@@ -98,6 +98,9 @@ function flexStyle(props: Record<string, unknown>): CSSProperties {
 		s.alignItems = props.alignItems as any;
 	if (typeof props.justifyContent === "string")
 		s.justifyContent = props.justifyContent as any;
+	if (typeof props.background === "string") s.background = props.background;
+	if (typeof props.height === "number") s.height = props.height;
+	if (typeof props.overflow === "string") s.overflow = props.overflow;
 	return s;
 }
 

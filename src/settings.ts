@@ -24,6 +24,14 @@ export function isTodoEnabled(): boolean {
 		.get<boolean>("todo.enabled", true);
 }
 
+/** ¿Está activo el tool `context` (snapshot de presión, frida-context)?
+ *  Default: true. Configurable vía frida.context.enabled. */
+export function isContextEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("context.enabled", true);
+}
+
 /** Snapshot de ambos toggles para publicar al webview. */
 export function readToolToggles(): { askUserQuestion: boolean; todo: boolean } {
 	return { askUserQuestion: isAskUserQuestionEnabled(), todo: isTodoEnabled() };

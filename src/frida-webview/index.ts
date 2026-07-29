@@ -35,6 +35,12 @@ export interface BoxProps {
 	bordered?: boolean;
 	/** Tono de fondo: "active" destaca la fila (ej. tarea en progreso). */
 	tone?: "default" | "active";
+	/** Color de fondo (CSS). Para segmentos de barra coloreada, celdas de leyenda, etc. */
+	background?: string;
+	/** Altura fija en px (para segmentos de barra). */
+	height?: number;
+	/** Overflow CSS (para recortar hijos al border-radius, ej. barra segmentada). */
+	overflow?: "hidden" | "visible" | "auto";
 }
 
 /** Props de texto (ftext → <span>). */

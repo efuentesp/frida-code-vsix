@@ -20,6 +20,7 @@ import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
 import { readDevengineConfig, type GatePatterns } from "./settings";
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
+import { createFridaContext } from "./tools/frida-context";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -93,6 +94,8 @@ export interface CreateFridaSessionOptions {
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
 	todoEnabled: () => boolean;
+	/** ¿Tool `context` (snapshot de presión, frida-context) activo? */
+	contextEnabled: () => boolean;
 	/** Patrones configurables del gate (frida.gates.*), leídos en vivo desde los
 	 *  settings de VS Code. El gate los consulta en cada tool_call, así los cambios
 	 *  aplican al instante sin recargar. */
@@ -249,6 +252,13 @@ export async function createFridaSession(
 			// monta al session_start y se re-renderiza solo ante cada mutation del store
 			// reactivo; el host no publica nada (postTodos quedó obsoleto).
 			{ name: "todo", factory: toggleable(opts.todoEnabled, createTodoWeb()) },
+			// frida-context: tool `context` (snapshot de presión del contexto para que
+			// el agente se auto-regule). El medidor para el humano ya vive en el webview
+			// (ContextBar); el reporte detallado /context es fase B.
+			{
+				name: "frida-context",
+				factory: toggleable(opts.contextEnabled, createFridaContext()),
+			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens
 			//  no está presente, el callback nunca se invoca.

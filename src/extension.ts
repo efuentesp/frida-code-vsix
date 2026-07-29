@@ -4,7 +4,10 @@ import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+	SessionManager,
+	SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import {
 	createFridaSession,
 	defaultAgentDir,
@@ -18,12 +21,19 @@ import {
 	SOFTTEK_PROVIDER_DISPLAY,
 } from "./providers/softtek-provider";
 import { getWebviewHtml } from "./webview-html";
+import { analyzeContext } from "./tools/frida-context/analysis";
+import { createContextReportElement } from "./tools/frida-context/ContextReport";
+import {
+	getCachedPromptOptions,
+	getCachedSystemPrompt,
+} from "./tools/frida-context/store";
 import { getTodoState } from "./tools/todo-web/store";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { createWebQuestionnaireElement } from "./web-questionnaire";
 import {
 	isAskUserQuestionEnabled,
+	isContextEnabled,
 	isTodoEnabled,
 	readGatePatterns,
 	readToolToggles,
@@ -485,6 +495,7 @@ export async function activate(
 					getMode: () => approvalMode,
 					askUserQuestionEnabled: isAskUserQuestionEnabled,
 					todoEnabled: isTodoEnabled,
+					contextEnabled: isContextEnabled,
 					getGatePatterns: readGatePatterns,
 					onLensDiagnostics: mergeLens,
 					onProviderError,
@@ -515,6 +526,25 @@ export async function activate(
 
 	// session.subscribe: observador para MOSTRAR (streaming + tarjetas de tool).
 	// El BLOQUEO de tools vive en la extensión de gates (createApprovalGates).
+
+	// Reserve de compactación cacheado (rara vez cambia; se relee al recargar la
+	// ventana). Lo usa postUsage para la presión ajustada de la barra del ContextBar.
+	let cachedReserveTokens: number | undefined;
+	function getReserveTokens(): number {
+		if (cachedReserveTokens !== undefined) return cachedReserveTokens;
+		try {
+			const wsCwd =
+				vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+			cachedReserveTokens = SettingsManager.create(
+				wsCwd,
+				defaultAgentDir(),
+			).getCompactionReserveTokens();
+		} catch {
+			cachedReserveTokens = 0;
+		}
+		return cachedReserveTokens;
+	}
+
 	function postUsage(session: any): void {
 		try {
 			const msgs: any[] = session?.agent?.state?.messages ?? [];
@@ -555,6 +585,18 @@ export async function activate(
 				(contextWindow
 					? Math.min(100, (contextTokens / contextWindow) * 100)
 					: 0);
+			// Presión ajustada por el reserve de compactación (paridad pressurePercent
+			// de frida-context): la barra la usa para ANTICIPAR la compactación, no sólo
+			// la ventana bruta. >100% ⇒ el agente debería compactar ya.
+			const reserveTokens = getReserveTokens();
+			const effectiveCapacity =
+				contextWindow > reserveTokens
+					? contextWindow - reserveTokens
+					: contextWindow;
+			const pressurePercent =
+				effectiveCapacity > 0
+					? Math.min(100, (contextTokens / effectiveCapacity) * 100)
+					: contextPercent;
 			post({
 				type: "usage",
 				inputTotal,
@@ -566,6 +608,8 @@ export async function activate(
 				contextTokens,
 				contextWindow,
 				contextPercent,
+				pressurePercent,
+				reserveTokens,
 			});
 		} catch {
 			/* noop */
@@ -1239,6 +1283,7 @@ export async function activate(
 		"clone",
 		"fork",
 		"todos",
+		"context",
 	]);
 
 	async function runBuiltinSlash(text: string): Promise<boolean> {
@@ -1307,6 +1352,9 @@ export async function activate(
 			case "todos":
 				postTodosCommand();
 				break;
+			case "context":
+				postContextCommand(arg);
+				break;
 		}
 		return true;
 	}
@@ -1341,7 +1389,7 @@ export async function activate(
 	function postHelp(): void {
 		post({
 			type: "info",
-			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
+			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /context /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
 		});
 	}
 
@@ -1377,6 +1425,48 @@ export async function activate(
 			for (const t of done) lines.push(fmt(t));
 		}
 		post({ type: "notice", text: lines.join("\n") });
+	}
+
+	// /context: reporte de uso del contexto como panel overlay (barra segmentada
+	// estilo Claude Code + leyenda + métricas). Porte de /supi-context (fase B,
+	// ADR-0015). Lee frida.session + el cache de before_agent_start (frida-context).
+	let contextReportHandle: { unmount: () => void } | undefined;
+	function postContextCommand(_arg: string): void {
+		if (!frida?.session) {
+			post({
+				type: "info",
+				text: "No hay sesión activa para analizar el contexto.",
+			});
+			return;
+		}
+		try {
+			const wsCwd =
+				vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+			const settings = SettingsManager.create(wsCwd, defaultAgentDir());
+			const analysis = analyzeContext({
+				usage: frida.session.getContextUsage?.(),
+				branch: frida.sessionManager?.getBranch?.() ?? [],
+				systemPromptText: getCachedSystemPrompt(),
+				options: getCachedPromptOptions(),
+				modelName:
+					frida.session.model?.name ??
+					frida.session.model?.id ??
+					"No model selected",
+				compactionEnabled: settings.getCompactionEnabled(),
+				reserveTokens: settings.getCompactionReserveTokens(),
+			});
+			// Reemplaza el reporte anterior si aún está abierto.
+			contextReportHandle?.unmount();
+			contextReportHandle = frida.webBridge.mountPersistent(
+				() =>
+					createContextReportElement(analysis, () =>
+						contextReportHandle?.unmount(),
+					),
+				"overlay",
+			);
+		} catch (e) {
+			post({ type: "info", text: `No se pudo analizar el contexto: ${e}` });
+		}
 	}
 
 	// Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
@@ -1764,6 +1854,7 @@ export async function activate(
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
+				contextEnabled: isContextEnabled,
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
 				onProviderError,

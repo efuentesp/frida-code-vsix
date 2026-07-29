@@ -136,7 +136,11 @@ export interface Usage {
 	// Contexto actual (barra)
 	contextTokens: number; // tokens que ocupan el contexto vivo
 	contextWindow: number;
-	contextPercent: number;
+	contextPercent: number; // % de la ventana bruta
+	// Presión ajustada por el reserve de compactación (paridad frida-context). La
+	// barra la usa para anticipar la compactación; >100% ⇒ compactar ya.
+	pressurePercent?: number;
+	reserveTokens?: number;
 }
 
 export interface SessionItem {

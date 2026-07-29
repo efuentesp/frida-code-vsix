@@ -217,6 +217,13 @@ export function App() {
 			},
 			{
 				kind: "builtin",
+				label: "/context",
+				name: "context",
+				description:
+					"Reporte de uso del contexto (presión, categorías, system prompt)",
+			},
+			{
+				kind: "builtin",
 				label: "/help",
 				name: "help",
 				description: "Mostrar atajos y comandos",

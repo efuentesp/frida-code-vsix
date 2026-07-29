@@ -657,6 +657,34 @@ el overlay de rpiv-todo, `todo-overlay.ts:177-194`):
 - Antes las filas eran planas (sin ramas). Código: `src/tools/todo-web/todo-web.tsx`.
   ADR-0014 §"Render del panel".
 
+### D27 — frida-context: observabilidad de la capacidad del contexto (ADR-0015)
+
+Extensión `frida-context` (`src/tools/frida-context/index.ts`) que registra el tool
+**`context`** (sin prefijo supi), porte conceptual de `@mrclrchtr/supi-context`. El
+agente YA NO es ciego a su propia presión de contexto:
+
+- **Tool `context`** (agent-facing, MVP fase A): devuelve un snapshot JSON constante
+  (`ContextPressureSnapshot`: contextWindow, usedTokens, usagePercent, headroomTokens,
+  **pressurePercent** ajustado por reserve, compactionEnabled, compacted,
+  approximationNote). El agente lo consulta antes de operaciones grandes para decidir
+  si compactar/ser conciso. Datos del SDK: `ctx.getContextUsage()`,
+  `SettingsManager.getCompaction{Enabled,ReserveTokens}`, `getLatestCompactionEntry`.
+- **Medidor para el humano:** `ContextBar` ya existía (barra % low/mid/high + tokens);
+  ahora usa `pressurePercent` (ajustado por reserve, calculado en `postUsage`) para
+  anticipar la compactación, en vez del `usagePercent` bruto.
+- **Toggle** `frida.context.enabled` (default true), mismo patrón `toggleable` que
+  todo/ask_user_question.
+- **Fase B (reporte detallado):** comando `/context` → overlay Remote React (barra
+  segmentada estilo Claude Code + leyenda coloreada + métricas; `ContextReport.tsx`, vía
+  `mountPersistent(…,"overlay")`) con categorías de uso
+  (system prompt/user/assistant/toolCalls/toolResults) + composición del system prompt
+  (base/guidelines/toolSnippets/skills/contextFiles). Tool `context({mode:"full"})` →
+  mismo análisis en JSON. Análisis porteado de supi (`analysis.ts`:
+  estimateTextTokens, computeMessageCategories, applyScaling,
+  computeSystemPromptBreakdown). `before_agent_start` cachea `systemPromptOptions`
+  - `systemPromptText` (`store.ts`). Filosofía compartida: snapshot=operativo (al
+  agente), reporte=diagnóstico (al humano, fuera del LLM). ADR-0015.
+
 ---
 
 ## 5. Hechos a verificar (antes/durante la implementación)

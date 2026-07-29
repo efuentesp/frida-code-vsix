@@ -78,6 +78,11 @@
           "default": true,
           "markdownDescription": "Habilita el tool `todo` y el panel de Tareas para seguimiento multi-paso. Se aplica al recargar (botón Configuración o `/reload`)."
         },
+        "frida.context.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita el tool `context` (snapshot de presión del contexto) para que el agente se auto-regule antes de operaciones grandes. El medidor para el humano (ContextBar) siempre está visible. Se aplica al recargar (botón Configuración o `/reload`)."
+        },
         "frida.gates.sensitiveExtensions": {
           "type": "array",
           "items": {
