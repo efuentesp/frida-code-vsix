@@ -1,3 +1,7 @@
 dist/
 node_modules/
 .DS_Store
+
+# El .vsix es un artefacto de build (30 MB+): se regenera con `npm run package`.
+# No se versiona — ralentiza el clone y es multiplataforma por sí mismo.
+*.vsix
