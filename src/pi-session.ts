@@ -205,10 +205,14 @@ export async function createFridaSession(
 	// DevEngine guardada. La resolución del modelo usa hasConfiguredAuth (no el
 	// contextWindow), así que podemos pre-calcularlo aquí.
 	const activeProvider = opts.activeModel?.provider;
+	// ¿Usaremos DevEngine en esta sesión? Sólo si no hay modelo guardado o el
+	// guardado es DevEngine. Ya NO exigimos hasConfiguredAuth aquí: la auth de la
+	// API key se resuelve al hacer la petición (env/secretStorage/keychain), así
+	// que restauramos el proveedor elegido aunque el credential-store del runtime
+	// aún no lo refleje del todo. (Antes esto hacía que z.ai cayera a DevEngine en
+	// cada recarga.)
 	const willUseDevengine =
-		!opts.activeModel ||
-		activeProvider === SOFTTEK_PROVIDER ||
-		(activeProvider != null && !modelRuntime.hasConfiguredAuth(activeProvider));
+		!opts.activeModel || activeProvider === SOFTTEK_PROVIDER;
 	let gatewayCtx: number | undefined;
 	const devKey = keyHolders[SOFTTEK_PROVIDER];
 	if (devKey && willUseDevengine) {
@@ -393,15 +397,28 @@ export async function createFridaSession(
 	});
 	await loader.reload();
 
-	// Resolver el modelo ACTIVO: el guardado por el host si está disponible
-	// (y autenticado para OAuth), si no, el default de Softtek.
+	// Resolver el modelo ACTIVO: el guardado por el host. NO exigimos
+	// hasConfiguredAuth (antes sí): la auth se resuelve al disparar la petición
+	// (env/secretStorage/keychain), y si de verdad falta, el 401 dispara
+	// onUnauthorized → prompt de la key. Antes, exigir authed hacía que z.ai
+	// cayera al fallback DevEngine en cada recarga. Además, si el modelId guardado
+	// ya no existe (catálogo cambió tras un refresh), usamos el primer modelo del
+	// mismo proveedor antes de caer a DevEngine — así nunca se te cambia de
+	// proveedor sin que tú lo pidas.
 	let model: any;
 	if (opts.activeModel) {
 		const am = opts.activeModel;
-		const authed =
-			am.provider === SOFTTEK_PROVIDER ||
-			modelRuntime.hasConfiguredAuth(am.provider);
-		if (authed) model = modelRuntime.getModel(am.provider, am.modelId);
+		model = modelRuntime.getModel(am.provider, am.modelId);
+		if (!model) {
+			const alts = modelRuntime.getModels?.(am.provider) ?? [];
+			model = alts[0];
+			if (model) {
+				console.warn(
+					`[frida] Modelo guardado ${am.provider}/${am.modelId} no encontrado en el catálogo; ` +
+						`usando el primero disponible de ${am.provider}: ${model.id}.`,
+				);
+			}
+		}
 	}
 	if (!model) model = modelRuntime.getModel(SOFTTEK_PROVIDER, SOFTTEK_MODEL);
 	if (!model) {

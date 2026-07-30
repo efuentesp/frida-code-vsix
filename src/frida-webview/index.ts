@@ -31,6 +31,8 @@ export interface BoxProps {
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
+	/** Click en el contenedor (fila/segmento clickeable). */
+	onClick?: () => void;
 	/** Dibuja borde + radio + fondo (look de tarjeta). Por defecto sin borde (layout plano). */
 	bordered?: boolean;
 	/** Tono de fondo: "active" destaca la fila (ej. tarea en progreso). */
@@ -41,6 +43,8 @@ export interface BoxProps {
 	height?: number;
 	/** Overflow CSS (para recortar hijos al border-radius, ej. barra segmentada). */
 	overflow?: "hidden" | "visible" | "auto";
+	/** Clase CSS extra (passthrough) para estilizar vía stylesheet del webview. */
+	cls?: string;
 }
 
 /** Props de texto (ftext → <span>). */
@@ -53,6 +57,8 @@ export interface TextProps {
 	wrap?: boolean;
 	/** Tachado (text-decoration: line-through). Ej. tareas completadas. */
 	strike?: boolean;
+	/** Clase CSS extra (passthrough). */
+	cls?: string;
 }
 
 /** Props de botón (fbutton → <button>). */
@@ -64,6 +70,8 @@ export interface ButtonProps {
 	variant?: "primary" | "secondary" | "danger";
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
+	/** Clase CSS extra (passthrough). */
+	cls?: string;
 }
 
 /** Props de input de texto (finput → <input>). */

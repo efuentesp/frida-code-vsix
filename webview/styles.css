@@ -184,32 +184,85 @@ body {
 }
 /* Toast efímero para state.info (reemplaza al info-bar persistente). Flotante
    bottom-center; el auto-hide (4.5s) lo controla el componente InfoToast. */
+/* Toast de notificación (header, top-right). Icono + color de contorno por
+   nivel (error/warning/info/success). Los errores NO se auto-cierran → el botón
+   de cierre (✕) siempre está visible; el texto es seleccionable para copiarlo. */
 .info-toast {
 	position: fixed;
-	bottom: 72px;
-	left: 50%;
-	transform: translateX(-50%);
+	top: 44px;
+	right: 12px;
 	z-index: 50;
-	max-width: 72%;
-	padding: 7px 14px;
+	max-width: min(440px, 80%);
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 10px;
 	font-size: 12px;
+	line-height: 1.35;
 	color: var(--vscode-foreground);
 	background: var(--vscode-list-hoverBackground);
 	border: 1px solid var(--vscode-panel-border);
+	border-left-width: 3px;
 	border-radius: 6px;
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-	text-align: center;
-	pointer-events: none;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 	animation: info-toast-in 0.18s ease-out;
+}
+.info-toast > svg {
+	flex: none;
+	margin-top: 1px;
+}
+.info-toast-text {
+	flex: 1;
+	user-select: text;
+	overflow-wrap: anywhere;
+}
+.info-toast-close {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	opacity: 0.55;
+	cursor: pointer;
+	background: transparent;
+	border: none;
+	padding: 0;
+	color: inherit;
+}
+.info-toast-close:hover {
+	opacity: 1;
+}
+/* Niveles: acento del contorno (borde izq.) + color del icono. */
+.info-toast.error {
+	border-left-color: var(--vscode-testing-iconFailed, #f85149);
+}
+.info-toast.error > svg {
+	color: var(--vscode-testing-iconFailed, #f85149);
+}
+.info-toast.warning {
+	border-left-color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.info-toast.warning > svg {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.info-toast.info {
+	border-left-color: var(--vscode-textLink-foreground, #4daafc);
+}
+.info-toast.info > svg {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.info-toast.success {
+	border-left-color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.info-toast.success > svg {
+	color: var(--vscode-testing-iconPassed, #3fb950);
 }
 @keyframes info-toast-in {
 	from {
 		opacity: 0;
-		transform: translate(-50%, 6px);
+		transform: translateY(-6px);
 	}
 	to {
 		opacity: 1;
-		transform: translate(-50%, 0);
+		transform: translateY(0);
 	}
 }
 .status-bar {
@@ -490,27 +543,47 @@ body {
 	opacity: 1 !important;
 	color: var(--vscode-foreground);
 }
+/* Razonamiento: tarjeta estilo ToolCard (mismo fondo/radio) con borde azul
+   textLink en los 4 lados. Header con icono Brain + chevron que rota. */
 .thinking {
 	margin: 6px 0;
-	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
-	border-radius: 0 6px 6px 0;
+	border: 1px solid var(--vscode-textLink-foreground, #4daafc);
+	border-radius: 6px;
 	background: var(
 		--vscode-textBlockQuote-background,
 		rgba(127, 127, 127, 0.06)
 	);
+	overflow: hidden;
 }
 .thinking > summary {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
 	cursor: pointer;
-	font-size: 11px;
-	opacity: 0.7;
-	padding: 4px 8px;
+	user-select: none;
 	list-style: none;
+	font-size: 12px;
 }
-.thinking > summary::before {
-	content: "▸ ";
+.thinking > summary::-webkit-details-marker {
+	display: none;
 }
-.thinking[open] > summary::before {
-	content: "▾ ";
+.thinking-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	flex: none;
+}
+.thinking-name {
+	font-weight: 600;
+}
+.thinking-chev {
+	margin-left: auto;
+	display: inline-flex;
+	opacity: 0.6;
+	transition: transform 0.1s;
+	transform: rotate(90deg);
+}
+.thinking:not([open]) > summary .thinking-chev {
+	transform: rotate(0deg);
 }
 .thinking-body {
 	padding: 2px 10px 8px;
@@ -2642,6 +2715,65 @@ kbd {
 }
 .web-footer:empty {
 	display: none;
+}
+
+/* ── Tab bar de ask_user_question (sólo con 2+ preguntas) ──
+   Pestañas clickeables: ● respondida (verde) / ○ pendiente (gris); la activa
+   lleva borde inferior azul (textLink). Override de .fbutton.secondary vía
+   especificidad igual (0,2,0) y orden de fuente posterior. */
+.q-tabs {
+	flex-wrap: wrap;
+	border-bottom: 1px solid var(--vscode-panel-border);
+	margin-bottom: 2px;
+}
+.fbutton.q-tab {
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	padding: 5px 10px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+.fbutton.q-tab.answered {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #3fb950);
+}
+.fbutton.q-tab.active {
+	color: var(--vscode-foreground);
+	border-bottom-color: var(--vscode-textLink-foreground, #4daafc);
+	font-weight: 600;
+}
+
+/* ── Opciones de ask_user_question (filas radio/checkbox) ──
+   Reemplazan el look de botón: fila de ancho completo, indicador a la izquierda,
+   label (bold) + descripción en 2ª línea. Seleccionada: acento azul + fondo. */
+.q-opt {
+	padding: 6px 8px;
+	border-left: 2px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.q-opt:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.q-opt.selected {
+	border-left-color: var(--vscode-textLink-foreground, #4daafc);
+	background: var(--vscode-list-hoverBackground);
+}
+.q-opt-marker {
+	display: inline-block;
+	min-width: 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	flex: none;
+}
+.q-opt.selected .q-opt-marker {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.q-opt-desc {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
 }
 
 /* Panel de diagnósticos de pi-lens (D16): resumen post-turno, con cuentas

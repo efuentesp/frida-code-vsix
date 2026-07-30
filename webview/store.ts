@@ -341,7 +341,7 @@ export function reduce(state: State, msg: InMessage): State {
 
 		case "ui_notify":
 			// MVP: mapear notify al banner info existente. Un toast dedicado es mejora futura.
-			return { ...state, info: msg.message };
+			return { ...state, info: { text: msg.message, level: msg.level } };
 
 		case "web_commit": {
 			const webRoots = { ...(state.webRoots ?? {}) };
@@ -355,7 +355,7 @@ export function reduce(state: State, msg: InMessage): State {
 		}
 
 		case "info":
-			return { ...state, info: msg.text };
+			return { ...state, info: { text: msg.text, level: msg.level ?? "info" } };
 
 		case "cleared":
 			return {
@@ -493,7 +493,9 @@ export function reduce(state: State, msg: InMessage): State {
 				isCompacting: false,
 				compactions: [],
 				branchSummaries: msg.branchSummaries ?? [],
-				info: msg.name ? `Sesión: ${msg.name}` : state.info,
+				info: msg.name
+					? { text: `Sesión: ${msg.name}`, level: "info" as const }
+					: state.info,
 				nextId,
 			};
 		}
@@ -523,11 +525,17 @@ export function reduce(state: State, msg: InMessage): State {
 				];
 			}
 			const info = msg.aborted
-				? "Compactación cancelada"
+				? { text: "Compactación cancelada", level: "info" as const }
 				: msg.errorMessage
-					? "Error al compactar: " + msg.errorMessage
+					? {
+							text: "Error al compactar: " + msg.errorMessage,
+							level: "error" as const,
+						}
 					: msg.tokensBefore != null && msg.summary
-						? `Contexto compactado desde ${msg.tokensBefore.toLocaleString()} tokens`
+						? {
+								text: `Contexto compactado desde ${msg.tokensBefore.toLocaleString()} tokens`,
+								level: "success" as const,
+							}
 						: state.info;
 			return {
 				...state,

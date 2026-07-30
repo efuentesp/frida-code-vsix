@@ -5,9 +5,10 @@ import {
 	useReducer,
 	useRef,
 	useState,
+	type ReactNode,
 } from "react";
 import { reduce, initialState } from "./store";
-import type { ApprovalMode, InMessage, OutMessage } from "./types";
+import type { ApprovalMode, InMessage, OutMessage, ToastLevel } from "./types";
 import { Onboarding } from "./components/Onboarding";
 import { TurnView } from "./components/Turn";
 import { CompactionCard } from "./components/CompactionCard";
@@ -23,9 +24,12 @@ import { WorkspaceBar } from "./components/WorkspaceBar";
 import {
 	Bot,
 	Brain,
+	CircleAlert,
+	CircleCheck,
 	CircleStop,
 	CornerDownRight,
 	History,
+	Info,
 	Key,
 	Library,
 	Minimize2,
@@ -338,6 +342,7 @@ export function App() {
 
 	return (
 		<div className="app">
+			<InfoToast toast={state.info} />
 			<header className="toolbar">
 				<span className="brand">
 					<span className="avatar ai sm">
@@ -534,8 +539,6 @@ export function App() {
 					<CircleStop size={12} /> Presiona Esc de nuevo para detener…
 				</div>
 			)}
-			{!escHint && <InfoToast info={state.info} />}
-
 			<div
 				className="log"
 				ref={logRef}
@@ -808,16 +811,48 @@ export function App() {
  *  Reemplaza al info-bar persistente (MVP → toast, como marcaba store.ts). Los
  *  avisos de modo (auto-edit/auto) y el hint de Esc siguen como info-bar
  *  (persistentes, arriba) porque son contexto operativo, no notificaciones. */
-function InfoToast({ info }: { info: string | undefined }) {
+const TOAST_META: Record<ToastLevel, { icon: ReactNode; cls: string }> = {
+	error: { icon: <CircleAlert size={14} />, cls: "error" },
+	warning: { icon: <TriangleAlert size={14} />, cls: "warning" },
+	info: { icon: <Info size={14} />, cls: "info" },
+	success: { icon: <CircleCheck size={14} />, cls: "success" },
+};
+function InfoToast({
+	toast,
+}: {
+	toast: { text: string; level: ToastLevel } | undefined;
+}) {
 	const [visible, setVisible] = useState(false);
-	const [text, setText] = useState("");
+	const [cur, setCur] = useState<
+		{ text: string; level: ToastLevel } | undefined
+	>();
 	useEffect(() => {
-		if (!info) return;
-		setText(info);
+		if (!toast) return;
+		setCur(toast);
 		setVisible(true);
+		// Los errores NO se auto-cierran: el usuario debe cerrarlos manualmente para
+		// alcanzar a leerlos/copiarlos. Los demás desaparecen a los 4.5s.
+		if (toast.level === "error") return;
 		const t = setTimeout(() => setVisible(false), 4500);
 		return () => clearTimeout(t);
-	}, [info]);
-	if (!visible || !text) return null;
-	return <div className="info-toast">{text}</div>;
+	}, [toast]);
+	if (!visible || !cur) return null;
+	const meta = TOAST_META[cur.level] ?? TOAST_META.info;
+	return (
+		<div
+			className={"info-toast " + meta.cls}
+			role={cur.level === "error" ? "alert" : "status"}
+		>
+			{meta.icon}
+			<span className="info-toast-text">{cur.text}</span>
+			<button
+				className="info-toast-close"
+				aria-label="Cerrar aviso"
+				type="button"
+				onClick={() => setVisible(false)}
+			>
+				<X size={13} />
+			</button>
+		</div>
+	);
 }

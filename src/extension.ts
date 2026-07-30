@@ -4,6 +4,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
+import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import {
 	SessionManager,
 	SettingsManager,
@@ -271,6 +272,15 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 export async function activate(
 	context: vscode.ExtensionContext,
 ): Promise<void> {
+	// Registrar los flujos OAuth de pi-ai como módulos BUNDLED (estáticos). Sin
+	// esto, el login OAuth (GitHub Copilot, etc.) cae en un dynamic import opaco
+	// que al empaquetar queda roto (ERR_MODULE_NOT_FOUND dist/github-copilot.js).
+	// Idempotente y sincrónico; debe ir antes de cualquier login/sesión.
+	try {
+		registerBunOAuthFlows();
+	} catch (e) {
+		console.error("[frida] registerBunOAuthFlows falló:", e);
+	}
 	// ADR-0017: keys POR proveedor cargadas del SecretStorage al arrancar. El mapa
 	// vive en memoria y se sincroniza con el runtime vía frida.setKey(id, key).
 	const keyCaches: Record<string, string> = {};
@@ -787,6 +797,31 @@ export async function activate(
 		return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
 	}
 
+	// Serializa un error de login a texto útil — NUNCA vacío. El catch anterior
+	// usaba `String(e?.message ?? e)` que devuelve "" cuando e.message es un string
+	// vacío (?? no considera "" como nulo), y el toast quedaba en blanco.
+	function describeLoginError(e: unknown): string {
+		if (e == null) return "(sin detalle)";
+		if (typeof e === "string") return e.trim() || "(error vacío)";
+		const er = e as Record<string, unknown>;
+		const parts: string[] = [];
+		if (typeof er.name === "string" && er.name && er.name !== "Error")
+			parts.push(er.name);
+		if (typeof er.message === "string" && er.message.trim())
+			parts.push(er.message.trim());
+		if (er.code != null) parts.push(`[${er.code}]`);
+		if (er.status != null) parts.push(`(HTTP ${er.status})`);
+		if (parts.length === 0) {
+			try {
+				const j = JSON.stringify(e);
+				parts.push(j && j !== "{}" ? j : String(e));
+			} catch {
+				parts.push(String(e));
+			}
+		}
+		return parts.join(" — ").trim() || "(error sin mensaje)";
+	}
+
 	async function loginProvider(providerId: string): Promise<void> {
 		if (!frida) return;
 		try {
@@ -795,8 +830,22 @@ export async function activate(
 				"oauth",
 				makeAuthInteraction(),
 			);
+			// login() puede resolver SIN lanzar pero sin guardar credencial (éxito
+			// falso silencioso). Verificamos que de verdad quedó autenticado.
+			const authed = !!frida.modelRuntime.hasConfiguredAuth?.(providerId);
+			console.log("[frida] login resolved", providerId, "authed:", authed);
+			if (!authed) {
+				post({
+					type: "info",
+					level: "warning",
+					text: `El login de ${providerDisplayName(providerId)} no completó la autenticación. ¿Autorizaste en el navegador a tiempo? Si lo hiciste, revisa la consola (Developer: Toggle Developer Tools) para el detalle.`,
+				});
+				post({ type: "oauth_clear" });
+				return;
+			}
 			post({
 				type: "info",
+				level: "success",
 				text: `Sesión iniciada: ${providerDisplayName(providerId)}`,
 			});
 			post({ type: "oauth_clear" });
@@ -808,9 +857,12 @@ export async function activate(
 			postModels();
 			post({ type: "session_ready" }); // cierra el onboarding si estaba abierto
 		} catch (e: any) {
+			const detail = describeLoginError(e);
+			console.error("[frida] login failed", providerId, e);
 			post({
 				type: "info",
-				text: "Error al iniciar sesión: " + String(e?.message ?? e),
+				level: "error",
+				text: `Error al iniciar sesión (${providerDisplayName(providerId)}): ${detail}`,
 			});
 			post({ type: "oauth_clear" });
 		}
@@ -1912,6 +1964,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al compactar: " + String(e?.message ?? e),
 			});
 		}
@@ -1954,6 +2007,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al recargar: " + String(e?.message ?? e),
 			});
 			return;
@@ -1995,6 +2049,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al recargar: " + String(e?.message ?? e),
 			});
 		}
@@ -2049,6 +2104,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al listar sesiones: " + String(e?.message ?? e),
 			});
 		}
@@ -2112,6 +2168,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al abrir sesión: " + String(e?.message ?? e),
 			});
 		}
@@ -2133,6 +2190,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al renombrar: " + String(e?.message ?? e),
 			});
 		}
@@ -2154,6 +2212,7 @@ export async function activate(
 		} catch (e: any) {
 			post({
 				type: "info",
+				level: "error",
 				text: "Error al eliminar: " + String(e?.message ?? e),
 			});
 		}

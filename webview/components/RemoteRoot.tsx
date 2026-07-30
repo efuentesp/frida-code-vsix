@@ -138,27 +138,47 @@ function renderNode(
 			const cls =
 				"fbox" +
 				(node.props.bordered ? " bordered" : "") +
-				(node.props.tone === "active" ? " tone-active" : "");
+				(node.props.tone === "active" ? " tone-active" : "") +
+				(typeof node.props.cls === "string" && node.props.cls
+					? " " + node.props.cls
+					: "");
 			return (
 				<div className={cls} style={flexStyle(node.props)} {...handlers}>
 					{children}
 				</div>
 			);
 		}
-		case "ftext":
+		case "ftext": {
+			const textCls =
+				"ftext" +
+				(typeof node.props.cls === "string" && node.props.cls
+					? " " + node.props.cls
+					: "");
 			return (
-				<span className="ftext" style={textStyle(node.props)}>
+				<span className={textCls} style={textStyle(node.props)}>
 					{children}
 				</span>
 			);
+		}
 		case "fbutton": {
 			const variant = node.props.variant ?? "primary";
+			// Filtramos props no-DOM (variant/cls) del spread para que no filtren al
+			// <button> como atributos inválidos.
+			const btnProps = { ...domProps } as Record<string, unknown>;
+			delete btnProps.variant;
+			delete btnProps.cls;
+			const btnCls =
+				"fbutton " +
+				variant +
+				(typeof node.props.cls === "string" && node.props.cls
+					? " " + node.props.cls
+					: "");
 			return (
 				<button
 					type="button"
-					className={`fbutton ${variant}`}
+					className={btnCls}
 					disabled={!!node.props.disabled}
-					{...domProps}
+					{...btnProps}
 				>
 					{children}
 				</button>

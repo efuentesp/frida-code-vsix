@@ -134,6 +134,7 @@ export function createAskUserQuestionWeb() {
 			promptGuidelines: [
 				"PROACTIVO con `ask_user_question`: si una petición es ambigua o una decisión tiene 2+ opciones concretas (enfoque, librería, alcance, nombres, trade-off), LLAMA AL TOOL en vez de preguntar en texto plano. Plantea la pregunta como opciones clicables — NUNCA como prosa de opción múltiple en tu respuesta.",
 				"Pregunta ANTES de construir, no después. Si de otro modo adivinarías un requisito, pregunta primero. Agrupa preguntas relacionadas en una sola llamada (máx 4). Pero NO lo uses para pasos triviales/obvios ni confirmaciones sin valor — sólo cuando la respuesta cambia genuinamente tu enfoque.",
+				"`multiSelect: true` cuando la pregunta admita VARIAS respuestas a la vez (¿cuáles quieres incluir?, ¿qué archivos tocar?, selecciona todo lo que aplique). `multiSelect` ausente/false = elección única mutuamente excluyente. NO fuerces multiSelect si las opciones son alternativas entre sí (ej. '¿qué librería usar?' → una sola). Mezcla en el mismo cuestionario preguntas single y multi según corresponda.",
 			],
 			parameters: askSchema,
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {

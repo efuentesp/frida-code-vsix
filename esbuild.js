@@ -1,6 +1,7 @@
 // Empaqueta la extensión a CJS para el extension host de VS Code.
 // El SDK de Pi es ESM; esbuild lo resuelve en el bundle.
 const esbuild = require("esbuild");
+const nodePath = require("path");
 
 // Nativos de Pi que NO se bundleean (se shipean como archivos en el .vsix).
 // Ver ADR-0002 / D5: tarea de empaquetado del MVP.
@@ -9,6 +10,22 @@ const external = [
 	"@silvia-odwyer/photon-node",
 	"@mariozechner/clipboard-*", // comodín: cubre todas las plataformas (.node)
 ];
+
+// pi-ai es dependencia TRANSITORIA (vive bajo pi-coding-agent) y NO resuelve
+// desde el top-level. Sin esto, el import estático de `@earendil-works/pi-ai/bun-oauth`
+// (registro de flujos OAuth bundled — fix al ERR_MODULE_NOT_FOUND de Copilot login)
+// no se bundlea. Añadimos el node_modules anidado de pi-coding-agent a `nodePaths`
+// para que esbuild resuelva @earendil-works/pi-ai/* (con su exports map) sin tocar
+// package.json/lockfile. Sólo si pi-ai no resuelve sola (ej. hoisteada al top-level).
+const fsSync = require("fs");
+const piNestedNodeModules = nodePath.resolve(
+	"node_modules/@earendil-works/pi-coding-agent/node_modules",
+);
+const piNodePaths =
+	!fsSync.existsSync(nodePath.resolve("node_modules/@earendil-works/pi-ai")) &&
+	fsSync.existsSync(piNestedNodeModules)
+		? [piNestedNodeModules]
+		: undefined;
 
 const watch = process.argv.includes("--watch");
 
@@ -22,6 +39,7 @@ const options = {
 	target: "node18",
 	sourcemap: true,
 	external,
+	...(piNodePaths ? { nodePaths: piNodePaths } : {}),
 	// Pi (ESM) usa import.meta.url e import.meta.resolve; en CJS esbuild los deja
 	// como {}. Los shimamos desde __filename del bundle.
 	banner: {

@@ -2,6 +2,9 @@
 
 export type ToolState = "running" | "ok" | "error";
 
+/** Nivel de un toast: error NO se auto-cierra (cierre manual); los demás sí. */
+export type ToastLevel = "info" | "warning" | "error" | "success";
+
 export interface ToolEntry {
 	tool: string;
 	args: unknown;
@@ -251,7 +254,7 @@ export interface State {
 	mode: ApprovalMode;
 	/** Stats footer (Fase 3): contadores del gate (✓N aprobadas / ✗M bloqueadas / ⚡Z auto). */
 	gateStats?: GateStats;
-	info?: string;
+	info?: { text: string; level: ToastLevel };
 	model?: string;
 	provider?: string;
 	thinking?: string;
@@ -330,7 +333,7 @@ export type InMessage =
 			tree: WebNode | null;
 			placement?: WebPlacement;
 	  }
-	| { type: "info"; text: string }
+	| { type: "info"; text: string; level?: ToastLevel }
 	| { type: "notice"; text: string }
 	| { type: "provider_error"; text: string }
 	| { type: "cleared" }

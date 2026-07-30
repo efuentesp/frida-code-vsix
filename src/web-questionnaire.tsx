@@ -133,20 +133,34 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 
 	function renderOption(opt: WebQuestionOption, i: number): ReactNode {
 		const selected = isOptionSelected(opt.label);
-		// multiSelect: checkbox visual (☑/☐) al inicio del label.
-		const marker = q.multiSelect ? (selected ? "☑ " : "☐ ") : "";
+		// Indicador: radio (◉/○) en single-select, checkbox (☑/☐) en multi.
+		const indicator = q.multiSelect
+			? selected
+				? "☑"
+				: "☐"
+			: selected
+				? "◉"
+				: "○";
 		return (
-			<fbutton
+			<fbox
 				key={`${opt.label}-${i}`}
-				variant={selected ? "primary" : "secondary"}
+				flexDirection="row"
+				alignItems="flex-start"
+				gap={8}
+				cls={"q-opt" + (selected ? " selected" : "")}
 				onMouseEnter={() => setHoverLabel(opt.label)}
 				onClick={() =>
 					q.multiSelect ? toggleMulti(opt.label) : chooseSingle(opt.label)
 				}
 			>
-				{marker}
-				{opt.label} — {opt.description}
-			</fbutton>
+				<ftext cls="q-opt-marker">{indicator}</ftext>
+				<fbox flexDirection="column" gap={2} flex={1}>
+					<ftext bold cls="q-opt-label">
+						{opt.label}
+					</ftext>
+					<ftext cls="q-opt-desc">{opt.description}</ftext>
+				</fbox>
+			</fbox>
 		);
 	}
 
@@ -163,10 +177,36 @@ function WebQuestionnaire({ questions, done }: Props): ReactElement {
 
 	return (
 		<fbox flexDirection="column" gap={8} padding={10} bordered>
-			<ftext bold>
-				{`Pregunta ${tab + 1}/${questions.length}`}
-				{q.header ? ` · ${q.header}` : ""}
-			</ftext>
+			{/* Tab bar: sólo con 2+ preguntas (paridad rpiv: isMulti). Cada tab es
+			    clickable; ● respondida (verde) / ○ pendiente (gris); la activa con
+			    borde inferior azul (textLink). */}
+			{questions.length >= 2 ? (
+				<fbox flexDirection="row" gap={2} cls="q-tabs">
+					{questions.map((qq, i) => {
+						const d = drafts[i];
+						const answered =
+							!!d &&
+							(d.kind === "multi" ? (d.selected?.length ?? 0) > 0 : !!d.answer);
+						return (
+							<fbutton
+								key={i}
+								variant="secondary"
+								cls={
+									"q-tab" +
+									(i === tab ? " active" : "") +
+									(answered ? " answered" : "")
+								}
+								onClick={() => setTab(i)}
+							>
+								{answered ? "● " : "○ "}
+								{qq.header || `Q${i + 1}`}
+							</fbutton>
+						);
+					})}
+				</fbox>
+			) : null}
+
+			{questions.length < 2 && q.header ? <ftext bold>{q.header}</ftext> : null}
 			<ftext>{q.question}</ftext>
 
 			{/* Opciones (+ preview side-by-side si aplica y no se está escribiendo custom) */}

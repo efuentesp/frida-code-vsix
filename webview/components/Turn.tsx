@@ -1,8 +1,9 @@
 import type { Turn } from "../types";
-import { Bot, Copy, TriangleAlert, UserRound } from "lucide-react";
+import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard } from "./ToolCard";
 import { BashCard } from "./BashCard";
+import { Icon } from "./Icon";
 import { parseSkillBlock } from "../skill-block";
 import { SkillBlockCard } from "./SkillBlock";
 
@@ -86,7 +87,13 @@ export function TurnView({
 							s.kind === "thinking" ? (
 								!hideThinking && s.text ? (
 									<details key={i} className="thinking">
-										<summary>Razonamiento</summary>
+										<summary className="thinking-head">
+											<Brain size={13} className="thinking-icon" />
+											<span className="thinking-name">Razonamiento</span>
+											<span className="thinking-chev">
+												<Icon name="chevron" size={12} />
+											</span>
+										</summary>
 										<div className="thinking-body">
 											<Markdown>{s.text}</Markdown>
 										</div>

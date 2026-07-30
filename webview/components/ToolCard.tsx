@@ -5,10 +5,12 @@ import { Tooltip } from "./Tooltip";
 import { Spinner } from "./Spinner";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+	Compass,
 	FilePen,
 	FileText,
 	Folder,
 	ListChecks,
+	MessageCircleQuestion,
 	PencilLine,
 	ScanSearch,
 	Search,
@@ -196,6 +198,32 @@ function toolCallInfo(
 			if (action === "clear")
 				return { icon: <ListChecks size={13} />, name: "todo", label: "∅" };
 			return { icon: <ListChecks size={13} />, name: "todo", label: action };
+		}
+		case "ask_user_question": {
+			// Label: header (chip corto) de la primera pregunta, o su texto.
+			const qs = Array.isArray(a.questions) ? a.questions : [];
+			const first = qs[0] as Record<string, unknown> | undefined;
+			const label = first ? String(first.header ?? first.question ?? "") : "";
+			return {
+				icon: <MessageCircleQuestion size={13} />,
+				name: "ask_user_question",
+				label,
+			};
+		}
+		case "agent_browser": {
+			// Label: la URL objetivo si es fácil de localizar (qa.url o el primer
+			// arg http(s) del modo args). Si no, vacío (el icono ya identifica al tool).
+			const url =
+				typeof a.url === "string"
+					? a.url
+					: Array.isArray(a.args)
+						? String(
+								(a.args as unknown[]).find((x) =>
+									/^https?:\/\//.test(String(x)),
+								) ?? "",
+							)
+						: "";
+			return { icon: <Compass size={13} />, name: "agent_browser", label: url };
 		}
 		default:
 			return { icon: <Wrench size={13} />, name: tool, label: "" };
