@@ -24,6 +24,16 @@ const GLYPH: Record<TaskStatus, string> = {
 	deleted: "✗",
 };
 
+// Color por estado (paleta temática VS Code):
+//   - pending: undefined → color por defecto (texto normal, legible).
+//   - in_progress: ámbar (color principal) → destaca como la tarea activa.
+//   - completed: descriptionForeground (tono muteado) + tachado (strike).
+const STATUS_COLOR: Partial<Record<TaskStatus, string>> = {
+	in_progress: "var(--vscode-list-warningForeground, #cca700)",
+	completed: "var(--vscode-descriptionForeground)",
+	deleted: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
+};
+
 /** Factory del elemento raíz que monta la extensión vía fridaWebMount. */
 export function createTodoWebPanelElement(): ReactElement {
 	return <TodoWebPanel />;
@@ -82,6 +92,8 @@ function TaskRow({
 	isLast: boolean;
 }): ReactElement {
 	const active = task.status === "in_progress";
+	const done = task.status === "completed";
+	const statusColor = STATUS_COLOR[task.status];
 	return (
 		<fbox
 			flexDirection="row"
@@ -93,11 +105,13 @@ function TaskRow({
 			<ftext color="var(--vscode-descriptionForeground)">
 				{isLast ? "└─" : "├─"}
 			</ftext>
-			<ftext>{GLYPH[task.status]}</ftext>
+			<ftext color={statusColor}>{GLYPH[task.status]}</ftext>
 			{showIds ? (
 				<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
 			) : null}
-			<ftext bold={active}>{task.subject}</ftext>
+			<ftext bold={active} color={statusColor} strike={done}>
+				{task.subject}
+			</ftext>
 			{task.status === "in_progress" && task.activeForm ? (
 				<ftext>({task.activeForm})</ftext>
 			) : null}

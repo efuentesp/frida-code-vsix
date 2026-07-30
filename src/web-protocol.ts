@@ -27,7 +27,7 @@ export interface WebNode {
 /** Dónde materializa el webview un root remoto: "overlay" (cuerpo, ej. diálogos
  *  efímeros como ask_user_question) o "footer" (panel inferior junto al Composer,
  *  ej. el panel persistente del tool `todo`). */
-export type WebPlacement = "overlay" | "footer";
+export type WebPlacement = "overlay" | "footer" | "composer";
 
 /** Host → webview: un commit es el árbol raíz completo (snapshot). El webview
  *  reemplaza su subárbol remoto por completo. Suficiente para UIs de extensión

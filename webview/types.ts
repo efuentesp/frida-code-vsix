@@ -110,7 +110,7 @@ export interface WebNode {
 }
 
 /** Dónde materializa el webview un root remoto (espejo de src/web-protocol.ts). */
-export type WebPlacement = "overlay" | "footer";
+export type WebPlacement = "overlay" | "footer" | "composer";
 
 /** Diálogo data-oriented del ExtensionUIContext (pi.ui.select/input/confirm).
  *  Las extensiones nativas en modo RPC (rpiv-ask-user-question) las enrutan aquí

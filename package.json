@@ -21,6 +21,10 @@
         "title": "Frida: Abrir panel"
       },
       {
+        "command": "frida.openHelp",
+        "title": "Frida: Abrir ayuda"
+      },
+      {
         "command": "frida.setKey",
         "title": "Frida: Actualizar API key"
       },
@@ -116,12 +120,18 @@
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
         },
         "frida.devengine.contextWindow": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "default": null,
           "markdownDescription": "Override manual de la ventana de contexto (tokens) del modelo DevEngine. Si se omite (null), Frida la resuelve automáticamente por prioridad: (1) `GET /models` del gateway DevEngine (context_window real), (2) catálogo canónico del modelo (gpt-5.4-mini → 400000), (3) 300000 conservador. Pon un número SÓLO si quieres forzar un límite (ej. el gateway da `500` con historial grande). Ver ADR-0019."
         },
         "frida.devengine.maxTokens": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "default": null,
           "markdownDescription": "Override manual del máximo de tokens de salida (`max_tokens`) del modelo DevEngine. Si se omite (null), se usa el del catálogo canónico (128000). Ver ADR-0019."
         },
@@ -156,6 +166,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.81.1",
+    "jiti": "^2.7.0",
     "react-reconciler": "^0.29.2",
     "typebox": "1.1.38"
   },

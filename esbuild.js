@@ -40,11 +40,30 @@ var __import_meta_resolve = function(specifier, parent) {
 	logLevel: "info",
 };
 
+// ADR-0020 Fase 4 — bundle DSL standalone para que los configs .ts importen el
+// DSL desde "frida-workflow" (jiti alias). CJS: jiti carga un bundle CJS vía alias
+// sin transformar (el ESM bundleado truena con "Cannot find module '.'"). typebox
+// se bundlea DENTRO (self-contained). En runtime: createJiti(configFile, {
+// alias: { "frida-workflow": <ext>/dist/frida-workflow.js }, interopDefault: true }).
+/** @type {import('esbuild').BuildOptions} */
+const dslOptions = {
+	entryPoints: ["src/tools/frida-workflow/index.ts"],
+	bundle: true,
+	outfile: "dist/frida-workflow.js",
+	platform: "node",
+	format: "cjs",
+	target: "node18",
+	sourcemap: true,
+	external: [], // typebox DENTRO (self-contained para el alias en runtime)
+	logLevel: "info",
+};
+
 (async () => {
 	if (watch) {
 		const ctx = await esbuild.context(options);
-		await ctx.watch();
+		const dslCtx = await esbuild.context(dslOptions);
+		await Promise.all([ctx.watch(), dslCtx.watch()]);
 	} else {
-		await esbuild.build(options);
+		await Promise.all([esbuild.build(options), esbuild.build(dslOptions)]);
 	}
 })();

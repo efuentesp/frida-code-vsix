@@ -29,7 +29,6 @@ import {
 	Key,
 	Library,
 	Minimize2,
-	Pause,
 	RotateCw,
 	Settings,
 	ShieldCheck,
@@ -40,6 +39,8 @@ import {
 import { ChevronDown } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
+import { AnimatedLabel } from "./components/AnimatedLabel";
+import { ApprovalCard } from "./components/ApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
@@ -113,15 +114,14 @@ export function App() {
 		if (el && stickRef.current) el.scrollTop = el.scrollHeight;
 	}, [state.turns, state.queued]);
 
-	// Auto-scroll al MONTAR un panel overlay-body nuevo (/context, /gates,
-	// ApprovalDialog): son resultados de comandos del usuario que espera ver. A
+	// Auto-scroll al MONTAR un panel overlay-body nuevo (/context, /gates): son resultados de comandos del usuario que espera ver. A
 	// diferencia del de turnos, aquí forzamos el scroll al final aunque el usuario
 	// hubiera subido a leer (el comando es explícito). No dispara en updates del
 	// mismo root (re-render del panel) — sólo en montajes nuevos.
 	const prevOverlayRootsRef = useRef<string[]>([]);
 	useEffect(() => {
 		const overlayIds = Object.entries(state.webRoots ?? {})
-			.filter(([, r]) => r.placement !== "footer" && r.tree)
+			.filter(([, r]) => r.placement === "overlay" && r.tree)
 			.map(([id]) => id);
 		const hasNew = overlayIds.some(
 			(id) => !prevOverlayRootsRef.current.includes(id),
@@ -316,6 +316,13 @@ export function App() {
 		if (last?.status === "thinking") return "Pensando…";
 		return "Procesando…";
 	})();
+
+	// Roots de diálogo en el slot del composer (ask_user_question): reemplazan
+	// el input como las aprobaciones. placement "composer" (distinto de "footer"
+	// para no mezclarse con el panel de todo/workflow, que vive en .web-footer).
+	const composerDialogRoots = Object.entries(state.webRoots ?? {}).filter(
+		([, r]) => r.placement === "composer" && r.tree,
+	);
 
 	if (state.keyNeeded) {
 		return (
@@ -568,14 +575,8 @@ export function App() {
 							<CornerDownRight size={12} /> encolado: {q}
 						</div>
 					))}
-					{state.approvals.length > 0 && (
-						<div className="approvals-banner">
-							<Pause size={12} /> Frida espera tu aprobación:
-						</div>
-					)}
-					{/* Fase 6: el diálogo de aprobación ahora es Remote React (ApprovalDialog),
-				    montado por el host como root overlay. Aquí sólo queda el banner; el
-				    ApprovalCard nativo ya no se renderiza. */}
+					{/* Las tarjetas de aprobación se renderizan ahora en el footer, en lugar
+					    del Composer, cuando hay pendientes (más abajo). */}
 					{state.uiRequests.map((r) => (
 						<UiDialog
 							key={r.id}
@@ -586,7 +587,7 @@ export function App() {
 						/>
 					))}
 					{Object.entries(state.webRoots ?? {})
-						.filter(([, r]) => r.placement !== "footer" && r.tree)
+						.filter(([, r]) => r.placement === "overlay" && r.tree)
 						.map(([id, r]) => (
 							<RemoteRoot
 								key={id}
@@ -608,9 +609,13 @@ export function App() {
 				{state.isCompacting ? (
 					<div className="proc-bar">
 						<Spinner size={14} />
-						{state.retry
-							? `Reintentando compactación (${state.retry.attempt}/${state.retry.maxAttempts}) en ${retrySecs ?? Math.ceil(state.retry.delayMs / 1000)}s…`
-							: `Compactando contexto${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`}
+						<AnimatedLabel
+							text={
+								state.retry
+									? `Reintentando compactación (${state.retry.attempt}/${state.retry.maxAttempts}) en ${retrySecs ?? Math.ceil(state.retry.delayMs / 1000)}s…`
+									: `Compactando contexto${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`
+							}
+						/>
 						<button
 							className="proc-cancel"
 							onClick={() => post({ type: "cancel_compaction" })}
@@ -621,7 +626,7 @@ export function App() {
 				) : (
 					procLabel && (
 						<div className="proc-bar">
-							<Spinner size={14} /> {procLabel}
+							<Spinner size={14} /> <AnimatedLabel text={procLabel} />
 						</div>
 					)
 				)}
@@ -640,18 +645,50 @@ export function App() {
 						))}
 				</div>
 				<LensDiagnostics lens={state.lens} />
-				<Composer
-					onSubmit={(text, mode, images) =>
-						post({ type: "submit", text, mode, images })
-					}
-					onSearch={(q) => post({ type: "search_files", query: q })}
-					files={state.files}
-					commands={commands}
-					models={state.models}
-					busy={state.busy}
-					pendingDialog={state.approvals.length > 0}
-					onAbort={() => post({ type: "abort" })}
-				/>
+				{state.approvals.length > 0 ? (
+					// Aprobación pendiente: el input cede su lugar a la tarjeta de permiso
+					// (como en la extensión original de pi). No tiene sentido dejar escribir
+					// mientras Frida espera Accept/Reject; la tarjeta trae los botones.
+					<div className="approval-inline">
+						{state.approvals.map((a) => (
+							<ApprovalCard
+								key={a.id}
+								approval={a}
+								onRespond={(r) =>
+									post({ type: "approval_response", id: a.id, ...r })
+								}
+							/>
+						))}
+					</div>
+				) : composerDialogRoots.length > 0 ? (
+					// Diálogo ask_user_question: ocupa el lugar del composer (como las
+					// aprobaciones). El cuestionario ya trae sus propios botones.
+					<div className="approval-inline">
+						{composerDialogRoots.map(([id, r]) => (
+							<RemoteRoot
+								key={id}
+								tree={r.tree!}
+								rootId={id}
+								onEvent={(handlerId, payload) =>
+									post({ type: "web_event", rootId: id, handlerId, payload })
+								}
+							/>
+						))}
+					</div>
+				) : (
+					<Composer
+						onSubmit={(text, mode, images) =>
+							post({ type: "submit", text, mode, images })
+						}
+						onSearch={(q) => post({ type: "search_files", query: q })}
+						files={state.files}
+						commands={commands}
+						models={state.models}
+						busy={state.busy}
+						pendingDialog={state.approvals.length > 0}
+						onAbort={() => post({ type: "abort" })}
+					/>
+				)}
 				<WorkspaceBar
 					ws={state.workspace}
 					onRefresh={() => post({ type: "workspace" })}

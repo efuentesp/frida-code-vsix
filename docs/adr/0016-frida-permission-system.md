@@ -58,8 +58,7 @@ src/tools/frida-permission-system/
 ├── audit-log.ts    # wrapper sobre ApprovalLogger → API del panel (Fase 2)
 ├── session-store.ts# session approvals por patrón + stats (Fase 3/4)
 ├── AuditPanel.tsx  # Remote React: auditoría navegable (Fase 2)
-├── ConfigPanel.tsx # Remote React: editor visual allow/ask/deny (Fase 5)
-└── ApprovalDialog.tsx # Remote React: diálogo efímero (Fase 6, reemplaza ApprovalCard)
+└── ConfigPanel.tsx # Remote React: editor visual allow/ask/deny (Fase 5)
 ```
 
 Los helpers actuales (`sensitive-paths`, `dangerous-commands`, `bash-indirection`,
@@ -125,7 +124,7 @@ Aplicación del **modo** (override):
 | --- | --- | --- | --- | --- |
 | **AuditPanel** | `/gates` | overlay persistente | JSONL navegable: filtros (tool/decisión/source), colores (✓allow ✗block ⚡auto), detalle expandible | 2 |
 | **Stats footer** | siempre | footer | modo + `✓N ✗M ⚡Z` (aprobadas/bloqueadas/auto-allow de la sesión) | 3 |
-| **ApprovalDialog** | `tool_call` ask | diálogo efímero | reemplaza ApprovalCard nativo: diff/command + warning + botones | 6 |
+| ~~ApprovalDialog~~ | ~~`tool_call` ask~~ | ~~diálogo efímero~~ | **REVERTIDO**: el overlay Remote React no se materializaba de forma fiable (banner sin tarjeta); se vuelve a la ApprovalCard nativa del webview (canal `approval_response`) | 6 |
 | **ConfigPanel** | `/gates-config` | overlay persistente | editor visual allow/ask/deny por superficie (escribe permission.json) | 5 |
 
 ### Plan por fases
@@ -138,7 +137,7 @@ Aplicación del **modo** (override):
 | **3** ✅ | **Stats footer** | bajo | medio |
 | **4** ✅ | Session approvals por **patrón** (no bool) | medio | medio |
 | **5** ✅ | **ConfigPanel** (editor visual) | medio | medio |
-| **6** ✅ | **ApprovalDialog** Remote React (migrar ApprovalCard) | medio | estético |
+| **6** ↩️ | ~~ApprovalDialog Remote React~~ → **revertido** (ApprovalCard nativa) | — | fiabilidad |
 | **7** ✅ | `deny` oculta tools del catálogo (`before_agent_start` + `setActiveTools`) | medio | paridad gotgenes |
 
 **Implementado (Fases 0-7 — todas):**
@@ -169,13 +168,15 @@ Aplicación del **modo** (override):
   vería los cambios). Cada tool tiene 3 botones (Permitir ✓/Preguntar ?/Bloquear ✗);
   clic → `setTool` → re-render. **Guardar** persiste (`savePermissionConfig`) y
   actualiza el cache que el gate lee en cada tool_call → aplica al instante.
-- **Fase 6 — ApprovalDialog:** migra la ApprovalCard nativa del webview a un
-  componente Remote React (`ApprovalDialog.tsx`) con el catálogo frida-webview,
-  unificando la estética con AuditPanel/ConfigPanel. El host sincroniza roots
-  overlay con la lista de pendientes del ApprovalBridge (`syncApprovalDialogs`:
-  monta uno por req.id, desmonta al resolver); `onRespond` dispara fireEvent →
-  `bridge.resolve` (mismo contrato, sin el conducto `approval_response`). La
-  ApprovalCard nativa se deja de renderizar (queda como archivo referencia).
+- **Fase 6 — ApprovalDialog (REVERTIDO):** se migró la ApprovalCard nativa a un
+  componente Remote React (`ApprovalDialog.tsx`) montado como overlay por el host
+  (`syncApprovalDialogs`). **Revertido** porque el overlay no se materializaba de
+  forma fiable en el webview: el usuario veía el banner "Frida espera tu
+  aprobación:" pero no la tarjeta con los botones. Se vuelve a la **ApprovalCard
+  nativa** del webview, renderizada directo desde `state.approvals` (que sí llega)
+  y respondida por el canal `approval_response` → `bridge.resolve`. Es además
+  más rica (renderiza el diff con `<Diff>` + iconos). El mecanismo Remote React
+  (`mountPersistent`) se conserva para AuditPanel/ConfigPanel/todo.
 - **Fase 7 — hide-tools deny:** el SDK expone `setActiveTools(toolNames)` (filtra el
   catálogo del LLM) + el evento `before_agent_start`. En cada turno,
   `computeDeniedTools(policy)` (excluye el wildcard `*` a propósito: un `*: deny` NO

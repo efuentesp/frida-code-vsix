@@ -51,6 +51,8 @@ export interface TextProps {
 	color?: string;
 	size?: number;
 	wrap?: boolean;
+	/** Tachado (text-decoration: line-through). Ej. tareas completadas. */
+	strike?: boolean;
 }
 
 /** Props de botón (fbutton → <button>). */

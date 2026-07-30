@@ -110,6 +110,7 @@ function textStyle(props: Record<string, unknown>): CSSProperties {
 	if (typeof props.color === "string") s.color = props.color;
 	if (typeof props.size === "number") s.fontSize = props.size;
 	if (props.wrap === false) s.whiteSpace = "nowrap";
+	if (props.strike) s.textDecoration = "line-through";
 	return s;
 }
 

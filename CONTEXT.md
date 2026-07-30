@@ -138,6 +138,7 @@ el resto son reversibles o el camino obvio y se detallan aquí.
 | 18 | Alineación con el TUI de pi | Paridad de eventos que el TUI cubría y Frida no: reintentos de compactación, progreso de tools (toolCallId), feedback de abort, skill blocks colapsables, branch summary y sync de thinking — *detalle D18*
 | 19 | DevEngine: round-trip de `reasoning_content` | El gateway devuelve reasoning pero lo rechaza de vuelta → 500 al continuar sesiones con razonamiento. Workaround `requiresThinkingAsText: true` (reenvía thinking como texto); **quitarlo** cuando DevEngine arregle el round-trip — *ver [ADR-0009](./docs/adr/0009-devengine-reasoning-roundtrip.md)*
 | 20 | agentDir propio (`~/.frida`) | Frida ya no lee `~/.pi` para extensiones/skills/auth/models; usa `~/.frida`. Evita errores de carga (`import.meta.resolve`) y choque con el CLI `pi`. **pi-lens queda fuera** hasta Fase 2 (adaptar/polyfill) — *ver [ADR-0010](./docs/adr/0010-frida-agentdir-propio.md)*
+| 21 | `frida-workflow` (porte nativo de rpiv-workflow) | ✅ **Motor completo** (Fases 0–8, 243 tests). Cadenas de skills en grafo tipado con routing por predicados, loops (fanout/iterate/fanin), jueces (verify/assess/panel), schemas, audit JSONL resumible, carga por capas (DSL bundle + jiti) y panel `fridaWeb` en footer. **Porte nativo** en `src/` (no se carga el npm). Etapas en sesiones hijas desprendidas; gates de hijas confluyen en el `ApprovalBridge` compartido (paridad de seguridad). — *ver [ADR-0020](./docs/adr/0020-frida-workflow-porte-nativo.md) y [diseño](./docs/frida-workflow-design.md); detalle D32*
 
 ### D6 — Conexión / proveedor
 
@@ -714,18 +715,18 @@ en sets de TS + 3 modos) a una **extensión independiente** `frida-permission-sy
 - **DEFAULT_POLICY = behavior actual** → Fase 0-1 es migración sin surprise (126 tests
   en verde, logger + fail-closed intactos).
 - **Webcontent (Remote React):** AuditPanel (`/gates`, JSONL navegable), Stats footer
-  (modo + contadores ✓N ✗M ⚡Z), ApprovalDialog (reemplaza ApprovalCard nativo),
+  (modo + contadores ✓N ✗M ⚡Z), ApprovalCard nativa (Fase 6 overlay revertido),
   ConfigPanel (`/gates-config`, editor visual allow/ask/deny).
 - **Plan por fases:** 0 estructura+config · 1 evaluación declarativa (core) · 2
   AuditPanel · 3 Stats · 4 session approvals por patrón · 5 ConfigPanel · 6
-  ApprovalDialog · 7 hide-tools deny (requiere investigar API del SDK).
+  ApprovalDialog (↩ revertido a ApprovalCard nativa) · 7 hide-tools deny.
 - **Helpers** (`sensitive-paths`, `dangerous-commands`, `bash-indirection`,
   `external-paths`) se quedan en `src/gates/` en Fase 0-1 (sus tests los importan);
   `policy.ts` los consume. Moverlos a `surfaces/` es cleanup posterior.
 - **Estado:** Fases 0-7 + 5b **todas implementadas — extensión completa**
   (declarativo + `createPermissionSystem` + AuditPanel `/gates` + Stats footer
   ✓N/✗M/⚡Z + Session approvals por patrón + ConfigPanel `/gates-config` con las 3
-  superficies tool/path/bash + ApprovalDialog Remote React + hide-tools deny +
+  superficies tool/path/bash + ApprovalCard nativa (Fase 6 revertido) + hide-tools deny +
   editor de wildcards: evaluate() aplica policy.path/bash most-restrictive-wins).
   163 tests.
 
@@ -834,6 +835,151 @@ lo obtiene del **catálogo** (dato estático), no de una consulta en vivo.
   en la sesión (`willUseDevengine`: es el activo, o el fallback si el activo no está
   autenticado). Así no se llama al gateway cuando el usuario usa z.ai/Copilot pero
   tiene la key de DevEngine guardada.
+
+### D32 — `frida-workflow`: porte nativo del motor de rpiv-workflow (ADR-0020)
+
+> ✅ **MOTOR COMPLETO** — Fases 0–8 implementadas, **243 tests** en verde. Paridad
+> con rpiv-workflow (grafo + routing + loops + jueces + schemas + resume + carga
+> por capas + panel + script/prompt + skill-contracts).
+
+Se añade un motor de **workflows** a Frida: cadenas de etapas tipo DAG (skill-agnostic,
+despacha `/skill:<name>`) con routing por predicados sobre los datos, loops
+(`fanout`/`iterate`/`assess`), jueces (`verify`/`panel`), validación de salida con
+schemas (Standard Schema v1) y un **trail JSONL append-only del que se resucita**.
+Es un **porte nativo** del diseño de `@juicesharp/rpiv-workflow` — **no** se carga el
+paquete npm (mismo criterio que D14/D15/D27/D28: porte nativo de rpiv-*). Diseño y
+plan por fases en [`docs/frida-workflow-design.md`](./docs/frida-workflow-design.md).
+
+- **Estrategia: porte nativo** en `src/tools/frida-workflow/`, 0 deps npm nuevas (reusa
+  `createAgentSession` del SDK embebido). No reabre ADR-0005.
+- **Ejecución: sesiones hijas desprendidas.** Cada etapa abre su propio `AgentSession`
+  en background (`spawnChild` → `createFridaChildSession` con su propio `SessionManager`);
+  el chat principal queda usable. Requiere refactor de `src/pi-session.ts` para separar un
+  `FridaSessionShared` (modelRuntime/loader/bridges) del núcleo de construcción.
+- **Paridad de seguridad (lo crítico):** las hijas ejecutan `bash`/`edit`/`write` → si no
+  pasaran por el gate, un workflow correría `rm -rf` sin visto bueno (rompería
+  ADR-0001/D7). Por eso el loader de cada hija reusa `createPermissionSystem` atado al
+  **mismo `ApprovalBridge`** del webview; los gates confluyen en un solo puente.
+- **Alcance: paridad completa** con rpiv-workflow (loops, judges, collectors, contracts),
+  entregada incrementalmente (Fases 1–8).
+- **UI: panel `fridaWeb` persistente en el footer** (`WorkflowPanel` vía
+  `mountPersistent(…,"footer")`, alimentado por los hooks de lifecycle; gates de hijas
+  como `ApprovalCard`).
+- **Layout:** config en `<cwd>/.frida/workflows/` + `~/.frida/workflows/` (jiti, dep
+  transitiva); runs en `<globalStorageUri>/workflows/<encoded-cwd>/runs/` (D13).
+- **Spike Fase 0 — SUPERADO** (`test/frida-workflow/spike-fase0.test.ts`, 3/3 verde,
+  offline/sin auth): Q1 `DefaultResourceLoader` es reutilizable entre sesiones; Q2
+  `SessionManager.forkFrom` corre in-process; Q3 `createPermissionSystem` ata N hijas a
+  un `ApprovalBridge` compartido. `ModelRuntime.create({modelsPath:null,
+  allowModelNetwork:false})` + `PI_OFFLINE=1` da catálogos built-in estáticos → hijas sin red.
+- **Punto frágil en bump de Pi (D12/D18):** `createAgentSession`,
+  `SessionManager.{create,open,forkFrom}`, `bindExtensions`,
+  `AgentSession.{prompt,subscribe,waitForIdle,abort,getBranch}`, `DefaultResourceLoader`
+  (shareabilidad).
+
+---
+
+### D33 — Sistema de extensiones externas + autoconocimiento (heredado de Pi)
+
+> ✅ **Implementado** el descubrimiento (global + proyecto), la skill de
+> autoconocimiento, la doc y `/help`. Dos follow-ups quedan **diferidos** (más abajo).
+
+Frida **hereda** el sistema de extensiones de Pi: el SDK descubre extensiones en
+`<agentDir>/extensions/` (= `~/.frida/extensions/` porque Frida fija `agentDir`) y las
+carga vía `session.bindExtensions(...)`. Una extensión es un `.ts` con
+`export default function (pi: ExtensionAPI) {...}` que puede registrar **tools**,
+**providers**, **hooks** (`pi.on`) y **UI webview** (`pi.ui.fridaWeb` /
+`fridaWebMount` + tags `fbox`/`ftext`/…). Carga completa con `/reload`.
+
+- **Global**: `~/.frida/extensions/*.ts` → heredado de Pi (vía agentDir). Funciona tal cual.
+- **Proyecto**: `.frida/extensions/*.ts` → cableado propio. **OJO:**
+  `additionalExtensionPaths` del `DefaultResourceLoader` trata un **directorio** como
+  *package source* y NO expande `.ts` sueltos; por eso Frida **enumera** los archivos
+  (`listProjectExtensionFiles` en `src/extension-paths.ts`: loose `*.ts` +
+  `subdir/index.ts`) y los pasa como rutas de archivo. `additionalSkillPaths` SÍ acepta
+  dir (loadSkills recursa `.md`). Verificado en `test/extensions-discovery.test.ts`.
+- **Skills de proyecto**: `.frida/skills/<name>/SKILL.md` (dir) vía `additionalSkillPaths`.
+- **Seguridad**: las de proyecto cargan estilo CLI (sin gate de trust), igual que
+  `.frida/workflows/*.ts` que ya se auto-carga vía jiti → abre sólo proyectos confiables.
+- **Autoconocimiento**: skill `frida-dev` (`~/.frida/skills/frida-dev/SKILL.md`) con la
+  referencia condensada de la API (Pi + `fridaWeb` + tags + ubicaciones + `/reload`);
+  el agente la lee on-demand al autorar extensiones.
+- **Doc**: [`docs/tools/extensions.md`](./docs/tools/extensions.md) + `/help extensions`.
+- **Demo**: `~/.frida/extensions/hello.ts` (tool `hello`).
+- **Punto frágil en bump de Pi:** `DefaultResourceLoader` (`additionalExtensionPaths`/
+  `additionalSkillPaths`), `ExtensionAPI` (`registerTool`/`on`/`registerProvider`),
+  `ExtensionUIContext` y el slice propio `pi.ui.fridaWeb`/`fridaWebMount`
+  (`src/extension-ui-context.ts`), tags `frida-webview` (`src/frida-webview/index.ts`).
+
+#### ⏳ Trabajo diferido (no implementado)
+
+**(A) Hot-reload on-save** — cierra el loop crear→probar sin `/reload` manual.
+
+- En `activate()` (`src/extension.ts`): `vscode.workspace.createFileSystemWatcher`
+  para el workspace (`.frida/{extensions,skills}/**`) + `fs.watch({recursive:true})`
+  para el global (`~/.frida/{extensions,skills}`).
+- Debounce ~300 ms → `reloadResources()` (que ya guarda `isStreaming`/`isCompacting`).
+- Opcional: setting `frida.dev.extensionsAutoReload` (default `true`).
+- **No** vigilar `.frida/workflows/` (no son extensiones).
+
+**(B) Skill shipped/built-in** — que `frida-dev` venga **con Frida** (no en `~/.frida`).
+
+- Añadir `builtInSkillsPath?: string` a `CreateFridaSessionOptions` (`src/pi-session.ts:93`).
+- Pasarlo en los 2 call sites de `createFridaSession` (`src/extension.ts:524` y `:2087`):
+  `builtInSkillsPath: path.join(context.extensionPath, "skills")`.
+- Mergearlo en `additionalSkillPaths` del loader (`src/pi-session.ts`, junto al
+  `.frida/skills` de proyecto), con guard `fs.existsSync`.
+- Mover `skills/frida-dev/SKILL.md` al repo (raíz `skills/`). `.vscodeignore` no lo
+  excluye → se envía en el `.vsix`.
+
+---
+
+### D34 — `frida-agent-browser`: porte nativo de pi-agent-browser-native (Esencial)
+
+> ✅ **Implementado** (48 tests, suite **297**). Porte "Esencial" del diseño del paquete
+> `pi-agent-browser-native` (~/.pi): tool nativo `agent_browser` que envuelve el
+> binario upstream `agent-browser` (Vercel Labs) para automation de navegador real.
+
+Extensión **built-in** (`src/tools/frida-agent-browser/`, registrada en `extensionFactories`
+de la sesión **main** — las hijas de workflow quedan curadas). Replica el diseño del
+referencia: schema de input-modes + inyección de system-prompt + sesión implícita +
+bash-guard + parseo.
+
+- **Valor central:** el agente puede automatizar el navegador real (leer docs vivos,
+  abrir páginas, snapshots, clicks/fills, screenshots, flujos autenticados). Sin el
+  system-prompt inyectado, el agente malgasta el tool (no sigue la receta
+  open→snapshot→click).
+- **Alcance "Esencial":** input-modes `args`/`semanticAction`/`job`/`qa` (compiladores
+  porteado fielmente a `batch [--bail]`+stdin / `find …` / QA preset) + sesión implícita
+  reutilizada (`--session <name>`, `fresh` bump) + bash-guard + parse JSON→content/details.
+  **Restan (no porteadas):** branch-restore/sourceLookup/networkSourceLookup (avanzado, bajo ROI). Fases 1–8 ✅.
+- **Binario NO empaquetado:** se resuelve desde PATH y se invoca con `--json`; si falta
+  (ENOENT), el tool devuelve un resultado **graceful** `failureCategory: missing-binary`
+  que guía a instalarlo (no crashea).
+- **Tool name `agent_browser`** (paridad con el referencia): el conocimiento del agente
+  se transfiere directo; no hay colisión en Frida.
+- **Hooks:** `before_agent_start` (apendeza `PROJECT_RULE_PROMPT` + **guidance advisory de config**
+  Fase 3: browser.defaultProfile/executablePath → system prompt, **sin** auto-inyectar flags),
+  `tool_call` (bloquea `agent-browser` por bash salvo `--help`/`--version`), `session_shutdown`
+  (cierra la sesión upstream best-effort).
+- **Layout:** `src/tools/frida-agent-browser/{constants,prompt,schema,compile,session,run,index,ref-guard,command-policy,navigation-policy}.ts`
+  - `results/{envelope,categories,snapshot,next-actions,artifacts,presentation}.ts` +
+  `config/{policy,load}.ts` + `web-search/{schema,providers,credentials,tool}.ts` +
+  `electron/{cdp,discovery,launch,cleanup,registry,compile,schema,host}.ts`;
+  tests en `test/frida-agent-browser/*.test.ts` (spawn/fetch mockeado + E2E real).
+- **Verificación:** typecheck 0, build 0 (ambos bundles), **204 tests** del módulo
+  (Fases 1–8 completas: presentation, stale-ref guard, config, artifactVerification,
+  web_search, command-policy+fail-clear, electron list/launch/status/cleanup/probe,
+  allowed-domains; + factory-wiring + E2E via seam `runFn`).
+  **Smoke E2E real** vs `agent-browser` 0.33.1: snapshot compacto con `@refs`; `click @e99`/
+  tras navegación → bloqueados **pre-spawn** (`stale-ref`); config real → guidance;
+  `screenshot sub/x.png` → `artifact-saved` + `verified:true`. web_search sin API key
+  real (smoke necesita credencial Exa/Brave). **Hallazgos `ts-path-traversal` (ast-grep)
+  sobre fs I/O marcados falso-positivo** (paths host/user-trusted; idéntico al referencia).
+- **Punto frágil en bump:** el binario upstream `agent-browser` (Vercel) — su contrato
+  JSON de salida, los input-modes y el modelo de sesión por nombre. El SDK Pi:
+  `pi.registerTool` (`promptGuidelines`), `pi.on` (`before_agent_start`/`tool_call`/
+  `session_shutdown`), `AgentToolResult<unknown>` (`details` obligatorio).
 
 ---
 

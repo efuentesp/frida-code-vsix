@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { listProjectExtensionFiles } from "./extension-paths";
 import {
 	createAgentSession,
 	DefaultResourceLoader,
@@ -40,6 +41,7 @@ import {
 } from "./settings";
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
+import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -77,6 +79,16 @@ export interface FridaSession {
 	 *  ProviderConfig con los descubiertos (ADR-0017). Best-effort: si falla, no
 	 *  cambia el catálogo. */
 	discoverModels: (providerId: string) => Promise<void>;
+	/** Crea una sesión hija desprendida para una etapa de workflow (ADR-0020/D32).
+	 *  Loader curado (provider hooks + gates; SIN todo-web/ask-user-question/
+	 *  frida-context — montarían paneles duplicados por session_start). Skills se
+	 *  recargan de disco; mismo modelo que la sesión interactiva. Los gates de la
+	 *  hija confluyen en el mismo ApprovalBridge (paridad de seguridad). */
+	createChildSession: (childOpts: {
+		prompt: string;
+		sessionDir: string;
+		signal?: AbortSignal;
+	}) => Promise<{ session: any; sessionManager: any }>;
 }
 
 export interface CreateFridaSessionOptions {
@@ -293,10 +305,21 @@ export async function createFridaSession(
 		// settings.json ausente o inválido → rpiv no carga → web activo.
 	}
 
+	// Extensiones/skills externas en proyecto (Opción B): .frida/ además del global
+	// ~/.frida/. Cargan estilo CLI (sin gate de trust), consistente con
+	// .frida/workflows que ya se auto-carga vía jiti. Ver docs/tools/extensions.md.
+	// NOTA: additionalSkillPaths acepta un directorio (loadSkills recursa .md), pero
+	// additionalExtensionPaths trata un dir como package source y NO expande .ts
+	// sueltos → enumeramos los archivos (loose *.ts + */index.ts) como hace el
+	// descubrimiento estándar de Pi. Verificado en test/extensions-discovery.test.ts.
+	const projExtDir = path.join(opts.cwd, ".frida", "extensions");
+	const projSkillDir = path.join(opts.cwd, ".frida", "skills");
 	const loader = new DefaultResourceLoader({
 		cwd: opts.cwd,
 		agentDir: opts.agentDir,
 		settingsManager,
+		additionalExtensionPaths: listProjectExtensionFiles(projExtDir),
+		additionalSkillPaths: fs.existsSync(projSkillDir) ? [projSkillDir] : [],
 		extensionFactories: [
 			...(fridaLensFactory
 				? [{ name: "frida-lens", factory: fridaLensFactory }]
@@ -351,6 +374,13 @@ export async function createFridaSession(
 			{
 				name: "frida-context",
 				factory: toggleable(opts.contextEnabled, createFridaContext()),
+			},
+			// frida-agent-browser (D34): tool `agent_browser` que envuelve el binario
+			// upstream agent-browser (Vercel) — automation de navegador real. Sesión
+			// main only (las hijas de workflow quedan curadas: providers + gates).
+			{
+				name: "frida-agent-browser",
+				factory: createFridaAgentBrowser({ agentDir: opts.agentDir }),
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens
@@ -438,6 +468,66 @@ export async function createFridaSession(
 			}
 			// DevEngine no expone discovery útil (los modelos son alias internos del
 			// gateway); se omite. Otros proveedores aquí cuando se añadan.
+		},
+		// ADR-0020/D32 — sesión hija para etapas de workflow. Loader CURADO (no el
+		// interactivo): provider hooks + permission system atados a los bridges
+		// COMPARTIDOS. Sin todo-web/ask-user-question/frida-context (montarían paneles
+		// duplicados). Spike Fase 0 (Q1) confirmó que DefaultResourceLoader es seguro
+		// de construir por separado; las skills se recargan de disco (costo aceptable
+		// en Fase 1; optimizar si se mide). El gate de la hija → mismo ApprovalBridge.
+		createChildSession: async (childOpts: {
+			prompt: string;
+			sessionDir: string;
+			signal?: AbortSignal;
+		}) => {
+			const childLoader = new DefaultResourceLoader({
+				cwd: opts.cwd,
+				agentDir: opts.agentDir,
+				settingsManager,
+				extensionFactories: [
+					{
+						name: "softtek-provider",
+						factory: createSofttekProviderHooks({
+							getKey: () => keyHolders[SOFTTEK_PROVIDER],
+							onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
+							onProviderError: opts.onProviderError,
+							requestDumpPath: opts.requestDumpPath,
+						}),
+					},
+					{
+						name: "z-ai-provider",
+						factory: createZaiProviderHooks({
+							onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+						}),
+					},
+					{
+						name: "frida-permission-system",
+						factory: createPermissionSystem(
+							bridge,
+							opts.getMode,
+							approvalLogger,
+							() => opts.cwd,
+							opts.getGatePatterns,
+							gateStats,
+							sessionApprovals,
+						),
+					},
+				],
+			});
+			await childLoader.reload();
+			fs.mkdirSync(childOpts.sessionDir, { recursive: true });
+			const childSM = SessionManager.create(opts.cwd, childOpts.sessionDir);
+			const { session: childSession } = await createAgentSession({
+				resourceLoader: childLoader,
+				modelRuntime,
+				model: session.model, // mismo modelo que la interactiva
+				settingsManager,
+				sessionManager: childSM,
+				agentDir: opts.agentDir,
+				cwd: opts.cwd,
+			} as any);
+			await childSession.bindExtensions({ uiContext, mode: "rpc" });
+			return { session: childSession, sessionManager: childSM };
 		},
 	};
 }

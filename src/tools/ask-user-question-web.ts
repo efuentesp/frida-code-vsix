@@ -131,6 +131,10 @@ export function createAskUserQuestionWeb() {
 				"preferencia donde el label y la descripción bastan — sólo sobrecargan y distraen. " +
 				"Los previews sólo aplican en single-select (se ignoran en multiSelect).",
 			promptSnippet: "Pregunta al usuario hasta 4 cosas con opciones concretas",
+			promptGuidelines: [
+				"PROACTIVO con `ask_user_question`: si una petición es ambigua o una decisión tiene 2+ opciones concretas (enfoque, librería, alcance, nombres, trade-off), LLAMA AL TOOL en vez de preguntar en texto plano. Plantea la pregunta como opciones clicables — NUNCA como prosa de opción múltiple en tu respuesta.",
+				"Pregunta ANTES de construir, no después. Si de otro modo adivinarías un requisito, pregunta primero. Agrupa preguntas relacionadas en una sola llamada (máx 4). Pero NO lo uses para pasos triviales/obvios ni confirmaciones sin valor — sólo cuando la respuesta cambia genuinamente tu enfoque.",
+			],
 			parameters: askSchema,
 			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 				const typed = params as { questions: WebQuestionSpec[] };
@@ -159,7 +163,7 @@ export function createAskUserQuestionWeb() {
 				const result = await ui.fridaWeb<WebQuestionnaireResult>(
 					(done) =>
 						createWebQuestionnaireElement(raw as WebQuestionSpec[], done),
-					"footer",
+					"composer",
 				);
 
 				if (result.cancelled) return declined();

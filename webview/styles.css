@@ -1087,6 +1087,18 @@ button.sec:hover {
 .bar {
 	padding: 8px 12px 12px;
 }
+/* Aprobación pendiente en el lugar del Composer (input oculto):
+   mismo padding horizontal que .bar; la tarjeta .approval pierde su
+   margin propio aquí para no duplicar espaciado. */
+.approval-inline {
+	padding: 8px 12px;
+}
+.approval-inline .approval {
+	margin: 0;
+}
+.approval-inline .approval + .approval {
+	margin-top: 8px;
+}
 .input {
 	width: 100%;
 	resize: none;
@@ -1354,6 +1366,28 @@ button.sec:hover {
 	width: 11px;
 	height: 11px;
 	border-width: 2px;
+}
+
+/* AnimatedLabel — ola de letras para el indicador "Procesando…" (proc-bar).
+   Cada carácter oscila con retardo escalonado; la ola recorre la palabra. */
+.proc-bar .proc-label.wave .ltr {
+	display: inline-block;
+	animation: proc-wave 1.4s ease-in-out infinite;
+}
+@keyframes proc-wave {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-3px);
+		color: var(--vscode-textLink-foreground, #4daafc);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.proc-bar .proc-label.wave .ltr {
+		animation: none;
+	}
 }
 .file-popup {
 	position: absolute;

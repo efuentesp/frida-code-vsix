@@ -18,7 +18,6 @@ import type { PermissionMode } from "./tools/frida-permission-system";
 import { readAuditLog } from "./tools/frida-permission-system/audit-log";
 import { createAuditPanelElement } from "./tools/frida-permission-system/AuditPanel";
 import { createConfigPanelElement } from "./tools/frida-permission-system/ConfigPanel";
-import { createApprovalDialogElement } from "./tools/frida-permission-system/ApprovalDialog";
 import {
 	DEVENGINE_BASE_URL,
 	SOFTTEK_PROVIDER,
@@ -40,6 +39,8 @@ import {
 	getCachedSystemPrompt,
 } from "./tools/frida-context/store";
 import { getTodoState } from "./tools/todo-web/store";
+import { createFridaWorkflowHost, handleWfSlash } from "./tools/frida-workflow";
+import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { createWebQuestionnaireElement } from "./web-questionnaire";
@@ -298,32 +299,6 @@ export async function activate(
 	// duplicadas — la perdedora se pierde sin dispose y su WebBridge vive publicando
 	// roots al webview para siempre (paneles duplicados). Ver ADR-0014.
 	let fridaPromise: Promise<FridaSession> | undefined;
-	// Fase 6 — roots Remote React de los diálogos de aprobación pendientes (uno por
-	// req.id). Se sincronizan con la lista del ApprovalBridge: montar nuevas,
-	// desmontar resueltas. Reemplazan a la ApprovalCard nativa del webview.
-	const approvalDialogRoots = new Map<string, { unmount: () => void }>();
-	function syncApprovalDialogs(reqs: ApprovalRequest[]): void {
-		if (!frida) return;
-		const incoming = new Set(reqs.map((r) => r.id));
-		for (const [id, handle] of approvalDialogRoots) {
-			if (!incoming.has(id)) {
-				handle.unmount();
-				approvalDialogRoots.delete(id);
-			}
-		}
-		const bridge = frida.bridge;
-		for (const req of reqs) {
-			if (approvalDialogRoots.has(req.id)) continue;
-			const handle = frida.webBridge.mountPersistent(
-				() =>
-					createApprovalDialogElement(req, (r) =>
-						bridge.resolve({ id: req.id, ...r }),
-					),
-				"overlay",
-			);
-			approvalDialogRoots.set(req.id, handle);
-		}
-	}
 	let activeModel: { provider: string; modelId: string } | undefined =
 		context.globalState.get(ACTIVE_MODEL_KEY);
 	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
@@ -1381,6 +1356,7 @@ export async function activate(
 		"context",
 		"gates",
 		"gates-config",
+		"wf",
 	]);
 
 	async function runBuiltinSlash(text: string): Promise<boolean> {
@@ -1438,7 +1414,7 @@ export async function activate(
 				await copyLastMessage();
 				break;
 			case "help":
-				postHelp();
+				postHelp(arg);
 				break;
 			case "clone":
 				await cloneSession();
@@ -1457,6 +1433,9 @@ export async function activate(
 				break;
 			case "gates-config":
 				postGatesConfigCommand();
+				break;
+			case "wf":
+				postWfCommand(arg);
 				break;
 		}
 		return true;
@@ -1489,10 +1468,82 @@ export async function activate(
 		post({ type: "info", text: "No hay mensaje del asistente para copiar." });
 	}
 
-	function postHelp(): void {
+	// /help: abre el README o la doc de una herramienta en markdown preview.
+	// Índice de herramientas con sus alias de match (para /help <alias>).
+	const HELP_TOOLS: { match: string[]; file: string; label: string }[] = [
+		{
+			match: ["workflow", "wf", "frida-workflow"],
+			file: "docs/tools/frida-workflow.md",
+			label: "frida-workflow",
+		},
+		{
+			match: ["permission", "gates", "frida-permission-system"],
+			file: "docs/tools/frida-permission-system.md",
+			label: "frida-permission-system",
+		},
+		{
+			match: ["context"],
+			file: "docs/tools/frida-context.md",
+			label: "frida-context",
+		},
+		{
+			match: [
+				"browser",
+				"agent-browser",
+				"agent_browser",
+				"web-search",
+				"web_search",
+				"electron",
+			],
+			file: "docs/tools/frida-agent-browser.md",
+			label: "frida-agent-browser",
+		},
+		{
+			match: ["extension", "extensions", "ext"],
+			file: "docs/tools/extensions.md",
+			label: "extensiones",
+		},
+		{
+			match: ["ask", "question", "ask-user-question-web"],
+			file: "docs/tools/ask-user-question-web.md",
+			label: "ask-user-question-web",
+		},
+		{ match: ["todo", "todos"], file: "docs/tools/todo.md", label: "todo" },
+		{ match: ["todo-web"], file: "docs/tools/todo-web.md", label: "todo-web" },
+	];
+
+	async function openHelpDoc(
+		relPath: string,
+		fragment?: string,
+	): Promise<void> {
+		const full = path.join(context.extensionPath, relPath);
+		let uri = vscode.Uri.file(full);
+		if (fragment) uri = uri.with({ fragment });
+		await vscode.commands.executeCommand("markdown.showPreview", uri);
+	}
+
+	async function postHelp(arg: string): Promise<void> {
+		const a = arg.trim();
+		if (!a) {
+			await openHelpDoc("README.md");
+			return;
+		}
+		const [head, ...rest] = a.split("#");
+		const frag = rest.join("#") || undefined;
+		const needle = head.trim().toLowerCase();
+		const tool = HELP_TOOLS.find(
+			(t) =>
+				t.match.some((m) => m.toLowerCase() === needle) ||
+				t.label.toLowerCase().includes(needle),
+		);
+		if (tool) {
+			await openHelpDoc(tool.file, frag);
+			return;
+		}
+		await openHelpDoc("README.md");
 		post({
 			type: "info",
-			text: "Comandos: /compact /reload /new /model /login <provider> /logout <provider> /name <texto> /copy /clone /fork /todos /context /gates /gates-config /help  ·  @ archivo  ·  ! bash (!! sin contexto)  ·  Enter enviar · Alt+Enter followUp · Esc detener  ·  Aprobaciones: botón de modo (manual/auto-edit/auto); patrones propios en settings frida.gates.*",
+			text: `No encontré "${arg}". Abriendo el índice (README). Herramientas: ${HELP_TOOLS.map((t) => t.label).join(", ")}.`,
 		});
 	}
 
@@ -1580,6 +1631,31 @@ export async function activate(
 		} catch (e) {
 			post({ type: "info", text: `No se pudo analizar el contexto: ${e}` });
 		}
+	}
+
+	// /wf: lanza un workflow (ADR-0020/D32). Corre en sesiones hijas desprendidas; el
+	// chat sigue usable y notifica por toast al terminar (panel llega en Fase 5).
+	async function postWfCommand(arg: string): Promise<void> {
+		const s = await ensureSession();
+		// Fase 5: montar el WorkflowPanel (footer) + registrar el lifecycle listener
+		// (idempotente). Antes de handleWfSlash para que los fire del runner lo pueblen.
+		wireWorkflowPanel(s.webBridge);
+		const host = createFridaWorkflowHost({
+			frida: s,
+			cwd: workspaceCwd(),
+			notify: (message) => post({ type: "info", text: message }),
+		});
+		await handleWfSlash(arg, {
+			host,
+			runsDirBase: path.join(context.globalStorageUri.fsPath, "workflows"),
+			cwd: workspaceCwd(),
+			agentDir: defaultAgentDir(),
+			dslBundlePath: path.join(
+				context.extensionPath,
+				"dist",
+				"frida-workflow.js",
+			),
+		});
 	}
 
 	// /gates: auditoría navegable de permisos (overlay Remote React, ADR-0016 Fase 2).
@@ -1937,7 +2013,6 @@ export async function activate(
 			frida.gateStats.reset(); // Fase 3: contadores a cero en el webview.
 			frida.sessionApprovals.clear(); // Fase 4: olvida patrones aprobados.
 			frida.webBridge.dispose();
-			approvalDialogRoots.clear(); // Fase 6: dispose ya desmontó los roots.
 			frida = undefined;
 			fridaPromise = undefined;
 		}
@@ -2006,7 +2081,6 @@ export async function activate(
 				},
 				onPendingApprovals: (reqs: ApprovalRequest[]) => {
 					post({ type: "approvals", approvals: reqs });
-					syncApprovalDialogs(reqs);
 				},
 				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
 				onUiNotify: (message, level) =>
@@ -2367,6 +2441,22 @@ export async function activate(
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
+		vscode.commands.registerCommand("frida.openHelp", async () => {
+			// /help desde la paleta: picker de README + herramientas.
+			type HelpItem = vscode.QuickPickItem & { rel?: string };
+			const items: HelpItem[] = [
+				{ label: "Frida Code — Índice general (README)", rel: "README.md" },
+				...HELP_TOOLS.map((t) => ({
+					label: t.label,
+					description: "herramienta",
+					rel: t.file,
+				})),
+			];
+			const pick = await vscode.window.showQuickPick(items, {
+				placeHolder: "Abrir ayuda de…",
+			});
+			if (pick?.rel) await openHelpDoc(pick.rel);
+		}),
 		vscode.commands.registerCommand(
 			"frida.diagnoseGateway",
 			() => void diagnoseGateway(),
