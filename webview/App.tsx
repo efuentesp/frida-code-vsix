@@ -461,6 +461,24 @@ export function App() {
 				</span>
 			</header>
 
+			{state.oauthDeviceCode && (
+				<div className="oauth-banner">
+					<div className="oauth-title">Iniciando sesión…</div>
+					<div className="oauth-hint">
+						Entra este código en GitHub (la página ya se abrió):
+					</div>
+					<div className="oauth-code">{state.oauthDeviceCode.userCode}</div>
+					<a
+						className="oauth-link"
+						href={state.oauthDeviceCode.verificationUri}
+						target="_blank"
+						rel="noreferrer"
+					>
+						{state.oauthDeviceCode.verificationUri}
+					</a>
+				</div>
+			)}
+
 			<div className="sub-header">
 				<Tooltip label="Proveedor" side="bottom">
 					<span className="sub-provider">{state.provider ?? "…"}</span>
