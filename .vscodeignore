@@ -3,6 +3,10 @@
 **/*.map
 **/tsconfig.json
 src/**
+# Excepción: skills y agentes .md de frida-pipeline van al .vsix
+# (Pi los descubre al sincronizarlos a ~/.frida/ en runtime).
+!src/tools/frida-pipeline/skills/**
+!src/tools/frida-pipeline/agents/**
 test/**
 scripts/**
 vitest.config.ts

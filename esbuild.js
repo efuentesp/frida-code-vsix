@@ -29,6 +29,35 @@ const piNodePaths =
 
 const watch = process.argv.includes("--watch");
 
+// Plugin: parchea loader.js del SDK para que getAliases() no crashee en el bundle.
+//
+// PROBLEMA: getAliases() computa packageIndex = path.resolve(__dirname, "../..",
+// "index.js"). En el bundle CJS, __dirname = dist/, así que packageIndex apunta a
+// <proyecto-padre>/index.js (inexistente). Además, resolveWorkspaceOrImport cae
+// al fallback fileURLToPath(import.meta.resolve(specifier)), y si el shim devuelve
+// el specifier tal cual (no es URL válida) → "Invalid URL".
+//
+// FIX: Reemplazar packageIndex para que apunte a dist/sdk-passthrough.js, que
+// re-exporta toda la API del SDK. El shim de import.meta.resolve también se
+// mejora para devolver __import_meta_url (no el specifier tal cual) en fallback.
+const fixExtensionLoader = {
+	name: "fix-extension-loader-aliases",
+	setup(build) {
+		build.onLoad(
+			{ filter: /[\\/]extensions[\\/]loader\.js$/ },
+			async (args) => {
+				let code = await fsSync.promises.readFile(args.path, "utf8");
+				// Hacer que packageIndex apunte al passthrough del SDK (no al monorepo).
+				code = code.replace(
+					'const packageIndex = path.resolve(__dirname, "../..", "index.js");',
+					'const packageIndex = path.join(__dirname, "sdk-passthrough.js");',
+				);
+				return { contents: code, loader: "js" };
+			},
+		);
+	},
+};
+
 /** @type {import('esbuild').BuildOptions} */
 const options = {
 	entryPoints: ["src/extension.ts"],
@@ -40,14 +69,20 @@ const options = {
 	sourcemap: true,
 	external,
 	...(piNodePaths ? { nodePaths: piNodePaths } : {}),
+	plugins: [fixExtensionLoader],
 	// Pi (ESM) usa import.meta.url e import.meta.resolve; en CJS esbuild los deja
 	// como {}. Los shimamos desde __filename del bundle.
+	//
+	// FIX: El shim de import.meta.resolve devolvía el specifier tal cual en catch
+	// (ej. "@earendil-works/pi-ai/compat"), y fileURLToPath de eso → "Invalid URL".
+	// Ahora devuelve __import_meta_url (el propio bundle) como fallback seguro:
+	// los paquetes @earendil-works/* están bundleados aquí.
 	banner: {
 		js: `
 var __import_meta_url = require("url").pathToFileURL(__filename).href;
 var __import_meta_resolve = function(specifier, parent) {
   try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
-  catch { return specifier; }
+  catch { return __import_meta_url; }
 };
 `,
 	},
@@ -76,12 +111,48 @@ const dslOptions = {
 	logLevel: "info",
 };
 
+// SDK passthrough: re-exporta la API pública del SDK para que las extensiones
+// externas (cargadas vía jiti desde ~/.frida/extensions/) puedan importar
+// { defineTool } from "@earendil-works/pi-coding-agent". Ver fixExtensionLoader.
+/** @type {import('esbuild').BuildOptions} */
+const passthroughOptions = {
+	entryPoints: ["src/sdk-passthrough.ts"],
+	bundle: true,
+	outfile: "dist/sdk-passthrough.js",
+	platform: "node",
+	format: "cjs",
+	target: "node18",
+	sourcemap: true,
+	external: external, // mismos externals que el bundle principal
+	...(piNodePaths ? { nodePaths: piNodePaths } : {}),
+	// Mismos shims que el bundle principal (el SDK usa import.meta.url internamente).
+	banner: {
+		js: `
+var __import_meta_url = require("url").pathToFileURL(__filename).href;
+var __import_meta_resolve = function(specifier, parent) {
+  try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
+  catch { return __import_meta_url; }
+};
+`,
+	},
+	define: {
+		"import.meta.url": "__import_meta_url",
+		"import.meta.resolve": "__import_meta_resolve",
+	},
+	logLevel: "info",
+};
+
 (async () => {
 	if (watch) {
 		const ctx = await esbuild.context(options);
 		const dslCtx = await esbuild.context(dslOptions);
-		await Promise.all([ctx.watch(), dslCtx.watch()]);
+		const ptCtx = await esbuild.context(passthroughOptions);
+		await Promise.all([ctx.watch(), dslCtx.watch(), ptCtx.watch()]);
 	} else {
-		await Promise.all([esbuild.build(options), esbuild.build(dslOptions)]);
+		await Promise.all([
+			esbuild.build(options),
+			esbuild.build(dslOptions),
+			esbuild.build(passthroughOptions),
+		]);
 	}
 })();

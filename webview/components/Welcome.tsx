@@ -148,7 +148,7 @@ export function Welcome() {
 			</div>
 			<h1>Frida Code (Softtek)</h1>
 			<p className="welcome-sub">
-				Frida Code es un asistente de codificación con IA. Pídele que construya funciones, corrija errores o explique tu base de código.
+				Frida Code es un asistente de codificación con IA creado por la VEU de AppDev. Pídele que construya funciones, corrija errores o explique tu base de código.
 			</p>
 
 			<div className="tip-day">

@@ -1,7 +1,8 @@
 # Análisis: porte de la funcionalidad `rpiv-pi` → `frida-code`
 
-> **Estado:** documento de descubrimiento (input para una futura skill
-> `/frida-pipeline` o el equivalente Frida de `rpiv-pi`). Sin plan todavía.
+> **Estado:** ✅ descubrimiento cerrado — `status: ready`.
+> Decisiones abiertas **resueltas** (ver §5). Próximo paso: **ADR-0021** +
+> spike de Fase 1 (esqueleto + banner + detección de siblings).
 >
 > **Fuentes consultadas (in-repo):**
 >
@@ -337,42 +338,29 @@ lo dependiente de hermanas al final y en cadena estricta.
 
 ---
 
-## 5. Decisiones abiertas (a resolver antes del ADR-0021)
+## 5. Decisiones resueltas (firmadas para ADR-0021)
 
-1. **¿`frida-pipeline` o `frida-orchestrator`?** Recomiendo `frida-pipeline`
-   (espejo de `rpiv-pi` y los usuarios que ya conocen rpiv).
-2. **¿Agentes globales (`<agentDir>/../global/agents/`) o por workspace?**
-   Recomiendo **global** para paridad y porque muchos subagentes son
-   "codebase-specialists" agnósticos al proyecto.
-3. **¿Artefactos en `.frida/artifacts/` o `.rpiv/artifacts/`?** Recomiendo
-   `.frida/artifacts/` (separación de namespaces, evita colisión si
-   coexisten).
-4. **¿Se distribuyen los 3 workflows built-in como TS compilado o como
-   JSON declarativo?** El patrón de `frida-workflow` (ADR-0020) los carga
-   con jiti desde `.ts`; replicar.
-5. **¿Las skills viven en `src/tools/frida-pipeline/skills/` (embebidas)
-   o en `.frida/skills/` (workspace, como las skills nativas de Pi)?**
-   Recomiendo **embebidas** (igual que rpiv-pi las embarca) para que la
-   extensión sea autosuficiente al instalar.
-6. **¿La skill `code-review` se queda como está (en rpiv) o se reescribe
-   para Frida?** Recomiendo reescribir (es la más usada, vale la pena
-   customizar al dominio Frida/Softtek).
-7. **¿Se eliminan los ADRs duplicados o se referencian?** Las ADRs de
-   Frida ya cubren muchos temas; `frida-pipeline` debe **referenciar**
-   (ADR-0010 agentDir, ADR-0015 context, ADR-0016 permission, ADR-0020
-   workflow) en vez de duplicar.
+| # | Decisión | Justificación |
+| --- | --- | --- |
+| D1 | **Nombre: `frida-pipeline`** | Espejo de `rpiv-pi`; usuarios que conocen rpiv lo identifican al instante. |
+| D2 | **Agentes globales** (`<frida.agentDir>/../global/agents/`) | Paridad con `rpiv-pi`. La mayoría son "codebase-specialists" agnósticos al proyecto; un workspace chico hereda los mismos 15 perfiles sin duplicar. |
+| D3 | **Artefactos en `.frida/artifacts/`** (no `.rpiv/`) | Separación de namespaces; evita colisión si rpiv-pi y frida-pipeline coexisten en la misma sesión Pi. |
+| D4 | **Workflows built-in en TS** (cargados con jiti) | Patrón de `frida-workflow` (ADR-0020); el mismo motor los descubre, valida y ejecuta. |
+| D5 | **Skills embebidas** en `src/tools/frida-pipeline/skills/` | Igual que `rpiv-pi` las embarca; la extensión es autosuficiente al instalar (no requiere poblar `.frida/skills/` manualmente). |
+| D6 | **`code-review` se reescribe para Frida** | Customizar al dominio Frida/Softtek (citando `docs/adr/`, `docs/tools/`, etc., no docs rpiv-agnósticas). |
+| D7 | **No duplicar ADRs; referenciar** | ADR-0010 (agentDir), ADR-0015 (context), ADR-0016 (permission), ADR-0020 (workflow), ADR-0014 (todo-web), ADR-0011 (extension-ui-context), ADR-0012 (frida-webview), ADR-0017/0018/0019 (providers/models) — `frida-pipeline` los **cita**, no los reescribe. |
 
 ---
 
 ## 6. Próximos pasos concretos
 
-1. **Revisar este doc** y firmar la Fase 0 (decisiones abiertas
-   resueltas) → ADR-0021.
-2. **Crear `docs/adr/0021-frida-pipeline-porter-rpiv-pi.md`** con las
-   decisiones firmadas.
-3. **Spike técnico de Fase 1** (esqueleto + banner + detección de
+1. ✅ **Revisar este doc** y firmar la Fase 0 (decisiones abiertas
+   resueltas).
+2. ⏭ **Crear `docs/adr/0021-frida-pipeline-porter-rpiv-pi.md`** con las
+   decisiones D1–D7 firmadas.
+3. ⏭ **Spike técnico de Fase 1** (esqueleto + banner + detección de
    siblings) antes de comprometerse a las 27 skills.
-4. **Programar el trabajo** por fases, validando cada gate antes de
+4. ⏭ **Programar el trabajo** por fases, validando cada gate antes de
    avanzar.
 
 ---

@@ -1,6 +1,6 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
@@ -42,6 +42,20 @@ import {
 import { getTodoState } from "./tools/todo-web/store";
 import { createFridaWorkflowHost, handleWfSlash } from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
+import {
+	computePipelineStatus,
+	formatPipelineStatus,
+	wirePipelinePanel,
+	getModelsConfigPath,
+	loadModelsConfig,
+	invalidateModelsConfigCache,
+	modelsConfigTemplate,
+	syncBundledAgents,
+	formatSyncReport,
+} from "./tools/frida-pipeline";
+import { listAgents, getAvailableTypes } from "./tools/frida-subagents";
+import { wireAgentWidget } from "./tools/frida-subagents/panel";
+import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { createWebQuestionnaireElement } from "./web-questionnaire";
@@ -1476,6 +1490,10 @@ export async function activate(
 		"gates",
 		"gates-config",
 		"wf",
+		"pipeline",
+		"frida-models",
+		"frida-update-agents",
+		"agents",
 		"version",
 		"update",
 	]);
@@ -1557,6 +1575,18 @@ export async function activate(
 				break;
 			case "wf":
 				postWfCommand(arg);
+				break;
+			case "pipeline":
+				void postPipelineCommand();
+				break;
+			case "frida-models":
+				void postFridaModelsCommand();
+				break;
+			case "frida-update-agents":
+				void postFridaUpdateAgentsCommand();
+				break;
+			case "agents":
+				void postAgentsCommand();
 				break;
 			case "version":
 				post({
@@ -1662,6 +1692,17 @@ export async function activate(
 			match: ["workflow", "wf", "frida-workflow"],
 			file: "docs/tools/frida-workflow.md",
 			label: "frida-workflow",
+		},
+		{
+			match: [
+				"pipeline",
+				"frida-pipeline",
+				"orquestador",
+				"frida-models",
+				"models",
+			],
+			file: "docs/tools/frida-pipeline.md",
+			label: "frida-pipeline",
 		},
 		{
 			match: ["permission", "gates", "frida-permission-system"],
@@ -1855,6 +1896,126 @@ export async function activate(
 				"frida-workflow.js",
 			),
 		});
+	}
+
+	// /pipeline: estado del orquestador frida-pipeline (ADR-0021). Fase 1: monta el
+	// banner persistente en el footer y postea el status actual al chat. Las
+	// Fases 2+ añadirán el resto de slash commands (/frida-models, /frida-update-agents,
+	// /frida-lanes) sin tocar este entry point.
+	async function postPipelineCommand(): Promise<void> {
+		const s = await ensureSession();
+		// Idempotente: si el panel ya está montado, retorna el mismo handle.
+		wirePipelinePanel(s.webBridge);
+		const status = computePipelineStatus();
+		const text = formatPipelineStatus(status);
+		post({
+			type: status.siblings.allPresent ? "info" : "warning",
+			text,
+		});
+	}
+
+	// /frida-models: editor de overrides de modelo por skill (ADR-0021 Fase 3).
+	// Muestra el config actual (overrides activos) y abre ~/.frida/models.json
+	// en el editor de VS Code. Si el archivo no existe, lo crea con un template.
+	// Tras editar, el usuario debe correr /frida-models de nuevo o reiniciar la
+	// sesión para que el cache se invalide.
+	async function postFridaModelsCommand(): Promise<void> {
+		await ensureSession();
+		const configPath = getModelsConfigPath();
+		const config = loadModelsConfig();
+
+		// Reportar el estado actual al chat.
+		const lines: string[] = [];
+		lines.push(`Config de modelos: ${configPath}`);
+		lines.push("");
+
+		if (config.defaults) {
+			lines.push(
+				`Defaults: ${config.defaults.model ?? "-"}${config.defaults.thinking ? ` (thinking: ${config.defaults.thinking})` : ""}`,
+			);
+		}
+		if (config.skills && Object.keys(config.skills).length > 0) {
+			lines.push("Skills:");
+			for (const [name, entry] of Object.entries(config.skills)) {
+				lines.push(
+					`  ${name}: ${entry.model ?? "-"}${entry.thinking ? ` (thinking: ${entry.thinking})` : ""}`,
+				);
+			}
+		}
+		if (
+			!config.defaults &&
+			!config.skills &&
+			!config.agents &&
+			!config.stages
+		) {
+			lines.push("(sin overrides configurados)");
+		}
+		lines.push("");
+		lines.push("Abriendo el editor…");
+		post({ type: "info", text: lines.join("\n") });
+
+		// Crear con template si no existe.
+		if (!existsSync(configPath)) {
+			await fs.mkdir(path.dirname(configPath), { recursive: true });
+			await fs.writeFile(configPath, modelsConfigTemplate(), "utf8");
+		}
+
+		// Abrir en el editor de VS Code.
+		const doc = await vscode.workspace.openTextDocument(configPath);
+		await vscode.window.showTextDocument(doc);
+
+		// Invalidar el cache para que la próxima invocación de skill-bracket
+		// lea el config actualizado.
+		invalidateModelsConfigCache();
+	}
+
+	// /frida-update-agents: sincroniza los 15 agentes empaquetados al agentDir
+	// global (~/.frida/global/agents/) con tracking sha256 (ADR-0021 Fase 5).
+	// Fuerza overwrite de archivos gestionados (apply=true), incluyendo los que
+	// el usuario editó a mano. Reporta el resultado al chat.
+	async function postFridaUpdateAgentsCommand(): Promise<void> {
+		await ensureSession();
+		const result = syncBundledAgents(true, defaultAgentDir());
+		post({
+			type: result.errors.length > 0 ? "warning" : "info",
+			text: formatSyncReport(result),
+		});
+	}
+
+	// /agents: gestión de sub-agentes (ADR-0022 Fase 4+6). Muestra agentes
+	// corriendo, tipos disponibles, settings y monta el widget del webview.
+	async function postAgentsCommand(): Promise<void> {
+		const s = await ensureSession();
+		wireAgentWidget(s.webBridge);
+		const cwd = workspaceCwd();
+		const lines: string[] = [];
+
+		// Agentes corriendo.
+		const agents = listAgents();
+		const running = agents.filter(
+			(a) => a.status === "running" || a.status === "queued",
+		);
+		if (running.length > 0) {
+			lines.push(`Agentes corriendo (${running.length}):`);
+			for (const a of running) {
+				lines.push(`  ● ${a.type}  ${a.description}  (${a.status})`);
+			}
+			lines.push("");
+		}
+
+		// Tipos disponibles.
+		const types = getAvailableTypes(cwd);
+		lines.push(`Tipos disponibles (${types.length}):`);
+		for (const t of types) {
+			lines.push(`  • ${t}`);
+		}
+		lines.push("");
+
+		// Settings.
+		const settings = loadSettings(cwd);
+		lines.push(formatSettings(settings));
+
+		post({ type: "info", text: lines.join("\n") });
 	}
 
 	// /gates: auditoría navegable de permisos (overlay Remote React, ADR-0016 Fase 2).

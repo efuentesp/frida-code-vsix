@@ -43,6 +43,8 @@ import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
 import { createFridaArgs } from "./tools/frida-args";
+import { createFridaPipeline } from "./tools/frida-pipeline";
+import { createFridaSubagents } from "./tools/frida-subagents";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -395,6 +397,23 @@ export async function createFridaSession(
 			{
 				name: "frida-agent-browser",
 				factory: createFridaAgentBrowser({ agentDir: opts.agentDir }),
+			},
+			// frida-pipeline (ADR-0021): orquestador puro — 0 tools propios. Registra
+			// los hooks invisibles de guidance recursiva (.frida/guidance/) y
+			// git-context (branch+commit+user). customType `frida-*` para coexistir
+			// con rpiv-pi. Fase 2: guidance + git-context; Fases 4–5 añaden
+			// pipeline-pointer y agents-sync aquí.
+			{
+				name: "frida-pipeline",
+				factory: createFridaPipeline(),
+			},
+			// frida-subagents (ADR-0022): sub-agentes autónomos estilo Claude Code.
+			// Registra 3 tools del modelo (Agent, get_subagent_result,
+			// steer_subagent). DEBE registrarse DESPUÉS de frida-pipeline para que
+			// los agentes ya estén sincronizados al discovery.
+			{
+				name: "frida-subagents",
+				factory: createFridaSubagents(),
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens

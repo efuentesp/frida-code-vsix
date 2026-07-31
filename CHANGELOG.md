@@ -11,6 +11,143 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-07-31
+
+### Corregido
+
+- **Error "Failed to load extension: Invalid URL"** al cargar extensiones
+  externas desde `~/.frida/extensions/` o `.frida/extensions/`. El shim de
+  `import.meta.resolve` en el bundle CJS devolvía el specifier tal cual
+  (ej. `"@earendil-works/pi-ai/compat"`) cuando `require.resolve` fallaba, y
+  `fileURLToPath()` de un bare specifier → TypeError. Ahora el shim devuelve
+  `__import_meta_url` (el propio bundle) como fallback.
+- **Añadido `dist/sdk-passthrough.js`** — re-exporta la API pública del SDK
+  (`defineTool`, `ExtensionAPI`, etc.) para que las extensiones externas
+  cargadas vía jiti puedan resolver `@earendil-works/pi-coding-agent`.
+- **Plugin `fixExtensionLoader`** en `esbuild.js` — parchea `loader.js` del SDK
+  durante el build para que `getAliases()` no calcule rutas inexistentes en el
+  bundle CJS.
+
+### Añadido
+
+- **`frida-subagents`** — sub-agentes autónomos estilo Claude Code sobre Pi
+  Agent (ADR-0022). Cero dependencias npm nuevas; extiende `frida-pipeline`
+  con spawning de agentes hijos via 3 tools (`Agent`, `get_subagent_result`,
+  `steer_subagent`).
+
+- **3 tools de modelo:**
+  - **`Agent`** — lanza un sub-agente (foreground síncrono o background
+    asíncrono). Soporta `subagent_type`, `prompt`, `description`,
+    `run_in_background`, `resume`, `max_turns`, `model`, `thinking`,
+    `inherit_context`, `isolation: worktree`.
+  - **`get_subagent_result`** — obtiene el resultado de un agente background
+    (con `wait: true` bloquea hasta completar; `verbose` trae la
+    conversación).
+  - **`steer_subagent`** — inyecta un mensaje de steering a un agente en
+    corrido para redirigirlo.
+
+- **Registry de tipos de agente:**
+  - 3 built-in: `general-purpose`, `Explore`, `Plan`.
+  - **Agentes personalizados** desde `.frida/agents/*.md` y
+    `~/.frida/global/agents/*.md` con frontmatter YAML (name, description,
+    model, tools, promptMode, etc.). `safeParseFrontmatter` con fallback si
+    el YAML parser estricto falla.
+  - **Tool scoping** — cada agente restringe las tools disponibles via
+    `allowedToolNames`.
+  - **Override de system prompt** — `promptMode: replace` o `append`.
+
+- **Lifecycle completo (Fase 2-4):**
+  - **Cola de concurrencia** — máximo 4 agentes simultáneos (configurable
+    via `~/.frida/subagents.json`). `acquireSlot`/`releaseSlot` con queue.
+  - **Group join** — modo `smart` (si todos completed), `async` (fire &
+    forget), o `group` (espera con timeout de 30s).
+  - **Notificaciones** — `ctx.ui.notify` al completar/error/abortar.
+  - **Graceful max_turns** — steering "wrap up" al llegar al límite, grace
+    de 5 turnos antes de hard-abortar.
+  - **Settings** — `~/.frida/subagents.json` (global) con override por
+    proyecto. Schema TypeBox.
+  - **`/agents`** — comando slash que muestra agentes corriendo, tipos
+    disponibles y settings.
+
+- **Aislamiento + memoria + skills (Fase 5):**
+  - **`isolation: worktree`** — crea un git worktree con branch
+    `pi-agent-<id>`, commitea cambios al completar (`cleanupWorktree`).
+  - **`memory: project|local|user`** — directorio persistente
+    `.frida/agent-memory/<name>/MEMORY.md`. Inyecta contenido al system
+    prompt; read-only si el agente no tiene tools de escritura.
+  - **`skills`** — precarga SKILL.md desde `~/.frida/skills/` al system
+    prompt (proyecto tiene prioridad sobre global).
+
+- **UI widget React fridaWeb (Fase 6):**
+  - **Widget persistente en el footer** — muestra agentes corriendo con
+    icono de estado (● ○ ✓ ✗ ■), tipo, descripción y tiempo transcurrido.
+  - **Auto-prune** — elimina agentes completados tras 10s del widget.
+  - **Store reactivo** — `useSyncExternalStore` sobre `agentWidgetStore`;
+    auto-hide cuando no hay agentes.
+
+### Cambiado
+
+- **`/agents`** ahora es async y monta el widget del webview la primera vez
+  que se invoca.
+
+## [0.2.0] - 2025-07-31
+
+### Añadido
+
+- **`frida-pipeline`** — orquestador nativo que ata las 5 extensiones existentes
+  y aporta paridad funcional con `rpiv-pi` (ADR-0021). Cero dependencias npm
+  nuevas; mismo patrón de porte nativo que frida-workflow (ADR-0020).
+
+- **Hooks invisibles de sesión:**
+  - **Guidance recursiva** — inyecta `AGENTS.md` > `CLAUDE.md` >
+    `.frida/guidance/<sub>/architecture.md` al tocar archivos (`tool_call`).
+  - **Git-context** — branch + commit + user inyectado en `session_start`,
+    `session_compact` y `before_agent_start` (con dedup por firma).
+  - **Pipeline pointer** — índice de skills inyectado en cada inicio de sesión
+    (`frida-pipeline-index`).
+  - **Skill-bracket** — override de modelo/thinking por skill via
+    `~/.frida/models.json`. El hook `input` detecta `/skill:<name>` y aplica
+    el override; `agent_end` lo restaura.
+
+- **27 skills** en español de México, distribuidas en 4 lotes:
+  - Descubrimiento: `discover`, `research`, `explore`
+  - Diseño: `design`, `design-slice`, `design-review`, `slice`
+  - Planificación: `plan`, `blueprint`, `synthesize`, `elaborate`, `revise`
+  - Ejecución: `implement`, `validate`, `grade`, `amend`, `commit`
+  - Revisión: `code-review`, `architecture-review`, `pr-triage`
+  - Utilidades: `create-handoff`, `resume-handoff`, `changelog`
+  - Anotación: `annotate-guidance`, `annotate-inline`, `migrate-to-guidance`
+  - Frontend: `frontend-design`
+
+- **15 subagentes** sincronizados al agentDir global (`~/.frida/global/agents/`)
+  con tracking sha256 para detectar drift. `/frida-update-agents` fuerza
+  re-sincronización.
+
+- **3 workflows built-in:**
+  - `/wf build "<feature>"` — pipeline completo (7 stages)
+  - `/wf vet` — revisión enfocada (2 stages)
+  - `/wf polish` — pulido estructural (4 stages)
+
+- **3 slash commands nuevos:**
+  - `/pipeline` — estado del orquestador + banner persistente
+  - `/frida-models` — editor de overrides de modelo por skill
+  - `/frida-update-agents` — re-sincroniza los 15 agentes
+
+- **ADR-0021** documentando las 7 decisiones firmadas (D1–D7).
+
+- **Documentación:** `docs/tools/frida-pipeline.md`, `docs/adr/0021-*.md`,
+  análisis de descubrimiento en `.rpiv/artifacts/discover/`.
+
+### Interno
+
+- `src/tools/frida-pipeline/` — 16 módulos TS (guidance, git-context,
+  session-hooks, skill-bracket, models-config, session-capture, agents-sync,
+  skills-sync, pipeline-pointer, workflows, banner, panel, siblings, etc).
+- Skills y agentes se sincronizan a `~/.frida/` al iniciar sesión (once-per-process).
+- `customType` con prefijo `frida-*` para coexistir con `rpiv-pi` sin colisión.
+- Artefactos en `.frida/artifacts/` (no `.rpiv/`).
+- 175 tests nuevos (frida-pipeline: 46 archivos, 679 tests totales).
+
 ## [0.1.0] - 2026-07-30
 
 ### Añadido
