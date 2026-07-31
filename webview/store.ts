@@ -452,6 +452,9 @@ export function reduce(state: State, msg: InMessage): State {
 				thinking: msg.thinking,
 			};
 
+		case "version":
+			return { ...state, version: msg.version };
+
 		case "tool_toggles":
 			return {
 				...state,

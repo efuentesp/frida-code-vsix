@@ -258,6 +258,8 @@ export interface State {
 	model?: string;
 	provider?: string;
 	thinking?: string;
+	/** Versión instalada de la extensión (badge del sub-header + /version). */
+	version?: string;
 	turns: Turn[];
 	approvals: ApprovalRequest[];
 	uiRequests: UiRequest[];
@@ -371,6 +373,7 @@ export type InMessage =
 	  }
 	| { type: "mode"; mode: ApprovalMode }
 	| { type: "gate_stats"; stats: GateStats }
+	| { type: "version"; version: string }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
 	| { type: "tool_toggles"; askUserQuestion: boolean; todo: boolean }
 	| { type: "lens_diagnostics"; summary: LensSummary | null }

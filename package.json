@@ -2,7 +2,7 @@
   "name": "frida-code",
   "displayName": "Frida Code",
   "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "softtek",
   "license": "UNLICENSED",
   "private": true,
@@ -14,6 +14,10 @@
   ],
   "main": "./dist/extension.js",
   "icon": "media/frida-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/efuentesp/frida-code-vsix.git"
+  },
   "contributes": {
     "commands": [
       {
@@ -69,6 +73,24 @@
         "title": "Frida: Diagnosticar thinking del proveedor"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "frida-sidebar",
+          "title": "Frida Code",
+          "icon": "media/favicon.svg"
+        }
+      ]
+    },
+    "views": {
+      "frida-sidebar": [
+        {
+          "id": "frida.codeView",
+          "name": "Frida Code",
+          "type": "webview"
+        }
+      ]
+    },
     "configuration": {
       "title": "Frida Code",
       "properties": {
@@ -158,7 +180,7 @@
     "build:host": "node esbuild.js",
     "build:webview": "vite build",
     "watch": "node esbuild.js --watch",
-    "package": "npm run build && vsce package",
+    "package": "npm run build && vsce package --allow-missing-repository",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",

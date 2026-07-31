@@ -146,9 +146,9 @@ export function Welcome() {
 			<div className="welcome-logo">
 				<img src={logo} className="welcome-logo-img" alt="Frida Code" />
 			</div>
-			<h1>Softtek</h1>
+			<h1>Frida Code (Softtek)</h1>
 			<p className="welcome-sub">
-				Tu asistente de código sobre Frida DevEngine.
+				Frida Code es un asistente de codificación con IA. Pídele que construya funciones, corrija errores o explique tu base de código.
 			</p>
 
 			<div className="tip-day">

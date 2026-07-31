@@ -32,23 +32,33 @@ chat.
 
 ## Quick Start
 
-1. **Instala la extensión** (PoC, por ahora desde fuente):
+1. **Instala la extensión** desde el `.vsix` precompilado:
 
-   ```bash
-   npm install
-   npm run build        # host (esbuild) + webview (Vite)
-   ```
+   - **Desde VS Code:** paleta *Extensions* → icono `⋯` (*Views and More Actions*)
+     → **Install from VSIX…** → selecciona `frida-code-<version>.vsix`.
+   - **Desde terminal:**
 
-   En VS Code pulsa **F5** (*Launch Extension*); el `preLaunchTask` recompila ambos.
+     ```bash
+     code --install-extension frida-code-<version>.vsix --force
+     ```
+
+   Tras instalar, **reinicia por completo VS Code** (`Cmd+Q` en macOS, no vale solo
+   *Reload Window*) para que aplique el modelo de activación. Aparecerá el icono de
+   Frida (lila) en la barra de actividad a la izquierda.
+
+   > ¿Desarrollas desde fuente? Ver [Desarrollo y empaquetado](#desarrollo-y-empaquetado):
+   > `npm install && npm run build` y **F5** (*Launch Extension*).
 
 2. **Configura tu API key.** Al primer uso, Frida te pide la key del gateway
    DevEngine y la guarda en `SecretStorage` (nunca se versiona ni se escribe a
    disco en claro). También puedes rotarla con el comando **Frida: Actualizar API
    key** o `/login devengine`.
 
-3. **Abre el panel** con el comando **Frida: Abrir panel** y escribe tu primer
-   mensaje. Las acciones del agente (`bash`, `edit`, `write`) pasarán por el gate
-   de aprobación según el modo activo.
+3. **Abre Frida Code:** haz click en el icono de Frida de la barra de actividad
+   (o ejecuta **Frida: Abrir panel**). La vista abre en el sidebar — si la prefieres
+   a la derecha como Copilot, arrástrala al sidebar secundario (VS Code lo recuerda).
+   Escribe tu primer mensaje; las acciones del agente (`bash`, `edit`, `write`)
+   pasarán por el gate de aprobación según el modo activo.
 
 > Si el gateway responde `401`, Frida te ofrece rotar la key en el momento.
 
@@ -112,6 +122,8 @@ El panel es un chat (webview React) que se comunica con el host por `postMessage
 | `/gates-config` | Configuración actual de gates |
 | `/wf <nombre> [input]` | Corre un workflow ([frida-workflow](./docs/tools/frida-workflow.md)) |
 | `/reload` | Recargar extensiones, skills y recursos |
+| `/version` | Muestra la versión instalada y el enlace a releases |
+| `/update` | Comprueba si hay una versión nueva en GitHub Releases (soporta `GITHUB_TOKEN` para repo privado) |
 
 Los `/<cmd>` que no sean built-in se envían tal cual al agente (p.ej. `/skill:...`
 o prompts guardados).
@@ -284,11 +296,16 @@ npm test            # vitest run
 En VS Code: **F5** (*Launch Extension*); el `preLaunchTask` recompila ambos. Al
 editar el webview hay que recompilar (no hay HMR cableado).
 
-**Empaquetar:**
+**Empaquetar e instalar:**
 
 ```bash
 npm run package     # build + produce frida-code-<version>.vsix
+
+# instala el .vsix recién creado (o desde la UI: Extensions → ⋯ → Install from VSIX…)
+code --install-extension frida-code-<version>.vsix --force
 ```
+
+Tras instalar, reinicia por completo VS Code (`Cmd+Q` en macOS, no *Reload Window*).
 
 > **Tarea de empaquetado ([ADR-0002](./docs/adr/)):** los nativos de Pi (`photon-node`
 > `.wasm` y `clipboard-*` `.node` por plataforma) deben incluirse en el `.vsix` con

@@ -9,7 +9,7 @@ import {
 } from "react";
 import { reduce, initialState } from "./store";
 import type { ApprovalMode, InMessage, OutMessage, ToastLevel } from "./types";
-import { Onboarding } from "./components/Onboarding";
+import { OnboardingWizard } from "./components/OnboardingWizard";
 import { TurnView } from "./components/Turn";
 import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
@@ -46,6 +46,7 @@ import { Spinner } from "./components/Spinner";
 import { AnimatedLabel } from "./components/AnimatedLabel";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { ModelPanel } from "./components/ModelPanel";
+import { SettingsHub } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 
@@ -77,6 +78,12 @@ export function App() {
 	const [modelsOpen, setModelsOpen] = useState(false);
 	const [forkOpen, setForkOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
+	// Wizard de onboarding: se muestra cuando no hay proveedor configurado
+	// (keyNeeded) y permanece hasta que el usuario completa el paso "¡Listo!".
+	const [wizardVisible, setWizardVisible] = useState(false);
+	useEffect(() => {
+		if (state.keyNeeded && !wizardVisible) setWizardVisible(true);
+	}, [state.keyNeeded, wizardVisible]);
 	const [hideThinking, setHideThinking] = useState(false);
 	const [retrySecs, setRetrySecs] = useState<number | null>(null);
 	const lastEscRef = useRef(0);
@@ -328,14 +335,19 @@ export function App() {
 		([, r]) => r.placement === "composer" && r.tree,
 	);
 
-	if (state.keyNeeded) {
+	if (wizardVisible) {
 		return (
-			<Onboarding
+			<OnboardingWizard
+				providers={state.models?.providers ?? []}
 				deviceCode={state.oauthDeviceCode}
-				onSubmit={(provider, key) => post({ type: "set_key", provider, key })}
-				onLoginCopilot={() =>
-					post({ type: "login_provider", provider: "github-copilot" })
-				}
+				onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
+				onLogin={(id) => post({ type: "login_provider", provider: id })}
+				onLogout={(id) => post({ type: "logout_provider", provider: id })}
+				onDone={() => setWizardVisible(false)}
+				onOpenSettings={() => {
+					setWizardVisible(false);
+					setConfigOpen(true);
+				}}
 			/>
 		);
 	}
@@ -536,6 +548,21 @@ export function App() {
 						>
 							{state.lensStatus.active ? "✓" : "○"} frida-lens
 						</span>
+					</Tooltip>
+				)}
+				{state.version && (
+					<Tooltip
+						label="Versión instalada · click para comprobar actualizaciones (/update)"
+						side="bottom"
+					>
+						<button
+							className="sub-version"
+							onClick={() =>
+								post({ type: "submit", text: "/update", mode: "steer" })
+							}
+						>
+							v{state.version}
+						</button>
 					</Tooltip>
 				)}
 			</div>
@@ -764,61 +791,11 @@ export function App() {
 				/>
 			)}
 			{configOpen && (
-				<div className="cfg-panel">
-					<div className="cfg-head">
-						<span className="cfg-title">Configuración</span>
-						<button className="ico" onClick={() => setConfigOpen(false)}>
-							<X size={15} />
-						</button>
-					</div>
-					<div className="cfg-body">
-						<div className="cfg-section">Herramientas del agente</div>
-						<div className="cfg-row">
-							<div className="cfg-row-info">
-								<div className="cfg-row-title">Preguntar al usuario</div>
-								<div className="cfg-row-desc">
-									Habilita el tool <code>ask_user_question</code> para que el
-									agente pregunte con opciones concretas en vez de adivinar.
-								</div>
-							</div>
-							<button
-								className={
-									"switch" +
-									((state.toolToggles?.askUserQuestion ?? true) ? " on" : "")
-								}
-								onClick={() =>
-									post({
-										type: "set_tool_toggle",
-										key: "askUserQuestion",
-										enabled: !(state.toolToggles?.askUserQuestion ?? true),
-									})
-								}
-							/>
-						</div>
-						<div className="cfg-row">
-							<div className="cfg-row-info">
-								<div className="cfg-row-title">Lista de tareas</div>
-								<div className="cfg-row-desc">
-									Habilita el tool <code>todo</code> y el panel de Tareas para
-									seguimiento multi-paso. Los cambios se aplican recargando las
-									extensiones (sin perder el historial).
-								</div>
-							</div>
-							<button
-								className={
-									"switch" + ((state.toolToggles?.todo ?? true) ? " on" : "")
-								}
-								onClick={() =>
-									post({
-										type: "set_tool_toggle",
-										key: "todo",
-										enabled: !(state.toolToggles?.todo ?? true),
-									})
-								}
-							/>
-						</div>
-					</div>
-				</div>
+				<SettingsHub
+					state={state}
+					post={post}
+					onClose={() => setConfigOpen(false)}
+				/>
 			)}
 		</div>
 	);

@@ -65,6 +65,29 @@ const ACTIVE_MODEL_KEY = "frida.activeModel";
 // de Copilot se añade por separado (OAuth, sin secret propio).
 const SUPPORTED_PROVIDERS = [...API_KEY_PROVIDER_IDS, "github-copilot"];
 
+// Repositorio de distribución del .vsix (GitHub Releases) para /version y /update.
+// Coincide con el campo `repository` de package.json.
+const UPDATE_REPO = "efuentesp/frida-code-vsix";
+const RELEASES_URL = `https://github.com/${UPDATE_REPO}/releases`;
+
+// Compara dos versiones semver (con o sin 'v' inicial): <0 si a<b, 0 si iguales, >0 si a>b.
+function compareSemver(a: string, b: string): number {
+	const pa = a
+		.replace(/^v/, "")
+		.split(".")
+		.map((n) => parseInt(n, 10) || 0);
+	const pb = b
+		.replace(/^v/, "")
+		.split(".")
+		.map((n) => parseInt(n, 10) || 0);
+	for (let i = 0; i < 3; i++) {
+		const da = pa[i] ?? 0;
+		const db = pb[i] ?? 0;
+		if (da !== db) return da - db;
+	}
+	return 0;
+}
+
 const BINARY_EXT = new Set([
 	"png",
 	"jpg",
@@ -316,9 +339,10 @@ export async function activate(
 	const pendingQueue: { text: string }[] = [];
 	let turnsInRun = 0;
 
-	let panel: vscode.WebviewPanel | undefined;
+	let view: vscode.WebviewView | undefined;
+	const fridaVersion = String(context.extension.packageJSON.version ?? "0.0.0");
 	const post = (msg: unknown): void => {
-		panel?.webview.postMessage(msg);
+		view?.webview.postMessage(msg);
 	};
 
 	function workspaceCwd(): string {
@@ -534,6 +558,19 @@ export async function activate(
 				frida = s;
 				wireSession(s.session);
 				sendModelInfo();
+				// Diagnóstico: si la sesión se creó pero session.model es undefined (ej. el
+				// modelo guardado no se restaura), el proveedor/modelo quedarían en "---"
+				// sin error visible. Lo hacemos explícito para poder depurarlo.
+				if (!s.session?.model) {
+					console.error(
+						"[frida] session.model es undefined tras createFridaSession",
+					);
+					post({
+						type: "info",
+						text: "La sesión inició pero no hay modelo activo. Abre Ayuda → Toggle Developer Tools → Console y busca ‘[frida]’ para ver el detalle.",
+						level: "warning",
+					});
+				}
 				postResources();
 				postModels();
 				void postWorkspace();
@@ -872,9 +909,17 @@ export async function activate(
 		if (!frida) return;
 		try {
 			await frida.modelRuntime.logout?.(providerId);
+			// Para proveedores de API key, borrar TAMBIÉN la key guardada (SecretStorage
+			// + caché) para que “olvidar” persista entre reinicios. (OAuth ya lo limpia
+			// modelRuntime.logout; los apikey no, porque su key vive en SecretStorage.)
+			const def = getApiKeyProvider(providerId);
+			if (def) {
+				await context.secrets.delete(def.secretKey);
+				delete keyCaches[providerId];
+			}
 			post({
 				type: "info",
-				text: `Sesión cerrada: ${providerDisplayName(providerId)}`,
+				text: `Se olvidó la credencial de ${providerDisplayName(providerId)}.`,
 			});
 			postModels();
 		} catch {
@@ -998,9 +1043,11 @@ export async function activate(
 	// los recursos cuanto antes. Captura errores para no dejar promesas sin manejar.
 	function bootstrapSession(): void {
 		void ensureSession().catch((e: any) => {
+			console.error("[frida] No se pudo iniciar la sesión:", e);
 			post({
 				type: "info",
 				text: "No se pudo iniciar la sesión: " + String(e?.message ?? e),
+				level: "error",
 			});
 		});
 	}
@@ -1198,32 +1245,31 @@ export async function activate(
 		});
 	}
 
-	async function openPanel(): Promise<void> {
-		if (panel) {
-			panel.reveal(vscode.ViewColumn.Two, true);
-			return;
-		}
-		panel = vscode.window.createWebviewPanel(
-			"frida",
-			"Frida Code",
-			vscode.ViewColumn.Two,
-			{
-				enableScripts: true,
-				retainContextWhenHidden: true,
-				localResourceRoots: [
-					vscode.Uri.joinPath(context.extensionUri, "dist-webview"),
-					vscode.Uri.joinPath(context.extensionUri, "media"),
-				],
-			},
+	// Frida Code vive en una vista lateral (webview view) registrada en la barra de
+	// actividad (viewsContainers.activitybar → frida-sidebar). resolveFridaView la
+	// monta la primera vez que se muestra; equivale al createWebviewPanel anterior,
+	// pero como vista lateral (no tab de editor). retainContextWhenHidden se fija en
+	// el provider (registerWebviewViewProvider) para preservar el estado al ocultarla.
+	function resolveFridaView(webviewView: vscode.WebviewView): void {
+		view = webviewView;
+		webviewView.webview.options = {
+			enableScripts: true,
+			localResourceRoots: [
+				vscode.Uri.joinPath(context.extensionUri, "dist-webview"),
+				vscode.Uri.joinPath(context.extensionUri, "media"),
+			],
+		};
+		webviewView.webview.html = getWebviewHtml(
+			webviewView.webview,
+			context.extensionUri,
 		);
-		panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
-		panel.onDidDispose(() => {
-			panel = undefined;
+		webviewView.onDidDispose(() => {
+			view = undefined;
 		});
-		panel.onDidChangeViewState(() => {
-			if (panel?.visible) void postWorkspace();
+		webviewView.onDidChangeVisibility(() => {
+			if (view?.visible) void postWorkspace();
 		});
-		panel.webview.onDidReceiveMessage((msg: any) => {
+		webviewView.webview.onDidReceiveMessage((msg: any) => {
 			void handleWebviewMessage(msg);
 		});
 	}
@@ -1232,12 +1278,23 @@ export async function activate(
 		switch (msg?.type) {
 			case "webview_ready":
 				post({ type: "mode", mode: approvalMode });
+				post({ type: "version", version: fridaVersion });
 				postToolToggles();
 				bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
-				// Re-publicar los roots Remote React persistentes ya montados (ej:
-				// panel del tool `todo`): el webview recargado perdió su estado y, al
-				// existir ya la sesión, no llega un session_start nuevo que los monte.
-				(await ensureSession()).webBridge.republish();
+				{
+					// Si la sesión YA existía (webview recreado, o sesión restaurada al
+					// arrancar), ensureSession la devuelve sin re-postear model_info/
+					// models → el webview nuevo se quedaría con proveedor/modelo en "---"
+					// y la pestaña Proveedores vacía, aunque el chat funcionase. Re-posteamos
+					// el estado (idempotente).
+					const s = await ensureSession();
+					s.webBridge.republish();
+					sendModelInfo();
+					postResources();
+					postModels();
+					void postWorkspace();
+					postUsage(s.session);
+				}
 				break;
 			case "submit":
 				await runPrompt(
@@ -1409,6 +1466,8 @@ export async function activate(
 		"gates",
 		"gates-config",
 		"wf",
+		"version",
+		"update",
 	]);
 
 	async function runBuiltinSlash(text: string): Promise<boolean> {
@@ -1489,8 +1548,74 @@ export async function activate(
 			case "wf":
 				postWfCommand(arg);
 				break;
+			case "version":
+				post({
+					type: "info",
+					text: `Frida Code v${fridaVersion} · usa /update para comprobar si hay versión nueva · ${RELEASES_URL}`,
+				});
+				break;
+			case "update":
+				void checkForUpdate();
+				break;
 		}
 		return true;
+	}
+
+	// /update: consulta la última release en GitHub y avisa si hay versión nueva.
+	// El repo es privado → 404 sin token; soporta GITHUB_TOKEN/GH_TOKEN para autenticar.
+	async function checkForUpdate(): Promise<void> {
+		const current = fridaVersion;
+		const url = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`;
+		try {
+			const headers: Record<string, string> = {
+				Accept: "application/vnd.github+json",
+				"User-Agent": "frida-code",
+			};
+			const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+			if (token) headers.Authorization = `Bearer ${token}`;
+			const r = await fetch(url, { headers });
+			if (r.status === 404) {
+				post({
+					type: "info",
+					text: `No se pudo comprobar actualizaciones (${UPDATE_REPO}). ¿Repo privado o sin releases? Si es privado, define GITHUB_TOKEN; si aún no hay, publica el .vsix en ${RELEASES_URL}.`,
+				});
+				return;
+			}
+			if (!r.ok) {
+				post({
+					type: "info",
+					text: `No se pudo comprobar actualizaciones (HTTP ${r.status}).`,
+				});
+				return;
+			}
+			const data: any = await r.json();
+			const latest = String(data?.tag_name ?? "").replace(/^v/, "");
+			if (!latest) {
+				post({
+					type: "info",
+					text: "La release más reciente no tiene tag de versión.",
+				});
+				return;
+			}
+			const htmlUrl: string =
+				data?.html_url ?? `https://github.com/${UPDATE_REPO}/releases`;
+			if (compareSemver(current, latest) < 0) {
+				post({
+					type: "info",
+					text: `Hay una versión nueva: v${latest} (tienes v${current}). Descarga: ${htmlUrl}`,
+				});
+			} else {
+				post({
+					type: "info",
+					text: `Estás al día (v${current}). Última release: v${latest}.`,
+				});
+			}
+		} catch (e: any) {
+			post({
+				type: "info",
+				text: `No se pudo comprobar actualizaciones: ${String(e?.message ?? e)}`,
+			});
+		}
 	}
 
 	async function renameCurrentSession(name: string): Promise<void> {
@@ -2499,7 +2624,16 @@ export async function activate(
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("frida.openPanel", () => void openPanel()),
+		vscode.window.registerWebviewViewProvider(
+			"frida.codeView",
+			{ resolveWebviewView: resolveFridaView },
+			{ webviewOptions: { retainContextWhenHidden: true } },
+		),
+		vscode.commands.registerCommand("frida.openPanel", () => {
+			// Enfoca la vista lateral (frida.codeView.focus es auto-generado por VS Code
+			// para la vista contribuida). Si la cerraron, se vuelve a resolver.
+			vscode.commands.executeCommand("frida.codeView.focus");
+		}),
 		vscode.commands.registerCommand("frida.openHelp", async () => {
 			// /help desde la paleta: picker de README + herramientas.
 			type HelpItem = vscode.QuickPickItem & { rel?: string };
