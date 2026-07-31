@@ -45,6 +45,7 @@ import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
 import { createFridaArgs } from "./tools/frida-args";
 import { createFridaPipeline } from "./tools/frida-pipeline";
 import { createFridaSubagents } from "./tools/frida-subagents";
+import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -414,6 +415,14 @@ export async function createFridaSession(
 			{
 				name: "frida-subagents",
 				factory: createFridaSubagents(),
+			},
+			// frida-mcp-adapter (ADR-0023): integración MCP (Model Context Protocol).
+			// Un único tool proxy mcp({}) (~200 tokens) da acceso a cientos de
+			// servidores MCP sin quemar contexto. Registra /mcp y /mcp-auth.
+			// DESPUÉS de frida-subagents para no interferir con el registro de tools.
+			{
+				name: "frida-mcp-adapter",
+				factory: createFridaMcpAdapter(),
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens

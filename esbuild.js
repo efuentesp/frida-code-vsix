@@ -9,6 +9,11 @@ const external = [
 	"vscode", // provisto por el extension host en runtime
 	"@silvia-odwyer/photon-node",
 	"@mariozechner/clipboard-*", // comodín: cubre todas las plataformas (.node)
+	// ADR-0023: @napi-rs/keyring es módulo nativo (N-API) — no se puede bundlear.
+	// Se shipea como .node en el .vsix (estilo clipboard). pi-mcp-adapter lo carga
+	// dinámicamente con createRequire + fallbacks por plataforma.
+	"@napi-rs/keyring",
+	"@napi-rs/keyring-*",
 ];
 
 // pi-ai es dependencia TRANSITORIA (vive bajo pi-coding-agent) y NO resuelve
@@ -58,6 +63,23 @@ const fixExtensionLoader = {
 	},
 };
 
+// ADR-0023: sampling-handler.ts importa `complete` de @earendil-works/pi-ai,
+// que fue removido en pi-ai v0.81+ (renombrado a streaming API).
+// Sampling es una feature opcional de MCP (la mayoría de servers no la usa).
+// Stub: exporta registerSamplingHandler como no-op.
+const stubSamplingHandler = {
+	name: "stub-mcp-sampling-handler",
+	setup(build) {
+		build.onLoad(
+			{ filter: /pi-mcp-adapter[\\/]sampling-handler\.ts$/ },
+			async () => ({
+				contents: `// Frida stub: pi-ai v0.81+ ya no exporta \`complete\`. Sampling deshabilitado.\nexport function registerSamplingHandler() {}\n`,
+				loader: "js",
+			}),
+		);
+	},
+};
+
 /** @type {import('esbuild').BuildOptions} */
 const options = {
 	entryPoints: ["src/extension.ts"],
@@ -69,7 +91,7 @@ const options = {
 	sourcemap: true,
 	external,
 	...(piNodePaths ? { nodePaths: piNodePaths } : {}),
-	plugins: [fixExtensionLoader],
+	plugins: [fixExtensionLoader, stubSamplingHandler],
 	// Pi (ESM) usa import.meta.url e import.meta.resolve; en CJS esbuild los deja
 	// como {}. Los shimamos desde __filename del bundle.
 	//
@@ -77,9 +99,13 @@ const options = {
 	// (ej. "@earendil-works/pi-ai/compat"), y fileURLToPath de eso → "Invalid URL".
 	// Ahora devuelve __import_meta_url (el propio bundle) como fallback seguro:
 	// los paquetes @earendil-works/* están bundleados aquí.
+	//
+	// ADR-0023: añadimos import.meta.dirname (Node 20+) para pi-mcp-adapter
+	// (ui-server.ts lo usa para resolver app-bridge.bundle.js).
 	banner: {
 		js: `
 var __import_meta_url = require("url").pathToFileURL(__filename).href;
+var __import_meta_dirname = __dirname;
 var __import_meta_resolve = function(specifier, parent) {
   try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
   catch { return __import_meta_url; }
@@ -88,6 +114,7 @@ var __import_meta_resolve = function(specifier, parent) {
 	},
 	define: {
 		"import.meta.url": "__import_meta_url",
+		"import.meta.dirname": "__import_meta_dirname",
 		"import.meta.resolve": "__import_meta_resolve",
 	},
 	logLevel: "info",
@@ -129,6 +156,7 @@ const passthroughOptions = {
 	banner: {
 		js: `
 var __import_meta_url = require("url").pathToFileURL(__filename).href;
+var __import_meta_dirname = __dirname;
 var __import_meta_resolve = function(specifier, parent) {
   try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
   catch { return __import_meta_url; }
@@ -137,6 +165,7 @@ var __import_meta_resolve = function(specifier, parent) {
 	},
 	define: {
 		"import.meta.url": "__import_meta_url",
+		"import.meta.dirname": "__import_meta_dirname",
 		"import.meta.resolve": "__import_meta_resolve",
 	},
 	logLevel: "info",
@@ -154,5 +183,17 @@ var __import_meta_resolve = function(specifier, parent) {
 			esbuild.build(dslOptions),
 			esbuild.build(passthroughOptions),
 		]);
+	}
+
+	// ADR-0023: copiar app-bridge.bundle.js a dist/ para MCP UI integration.
+	// ui-server.ts lo sirve desde import.meta.dirname (que en el bundle = dist/).
+	// Sin esto, las UIs de MCP servers no cargan el bridge JS del browser.
+	const bridgeSrc = nodePath.resolve(
+		"node_modules/pi-mcp-adapter/app-bridge.bundle.js",
+	);
+	const bridgeDst = nodePath.resolve("dist/app-bridge.bundle.js");
+	if (fsSync.existsSync(bridgeSrc)) {
+		fsSync.copyFileSync(bridgeSrc, bridgeDst);
+		if (!watch) console.log("  dist/app-bridge.bundle.js  copied");
 	}
 })();

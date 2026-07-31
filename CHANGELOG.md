@@ -11,6 +11,87 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-07-31
+
+### Añadido
+
+- **`frida-mcp-adapter`** — integración MCP (Model Context Protocol) que da
+  acceso al ecosistema de servidores MCP sin quemar contexto (ADR-0023). Un
+  único tool proxy `mcp({})` (~200 tokens) reemplaza cientos de definiciones
+  de herramientas. Wrapper delgado sobre [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)
+  v2.17.0.
+
+- **Tool proxy `mcp({})`** con 10 modos: status, list, search, describe,
+  call, connect, instructions, auth-start, auth-complete, ui-messages. El
+  agente descubre y ejecuta herramientas on-demand.
+
+- **Lifecycle de servidores** — lazy (default), eager, keep-alive,
+  lazy-keep-alive. Idle timeout configurable (10 min default). Health checks
+  y auto-reconnect.
+
+- **Config jerárquica** — lee `.mcp.json` (estándar compartido con Claude,
+  Cursor, Windsurf), `~/.config/mcp/mcp.json`, y overrides de Frida
+  (`~/.frida/mcp.json`, `.frida/mcp.json`). Imports de configs de otros
+  agentes (Cursor, Claude Code, Codex, Windsurf, VS Code, OpenCode).
+
+- **OAuth 2.1 completo** — PKCE, dynamic client registration, callback server
+  HTTP, tokens persistidos en el keyring nativo del SO (macOS Keychain). Soporta
+  headless/SSH via `mcp({ action: "auth-start" })`.
+
+- **Direct tools** — registrar tools MCP específicos como first-class tools
+  del agente (visibles en la tool list).
+
+- **Metadata cache** — caché persistente en disco para que search/list/
+  describe funcionen sin conexiones activas.
+
+- **Output guard** — protege el contexto de responses oversized (50 KiB /
+  2000 líneas inline, resto a temp file). Kill switch `MCP_OUTPUT_GUARD=0`.
+
+- **Slash commands `/mcp` y `/mcp-auth`** — panel interactivo de status,
+  reconexión, OAuth, setup guiado.
+
+- **MCP prompts como slash commands** — `/mcp__<server>__<prompt>`.
+
+- **`app-bridge.bundle.js`** copiado a `dist/` para MCP UI integration
+  (iframes interactivos en browser).
+
+### Cambiado
+
+- **`PI_CODING_AGENT_DIR`** se setea a `~/.frida/` antes de inicializar el
+  adapter, redirigiendo metadata cache, OAuth legacy y override global a
+  Frida.
+
+- **esbuild.js** — añadido `@napi-rs/keyring` + `@napi-rs/keyring-*` a
+  `external`; plugin `stubSamplingHandler` (sampling handler stubbeado por
+  incompatibilidad de API `complete` en pi-ai v0.81+); shim
+  `import.meta.dirname`; copy step para `app-bridge.bundle.js`.
+
+- **`tsconfig.json`** — `allowImportingTsExtensions: true` (pi-mcp-adapter
+  importa con extensión `.ts`).
+
+### Dependencias
+
+- `pi-mcp-adapter@2.17.0` (devDep) — wrapper del upstream.
+- `@modelcontextprotocol/sdk@1.30.0` (transitiva) — SDK de MCP, bundleado.
+- `@modelcontextprotocol/ext-apps@1.7.5` (transitiva) — MCP UI ext-apps.
+- `@napi-rs/keyring@1.3.0` (dep runtime) — keyring nativo del SO.
+- `recheck`, `smol-toml`, `ajv-formats` (transitivas) — bundleadas.
+
+### Limitaciones
+
+- **Sampling deshabilitado** — `pi-ai` v0.81+ removió la función `complete`
+  que el sampling handler usa. El handler se stubbeó como no-op. La mayoría
+  de servidores MCP no usan sampling.
+- **Keyring en Linux/Windows** — sólo `@napi-rs/keyring-darwin-arm64` se
+  incluye en el VSIX. En otras plataformas, OAuth no persiste (el proxy tool
+  y direct tools funcionan normalmente).
+
+### Interno
+
+- 28 tests nuevos (wrapper, keyring, integration). Total: 808 tests.
+- ADR-0023 documentando las 7 decisiones firmadas (D1–D7).
+- Documentación: `docs/tools/frida-mcp-adapter.md`.
+
 ## [0.3.0] - 2025-07-31
 
 ### Corregido

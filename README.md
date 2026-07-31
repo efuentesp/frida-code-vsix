@@ -196,6 +196,9 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | **frida-args** | Argumentos (`$1`/`$ARGUMENTS`) y shell (`!`cmd``) en skills — porte de rpiv-args | [→](./docs/tools/frida-args.md) |
 | **ask-user-question-web** | El agente pregunta con opciones estructuradas (UI web) | [→](./docs/tools/ask-user-question-web.md) |
 | **todo** / **todo-web** | Seguimiento multi-paso de tareas + panel | [→](./docs/tools/todo.md) |
+| **frida-pipeline** | Orquestador con 27 skills, 15 sub-agentes y 3 workflows (porte de rpiv-pi) | [→](./docs/tools/frida-pipeline.md) |
+| **frida-subagents** | Sub-agentes autónomos estilo Claude Code (Agent, get_subagent_result, steer_subagent) | [→](./docs/tools/frida-subagents.md) |
+| **frida-mcp-adapter** | Integración MCP — un proxy tool da acceso a cientos de servidores sin quemar contexto | [→](./docs/tools/frida-mcp-adapter.md) |
 
 ## Extensiones
 
