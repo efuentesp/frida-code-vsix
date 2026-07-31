@@ -1,18 +1,32 @@
-import { useState } from "react";
-import { Plug, SlidersHorizontal, Wrench, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+	Library,
+	Plug,
+	RotateCw,
+	SlidersHorizontal,
+	Wrench,
+	X,
+} from "lucide-react";
 import type { OutMessage, State } from "../types";
 import { ProveedoresTab } from "./ProveedoresTab";
+import { ResourcesContent } from "./ResourcesPanel";
 
 // Hub de Configuración (se abre con el engrane ⚙ o desde el onboarding). Pestañas:
 // Proveedores · Modelos · Auto-Aprobación · Herramientas. Reemplaza al viejo
 // cfg-panel de un sólo bloque. Modelos y Auto-Aprobación quedan como stubs por
 // ahora (alcance: onboarding + proveedores primero).
-export type SettingsTab = "providers" | "models" | "approval" | "tools";
+export type SettingsTab =
+	| "providers"
+	| "models"
+	| "approval"
+	| "resources"
+	| "tools";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
 	{ id: "providers", label: "Proveedores", icon: Plug },
 	{ id: "models", label: "Modelos", icon: SlidersHorizontal },
 	{ id: "approval", label: "Auto-Aprobación", icon: SlidersHorizontal },
+	{ id: "resources", label: "Recursos", icon: Library },
 	{ id: "tools", label: "Herramientas", icon: Wrench },
 ];
 
@@ -29,6 +43,12 @@ export function SettingsHub({
 }) {
 	const [tab, setTab] = useState<SettingsTab>(initialTab);
 	const providers = state.models?.providers ?? [];
+
+	// Al abrir la pestaña Recursos, refrescar la lista desde el host (el botón
+	// Library ya no está en el header; lo dispara esto al entrar a la pestaña).
+	useEffect(() => {
+		if (tab === "resources") post({ type: "list_resources" });
+	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	return (
 		<div className="cfg-panel">
@@ -75,6 +95,25 @@ export function SettingsHub({
 						Los modos de aprobación (manual / auto-edit / auto) están en la
 						barra inferior. Próximamente: toggles granulares (leer, escribir,
 						bash) estilo Roo Auto-Approve.
+					</div>
+				)}
+
+				{tab === "resources" && (
+					<div className="cfg-resources">
+						<div className="cfg-res-actions">
+							<button
+								className="pc-save"
+								onClick={() => post({ type: "reload" })}
+								disabled={state.busy}
+							>
+								<RotateCw size={13} /> Recargar extensiones y recursos
+							</button>
+						</div>
+						{state.resources ? (
+							<ResourcesContent res={state.resources} />
+						) : (
+							<div className="cfg-stub">Cargando recursos…</div>
+						)}
 					</div>
 				)}
 

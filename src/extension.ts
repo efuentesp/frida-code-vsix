@@ -65,6 +65,16 @@ const ACTIVE_MODEL_KEY = "frida.activeModel";
 // de Copilot se añade por separado (OAuth, sin secret propio).
 const SUPPORTED_PROVIDERS = [...API_KEY_PROVIDER_IDS, "github-copilot"];
 
+// ¿El proveedor está autenticado? getProviderAuthStatus revisa storedProviders
+// (auth.json persistido) → confiable para OAuth (Copilot) incluso tras reinicios.
+// hasConfiguredAuth sólo ve el snapshot en memoria, que se vacía al recrear la
+// sesión hasta la siguiente petición (por eso Copilot respondía pero aparecía como
+// “Disponible”). Fallback a hasConfiguredAuth si getProviderAuthStatus no existe.
+function isProviderAuthed(mr: any, id: string): boolean {
+	const status = mr?.getProviderAuthStatus?.(id);
+	return status ? !!status.configured : !!mr?.hasConfiguredAuth?.(id);
+}
+
 // Repositorio de distribución del .vsix (GitHub Releases) para /version y /update.
 // Coincide con el campo `repository` de package.json.
 const UPDATE_REPO = "efuentesp/frida-code-vsix";
@@ -578,8 +588,8 @@ export async function activate(
 				postUsage(s.session);
 				// Onboarding si NINGÚN proveedor soportado está autenticado (fase 2b:
 				// crear la sesión siempre permite elegir Copilot desde el onboarding).
-				const anyAuthed = SUPPORTED_PROVIDERS.some(
-					(id) => !!s?.modelRuntime?.hasConfiguredAuth?.(id),
+				const anyAuthed = SUPPORTED_PROVIDERS.some((id) =>
+					isProviderAuthed(s?.modelRuntime, id),
 				);
 				post({ type: anyAuthed ? "session_ready" : "need_key" });
 				return s;
@@ -713,7 +723,7 @@ export async function activate(
 			name: providerDisplayName(id),
 			oauth: !!mr.isUsingOAuth?.(id),
 			apiKey: !!getApiKeyProvider(id),
-			authed: !!mr.hasConfiguredAuth?.(id),
+			authed: isProviderAuthed(mr, id),
 			models: (mr.getModels?.(id) ?? []).map((mm: any) => ({
 				id: mm.id,
 				name: mm.name,
@@ -869,7 +879,7 @@ export async function activate(
 			);
 			// login() puede resolver SIN lanzar pero sin guardar credencial (éxito
 			// falso silencioso). Verificamos que de verdad quedó autenticado.
-			const authed = !!frida.modelRuntime.hasConfiguredAuth?.(providerId);
+			const authed = isProviderAuthed(frida.modelRuntime, providerId);
 			console.log("[frida] login resolved", providerId, "authed:", authed);
 			if (!authed) {
 				post({
@@ -1676,6 +1686,18 @@ export async function activate(
 			label: "frida-agent-browser",
 		},
 		{
+			match: [
+				"args",
+				"frida-args",
+				"skill-args",
+				"argumentos",
+				"placeholders",
+				"shell-substitution",
+			],
+			file: "docs/tools/frida-args.md",
+			label: "frida-args",
+		},
+		{
 			match: ["extension", "extensions", "ext"],
 			file: "docs/tools/extensions.md",
 			label: "extensiones",
@@ -1968,8 +1990,8 @@ export async function activate(
 			return;
 		}
 		// Auth global: API key de Softtek o login de suscripción (Copilot).
-		const anyAuthed = SUPPORTED_PROVIDERS.some(
-			(id) => !!session.modelRuntime?.hasConfiguredAuth?.(id),
+		const anyAuthed = SUPPORTED_PROVIDERS.some((id) =>
+			isProviderAuthed(session.modelRuntime, id),
 		);
 		if (!anyAuthed) {
 			post({ type: "need_key" });
@@ -2729,8 +2751,8 @@ export async function activate(
 			// reasoning_content: al correr esta demo se verá ✅.
 			try {
 				const s = await ensureSession();
-				const anyAuthed = SUPPORTED_PROVIDERS.some(
-					(id) => !!s.modelRuntime?.hasConfiguredAuth?.(id),
+				const anyAuthed = SUPPORTED_PROVIDERS.some((id) =>
+					isProviderAuthed(s.modelRuntime, id),
 				);
 				if (!anyAuthed) {
 					post({ type: "need_key" });

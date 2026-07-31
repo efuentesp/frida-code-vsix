@@ -32,7 +32,7 @@ function Section({
 // Sección estática de referencia: dónde colocar cada tipo de recurso para que
 // el descubrimiento propio ~/.frida (ADR-0010) lo cargue.
 function LocationsSection() {
-	const [open, setOpen] = useState(false);
+	const [open, setOpen] = useState(true);
 	const Row = ({
 		kind,
 		global,
@@ -109,171 +109,102 @@ function extName(p: string): string {
 	return base.replace(/\.(ts|js)$/, "");
 }
 
-// Sección de referencia rápida: cómo invocar skills y prompts.
-function UsageSection() {
-	const [open, setOpen] = useState(true);
+export function ResourcesContent({ res }: { res: ResourceSummary }) {
 	return (
-		<div className={"res-section usage" + (open ? "" : " collapsed")}>
-			<div className="res-section-head" onClick={() => setOpen(!open)}>
-				<span className="chev">
-					<ChevronRight size={12} />
-				</span>
-				<span className="res-section-title">Cómo invocarlos</span>
-				<span className="res-section-count">ref</span>
-			</div>
-			{open && (
-				<div className="res-section-body">
-					<p className="res-loc-intro">
-						Escribe <code>/</code> en el cuadro de texto: aparece la lista de
-						skills y prompts cargados. Sigue escribiendo para filtrar;{" "}
-						<kbd>↑</kbd>/<kbd>↓</kbd> navega, <kbd>Enter</kbd> o <kbd>Tab</kbd>{" "}
-						seleccionan, <kbd>Esc</kbd> cierra.
-					</p>
-					<div className="res-loc-row">
-						<div className="res-loc-kind">Skill</div>
-						<code className="res-loc-path">/skill:&lt;nombre&gt;</code>
-						<span className="res-loc-sep">·</span>
-						<code className="res-loc-path muted">ej. /skill:diagnose</code>
-					</div>
-					<div className="res-loc-row">
-						<div className="res-loc-kind">Prompt</div>
-						<code className="res-loc-path">/&lt;nombre&gt;</code>
-						<span className="res-loc-sep">·</span>
-						<code className="res-loc-path muted">ej. /review</code>
-					</div>
-					<p className="res-loc-note">
-						Al enviar, Frida expande el contenido del skill/prompt y lo pasa al
-						modelo.
-					</p>
-				</div>
-			)}
-		</div>
-	);
-}
+		<div className="resources-content">
+			<div className="sessions-list">
+				<Section title="Extensiones" count={res.extensions.length}>
+					{res.extensions.map((e, i) => {
+						const pills = [
+							...(e.tools ?? []).map((t) => ({ k: "tool", v: t })),
+							...(e.commands ?? []).map((c) => ({ k: "cmd", v: c })),
+						];
+						return (
+							<div key={i} className="res-item">
+								<Tooltip label={shortPath(e.path)} side="top">
+									<div className="res-item-name">
+										{e.inline ? (
+											<span className="tag inline">inline</span>
+										) : (
+											<span className="tag">ext</span>
+										)}
+										<span className="ext-name">{extName(e.path)}</span>
+									</div>
+								</Tooltip>
+								{pills.length > 0 && (
+									<div className="res-item-pills">
+										{pills.map((p, j) => (
+											<span key={j} className="tag tool">
+												<span className="tag-k">{p.k}</span>
+												{p.v}
+											</span>
+										))}
+									</div>
+								)}
+							</div>
+						);
+					})}
+				</Section>
 
-export function ResourcesPanel({
-	res,
-	model,
-	onClose,
-}: {
-	res: ResourceSummary;
-	model?: string;
-	onClose: () => void;
-}) {
-	return (
-		<div className="sessions-overlay" onClick={onClose}>
-			<div
-				className="sessions-panel res-panel"
-				onClick={(e) => e.stopPropagation()}
-			>
-				<div className="sessions-head">
-					<span>Recursos cargados</span>
-					<button className="sec" onClick={onClose}>
-						Cerrar
-					</button>
-				</div>
-				<div className="sessions-list">
-					{model && (
-						<div className="res-model">
-							Modelo: <code>{model}</code>
+				<Section title="Skills" count={res.skills.length}>
+					{res.skills.map((s, i) => (
+						<div key={i} className="res-item">
+							<div className="res-item-name">
+								<code>/{s.name || "skill"}</code>
+							</div>
+							{s.description && (
+								<div className="res-item-meta">{s.description}</div>
+							)}
 						</div>
-					)}
+					))}
+				</Section>
 
-					<UsageSection />
-
-					<Section title="Extensiones" count={res.extensions.length}>
-						{res.extensions.map((e, i) => {
-							const pills = [
-								...(e.tools ?? []).map((t) => ({ k: "tool", v: t })),
-								...(e.commands ?? []).map((c) => ({ k: "cmd", v: c })),
-							];
-							return (
-								<div key={i} className="res-item">
-									<Tooltip label={shortPath(e.path)} side="top">
-										<div className="res-item-name">
-											{e.inline ? (
-												<span className="tag inline">inline</span>
-											) : (
-												<span className="tag">ext</span>
-											)}
-											<span className="ext-name">{extName(e.path)}</span>
-										</div>
-									</Tooltip>
-									{pills.length > 0 && (
-										<div className="res-item-pills">
-											{pills.map((p, j) => (
-												<span key={j} className="tag tool">
-													<span className="tag-k">{p.k}</span>
-													{p.v}
-												</span>
-											))}
-										</div>
-									)}
-								</div>
-							);
-						})}
-					</Section>
-
-					<Section title="Skills" count={res.skills.length}>
-						{res.skills.map((s, i) => (
-							<div key={i} className="res-item">
-								<div className="res-item-name">
-									<code>/{s.name || "skill"}</code>
-								</div>
-								{s.description && (
-									<div className="res-item-meta">{s.description}</div>
-								)}
+				<Section title="Prompts" count={res.prompts.length}>
+					{res.prompts.map((p, i) => (
+						<div key={i} className="res-item">
+							<div className="res-item-name">
+								<code>/{p.name}</code>
 							</div>
-						))}
-					</Section>
+							{p.description && (
+								<div className="res-item-meta">{p.description}</div>
+							)}
+						</div>
+					))}
+				</Section>
 
-					<Section title="Prompts" count={res.prompts.length}>
-						{res.prompts.map((p, i) => (
-							<div key={i} className="res-item">
-								<div className="res-item-name">
-									<code>/{p.name}</code>
-								</div>
-								{p.description && (
-									<div className="res-item-meta">{p.description}</div>
-								)}
+				<Section title="Themes" count={res.themes.length}>
+					{res.themes.map((t, i) => (
+						<div key={i} className="res-item">
+							<div className="res-item-name">{t.name}</div>
+						</div>
+					))}
+				</Section>
+
+				<Section
+					title="Contexto (AGENTS.md / CLAUDE.md)"
+					count={res.contextFiles.length}
+				>
+					{res.contextFiles.map((f, i) => (
+						<div key={i} className="res-item">
+							<div className="res-item-name">
+								<code>{shortPath(f.path)}</code>
 							</div>
-						))}
-					</Section>
+						</div>
+					))}
+				</Section>
 
-					<Section title="Themes" count={res.themes.length}>
-						{res.themes.map((t, i) => (
-							<div key={i} className="res-item">
-								<div className="res-item-name">{t.name}</div>
+				<Section title="Errores" count={res.errors.length}>
+					{res.errors.map((e, i) => (
+						<div key={i} className="res-item err">
+							<div className="res-item-name">
+								<code>{shortPath(e.path)}</code>
 							</div>
-						))}
-					</Section>
+							<div className="res-item-meta">{e.error}</div>
+						</div>
+					))}
+				</Section>
 
-					<Section
-						title="Contexto (AGENTS.md / CLAUDE.md)"
-						count={res.contextFiles.length}
-					>
-						{res.contextFiles.map((f, i) => (
-							<div key={i} className="res-item">
-								<div className="res-item-name">
-									<code>{shortPath(f.path)}</code>
-								</div>
-							</div>
-						))}
-					</Section>
-
-					<Section title="Errores" count={res.errors.length}>
-						{res.errors.map((e, i) => (
-							<div key={i} className="res-item err">
-								<div className="res-item-name">
-									<code>{shortPath(e.path)}</code>
-								</div>
-								<div className="res-item-meta">{e.error}</div>
-							</div>
-						))}
-					</Section>
-
-					<LocationsSection />
-				</div>
+				<LocationsSection />
 			</div>
 		</div>
 	);

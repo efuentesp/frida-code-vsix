@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize2, Send, Square } from "lucide-react";
+import { Maximize, SendHorizontal, ShieldCheck, Square } from "lucide-react";
 import { Tooltip } from "./Tooltip";
-import type { ImageAttachment, ProviderOption } from "../types";
+import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
 
 interface Files {
 	query: string;
@@ -60,9 +60,15 @@ export function Composer({
 	files,
 	commands,
 	models,
+	active,
+	thinking,
+	mode,
 	busy,
 	pendingDialog,
 	onAbort,
+	onSelectModel,
+	onSetThinking,
+	onCycleMode,
 }: {
 	onSubmit: (
 		text: string,
@@ -73,12 +79,18 @@ export function Composer({
 	files?: Files;
 	commands?: CommandItem[];
 	models?: { providers: ProviderOption[] };
+	active?: { provider: string; modelId: string };
+	thinking?: string;
+	mode?: ApprovalMode;
 	busy?: boolean;
 	/** true cuando hay una pregunta o aprobación pendiente: el input se bloquea
 	 *  para forzar al usuario a responder la tarjeta (evita responder por texto
 	 *  que compite con el tool y confunde al modelo). */
 	pendingDialog?: boolean;
 	onAbort?: () => void;
+	onSelectModel?: (provider: string, modelId: string) => void;
+	onSetThinking?: (level: string) => void;
+	onCycleMode?: () => void;
 }) {
 	const [text, setText] = useState("");
 	const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -97,6 +109,12 @@ export function Composer({
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const bashMode = text.trimStart().startsWith("!");
+	// Selects de la fila 2: proveedor/modelo/esfuerzo derivados del estado.
+	const provs = models?.providers ?? [];
+	const activeProvider = provs.find((p) => p.id === active?.provider);
+	const modelOptions = activeProvider?.models ?? [];
+	const modeLabel =
+		mode === "manual" ? "Manual" : mode === "auto-edit" ? "Auto-edit" : "Auto";
 
 	useEffect(() => {
 		ref.current?.focus();
@@ -565,7 +583,7 @@ export function Composer({
 							? "Frida espera tu respuesta en la tarjeta de arriba (o pulsa Detener para cancelarla)…"
 							: bashMode
 								? "$ ejecuta bash…"
-								: "Pídele algo a Frida…"
+								: "Escribe un mensaje… (Enter envía, Shift+Enter nueva línea)"
 					}
 					value={text}
 					readOnly={pendingDialog}
@@ -580,33 +598,16 @@ export function Composer({
 				/>
 				<Tooltip label="Editor ampliado" side="top">
 					<button
-						className="send-btn ghost"
+						className="bar-ico"
 						disabled={pendingDialog}
 						onClick={() => {
 							setEditorText(text);
 							setEditorOpen(true);
 						}}
 					>
-						<Maximize2 size={15} />
+						<Maximize size={15} />
 					</button>
 				</Tooltip>
-				{busy ? (
-					<Tooltip label="Detener" side="top">
-						<button className="send-btn stop" onClick={() => onAbort?.()}>
-							<Square size={15} />
-						</button>
-					</Tooltip>
-				) : (
-					<Tooltip label="Enviar (Enter)" side="top">
-						<button
-							className="send-btn"
-							onClick={sendNow}
-							disabled={!text.trim()}
-						>
-							<Send size={16} />
-						</button>
-					</Tooltip>
-				)}
 			</div>
 			{atFiles.length > 0 && (
 				<div className="chips">
@@ -644,9 +645,81 @@ export function Composer({
 					))}
 				</div>
 			)}
-			<div className="hint">
-				@ archivos · / skill·prompt · ! bash · Enter envía · Alt+Enter =
-				followUp
+			<div className="bar-controls">
+				<div className="bar-left">
+					{provs.length > 0 && (
+						<select
+							className="bar-select"
+							value={active?.provider ?? ""}
+							onChange={(e) => {
+								const p = provs.find((x) => x.id === e.target.value);
+								const first = p?.models[0]?.id;
+								if (p && first) onSelectModel?.(p.id, first);
+							}}
+							aria-label="Proveedor"
+						>
+							{provs.map((p) => (
+								<option key={p.id} value={p.id}>
+									{p.name}
+								</option>
+							))}
+						</select>
+					)}
+					{modelOptions.length > 0 && (
+						<select
+							className="bar-select"
+							value={active?.modelId ?? ""}
+							onChange={(e) =>
+								active?.provider &&
+								onSelectModel?.(active.provider, e.target.value)
+							}
+							aria-label="Modelo"
+						>
+							{modelOptions.map((m) => (
+								<option key={m.id} value={m.id}>
+									{m.name}
+								</option>
+							))}
+						</select>
+					)}
+					<select
+						className="bar-select"
+						value={thinking ?? "medium"}
+						onChange={(e) => onSetThinking?.(e.target.value)}
+						aria-label="Esfuerzo"
+					>
+						<option value="low">Bajo</option>
+						<option value="medium">Medio</option>
+						<option value="high">Alto</option>
+					</select>
+				</div>
+				<div className="bar-right">
+					<Tooltip label={`Modo: ${modeLabel} (clic para ciclar)`} side="top">
+						<button
+							className={"bar-ico mode-" + (mode ?? "manual")}
+							onClick={() => onCycleMode?.()}
+						>
+							<ShieldCheck size={15} />
+						</button>
+					</Tooltip>
+					{busy ? (
+						<Tooltip label="Detener" side="top">
+							<button className="bar-send stop" onClick={() => onAbort?.()}>
+								<Square size={15} />
+							</button>
+						</Tooltip>
+					) : (
+						<Tooltip label="Enviar (Enter) · Alt+Enter = seguir" side="top">
+							<button
+								className="bar-send"
+								onClick={sendNow}
+								disabled={!text.trim()}
+							>
+								<SendHorizontal size={16} />
+							</button>
+						</Tooltip>
+					)}
+				</div>
 			</div>
 			{editorOpen && (
 				<div

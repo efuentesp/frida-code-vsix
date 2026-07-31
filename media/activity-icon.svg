@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <!-- Silueta de robot (cabeza + antena + orejas), SIN fondo. VS Code toma el canal
+       alfa y lo pinta con el color de ícono del tema (morado en temas tipo Dracula),
+       igual que a los íconos nativos. El favicon.svg (círculo púrpura relleno) se
+       queda para el welcome/webview: el círculo relleno hacía que la barra lo
+       enmascarara como un blob blanco. Contenido centrado a ~2/3 del marco. -->
+  <g fill="#6a5acd">
+    <circle cx="16" cy="6" r="1.9"/>
+    <rect x="15.05" y="7.3" width="1.9" height="3.3" rx="0.95"/>
+    <rect x="3.4" y="14.8" width="3" height="5.6" rx="1.5"/>
+    <rect x="25.6" y="14.8" width="3" height="5.6" rx="1.5"/>
+    <rect x="6.5" y="11" width="19" height="13" rx="4"/>
+  </g>
+</svg>

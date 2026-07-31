@@ -71,17 +71,17 @@ body {
 	padding: 4px;
 	background: none;
 	border: none;
-	color: var(--vscode-descriptionForeground);
+	color: var(--vscode-button-background);
 	cursor: pointer;
 	display: inline-flex;
 	border-radius: 4px;
 }
 .toolbar button.ico:hover {
-	color: var(--vscode-foreground);
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
+	color: var(--vscode-button-background);
 }
 .toolbar button.ico.active {
-	color: var(--vscode-textLink-foreground, #4daafc);
+	color: var(--vscode-button-background);
 }
 .toolbar button.ico.off {
 	opacity: 0.5;
@@ -382,6 +382,11 @@ body {
 	flex: 0 0 90px;
 	height: 6px;
 	background: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.2));
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(127, 127, 127, 0.4))
+		);
 	border-radius: 3px;
 	overflow: hidden;
 }
@@ -1899,8 +1904,8 @@ button.danger:hover {
 	margin-bottom: 14px;
 }
 .welcome-logo-img {
-	width: 224px;
-	height: 224px;
+	width: 150px;
+	height: 150px;
 	object-fit: contain;
 }
 .brand-logo {
@@ -3396,4 +3401,121 @@ kbd {
 }
 .pc-danger:hover {
 	filter: brightness(1.1);
+}
+
+/* Pestaña "Recursos" dentro del hub de Configuración (antes era un overlay modal). */
+.cfg-resources {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.cfg-res-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+.resources-content {
+	width: 100%;
+}
+.resources-content .sessions-list {
+	padding: 0;
+}
+
+/* Composer — fila 2 (estilo Kilocode): selects a la izq, íconos + enviar a la der. */
+.bar-controls {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+.bar-left,
+.bar-right {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+/* Selects compactos (proveedor / modelo / esfuerzo). */
+.bar-select {
+	padding: 3px 8px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border-radius: 6px;
+	cursor: pointer;
+	outline: none;
+	max-width: 170px;
+}
+.bar-select:hover {
+	color: var(--vscode-foreground);
+	border-color: var(
+		--vscode-inputOption-activeBorder,
+		var(--vscode-focusBorder)
+	);
+}
+.bar-select:focus {
+	border-color: var(--vscode-focusBorder);
+}
+/* Íconos planos (editor ampliado, modo aprobación): mismo morado que el toolbar. */
+.bar-ico {
+	padding: 5px;
+	line-height: 0;
+	background: none;
+	border: none;
+	color: var(--vscode-button-background);
+	cursor: pointer;
+	display: inline-flex;
+	border-radius: 4px;
+}
+.bar-ico:hover {
+	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
+	color: var(--vscode-button-background);
+}
+.bar-ico:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+/* Acento según el modo de aprobación (sólo ícono, sin texto). */
+.bar-ico.mode-auto {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.bar-ico.mode-auto-edit {
+	color: var(--vscode-editorWarning-foreground, #d29922);
+}
+/* Botón Enviar / Detener. */
+.bar-send {
+	flex: none;
+	padding: 7px;
+	line-height: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+}
+.bar-send:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+.bar-send:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.bar-send.stop {
+	background: var(--vscode-errorForeground, #f85149);
+	color: #fff;
+}
+
+/* Cluster derecho de la fila de contexto: frida-lens + versión, pegados a la derecha. */
+.ctx-right {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }

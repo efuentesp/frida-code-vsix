@@ -42,6 +42,7 @@ import {
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
+import { createFridaArgs } from "./tools/frida-args";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -378,6 +379,15 @@ export async function createFridaSession(
 			{
 				name: "frida-context",
 				factory: toggleable(opts.contextEnabled, createFridaContext()),
+			},
+			// frida-args: argumentos ($1/$ARGUMENTS/${@:N:L}), variables (${SKILL_DIR}/
+			// ${SESSION_ID}) y sustitución de shell (!`cmd` / ```!) en skills. Porte de
+			// @juicesharp/rpiv-args como extensión embebida; 100% headless → modo rpc.
+			// Intercepta /skill:<name> <args> antes del expansor nativo de Pi. Siempre
+			// activa: una skill sin placeholders ni shell emite bytes idénticos a Pi.
+			{
+				name: "frida-args",
+				factory: createFridaArgs(),
 			},
 			// frida-agent-browser (D34): tool `agent_browser` que envuelve el binario
 			// upstream agent-browser (Vercel) — automation de navegador real. Sesión

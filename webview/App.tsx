@@ -19,7 +19,6 @@ import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
-import { ResourcesPanel } from "./components/ResourcesPanel";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import {
 	Bot,
@@ -30,17 +29,12 @@ import {
 	CornerDownRight,
 	History,
 	Info,
-	Key,
-	Library,
-	Minimize2,
-	RotateCw,
+	ListChevronsDownUp,
+	Plus,
 	Settings,
-	ShieldCheck,
-	SquarePen,
 	TriangleAlert,
 	X,
 } from "lucide-react";
-import { ChevronDown } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { Spinner } from "./components/Spinner";
 import { AnimatedLabel } from "./components/AnimatedLabel";
@@ -63,9 +57,6 @@ function getVsCode(): VsCodeApi {
 function nextMode(m: ApprovalMode): ApprovalMode {
 	return m === "manual" ? "auto-edit" : m === "auto-edit" ? "auto" : "manual";
 }
-function labelMode(m: ApprovalMode): string {
-	return m === "manual" ? "Manual" : m === "auto-edit" ? "Auto-edit" : "Auto";
-}
 
 export function App() {
 	const [state, dispatch] = useReducer(reduce, initialState);
@@ -74,7 +65,6 @@ export function App() {
 	const stickRef = useRef(true);
 	const [escHint, setEscHint] = useState(false);
 	const [sessionsOpen, setSessionsOpen] = useState(false);
-	const [resourcesOpen, setResourcesOpen] = useState(false);
 	const [modelsOpen, setModelsOpen] = useState(false);
 	const [forkOpen, setForkOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
@@ -364,18 +354,13 @@ export function App() {
 				</span>
 				<span className="spacer" />
 				<span className="tb-group">
-					<Tooltip
-						label="Recursos cargados (extensiones, skills, prompts, themes, contexto)"
-						side="bottom"
-					>
+					<Tooltip label="Nueva sesión" side="bottom">
 						<button
 							className="ico"
-							onClick={() => {
-								post({ type: "list_resources" });
-								setResourcesOpen(true);
-							}}
+							onClick={() => post({ type: "new_session" })}
+							disabled={state.busy}
 						>
-							<Library size={15} />
+							<Plus size={15} />
 						</button>
 					</Tooltip>
 					<Tooltip label="Sesiones anteriores" side="bottom">
@@ -389,23 +374,9 @@ export function App() {
 							<History size={15} />
 						</button>
 					</Tooltip>
-					<Tooltip label="Configuración" side="bottom">
-						<button className="ico" onClick={() => setConfigOpen(true)}>
-							<Settings size={15} />
-						</button>
-					</Tooltip>
 				</span>
 				<span className="tb-sep" />
 				<span className="tb-group">
-					<Tooltip label="Nueva sesión" side="bottom">
-						<button
-							className="ico"
-							onClick={() => post({ type: "new_session" })}
-							disabled={state.busy}
-						>
-							<SquarePen size={15} />
-						</button>
-					</Tooltip>
 					<Tooltip label="Compactar contexto" side="bottom">
 						<button
 							className="ico"
@@ -414,7 +385,7 @@ export function App() {
 								state.busy || state.isCompacting || state.turns.length === 0
 							}
 						>
-							<Minimize2 size={15} />
+							<ListChevronsDownUp size={15} />
 						</button>
 					</Tooltip>
 					<Tooltip
@@ -430,44 +401,12 @@ export function App() {
 							<Brain size={15} />
 						</button>
 					</Tooltip>
-					<Tooltip label="Recargar extensiones y recursos" side="bottom">
-						<button
-							className="ico"
-							onClick={() => post({ type: "reload" })}
-							disabled={state.busy}
-						>
-							<RotateCw size={15} />
-						</button>
-					</Tooltip>
 				</span>
 				<span className="tb-sep" />
 				<span className="tb-group">
-					<Tooltip
-						label="Modo de aprobación: Manual → Auto-edit → Auto (clic para ciclar)"
-						side="bottom"
-					>
-						<button
-							className={"toggle " + state.mode}
-							onClick={() =>
-								post({ type: "set_mode", mode: nextMode(state.mode) })
-							}
-						>
-							<ShieldCheck size={14} /> {labelMode(state.mode)}
-							{state.gateStats &&
-							state.gateStats.allow +
-								state.gateStats.block +
-								state.gateStats.autoAllow >
-								0 ? (
-								<span className="gate-stats">
-									<span className="gs-allow">✓{state.gateStats.allow}</span>
-									<span className="gs-block">✗{state.gateStats.block}</span>
-									{state.gateStats.autoAllow > 0 ? (
-										<span className="gs-auto">
-											⚡{state.gateStats.autoAllow}
-										</span>
-									) : null}
-								</span>
-							) : null}
+					<Tooltip label="Configuración" side="bottom">
+						<button className="ico" onClick={() => setConfigOpen(true)}>
+							<Settings size={15} />
 						</button>
 					</Tooltip>
 				</span>
@@ -490,82 +429,6 @@ export function App() {
 					</a>
 				</div>
 			)}
-
-			<div className="sub-header">
-				<Tooltip label="Proveedor" side="bottom">
-					<span className="sub-provider">{state.provider ?? "…"}</span>
-				</Tooltip>
-				<span className="sub-sep">·</span>
-				<Tooltip label="Cambiar modelo / proveedor" side="bottom">
-					<button
-						className="sub-model-btn"
-						onClick={() => {
-							setModelsOpen(true);
-							post({ type: "list_models" });
-						}}
-					>
-						{state.model ?? "…"} <ChevronDown size={12} />
-					</button>
-				</Tooltip>
-				<span className="sub-sep">·</span>
-				<Tooltip label="Nivel de esfuerzo / thinking" side="bottom">
-					<select
-						className="thinking-select"
-						value={state.thinking ?? "medium"}
-						onChange={(e) =>
-							post({ type: "set_thinking", level: e.target.value })
-						}
-					>
-						<option value="low">low</option>
-						<option value="medium">medium</option>
-						<option value="high">high</option>
-					</select>
-				</Tooltip>
-				<Tooltip
-					label={state.keyNeeded ? "Configurar API key" : "Cambiar API key"}
-					side="bottom"
-				>
-					<button
-						className={"sub-key" + (state.keyNeeded ? " missing" : "")}
-						onClick={() => post({ type: "rotate_key" })}
-					>
-						<Key size={12} />
-					</button>
-				</Tooltip>
-				{state.lensStatus?.loaded && (
-					<Tooltip
-						label={
-							state.lensStatus.active
-								? "frida-lens activo (emitiendo diagnósticos)"
-								: "frida-lens cargado (sin actividad aún este turno)"
-						}
-						side="bottom"
-					>
-						<span
-							className={
-								"lens-badge" + (state.lensStatus.active ? " active" : "")
-							}
-						>
-							{state.lensStatus.active ? "✓" : "○"} frida-lens
-						</span>
-					</Tooltip>
-				)}
-				{state.version && (
-					<Tooltip
-						label="Versión instalada · click para comprobar actualizaciones (/update)"
-						side="bottom"
-					>
-						<button
-							className="sub-version"
-							onClick={() =>
-								post({ type: "submit", text: "/update", mode: "steer" })
-							}
-						>
-							v{state.version}
-						</button>
-					</Tooltip>
-				)}
-			</div>
 
 			{state.mode === "auto-edit" && (
 				<div className="info-bar warn">
@@ -732,16 +595,30 @@ export function App() {
 						files={state.files}
 						commands={commands}
 						models={state.models}
+						active={state.models?.active}
+						thinking={state.thinking}
+						mode={state.mode}
 						busy={state.busy}
 						pendingDialog={state.approvals.length > 0}
 						onAbort={() => post({ type: "abort" })}
+						onSelectModel={(provider, modelId) =>
+							post({ type: "select_model", provider, model: modelId })
+						}
+						onSetThinking={(level) => post({ type: "set_thinking", level })}
+						onCycleMode={() =>
+							post({ type: "set_mode", mode: nextMode(state.mode) })
+						}
 					/>
 				)}
-				<WorkspaceBar
-					ws={state.workspace}
-					onRefresh={() => post({ type: "workspace" })}
+				<WorkspaceBar ws={state.workspace} />
+				<ContextBar
+					usage={state.usage}
+					lensStatus={state.lensStatus}
+					version={state.version}
+					onVersionClick={() =>
+						post({ type: "submit", text: "/update", mode: "steer" })
+					}
 				/>
-				{state.usage && <ContextBar usage={state.usage} />}
 			</div>
 			{sessionsOpen && state.sessions && (
 				<SessionsPanel
@@ -755,13 +632,6 @@ export function App() {
 						post({ type: "rename_session", path: p, name: n })
 					}
 					onDelete={(p) => post({ type: "delete_session", path: p })}
-				/>
-			)}
-			{resourcesOpen && state.resources && (
-				<ResourcesPanel
-					res={state.resources}
-					model={state.model}
-					onClose={() => setResourcesOpen(false)}
 				/>
 			)}
 			{modelsOpen && state.models && (
