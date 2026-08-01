@@ -2,7 +2,7 @@
 
 > **Audiencia:** Desarrolladores del equipo que aprenderán a usar **Frida Code** end-to-end construyendo una aplicación real.
 > **Duración estimada:** 6-8 horas (puede hacerse en 2-3 sesiones).
-> **Stack del proyecto:** Next.js 15 + shadcn/ui + PocketBase + Docker.
+> **Stack del proyecto:** Next.js 15 + shadcn/ui + PocketBase (binario nativo en Windows).
 > **Nivel:** Intermedio. Asume familiaridad con TypeScript y React básicos.
 
 ---
@@ -28,7 +28,7 @@
 
 - [2.1 Scaffold del proyecto Next.js](#21-scaffold-del-proyecto-nextjs)
 - [2.2 Configuración de shadcn/ui](#22-configuración-de-shadcnui)
-- [2.3 Levantar PocketBase con Docker](#23-levantar-pocketbase-con-docker)
+- [2.3 Levantar PocketBase (binario nativo)](#23-levantar-pocketbase-binario-nativo)
 - [2.4 Schema inicial de la base de datos](#24-schema-inicial-de-la-base-de-datos)
 - [2.5 Cliente PocketBase en Next.js](#25-cliente-pocketbase-en-nextjs)
 - [2.6 Primera conversación con Frida](#26-primera-conversación-con-frida)
@@ -60,7 +60,7 @@
 - [6.1 Suite de pruebas con frida-pipeline](#61-suite-de-pruebas-con-frida-pipeline)
 - [6.2 Code review con `/skill:code-review`](#62-code-review-con-skillcode-review)
 - [6.3 Changelog y release notes](#63-changelog-y-release-notes)
-- [6.4 Deploy con Docker](#64-deploy-con-docker)
+- [6.4 Build de producción en Windows](#64-build-de-producción-en-windows)
 
 ### Apéndices
 
@@ -110,37 +110,81 @@ Frida estructura este flujo con **workflows** (`/wf build` ejecuta 7 stages auto
 
 ## 0.2 Prerrequisitos
 
-Necesitas instalar antes de empezar:
+### Software necesario
 
-| Software | Versión mínima | Cómo verificar |
-| --- | --- | --- |
-| **VS Code** | 1.85+ | Abrir VS Code → Help → About |
-| **Git** | 2.30+ | `git --version` |
-| **Node.js** | 20+ | `node --version` |
-| **Python** | 3.10+ | `python --version` |
-| **Docker Desktop** | 4.0+ | `docker --version` |
+| Software | Versión mínima | Quién instala | Cómo verificar |
+| --- | --- | --- | --- |
+| **VS Code** | 1.85+ | TI (vía ticket) | Abrir VS Code → Help → About |
+| **Node.js LTS** | 20+ | TI (vía ticket) | `node --version` en PowerShell |
+| **Python** | 3.10+ | TI (vía ticket) | `python --version` en PowerShell |
+| **Git** | 2.30+ | TI (vía ticket) | `git --version` en PowerShell |
+| **PocketBase** | 0.22+ | TI (vía ticket) | `pocketbase --version` en PowerShell |
+| **Frida Code** | 0.4.0 (extensión `.vsix`) | TI (vía ticket) | Visible en Extensions de VS Code |
 
-### Instalación por sistema operativo
+**Importante:** PocketBase corre como binario nativo en Windows. Todo el software se ejecuta directamente en Windows 11, sin máquinas virtuales.
 
-**macOS (con Homebrew):**
+### Paso previo: levantar ticket en help.softtek.com
 
-```bash
-brew install node git python docker
-```
+**Toda la instalación de software en este equipo la realiza el equipo de TI** a través de un ticket en [help.softtek.com](https://help.softtek.com). No intentes instalar nada por tu cuenta — los equipos están bajo policies corporativos que requieren aprobación y configuración específica.
 
-**Ubuntu/Debian:**
+**Datos para el ticket:**
 
-```bash
-sudo apt update
-sudo apt install -y nodejs npm git python3 python3-pip docker.io
-sudo usermod -aG docker $USER  # Reiniciar sesión después
-```
+- **Asunto:** `Solicitud de ambiente de desarrollo - Frida Code (Next.js + PocketBase nativo)`
+- **Categoría:** Software / Instalación
+- **Descripción del ticket:**
 
-**Windows (con Chocolatey):**
+  ```
+  Necesito configurar mi equipo Windows 11 con el siguiente software
+  para desarrollo con Frida Code:
+
+  1. VS Code (última versión estable, ≥ 1.85)
+  2. Node.js LTS (≥ v20) con npm incluido
+  3. Python (≥ 3.10) con pip
+  4. Git (≥ 2.30)
+  5. PocketBase (≥ 0.22) — binario nativo para Windows
+     (descargar de https://pocketbase.io/docs/ y colocar en
+     C:\tools\pocketbase\pocketbase.exe)
+  6. Extensión Frida Code (.vsix adjunto)
+
+  Configuración adicional requerida:
+  - Crear la carpeta C:\dev\ con permisos de escritura para mi usuario
+  - Crear la carpeta C:\tools\pocketbase\ y agregar al PATH del sistema
+  - Agregar al PATH del sistema: C:\Program Files\nodejs\
+  - Permitir conexión localhost:8090 (PocketBase) en el firewall de Windows
+  - Permitir conexión localhost:3000 (Next.js dev server) en el firewall
+  - Crear exclusiones en el antivirus corporativo para:
+    * C:\tools\pocketbase\
+    * C:\dev\
+    * El proceso node.exe
+    * El proceso pocketbase.exe
+
+  Nota: NO se requiere ninguna máquina virtual.
+  Todo se ejecuta nativamente en Windows.
+  ```
+
+- **Adjuntar:** El archivo `.vsix` de Frida Code que descargaste de [github.com/efuentesp/frida-code-vsix/releases](https://github.com/efuentesp/frida-code-vsix/releases).
+
+**SLA esperado:** El equipo de TI suele responder en 1-2 días hábiles. Una vez que te confirmen que el software está instalado, continúa con la sección **0.3** de este tutorial.
+
+**Mientras esperas el ticket**, puedes ir leyendo las secciones conceptuales (0.1 y 0.4) para familiarizarte con Frida Code y el flujo spec-driven.
+
+### Verificación post-instalación
+
+Una vez que TI confirme que el software está instalado, abre PowerShell y verifica que todo esté en el PATH:
 
 ```powershell
-choco install nodejs-lts git python docker-desktop
+node --version       # v20.x.x o superior
+npm --version        # 10.x.x o superior
+python --version     # 3.10 o superior
+git --version        # 2.30 o superior
+pocketbase --version # 0.22 o superior
 ```
+
+Si algún comando no se reconoce, **no agregues nada al PATH por tu cuenta**. Agrega un comentario al ticket pidiendo a TI que ajuste las variables de entorno.
+
+Abre VS Code, ve a Extensions (`Ctrl+Shift+X`) y verifica que **Frida Code** aparece en la lista de extensiones instaladas.
+
+Si todo está correcto, ve a la **sección 0.3** para terminar de configurar Frida Code.
 
 ---
 
@@ -150,11 +194,17 @@ choco install nodejs-lts git python docker-desktop
 
 Ve a [github.com/efuentesp/frida-code-vsix/releases](https://github.com/efuentesp/frida-code-vsix/releases) y descarga la última versión (`frida-code-X.Y.Z.vsix`).
 
-### Paso 2: Instalar el VSIX
+### Paso 2: Solicitar instalación a TI (vía ticket)
+
+**Al igual que VS Code y WSL2, la extensión Frida Code también la instala el equipo de TI** según el ticket que levantaste en la sección 0.2. Adjunta el archivo `.vsix` que descargaste en el paso 1.
+
+Si TI ya incluye la instalación de la extensión en el mismo ticket de la sección 0.2 (opción recomendada), omite este paso y ve directo a la verificación.
+
+**Si prefieres instalar la extensión por tu cuenta** (requiere permisos de admin local):
 
 **Opción A — Desde la UI de VS Code:**
 
-1. Abre la paleta de comandos: `Cmd+Shift+P` (macOS) / `Ctrl+Shift+P` (Windows/Linux).
+1. Abre la paleta de comandos: `Ctrl+Shift+P`.
 2. Escribe: `Extensions: Install from VSIX...`.
 3. Selecciona el archivo `.vsix` descargado.
 
@@ -166,7 +216,7 @@ code --install-extension frida-code-0.4.0.vsix
 
 ### Paso 3: Verificar la instalación
 
-1. Recarga VS Code: `Cmd+R` / `Ctrl+R`.
+1. Recarga VS Code: `Ctrl+R`.
 2. Abre la paleta de comandos y escribe `Frida Code`.
 3. Deberías ver comandos como "Frida Code: Open".
 
@@ -176,26 +226,48 @@ code --install-extension frida-code-0.4.0.vsix
 
 ## 0.4 Configuración inicial
 
-### Configurar el provider de IA
+### Configurar el motor de IA (Softtek DevEngine Gateway)
 
-Frida Code usa Pi como motor de IA. Necesitas configurar un provider (proveedor de modelos).
+Frida Code usa **Softtek DevEngine Gateway** como motor de IA. El API key se obtiene de **mywork.softtek.com** (sitio interno de Softtek) y se configura desde la pantalla de Settings/Proveedores de Frida.
 
-#### Opción A: Softtek DevEngine Gateway (entorno corporativo)
+**Paso 1: Abrir la configuración de proveedores**
 
-1. Abre el panel de Settings: `Cmd+,` / `Ctrl+,`.
+1. Abre el panel de Settings: `Ctrl+,`.
 2. Busca `Frida Code: Provider`.
 3. Selecciona `softtek` en el dropdown.
-4. Ingresa tu API key cuando se solicite.
+4. Frida Code te mostrará un botón **"Obtener API key"** (o un enlace) que apunta a `mywork.softtek.com`.
 
-#### Opción B: z.ai (GLM models)
+**Paso 2: Obtener tu API key en mywork.softtek.com**
 
-1. Settings → `Frida Code: Provider` → `zai`.
-2. Ingresa tu API key de [z.ai](https://z.ai).
+1. Click en el botón/enlace — se abrirá `mywork.softtek.com` en tu browser.
+2. Inicia sesión con tus credenciales corporativas de Softtek (es Single Sign-On).
+3. En la página de DevEngine Gateway, busca la sección **"API Keys"** o **"Tokens de acceso"**.
+4. Click en **"Crear nueva API key"** (o "Generate token").
+5. Asigna un nombre descriptivo: `frida-code-<tu-inicial>-<fecha>` (ej. `frida-code-efp-2025-07`).
+6. Selecciona los scopes/permisos necesarios (si te pregunta): por default, acceso a modelos de chat y completion.
+7. Click en **"Generar"** o **"Create"**.
+8. **Copia el token inmediatamente** — muchos portales solo lo muestran una vez. Guárdalo en un lugar seguro (un password manager como 1Password o Bitwarden es ideal).
 
-#### Opción C: GitHub Copilot
+> **Nota:** `mywork.softtek.com` es un sitio interno. **Solo personal de Softtek tiene acceso.** Si no puedes entrar, contacta al líder técnico de tu equipo o al administrador de DevEngine Gateway.
 
-1. Settings → `Frida Code: Provider` → `github-copilot`.
-2. Sigue el flujo OAuth: se abrirá un browser, autorizas, y vuelves a VS Code.
+**Paso 3: Pegar el API key en Frida Code**
+
+1. Regresa a VS Code (la ventana del browser sigue abierta en mywork.softtek.com).
+2. En la pantalla de Settings de Frida, pega el token en el campo **"API key"** o **"Token"**.
+3. Frida Code valida el token con DevEngine Gateway. Si todo está bien, verás un check verde o un mensaje de éxito.
+4. Click en **"Aceptar"** o cierra el panel de Settings.
+
+**Paso 4: Verificar la conexión**
+
+En el chat de Frida, escribe:
+
+```
+¿Estás conectado a DevEngine Gateway?
+```
+
+Frida responderá confirmando que el motor de IA está activo y qué modelo está usando por default.
+
+✅ **Checkpoint:** Frida responde con confirmación de conexión a DevEngine Gateway.
 
 ### Directorio de trabajo
 
@@ -264,9 +336,9 @@ En esta sección vamos a descubrir el problema de la app de tareas. Empezamos de
 
 ### Paso 1: Crear el directorio del proyecto
 
-```bash
-mkdir ~/projects/todo-frida
-cd ~/projects/todo-frida
+```powershell
+mkdir C:\dev\projects\todo-frida
+cd C:\dev\projects\todo-frida
 git init
 code .
 ```
@@ -275,22 +347,21 @@ code .
 
 Crea un archivo `AGENTS.md` (las convenciones de tu equipo):
 
-```bash
-cat > AGENTS.md <<'EOF'
+```powershell
+@'
 # Proyecto: Todo Frida
 
 ## Stack
 - Next.js 15 (App Router)
 - shadcn/ui (componentes)
-- PocketBase (auth + DB)
-- Docker (PocketBase + futuro deploy)
+- PocketBase (auth + DB, binario nativo en Windows)
 
 ## Convenciones
 - TypeScript estricto
 - Commits en español
 - Branches: `feat/`, `fix/`, `chore/`
 - Tests con Vitest
-EOF
+'@ | Out-File -Encoding utf8 AGENTS.md
 ```
 
 ### Paso 3: Invocar la skill discover
@@ -438,29 +509,34 @@ Ahora que tienes el diseño, vamos a inicializar el proyecto. Usaremos `create-n
 
 ### Paso 1: Crear el proyecto
 
-```bash
-cd ~/projects/todo-frida
-npx create-next-app@latest . \
-  --typescript \
-  --app \
-  --tailwind \
-  --eslint \
-  --src-dir \
-  --import-alias "@/*" \
-  --use-npm
+Abre PowerShell y navega a la carpeta del proyecto:
+
+```powershell
+cd C:\dev\projects\todo-frida
+npx create-next-app@latest . `
+  --typescript `
+  --app `
+  --tailwind `
+  --eslint `
+  --src-dir `
+  --import-alias "@/*" `
+  --use-npm `
+  --no-turbopack
 ```
+
+> **Nota sobre Turbopack:** En Windows nativo, Turbopack puede tener issues de filesystem. Por ahora usamos webpack (que es el default estable). Más adelante puedes activarlo si lo necesitas.
 
 Responde a las preguntas interactivas:
 
-- Would you like to use Turbopack? → **Yes** (más rápido)
+- Would you like to use Turbopack? → **No** (por estabilidad en Windows nativo)
 - Would you like to customize the import alias? → **No**
 
 ✅ **Verifica:** `package.json` debe tener `next: "^15.x.x"`.
 
 ### Paso 2: Estructura inicial
 
-```bash
-ls -la
+```powershell
+Get-ChildItem -Force
 # .next/         (build cache)
 # node_modules/
 # public/
@@ -478,7 +554,7 @@ ls -la
 
 ### Paso 3: Commit inicial
 
-```bash
+```powershell
 git add .
 git commit -m "chore: scaffold Next.js 15 con TypeScript y Tailwind"
 ```
@@ -518,47 +594,91 @@ git commit -m "chore: agregar componentes shadcn/ui"
 
 ---
 
-## 2.3 Levantar PocketBase con Docker
+## 2.3 Levantar PocketBase (binario nativo en Windows)
 
-PocketBase es una base de datos con auth y admin UI incluidos. La levantamos con Docker.
+PocketBase es una base de datos con auth y admin UI incluidos. En este proyecto corre como **binario nativo en Windows**.
 
-### Paso 1: Crear `docker-compose.yml`
+### Paso 1: Verificar que TI instaló PocketBase
 
-```bash
-cat > docker-compose.yml <<'EOF'
-services:
-  pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
-    container_name: todo-pb
-    restart: unless-stopped
-    ports:
-      - "8090:8090"
-    volumes:
-      - ./pb_data:/pb_data
-      - ./pb_public:/pb_public
-    environment:
-      - PB_ADMIN_EMAIL=admin@todo.local
-      - PB_ADMIN_PASSWORD=admin12345
-EOF
+Abre PowerShell y ejecuta:
+
+```powershell
+pocketbase --version
+# Debe responder algo como: PocketBase v0.22.x
 ```
 
-### Paso 2: Levantar el servicio
+Si no se reconoce el comando, agregá un comentario al ticket de help.softtek.com pidiendo que agreguen `C:\tools\pocketbase\` al PATH del sistema.
 
-```bash
-docker compose up -d
+### Paso 2: Crear el directorio del proyecto
+
+```powershell
+mkdir C:\dev\projects\todo-frida -Force
+cd C:\dev\projects\todo-frida
+git init
+code .
 ```
 
-✅ **Verifica:** Abre [http://localhost:8090/_/](http://localhost:8090/_/) — debes ver el admin UI de PocketBase.
+VS Code se abre con la carpeta del proyecto. La barra de estado muestra la ruta de Windows nativa (ej. `C:\dev\projects\todo-frida`).
 
-### Paso 3: Commit
+### Paso 3: Crear script de arranque de PocketBase
 
-```bash
-git add docker-compose.yml
-echo "pb_data/" >> .gitignore
-echo "pb_public/" >> .gitignore
+Crea un archivo `start-pb.ps1` en la raíz del proyecto:
+
+```powershell
+# start-pb.ps1 — Arranca PocketBase en background
+$pbPath = "C:\tools\pocketbase\pocketbase.exe"
+$dataDir = Join-Path $PSScriptRoot "pb_data"
+
+# Crear pb_data/ si no existe
+if (-not (Test-Path $dataDir)) {
+    New-Item -ItemType Directory -Path $dataDir | Out-Null
+}
+
+# Crear pb_public/ si no existe
+$publicDir = Join-Path $PSScriptRoot "pb_public"
+if (-not (Test-Path $publicDir)) {
+    New-Item -ItemType Directory -Path $publicDir | Out-Null
+}
+
+Write-Host "Iniciando PocketBase en http://localhost:8090 ..."
+Write-Host "Admin UI: http://localhost:8090/_/"
+Write-Host "Presiona Ctrl+C para detener."
+
+& $pbPath serve --http=0.0.0.0:8090 --dir="$dataDir" --publicDir="$publicDir"
+```
+
+### Paso 4: Levantar PocketBase
+
+Abre una terminal de PowerShell en VS Code (`Ctrl+`) y ejecuta:
+
+```powershell
+.\start-pb.ps1
+```
+
+PocketBase arranca y muestra el log en la terminal. **No cierres esta terminal** — PocketBase vive mientras la terminal esté abierta.
+
+✅ **Verifica:** Abre [http://localhost:8090/_/](http://localhost:8090/_/) en tu browser — debes ver el admin UI de PocketBase. La primera vez te pedirá crear la cuenta de admin.
+
+### Paso 5: Crear cuenta de admin inicial
+
+En el admin UI:
+
+1. Click en **"CREATE ADMIN"** (esquina superior derecha).
+2. Email: `admin@todo.local`.
+3. Password: `admin12345` (lo cambiamos después en producción).
+4. Confirma y entra al dashboard.
+
+### Paso 6: Commit
+
+```powershell
+git add start-pb.ps1
+"pb_data/" | Out-File -Encoding utf8 .gitignore -Append
+"pb_public/" | Out-File -Encoding utf8 .gitignore -Append
 git add .gitignore
-git commit -m "chore: docker-compose para PocketBase"
+git commit -m "chore: script para arrancar PocketBase en Windows"
 ```
+
+**Nota:** Si prefieres correr PocketBase como servicio de Windows (que sobrevive al cerrar la terminal), puedes pedir a TI que lo instale con **NSSM** (Non-Sucking Service Manager) o **pm2-windows**. Para este tutorial basta con el script de PowerShell.
 
 ---
 
@@ -621,33 +741,46 @@ En el admin UI:
 
 PocketBase guarda el schema en `pb_data/`. Como está en `.gitignore`, lo exportamos a un JSON:
 
-```bash
+```powershell
 # Crear script para exportar schema
-cat > scripts/export-schema.sh <<'EOF'
-#!/bin/bash
-mkdir -p pb_schema
-curl -s http://localhost:8090/api/health > /dev/null || {
-  echo "PocketBase no está corriendo. Levantando..."
-  docker compose up -d pocketbase
-  sleep 3
+mkdir scripts
+@'
+# export-schema.ps1 — Exporta el schema de PocketBase a JSON
+$ErrorActionPreference = "Stop"
+$baseUrl = "http://localhost:8090"
+$adminEmail = "admin@todo.local"
+$adminPassword = "admin12345"
+
+# Verificar que PocketBase está corriendo
+try {
+    Invoke-RestMethod -Uri "$baseUrl/api/health" -TimeoutSec 3 | Out-Null
+} catch {
+    Write-Error "PocketBase no está corriendo. Ejecuta .\start-pb.ps1 primero."
+    exit 1
 }
+
 # Login como admin
-TOKEN=$(curl -s -X POST http://localhost:8090/api/admins/auth-with-password \
-  -H "Content-Type: application/json" \
-  -d '{"identity":"admin@todo.local","password":"admin12345"}' \
-  | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
+$body = @{ identity = $adminEmail; password = $adminPassword } | ConvertTo-Json
+$response = Invoke-RestMethod -Uri "$baseUrl/api/admins/auth-with-password" `
+    -Method Post -ContentType "application/json" -Body $body
+$token = $response.token
+
+# Crear carpeta pb_schema/
+New-Item -ItemType Directory -Path "pb_schema" -Force | Out-Null
+
 # Exportar collections
-curl -s -H "Authorization: $TOKEN" \
-  http://localhost:8090/api/collections \
-  > pb_schema/collections.json
-echo "Schema exportado a pb_schema/collections.json"
-EOF
-chmod +x scripts/export-schema.sh
+Invoke-RestMethod -Uri "$baseUrl/api/collections" `
+    -Headers @{ Authorization = $token } `
+    | ConvertTo-Json -Depth 10 `
+    | Out-File "pb_schema/collections.json" -Encoding utf8
+
+Write-Host "Schema exportado a pb_schema/collections.json"
+'@ | Out-File -Encoding utf8 scripts/export-schema.ps1
 ```
 
-✅ **Verifica:** `./scripts/export-schema.sh` debe crear `pb_schema/collections.json`.
+✅ **Verifica:** `.\scripts\export-schema.ps1` debe crear `pb_schema/collections.json`.
 
-```bash
+```powershell
 git add scripts/
 git commit -m "feat: script para exportar schema de PocketBase"
 ```
@@ -660,15 +793,17 @@ Ahora conectamos Next.js a PocketBase. Usaremos el SDK oficial de JS.
 
 ### Paso 1: Instalar el SDK
 
-```bash
+```powershell
 npm install pocketbase
 ```
 
 ### Paso 2: Crear el cliente
 
-```bash
-mkdir -p src/lib
-cat > src/lib/pocketbase.ts <<'EOF'
+Crea la carpeta `src/lib/` y dentro el archivo `pocketbase.ts`:
+
+```powershell
+New-Item -ItemType Directory -Path "src\lib" -Force
+@'
 import PocketBase from "pocketbase";
 import { cookies } from "next/headers";
 
@@ -696,21 +831,19 @@ export function getClientPocketBase() {
   }
   return clientPb;
 }
-EOF
+'@ | Out-File -Encoding utf8 src\lib\pocketbase.ts
 ```
 
 ### Paso 3: Configurar variables de entorno
 
-```bash
-cat > .env.local <<'EOF'
-POCKETBASE_URL=http://localhost:8090
-EOF
-echo ".env.local" >> .gitignore
+```powershell
+"POCKETBASE_URL=http://localhost:8090" | Out-File -Encoding utf8 .env.local
+".env.local" | Out-File -Encoding utf8 .gitignore -Append
 ```
 
 ### Paso 4: Commit
 
-```bash
+```powershell
 git add .
 git commit -m "feat: cliente PocketBase para server y client components"
 ```
@@ -728,7 +861,7 @@ Ahora vamos a usar Frida para verificar que todo está bien configurado.
 
 Frida va a:
 
-- Leer `package.json`, `docker-compose.yml`, `src/lib/pocketbase.ts`.
+- Leer `package.json`, `start-pb.ps1`, `src/lib/pocketbase.ts`.
 - Verificar que las versiones sean compatibles.
 - Reportar issues (ej. `pocketbase` no está en `dependencies` si lo agregaste mal).
 
@@ -1132,7 +1265,7 @@ Crea `.mcp.json` en la raíz del proyecto:
 
 ### Paso 2: Recargar Frida
 
-`Cmd+Shift+P` → `Developer: Reload Window`.
+`Ctrl+Shift+P` → `Developer: Reload Window`.
 
 ### Paso 3: Probar MCP
 
@@ -1192,7 +1325,7 @@ Settings → `Frida Code: Permissions`:
 | --- | --- | --- |
 | `bash:rm` | Borrar archivos | ✅ |
 | `bash:git-push` | Push a remote | ✅ |
-| `deploy:docker` | Deploy con Docker | ✅ |
+| `deploy:windows-service` | Deploy como Windows Service (NSSM/pm2) | ✅ |
 | `bash:curl-POST` | HTTP POST | ❌ |
 
 ### Paso 2: Probar un gate
@@ -1307,45 +1440,88 @@ gh release create v0.1.0 --generate-notes
 
 ---
 
-## 6.4 Deploy con Docker
+## 6.4 Build de producción en Windows
 
-Para deployar, agregamos un Dockerfile para Next.js.
+El deploy se hace con un build nativo de Next.js ejecutado directamente en Windows (o en un servidor Windows Server, según decida el equipo de infra).
 
-### Paso 1: Dockerfile
+### Paso 1: Ajustar `next.config.ts` para build standalone
 
-```bash
-cat > Dockerfile <<'EOF'
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+Next.js puede generar un build que incluye todas las dependencias en una carpeta, sin necesidad de `node_modules` externo. Esto facilita correr la app en otro equipo.
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
-CMD ["node", "server.js"]
-EOF
-```
-
-### Paso 2: Actualizar next.config.ts
+Edita (o crea) `next.config.ts` en la raíz del proyecto:
 
 ```typescript
-const nextConfig = {
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   output: "standalone",
 };
+
 export default nextConfig;
 ```
 
-### Paso 3: Build de la imagen
+### Paso 2: Generar el build
 
-```bash
-docker build -t todo-frida:latest .
+```powershell
+npm run build
+```
+
+Esto produce:
+
+- `.next/standalone/` — la app con sus dependencias bundleadas.
+- `.next/static/` — assets estáticos (CSS, JS, imágenes).
+- `public/` — archivos públicos.
+
+### Paso 3: Crear el script de arranque de producción
+
+Crea `start-prod.ps1` en la raíz:
+
+```powershell
+# start-prod.ps1 — Arranca la app de Next.js en modo producción
+$ErrorActionPreference = "Stop"
+$root = $PSScriptRoot
+
+$standalone = Join-Path $root ".next\standalone"
+$static = Join-Path $root ".next\static"
+$public = Join-Path $root "public"
+
+# Copiar assets que Next.js no incluye automáticamente
+if (Test-Path $static) {
+    Copy-Item -Path "$static\*" -Destination "$standalone\.next\static" -Recurse -Force
+}
+if (Test-Path $public) {
+    Copy-Item -Path "$public\*" -Destination "$standalone\public" -Recurse -Force
+}
+
+Set-Location $standalone
+$env:PORT = "3000"
+Write-Host "Iniciando app en http://localhost:3000 ..."
+& node server.js
+```
+
+### Paso 4: Probar el build de producción
+
+```powershell
+.\start-prod.ps1
+```
+
+Abre [http://localhost:3000](http://localhost:3000) y verifica que la app corre exactamente igual que en desarrollo.
+
+### Paso 5: Correr como servicio de Windows (opcional)
+
+Para que la app sobreviva al cierre de la terminal (recomendado en servidores), pide a TI que la instale como **Windows Service** usando una de estas opciones:
+
+- **NSSM** (Non-Sucking Service Manager): comando `nssm install todo-frida "C:\Program Files\nodejs\node.exe" "C:\dev\projects\todo-frida\start-prod.ps1"`.
+- **pm2-windows**: `pm2-service-install` después de `npm install -g pm2`.
+- **node-windows**: `npm install -g node-windows` y un script de instalación.
+
+Para este tutorial, basta con ejecutar `.\start-prod.ps1` en una terminal o terminal server.
+
+### Paso 6: Commit final
+
+```powershell
+git add next.config.ts start-prod.ps1
+git commit -m "chore: build de producción standalone para Windows"
 ```
 
 ---
@@ -1436,7 +1612,7 @@ Ver [docs/tools/frida-mcp-adapter.md](./tools/frida-mcp-adapter.md) para más de
 ### Frida no aparece en la barra lateral
 
 1. Verifica que la extensión está habilitada: Settings → Extensions.
-2. Recarga VS Code: `Cmd+Shift+P` → `Developer: Reload Window`.
+2. Recarga VS Code: `Ctrl+Shift+P` → `Developer: Reload Window`.
 3. Revisa la consola: Help → Toggle Developer Tools → Console.
 
 ### "Failed to load extension: Invalid URL"
@@ -1448,32 +1624,76 @@ Este es un bug conocido de Frida 0.3.0 con extensiones externas. Solución:
 
 ### El modelo no responde
 
-1. Verifica tu API key: Settings → Frida Code → Provider.
-2. Verifica tu conexión a internet.
-3. Revisa los logs: View → Output → "Frida Code".
+1. **Verifica el API key:** Settings → Frida Code → Provider → `softtek`. Si está vacío o muestra error, repite el flujo de la sección 0.4 (obtener uno nuevo en `mywork.softtek.com`).
+2. **Verifica que el token no haya expirado:** en `mywork.softtek.com`, ve a la sección de API keys y revisa el estado. Si está expirado, genera uno nuevo y reemplázalo en Frida.
+3. **Verifica tu conexión a internet** y a la red corporativa (algunos proxies corporativos bloquean el endpoint de DevEngine Gateway).
+4. **Revisa los logs:** View → Output → "Frida Code". El error específico suele aparecer ahí (token inválido, endpoint no reachable, etc.).
+5. Si todo lo anterior está bien, **recarga VS Code**: `Ctrl+Shift+P` → `Developer: Reload Window`.
 
-### Docker no levanta PocketBase
+### PocketBase no inicia — puerto 8090 ocupado
 
-```bash
-docker compose down
-docker volume prune  # ⚠️ Borra volúmenes huérfanos
-docker compose up -d
+```powershell
+# Ver qué proceso usa el puerto
+netstat -ano | findstr :8090
+
+# Matar el proceso (reemplaza <PID> con el ID del paso anterior)
+taskkill /PID <PID> /F
+
+# Vuelve a iniciar PocketBase
+.\start-pb.ps1
 ```
+
+### PowerShell no reconoce node / python / git / pocketbase
+
+El equipo de TI debe haber agregado las carpetas al PATH del sistema. Si no se reconoce un comando:
+
+1. Abre una nueva ventana de PowerShell (cierra y reabre — los cambios en PATH requieren nueva sesión).
+2. Si sigue sin funcionar, agrega un comentario al ticket de help.softtek.com.
+
+**No modifiques las variables de entorno tú mismo.**
+
+### El firewall de Windows bloquea localhost:8090 o localhost:3000
+
+Si PocketBase o Next.js no responden desde el browser:
+
+1. Windows Security → Firewall & network protection → Advanced settings.
+2. Inbound Rules → New Rule.
+3. Port → TCP → Specific local ports: `8090, 3000`.
+4. Allow the connection.
+5. Aplica a Domain, Private, Public.
+
+Pide a TI que agregue esta regla vía ticket si no tienes permisos de admin.
 
 ### Los tests E2E fallan
 
 Verifica que PocketBase esté corriendo:
 
-```bash
-curl http://localhost:8090/api/health
+```powershell
+Invoke-WebRequest http://localhost:8090/api/health | Select-Object -ExpandProperty Content
 # {"code":200,"message":"API is healthy.","data":{}}
 ```
 
 ### MCP server no conecta
 
-1. Verifica `.mcp.json` es válido: `python3 -m json.tool .mcp.json`.
+1. Verifica que `.mcp.json` es válido:
+
+   ```powershell
+   Get-Content .mcp.json | ConvertFrom-Json
+   ```
+
 2. Recarga Frida: `/reload` en el chat.
 3. Revisa los logs: `/mcp` → "Reconnect".
+
+### El antivirus corporativo bloquea node.exe o pocketbase.exe
+
+Si experimentas lentitud extrema, errores de "Access Denied", o cierres inesperados:
+
+1. Pide a TI que agregue exclusiones para:
+   - `C:\tools\pocketbase\`
+   - `C:\dev\`
+   - Proceso: `node.exe`
+   - Proceso: `pocketbase.exe`
+2. Documenta el comportamiento exacto (con timestamps) en el ticket.
 
 ---
 
