@@ -52,6 +52,7 @@ import {
 	modelsConfigTemplate,
 	syncBundledAgents,
 	formatSyncReport,
+	getBundledSkillNames,
 } from "./tools/frida-pipeline";
 import { listAgents, getAvailableTypes } from "./tools/frida-subagents";
 import { wireAgentWidget } from "./tools/frida-subagents/panel";
@@ -976,29 +977,94 @@ export async function activate(
 				error: String(d?.message ?? d),
 			});
 		}
+		// Extensiones visibles (no ocultas) con sus tools/commands. Se reutiliza
+		// abajo para coleccionar los comandos de extensión en la sección Comandos.
+		const extensionsData = (ext.extensions ?? [])
+			.filter((e: any) => !e.hidden)
+			.map((e: any) => {
+				const p = String(e.path ?? "");
+				return {
+					path: p,
+					// pi marca las factories registradas en código como "<inline:...>"
+					// (resource-loader.js). Las de disco tienen un path real de archivo.
+					inline: p.startsWith("<inline:"),
+					tools: Array.from(e.tools?.keys?.() ?? []),
+					commands: Array.from(e.commands?.keys?.() ?? []),
+				};
+			});
+		// Nombre legible de una extensión desde su path (<inline:NAME> o basename).
+		const extNameOf = (p: string): string => {
+			const m = p.match(/^<inline:([^>]+)>$/);
+			if (m) return m[1];
+			const base = p.split(/[/\\]/).pop() ?? p;
+			return base.replace(/\.(ts|js)$/, "");
+		};
+		// Comandos slash registrados por extensiones vía la API de Pi (e.commands).
+		// Hoy frida no registra ninguno propio, pero extensiones externas/usuario
+		// (en ~/.frida/extensions o .frida/extensions) sí pueden → los unificamos en
+		// la sección Comandos con source "extension" para distinguirlos de los
+		// built-in del host. Dedupe: si un nombre ya es built-in, gana el built-in.
+		const builtinNames = new Set(BUILTIN_COMMANDS.map((c) => c.name));
+		const extCommands: {
+			name: string;
+			description: string;
+			argumentHint?: string;
+			source: "extension";
+			extension: string;
+		}[] = [];
+		for (const e of (ext.extensions ?? []).filter((e: any) => !e.hidden)) {
+			const extLabel = extNameOf(String(e.path ?? ""));
+			for (const name of Array.from(e.commands?.keys?.() ?? [])) {
+				const n = String(name);
+				if (!n || builtinNames.has(n)) continue;
+				extCommands.push({
+					name: n,
+					description: "",
+					source: "extension",
+					extension: extLabel,
+				});
+			}
+		}
 		return {
-			extensions: (ext.extensions ?? [])
-				.filter((e: any) => !e.hidden)
-				.map((e: any) => {
-					const p = String(e.path ?? "");
-					return {
-						path: p,
-						// pi marca las factories registradas en código como "<inline:...>"
-						// (resource-loader.js). Las de disco tienen un path real de archivo.
-						inline: p.startsWith("<inline:"),
-						tools: Array.from(e.tools?.keys?.() ?? []),
-						commands: Array.from(e.commands?.keys?.() ?? []),
-					};
-				}),
-			skills: (skills.skills ?? []).map((s: any) => ({
-				name: String(s.name),
-				description: String(s.description ?? ""),
-			})),
+			extensions: extensionsData,
+			skills: (skills.skills ?? []).map((s: any) => {
+				const scope = s?.sourceInfo?.scope;
+				// Procedencia: las skills empaquetadas por frida-pipeline se
+				// sincronizan a ~/.frida/skills/ y Pi las marca scope "user" igual
+				// que las creadas a mano → cruzamos con el set empaquetado para
+				// distinguir "extensión" de "global" real.
+				const isBundled = getBundledSkillNames().has(String(s.name));
+				const source = isBundled
+					? "extension"
+					: scope === "project"
+						? "project"
+						: scope === "user"
+							? "global"
+							: "path";
+				return {
+					name: String(s.name),
+					description: String(s.description ?? ""),
+					source,
+					path: String(s.filePath ?? ""),
+				};
+			}),
 			prompts: (prompts.prompts ?? []).map((p: any) => ({
 				name: String(p.name),
 				description: String(p.description ?? ""),
 			})),
 			themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
+			// Comandos slash: built-in del host (fuente única: BUILTIN_COMMANDS) más
+			// los registrados por extensiones vía la API de Pi. Se muestran en
+			// Recursos > Comandos y alimentan el autocompletado de "/" del Composer.
+			commands: [
+				...BUILTIN_COMMANDS.map((c) => ({
+					name: c.name,
+					description: c.description,
+					argumentHint: c.argumentHint,
+					source: "built-in" as const,
+				})),
+				...extCommands,
+			],
 			contextFiles: (agents.agentsFiles ?? []).map((f: any) => ({
 				path: String(f.path),
 			})),
@@ -1473,30 +1539,96 @@ export async function activate(
 
 	// Built-in slash commands del composer (estilo TUI de pi). Se interceptan
 	// en runPrompt ANTES de enviar al agente.
-	const BUILTIN_SLASH = new Set([
-		"compact",
-		"reload",
-		"new",
-		"model",
-		"login",
-		"logout",
-		"name",
-		"copy",
-		"help",
-		"clone",
-		"fork",
-		"todos",
-		"context",
-		"gates",
-		"gates-config",
-		"wf",
-		"pipeline",
-		"frida-models",
-		"frida-update-agents",
-		"agents",
-		"version",
-		"update",
-	]);
+	//
+	// FUENTE ÚNICA DE VERDAD: BUILTIN_COMMANDS describe los 22 comandos (name +
+	// description + argumentHint). Se envían al webview vía ResourceSummary.commands
+	// para que aparezcan TANTO en Configuración > Recursos > Comandos COMO en el
+	// autocompletado de "/" del Composer. Así host y client nunca divergen
+	// (bug anterior: 22 en el host vs 15 hardcodeados en App.tsx → /wf y 6 más
+	// sólo funcionaban escribiéndolos a mano).
+	const BUILTIN_COMMANDS: {
+		name: string;
+		description: string;
+		argumentHint?: string;
+	}[] = [
+		{ name: "compact", description: "Compactar el contexto de la sesión" },
+		{ name: "reload", description: "Recargar extensiones, skills y prompts" },
+		{ name: "new", description: "Iniciar una sesión nueva" },
+		{
+			name: "model",
+			description: "Abrir el selector de modelo/proveedor",
+			argumentHint: "<provider/model>",
+		},
+		{
+			name: "login",
+			description: "Iniciar sesión con un proveedor (suscripción)",
+			argumentHint: "<provider>",
+		},
+		{
+			name: "logout",
+			description: "Cerrar sesión de un proveedor",
+			argumentHint: "<provider>",
+		},
+		{
+			name: "name",
+			description: "Renombrar la sesión actual",
+			argumentHint: "<nombre>",
+		},
+		{ name: "copy", description: "Copiar el último mensaje al portapapeles" },
+		{
+			name: "help",
+			description: "Mostrar atajos y comandos",
+			argumentHint: "[herramienta]",
+		},
+		{ name: "clone", description: "Duplicar la sesión actual" },
+		{ name: "fork", description: "Bifurcar desde un mensaje anterior" },
+		{
+			name: "todos",
+			description: "Mostrar la lista de tareas agrupada por estado",
+		},
+		{
+			name: "context",
+			description:
+				"Reporte de uso del contexto (presión, categorías, system prompt)",
+		},
+		{
+			name: "gates",
+			description: "Auditoría de permisos (decisiones allow/block del gate)",
+		},
+		{
+			name: "gates-config",
+			description: "Editor de permisos (allow/ask/deny por tool)",
+		},
+		{
+			name: "wf",
+			description: "Lanzar o reanudar un workflow",
+			argumentHint: '<nombre> "<input>" | @<ref>',
+		},
+		{
+			name: "pipeline",
+			description: "Estado del orquestador frida-pipeline",
+		},
+		{
+			name: "agents",
+			description: "Listar sub-agentes corriendo y disponibles",
+		},
+		{
+			name: "frida-models",
+			description: "Editor de overrides de modelo por skill (models.json)",
+		},
+		{
+			name: "frida-update-agents",
+			description: "Re-sincronizar los agentes empaquetados",
+		},
+		{
+			name: "version",
+			description: "Mostrar la versión instalada de Frida",
+		},
+		{ name: "update", description: "Comprobar si hay una versión nueva" },
+	];
+	// Allowlist de ejecución (runBuiltinSlash): un comando es built-in si está
+	// aquí. Derivado de BUILTIN_COMMANDS para no mantener dos listas.
+	const BUILTIN_SLASH = new Set(BUILTIN_COMMANDS.map((c) => c.name));
 
 	async function runBuiltinSlash(text: string): Promise<boolean> {
 		const m = text.match(/^\/([\w-]+)(?:\s+([\s\S]*))?$/);

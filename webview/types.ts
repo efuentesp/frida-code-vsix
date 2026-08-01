@@ -163,11 +163,37 @@ export interface ResourceExtension {
 	tools?: string[];
 	commands?: string[];
 }
+/** Procedencia de un recurso. Para skills: extensión (frida-pipeline),
+ *  global (~/.frida), proyecto (.frida/.pi en el cwd) o path (adicional).
+ *  Para comandos: built-in (host) o extensión (registrado vía API de Pi). */
+export type ResourceOrigin =
+	| "extension"
+	| "global"
+	| "project"
+	| "path"
+	| "built-in";
+
 export interface ResourceSummary {
 	extensions: ResourceExtension[];
-	skills: { name: string; description: string }[];
+	skills: {
+		name: string;
+		description: string;
+		source: Exclude<ResourceOrigin, "built-in">;
+		path: string;
+	}[];
 	prompts: { name: string; description: string }[];
 	themes: { name: string }[];
+	/** Comandos slash: built-in del host (fuente única: BUILTIN_COMMANDS en
+	 *  extension.ts) o de extensión. Se muestran en Recursos > Comandos y
+	 *  alimentan el autocompletado de "/" del Composer. */
+	commands: {
+		name: string;
+		description: string;
+		argumentHint?: string;
+		source: "built-in" | "extension";
+		/** Nombre legible de la extensión que aporta el comando (sólo source=extension). */
+		extension?: string;
+	}[];
 	contextFiles: { path: string }[];
 	errors: { path: string; error: string }[];
 }

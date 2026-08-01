@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize, SendHorizontal, ShieldCheck, Square } from "lucide-react";
+import {
+	Maximize,
+	Minimize2,
+	SendHorizontal,
+	ShieldCheck,
+	Square,
+} from "lucide-react";
 import { Tooltip } from "./Tooltip";
 import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
 
@@ -103,8 +109,7 @@ export function Composer({
 		command: string;
 		prefix: string;
 	} | null>(null); // argumento de /login /model
-	const [editorOpen, setEditorOpen] = useState(false);
-	const [editorText, setEditorText] = useState("");
+	const [expanded, setExpanded] = useState(false);
 	const [sel, setSel] = useState(0);
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,6 +226,9 @@ export function Composer({
 	}
 
 	function grow(el: HTMLTextAreaElement) {
+		// En modo expandido la altura la fija CSS (.input-expanded): no
+		// auto-redimensionamos, o cada pulsación revertiría la altura grande.
+		if (expanded) return;
 		el.style.height = "auto";
 		el.style.height = Math.min(el.scrollHeight, 140) + "px";
 	}
@@ -576,7 +584,11 @@ export function Composer({
 			<div className="input-row">
 				<textarea
 					ref={ref}
-					className={"input" + (pendingDialog ? " input-blocked" : "")}
+					className={
+						"input" +
+						(expanded ? " input-expanded" : "") +
+						(pendingDialog ? " input-blocked" : "")
+					}
 					rows={1}
 					placeholder={
 						pendingDialog
@@ -596,16 +608,24 @@ export function Composer({
 					onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
 					onKeyDown={onKeyDown}
 				/>
-				<Tooltip label="Editor ampliado" side="top">
+				<Tooltip
+					label={expanded ? "Contraer editor" : "Expandir editor"}
+					side="top"
+				>
 					<button
-						className="bar-ico"
+						className={"bar-ico" + (expanded ? " active" : "")}
 						disabled={pendingDialog}
 						onClick={() => {
-							setEditorText(text);
-							setEditorOpen(true);
+							const next = !expanded;
+							setExpanded(next);
+							const el = ref.current;
+							if (!el) return;
+							if (next)
+								el.style.height = ""; // deja que .input-expanded fije la altura
+							else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
 						}}
 					>
-						<Maximize size={15} />
+						{expanded ? <Minimize2 size={15} /> : <Maximize size={15} />}
 					</button>
 				</Tooltip>
 			</div>
@@ -721,45 +741,6 @@ export function Composer({
 					)}
 				</div>
 			</div>
-			{editorOpen && (
-				<div
-					className="editor-overlay"
-					onClick={(e) => {
-						if (e.target === e.currentTarget) setEditorOpen(false);
-					}}
-				>
-					<div className="editor-modal">
-						<textarea
-							className="editor-full"
-							value={editorText}
-							onChange={(e) => setEditorText(e.target.value)}
-							placeholder="Escribe tu prompt…"
-							autoFocus
-						/>
-						<div className="editor-actions">
-							<button
-								className="editor-cancel"
-								onClick={() => setEditorOpen(false)}
-							>
-								Cancelar
-							</button>
-							<button
-								className="primary-btn"
-								onClick={() => {
-									setText(editorText);
-									setEditorOpen(false);
-									doSubmit("steer");
-									requestAnimationFrame(() => {
-										if (ref.current) grow(ref.current);
-									});
-								}}
-							>
-								Enviar
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }

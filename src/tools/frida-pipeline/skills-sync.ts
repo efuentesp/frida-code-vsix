@@ -22,6 +22,36 @@ import { BUNDLED_AGENTS_DIR } from "./paths";
 /** Directorio fuente de skills (src/tools/frida-pipeline/skills/). */
 const BUNDLED_SKILLS_DIR = join(BUNDLED_AGENTS_DIR, "..", "skills");
 
+/** Cache de nombres de skills empaquetadas (subdirectorios con SKILL.md bajo
+ *  BUNDLED_SKILLS_DIR, sin contar `_shared`). Sirve para que el panel Recursos
+ *  pueda marcar una skill como "extensión" aunque Pi la etiquete "user"
+ *  (porque la sincronizamos a ~/.frida/skills/). Se calcula bajo demanda y se
+ *  cachea: el set es estático por proceso. */
+let bundledSkillNamesCache: Set<string> | null = null;
+export function getBundledSkillNames(): Set<string> {
+	if (bundledSkillNamesCache) return bundledSkillNamesCache;
+	const set = new Set<string>();
+	try {
+		if (existsSync(BUNDLED_SKILLS_DIR)) {
+			for (const entry of readdirSync(BUNDLED_SKILLS_DIR, {
+				withFileTypes: true,
+			})) {
+				if (
+					entry.isDirectory() &&
+					entry.name !== "_shared" &&
+					existsSync(join(BUNDLED_SKILLS_DIR, entry.name, "SKILL.md"))
+				) {
+					set.add(entry.name);
+				}
+			}
+		}
+	} catch {
+		/* set queda vacío — nada que etiquetar como extensión */
+	}
+	bundledSkillNamesCache = set;
+	return set;
+}
+
 /** Directorio destino: ~/.frida/skills/ */
 function getSkillsTargetDir(agentDir: string): string {
 	return join(agentDir, "skills");

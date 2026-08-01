@@ -109,7 +109,82 @@ function extName(p: string): string {
 	return base.replace(/\.(ts|js)$/, "");
 }
 
+// --- Procedencia (extensión / global / proyecto / built-in / path) ---
+// Metadatos por origen: etiqueta legible + clase del punto de color. El orden
+// fija el orden de los chips en la barra de filtros.
+const ORIGIN_META: Record<string, { label: string; dot: string }> = {
+	extension: { label: "extensión", dot: "src-extension" },
+	global: { label: "global", dot: "src-global" },
+	project: { label: "proyecto", dot: "src-project" },
+	"built-in": { label: "built-in", dot: "src-built-in" },
+	path: { label: "path", dot: "src-path" },
+};
+const ORIGIN_ORDER = ["extension", "global", "project", "built-in", "path"];
+
+/** Punto de color que identifica el origen a simple vista. */
+function SourceDot({ source }: { source: string }) {
+	const meta = ORIGIN_META[source] ?? ORIGIN_META.path;
+	return (
+		<span
+			className={"src-dot " + meta.dot}
+			title={meta.label}
+			aria-label={meta.label}
+		/>
+	);
+}
+
+/** Barra de filtros por origen. Sólo se renderiza si hay 2+ orígenes distintos
+ *  (si todos son del mismo tipo, el filtro no aporta). Cada chip muestra el
+ *  conteo; al hacer clic alterna (igual origen → vuelve a "Todos"). */
+function SourceFilter({
+	items,
+	active,
+	setActive,
+}: {
+	items: { source: string }[];
+	active: string;
+	setActive: (s: string) => void;
+}) {
+	const counts = new Map<string, number>();
+	for (const it of items)
+		counts.set(it.source, (counts.get(it.source) ?? 0) + 1);
+	const distinct = ORIGIN_ORDER.filter((o) => counts.has(o));
+	// Mostramos la barra siempre que haya ítems: aun con un solo origen actúa como
+	// leyenda (te dice de dónde vienen y fija el color del punto) y deja el
+	// filtro listo para cuando aparezca un segundo origen. Sin ítems → oculta.
+	if (items.length === 0) return null;
+	return (
+		<div className="src-filter">
+			<button
+				className={"src-chip" + (active === "all" ? " active" : "")}
+				onClick={() => setActive("all")}
+			>
+				Todos {items.length}
+			</button>
+			{distinct.map((o) => (
+				<button
+					key={o}
+					className={"src-chip" + (active === o ? " active" : "")}
+					onClick={() => setActive(active === o ? "all" : o)}
+				>
+					<span className={"src-dot " + ORIGIN_META[o].dot} />
+					{ORIGIN_META[o].label} {counts.get(o)}
+				</button>
+			))}
+		</div>
+	);
+}
+
 export function ResourcesContent({ res }: { res: ResourceSummary }) {
+	// Filtros por origen (uno por sección con múltiples orígenes). "all" = sin filtro.
+	const [skillFilter, setSkillFilter] = useState("all");
+	const [cmdFilter, setCmdFilter] = useState("all");
+	const skills = res.skills.filter(
+		(s) => skillFilter === "all" || s.source === skillFilter,
+	);
+	const commands = res.commands.filter(
+		(c) => cmdFilter === "all" || c.source === cmdFilter,
+	);
 	return (
 		<div className="resources-content">
 			<div className="sessions-list">
@@ -146,14 +221,48 @@ export function ResourcesContent({ res }: { res: ResourceSummary }) {
 					})}
 				</Section>
 
-				<Section title="Skills" count={res.skills.length}>
-					{res.skills.map((s, i) => (
+				<Section title="Comandos" count={res.commands.length}>
+					<SourceFilter
+						items={res.commands}
+						active={cmdFilter}
+						setActive={setCmdFilter}
+					/>
+					{commands.map((c, i) => (
 						<div key={i} className="res-item">
 							<div className="res-item-name">
-								<code>/{s.name || "skill"}</code>
+								<SourceDot source={c.source} />
+								<code>/{c.name}</code>
+								{c.argumentHint && (
+									<span className="cmd-arg">{c.argumentHint}</span>
+								)}
+								{c.source === "extension" && c.extension && (
+									<span className="tag">{c.extension}</span>
+								)}
+							</div>
+							{c.description && (
+								<div className="res-item-meta">{c.description}</div>
+							)}
+						</div>
+					))}
+				</Section>
+
+				<Section title="Skills" count={res.skills.length}>
+					<SourceFilter
+						items={res.skills}
+						active={skillFilter}
+						setActive={setSkillFilter}
+					/>
+					{skills.map((s, i) => (
+						<div key={i} className="res-item">
+							<div className="res-item-name">
+								<SourceDot source={s.source} />
+								<code>{s.name || "skill"}</code>
 							</div>
 							{s.description && (
 								<div className="res-item-meta">{s.description}</div>
+							)}
+							{s.path && (
+								<div className="res-item-meta muted">{shortPath(s.path)}</div>
 							)}
 						</div>
 					))}

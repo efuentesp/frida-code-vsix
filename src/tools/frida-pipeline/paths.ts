@@ -1,22 +1,48 @@
 // frida-pipeline — resolución de paths de recursos empaquetados.
 //
 // Porte de `rpiv-core/paths.ts` (ADR-0021 Fase 5). Resuelve el directorio de
-// agentes empaquetados relativo a este módulo. El SDK de Pi no expone un "dame
-// la raíz de mi propia extensión", así que esto es la resolución idiomática.
+// agentes/skills empaquetados. El SDK de Pi no expone un "dame la raíz de mi
+// propia extensión", así que esto es la resolución idiomática.
 //
-// Bajo esbuild bundle, `import.meta.url` se pierde — el bundle mete todo en
-// `dist/extension.js`. El walk-up busca el `package.json` con
-// `name === "frida-code"` (mismo enfoque que siblings.ts). Si falla, cae a
-// `process.cwd()` (VS Code fija el cwd al workspace).
+// Bajo esbuild bundle (format: cjs), `import.meta.url` se pierde (se shimea),
+// pero `__dirname` sigue disponible y vale `<root>/dist/`. La resolución
+// primaria usa `__dirname` (válido en dev y en VSIX instalado); el walk-up
+// desde `process.cwd()` queda como fallback para tests/headless. Ver
+// `resolveProjectRoot()` para el detalle.
 
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 /**
- * Raíz del proyecto frida-code. Busca subiendo desde `process.cwd()` hasta
- * encontrar un `package.json` con `name === "frida-code"`.
+ * Raíz del proyecto frida-code.
+ *
+ * Orden de resolución:
+ *  1. Relativa al bundle CJS: `__dirname` = `<root>/dist/` (válido tanto en
+ *     dev como en VSIX instalado, donde `src/tools/frida-pipeline/{agents,
+ *     skills}/` se shipea vía .vscodeignore). Guard estricto: sólo se usa si el
+ *     árbol de pipeline existe en ese punto.
+ *  2. Walk-up desde `process.cwd()` buscando `package.json` con
+ *     `name === "frida-code"` (tests con vitest / headless, donde `__dirname`
+ *     apunta al source transformado, no al bundle).
+ *
+ * NOTA: ANTES esto sólo hacía (2), que fallaba cuando la extensión corría con
+ * un workspace distinto al repo (Extension Development Host sobre un proyecto
+ * de prueba, o VSIX instalado donde cwd = proyecto del usuario):
+ * `BUNDLED_AGENTS_DIR` no existía → `syncBundled{Agents,Skills}` retornaban
+ * vacío en silencio → Pi nunca descubría los skills empaquetados y no aparían
+ * en Configuración > Recursos.
  */
 function resolveProjectRoot(): string {
+	// 1. Relativo al bundle (__dirname = <root>/dist/ en CJS).
+	if (typeof __dirname !== "undefined") {
+		const byBundle = resolve(__dirname, "..");
+		if (
+			existsSync(join(byBundle, "src", "tools", "frida-pipeline", "agents"))
+		) {
+			return byBundle;
+		}
+	}
+	// 2. Walk-up desde cwd (tests / headless sin bundle).
 	let cursor = process.cwd();
 	for (let i = 0; i < 8; i++) {
 		const pkgPath = join(cursor, "package.json");

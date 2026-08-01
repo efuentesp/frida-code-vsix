@@ -21,6 +21,7 @@ import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
 import { WorkspaceBar } from "./components/WorkspaceBar";
 import {
+	ArrowDown,
 	Bot,
 	Brain,
 	CircleAlert,
@@ -62,7 +63,14 @@ export function App() {
 	const [state, dispatch] = useReducer(reduce, initialState);
 	const approvalsRef = useRef<HTMLDivElement>(null);
 	const logRef = useRef<HTMLDivElement>(null);
+	// `stick` (state) → re-render para mostrar/ocultar el botón flotante.
+	// `stickRef` (ref) → lectura "actual" dentro del efecto de auto-scroll sin
+	// meter `stick` en sus deps (evita re-scrollear al cambiar de estado).
+	const [stick, setStick] = useState(true);
 	const stickRef = useRef(true);
+	useEffect(() => {
+		stickRef.current = stick;
+	}, [stick]);
 	const [escHint, setEscHint] = useState(false);
 	const [sessionsOpen, setSessionsOpen] = useState(false);
 	const [modelsOpen, setModelsOpen] = useState(false);
@@ -161,114 +169,23 @@ export function App() {
 
 	const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
-	// Built-in slash commands (siempre disponibles, ejecutados por el host).
-	const builtinCommands: CommandItem[] = useMemo(
-		() => [
-			{
-				kind: "builtin",
-				label: "/compact",
-				name: "compact",
-				description: "Compactar el contexto de la sesión",
-			},
-			{
-				kind: "builtin",
-				label: "/reload",
-				name: "reload",
-				description: "Recargar extensiones, skills y prompts",
-			},
-			{
-				kind: "builtin",
-				label: "/new",
-				name: "new",
-				description: "Iniciar una sesión nueva",
-			},
-			{
-				kind: "builtin",
-				label: "/model",
-				name: "model",
-				description: "Abrir el selector de modelo/proveedor",
-				argumentHint: "<provider/model>",
-			},
-			{
-				kind: "builtin",
-				label: "/login",
-				name: "login",
-				description: "Iniciar sesión con un proveedor (suscripción)",
-				argumentHint: "<provider>",
-			},
-			{
-				kind: "builtin",
-				label: "/logout",
-				name: "logout",
-				description: "Cerrar sesión de un proveedor",
-				argumentHint: "<provider>",
-			},
-			{
-				kind: "builtin",
-				label: "/name",
-				name: "name",
-				description: "Renombrar la sesión actual",
-				argumentHint: "<nombre>",
-			},
-			{
-				kind: "builtin",
-				label: "/copy",
-				name: "copy",
-				description: "Copiar el último mensaje al portapapeles",
-			},
-			{
-				kind: "builtin",
-				label: "/clone",
-				name: "clone",
-				description: "Duplicar la sesión actual",
-			},
-			{
-				kind: "builtin",
-				label: "/fork",
-				name: "fork",
-				description: "Bifurcar desde un mensaje anterior",
-			},
-			{
-				kind: "builtin",
-				label: "/todos",
-				name: "todos",
-				description: "Mostrar la lista de tareas agrupada por estado",
-			},
-			{
-				kind: "builtin",
-				label: "/context",
-				name: "context",
-				description:
-					"Reporte de uso del contexto (presión, categorías, system prompt)",
-			},
-			{
-				kind: "builtin",
-				label: "/gates",
-				name: "gates",
-				description: "Auditoría de permisos (decisiones allow/block del gate)",
-			},
-			{
-				kind: "builtin",
-				label: "/gates-config",
-				name: "gates-config",
-				description: "Editor de permisos (allow/ask/deny por tool)",
-			},
-			{
-				kind: "builtin",
-				label: "/help",
-				name: "help",
-				description: "Mostrar atajos y comandos",
-			},
-		],
-		[],
-	);
-
-	// Lista de comandos para el autocompletado de "/": built-in + skills + prompts.
+	// Comandos para el autocompletado de "/": built-in (del host vía
+	// state.resources.commands) + skills + prompts. FUENTE ÚNICA: BUILTIN_COMMANDS
+	// en extension.ts → ResourceSummary.commands → aquí. Así host y client nunca
+	// divergen (bug anterior: 22 en el host vs 15 hardcodeados → /wf y 6 más sólo
+	// funcionaban escribiéndolos a mano).
 	const commands: CommandItem[] = useMemo(() => {
 		const r = state.resources;
-		if (!r) return builtinCommands;
+		const builtins: CommandItem[] = (r?.commands ?? []).map((c) => ({
+			kind: "builtin" as const,
+			label: `/${c.name}`,
+			name: c.name,
+			description: c.description,
+			argumentHint: c.argumentHint,
+		}));
+		if (!r) return builtins;
 		return [
-			...builtinCommands,
+			...builtins,
 			...r.skills.map((s) => ({
 				kind: "skill" as const,
 				label: `/skill:${s.name}`,
@@ -282,7 +199,7 @@ export function App() {
 				description: p.description,
 			})),
 		];
-	}, [state.resources, builtinCommands]);
+	}, [state.resources]);
 
 	// Etiqueta del indicador de procesamiento (fijo en el footer). Refleja el
 	// sub-estado cuando se conoce; no depende del scroll de la conversación.
@@ -453,8 +370,10 @@ export function App() {
 				onScroll={() => {
 					const el = logRef.current;
 					if (!el) return;
-					stickRef.current =
+					const atBottom =
 						el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+					stickRef.current = atBottom;
+					setStick(atBottom);
 				}}
 			>
 				{state.turns.length === 0 && <Welcome />}
@@ -480,6 +399,20 @@ export function App() {
 							))}
 					</Fragment>
 				))}
+				{/* Botón flotante "ir al final": siempre montado para que el fade
+				    sea estable; se oculta con .hidden cuando stick=true. */}
+				<button
+					className={"jump-bottom" + (stick ? " hidden" : "")}
+					title="Ir al final"
+					aria-label="Ir al final de la conversación"
+					onClick={() => {
+						const el = logRef.current;
+						if (!el) return;
+						el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+					}}
+				>
+					<ArrowDown size={18} />
+				</button>
 				<div ref={approvalsRef} className="approvals-area">
 					{state.queued.map((q, i) => (
 						<div key={i} className="queued-msg">

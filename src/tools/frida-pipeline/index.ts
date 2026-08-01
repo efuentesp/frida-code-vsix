@@ -105,7 +105,7 @@ export {
 export type { SyncResult, SyncError } from "./agents-sync";
 
 // Skills sync (Fase 11)
-export { syncBundledSkills } from "./skills-sync";
+export { syncBundledSkills, getBundledSkillNames } from "./skills-sync";
 export type { SkillSyncResult } from "./skills-sync";
 export {
 	BUNDLED_AGENTS_DIR,
