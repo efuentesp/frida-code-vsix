@@ -4,10 +4,123 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Frida Code</title>
-    <script type="module" crossorigin src="./assets/index-SGggmlGn.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BkdosJq8.css">
+    <!-- Splash de carga PRE-React: aparece instantáneamente antes de que se
+         parseé el bundle (568 KB) y tapa la pantalla blanca. Vive dentro de
+         #root, así React lo reemplaza automáticamente al montar. Estilos inline
+         y scoped (#frida-splash) para no depender del CSS bundle. -->
+    <style>
+      #frida-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: var(--vscode-editor-background, #1e1e1e);
+        color: var(--vscode-foreground, #cccccc);
+        font-family: var(
+          --vscode-font-family,
+          system-ui,
+          -apple-system,
+          sans-serif
+        );
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+      #frida-splash .splash-mark {
+        width: 44px;
+        height: 44px;
+        animation: splash-pulse 1.2s ease-in-out infinite;
+      }
+      #frida-splash .splash-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      #frida-splash .splash-sub {
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      #frida-splash .splash-dots span {
+        display: inline-block;
+        animation: splash-bounce 1.2s ease-in-out infinite;
+      }
+      #frida-splash .splash-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      #frida-splash .splash-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes splash-pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(1.08);
+        }
+      }
+      @keyframes splash-bounce {
+        0%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        50% {
+          transform: translateY(-3px);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #frida-splash .splash-mark,
+        #frida-splash .splash-dots span {
+          animation: none;
+        }
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-BbkXrk3r.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CBASZ5C0.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="frida-splash" aria-busy="true" aria-label="Cargando Frida Code">
+        <!-- marca de Frida (favicon.svg incrustado: círculo #6a5acd + bot blanco) -->
+        <svg
+          class="splash-mark"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 32 32"
+          width="44"
+          height="44"
+          role="img"
+          aria-hidden="true"
+        >
+          <circle cx="16" cy="16" r="16" fill="#6a5acd" />
+          <g
+            transform="translate(4 4)"
+            fill="none"
+            stroke="#ffffff"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 8V4H8" />
+            <rect width="16" height="12" x="4" y="8" rx="2" />
+            <path d="M2 14h2" />
+            <path d="M20 14h2" />
+            <path d="M15 13v2" />
+            <path d="M9 13v2" />
+          </g>
+        </svg>
+        <div class="splash-title">Frida Code</div>
+        <div class="splash-sub">
+          Cargando<span class="splash-dots"
+            ><span>·</span><span>·</span><span>·</span></span
+          >
+        </div>
+      </div>
+    </div>
   </body>
 </html>

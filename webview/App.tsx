@@ -241,6 +241,22 @@ export function App() {
 	const composerDialogRoots = Object.entries(state.webRoots ?? {}).filter(
 		([, r]) => r.placement === "composer" && r.tree,
 	);
+	// Estado controlado del editor ampliado del Composer: lo subimos a App para
+	// saber cuándo ocultar el botón "ir al final" (al ampliar crece el footer →
+	// .log se redimensiona → el botón salta). Fuente única → sin desync al
+	// desmontarse el Composer por una aprobación/diálogo.
+	const [composerExpanded, setComposerExpanded] = useState(false);
+	// El botón "ir al final" salta de sitio cuando un diálogo interactivo reemplaza
+	// el composer (approval / ask_user_question), cuando el editor está ampliado
+	// o mientras se procesa una petición: el footer cambia de altura y .log se
+	// redimensiona. Lo ocultamos en esos estados; sólo reaparece con el agente
+	// idle, editor compacto y composer visible.
+	const hideJump =
+		state.busy ||
+		state.approvals.length > 0 ||
+		state.uiRequests.length > 0 ||
+		composerDialogRoots.length > 0 ||
+		composerExpanded;
 
 	if (wizardVisible) {
 		return (
@@ -389,6 +405,9 @@ export function App() {
 					<Fragment key={t.id}>
 						<TurnView
 							turn={t}
+							live={
+								state.busy && t.id === state.turns[state.turns.length - 1]?.id
+							}
 							hideThinking={hideThinking}
 							onCopy={(text) => post({ type: "copy_text", text })}
 						/>
@@ -402,7 +421,7 @@ export function App() {
 				{/* Botón flotante "ir al final": siempre montado para que el fade
 				    sea estable; se oculta con .hidden cuando stick=true. */}
 				<button
-					className={"jump-bottom" + (stick ? " hidden" : "")}
+					className={"jump-bottom" + (stick || hideJump ? " hidden" : "")}
 					title="Ir al final"
 					aria-label="Ir al final de la conversación"
 					onClick={() => {
@@ -533,6 +552,8 @@ export function App() {
 						mode={state.mode}
 						busy={state.busy}
 						pendingDialog={state.approvals.length > 0}
+						expanded={composerExpanded}
+						onExpandedChange={setComposerExpanded}
 						onAbort={() => post({ type: "abort" })}
 						onSelectModel={(provider, modelId) =>
 							post({ type: "select_model", provider, model: modelId })

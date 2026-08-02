@@ -75,6 +75,8 @@ export function Composer({
 	onSelectModel,
 	onSetThinking,
 	onCycleMode,
+	expanded,
+	onExpandedChange,
 }: {
 	onSubmit: (
 		text: string,
@@ -97,6 +99,11 @@ export function Composer({
 	onSelectModel?: (provider: string, modelId: string) => void;
 	onSetThinking?: (level: string) => void;
 	onCycleMode?: () => void;
+	/** ¿El editor está ampliado? Estado controlado por App para que ésta sepa
+	 *  cuándo ocultar el botón "ir al final": al ampliar, el footer crece y
+	 *  .log se redimensiona → el botón saltaría de sitio. */
+	expanded: boolean;
+	onExpandedChange?: (expanded: boolean) => void;
 }) {
 	const [text, setText] = useState("");
 	const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -109,7 +116,6 @@ export function Composer({
 		command: string;
 		prefix: string;
 	} | null>(null); // argumento de /login /model
-	const [expanded, setExpanded] = useState(false);
 	const [sel, setSel] = useState(0);
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -617,7 +623,7 @@ export function Composer({
 						disabled={pendingDialog}
 						onClick={() => {
 							const next = !expanded;
-							setExpanded(next);
+							onExpandedChange?.(next);
 							const el = ref.current;
 							if (!el) return;
 							if (next)
@@ -670,6 +676,7 @@ export function Composer({
 					{provs.length > 0 && (
 						<select
 							className="bar-select"
+							disabled={busy}
 							value={active?.provider ?? ""}
 							onChange={(e) => {
 								const p = provs.find((x) => x.id === e.target.value);
@@ -688,6 +695,7 @@ export function Composer({
 					{modelOptions.length > 0 && (
 						<select
 							className="bar-select"
+							disabled={busy}
 							value={active?.modelId ?? ""}
 							onChange={(e) =>
 								active?.provider &&
@@ -704,6 +712,7 @@ export function Composer({
 					)}
 					<select
 						className="bar-select"
+						disabled={busy}
 						value={thinking ?? "medium"}
 						onChange={(e) => onSetThinking?.(e.target.value)}
 						aria-label="Esfuerzo"

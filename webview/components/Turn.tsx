@@ -11,10 +11,14 @@ export function TurnView({
 	turn,
 	onCopy,
 	hideThinking,
+	live,
 }: {
 	turn: Turn;
 	onCopy?: (text: string) => void;
 	hideThinking?: boolean;
+	/** true si este turno es el activo (el último, con el agente ocupado):
+	 *  permite que el Brain del segmento thinking en curso "lata". */
+	live?: boolean;
 }) {
 	const hasAssistant = turn.segments.length > 0 || !!turn.error || !!turn.bash;
 	const assistantText = turn.segments
@@ -88,7 +92,15 @@ export function TurnView({
 								!hideThinking && s.text ? (
 									<details key={i} className="thinking">
 										<summary className="thinking-head">
-											<Brain size={13} className="thinking-icon" />
+											<Brain
+												size={13}
+												className={
+													"thinking-icon" +
+													(live && i === turn.segments.length - 1
+														? " thinking-live"
+														: "")
+												}
+											/>
 											<span className="thinking-name">Razonamiento</span>
 											<span className="thinking-chev">
 												<Icon name="chevron" size={12} />

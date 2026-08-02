@@ -3,6 +3,8 @@
 // Porte simplificado de pi-subagents/src/types.ts (ADR-0022 Fase 1).
 // Tipos mínimos para soportar el tool Agent con general-purpose.
 
+import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
+
 /** Tipo de subagente: cualquier string (defaults o custom). */
 export type SubagentType = string;
 
@@ -101,4 +103,8 @@ export interface SpawnOptions {
 	onComplete?: (result: string, record: AgentRecord) => void;
 	/** Callback de actividad (turnos, tools). */
 	onTurnEnd?: (turnCount: number) => void;
+	/** Reenvía texto/tools del sub-agente en vivo al webview como "partial" del
+	 *  tool padre (agent foreground o get_subagent_result wait). Así se ve que el
+	 *  sub-agente genera contenido mientras corre, no que está trabado. */
+	onUpdate?: AgentToolUpdateCallback;
 }

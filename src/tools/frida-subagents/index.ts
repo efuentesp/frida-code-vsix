@@ -10,12 +10,14 @@
 import { Type } from "typebox";
 import {
 	defineTool,
+	type AgentToolUpdateCallback,
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import {
 	resolveAgentConfig,
 	runAgent,
+	forwardLiveProgress,
 	getAvailableTypes,
 	steerAgent,
 } from "./agent-runner";
@@ -142,7 +144,7 @@ export function createFridaSubagents() {
 						isolated?: boolean;
 					},
 					_signal: AbortSignal | undefined,
-					_onUpdate: unknown,
+					onUpdate: AgentToolUpdateCallback | undefined,
 					ctx: ExtensionContext,
 				) => {
 					// Resolver el tipo de agente.
@@ -159,6 +161,7 @@ export function createFridaSubagents() {
 						runInBackground: params.run_in_background,
 						resume: params.resume,
 						isolated: params.isolated,
+						onUpdate,
 					};
 
 					if (params.run_in_background) {
@@ -256,7 +259,7 @@ export function createFridaSubagents() {
 						verbose?: boolean;
 					},
 					_signal: AbortSignal | undefined,
-					_onUpdate: unknown,
+					onUpdate: AgentToolUpdateCallback | undefined,
 					_ctx: ExtensionContext,
 				) => {
 					const agent = getAgent(params.agent_id);
@@ -266,10 +269,18 @@ export function createFridaSubagents() {
 
 					// Si wait:true, esperar el promise.
 					if (params.wait && agent.promise) {
+						// Vistazo en vivo: mientras espera, reenvía texto/tools del sub-agente
+						// al webview como "partial" de esta tarjeta.
+						let stopLive: (() => void) | undefined;
+						if (onUpdate && agent.session) {
+							stopLive = forwardLiveProgress(agent.session, onUpdate);
+						}
 						try {
 							await agent.promise;
 						} catch {
 							// El error ya está en agent.error
+						} finally {
+							stopLive?.();
 						}
 					}
 

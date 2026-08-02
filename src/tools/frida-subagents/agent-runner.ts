@@ -8,7 +8,9 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
 	createAgentSession,
+	type AgentToolUpdateCallback,
 	type AgentSession,
+	type ModelRuntime,
 	SessionManager,
 	SettingsManager,
 	DefaultResourceLoader,
@@ -16,6 +18,7 @@ import {
 import { join } from "node:path";
 import { homedir } from "node:os";
 import type { AgentConfig, SpawnOptions } from "./types";
+import { createActivityTracker, describeActivity } from "./activity-tracker";
 import {
 	getAgentConfig as registryGetConfig,
 	getAvailableTypes as registryGetTypes,
@@ -130,12 +133,23 @@ export async function runAgent(
 	// Modelo: usar el del padre por ahora (Fase 1 sin fuzzy resolution).
 	const model = ctx.model ?? undefined;
 
+	// Propagar el ModelRuntime del padre a la sesión hija. Las API keys de los
+	// providers con SecretStorage (zai, etc.) viven inyectadas en el runtime del
+	// padre, NO en auth.json; sin esto, la hija crea un runtime nuevo que sólo
+	// lee auth.json y falla con "No API key found". Patrón de
+	// @tintinweb/pi-subagents. (ModelRegistry.runtime es private en los .d.ts →
+	// acceso vía cast tipado; createAgentSession en pi 0.80.8+ usa modelRuntime.)
+	const parentModelRuntime = (
+		ctx.modelRegistry as unknown as { runtime?: ModelRuntime }
+	).runtime;
+
 	const { session } = await createAgentSession({
 		cwd,
 		agentDir: FRIDA_AGENT_DIR,
 		sessionManager,
 		settingsManager,
 		resourceLoader: loader,
+		...(parentModelRuntime && { modelRuntime: parentModelRuntime }),
 		model,
 		// Excluir nuestros propios tools para evitar recursión infinita.
 		excludeTools: ["Agent", "get_subagent_result", "steer_subagent"],
@@ -197,6 +211,18 @@ export async function runAgent(
 		}
 	});
 
+	// Vistazo en vivo (sólo foreground): reenvía texto streaming + tools del
+	// sub-agente al webview como "partial" del tool padre. El background se ve vía
+	// get_subagent_result(wait:true), que adjunta su propio forwarder.
+	let stopLive: (() => void) | undefined;
+	if (!options.runInBackground && options.onUpdate) {
+		stopLive = forwardLiveProgress(
+			session,
+			options.onUpdate,
+			options.maxTurns ?? config.maxTurns,
+		);
+	}
+
 	// Si es background, no esperar — arrancar en fondo.
 	if (options.runInBackground) {
 		const promise = runSessionPrompt(
@@ -244,6 +270,8 @@ export async function runAgent(
 			e instanceof Error ? e.message : String(e),
 		);
 		throw e;
+	} finally {
+		stopLive?.();
 	}
 }
 
@@ -310,6 +338,118 @@ function extractText(msg: { content?: unknown }): string {
 			.join("\n");
 	}
 	return "";
+}
+
+/**
+ * Suscribe la sesión hija y reenvía su actividad en vivo vía onUpdate como
+ * "partial" estructurado del tool padre (agent foreground o get_subagent_result
+ * wait). Usa un ActivityTracker (activeTools start/end, toolUses, turnos,
+ * responseText, tokens) + describeActivity() para producir un resumen compacto
+ * ("searching…", "editing…", "thinking…") con métricas, en vez de un volcado de
+ * texto creciendo. Patrón de @tintinweb/pi-subagents.
+ *
+ * El details {kind:"subagent_progress",...} viaja por el pipeline
+ * (tool_execution_update) hasta el webview, que lo renderiza rico. El content
+ * lleva el activity one-liner como fallback. Throttle ~6/s. Devuelve un unsub.
+ */
+export function forwardLiveProgress(
+	session: unknown,
+	onUpdate: AgentToolUpdateCallback,
+	maxTurns?: number,
+): () => void {
+	const tracker = createActivityTracker(maxTurns);
+	let currentText = "";
+	let turnCount = 1;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let lastFlush = 0;
+
+	const buildDetails = () => {
+		const s = tracker.state;
+		return {
+			kind: "subagent_progress" as const,
+			toolUses: s.toolUses,
+			turnCount: s.turnCount,
+			maxTurns: s.maxTurns,
+			tokens: s.tokens,
+			activity: describeActivity(s.activeTools, s.responseText),
+		};
+	};
+
+	const flush = (): void => {
+		lastFlush = Date.now();
+		const d = buildDetails();
+		onUpdate({ content: [{ type: "text", text: d.activity }], details: d });
+	};
+
+	const scheduleFlush = (): void => {
+		if (timer) return;
+		const elapsed = Date.now() - lastFlush;
+		timer = setTimeout(
+			() => {
+				timer = undefined;
+				flush();
+			},
+			elapsed >= 150 ? 0 : 150 - elapsed,
+		);
+	};
+
+	const unsub = (session as AgentSession).subscribe(
+		(event: { type: string }) => {
+			const e = event as {
+				toolName?: unknown;
+				assistantMessageEvent?: { type?: string; delta?: string };
+				message?: {
+					role?: string;
+					usage?: { input?: number; output?: number };
+				};
+			};
+			if (event.type === "tool_execution_start") {
+				tracker.callbacks.onToolActivity({
+					type: "start",
+					toolName: String(e.toolName ?? "tool"),
+				});
+				scheduleFlush();
+			} else if (event.type === "tool_execution_end") {
+				tracker.callbacks.onToolActivity({
+					type: "end",
+					toolName: String(e.toolName ?? "tool"),
+				});
+				scheduleFlush();
+			} else if (event.type === "message_update") {
+				const ae = e.assistantMessageEvent;
+				if (ae?.type === "text_delta" && typeof ae.delta === "string") {
+					currentText += ae.delta;
+					tracker.callbacks.onTextDelta(ae.delta, currentText);
+					scheduleFlush();
+				}
+			} else if (event.type === "turn_end") {
+				turnCount++;
+				tracker.callbacks.onTurnEnd(turnCount);
+				scheduleFlush();
+			} else if (
+				event.type === "message_end" &&
+				e.message?.role === "assistant"
+			) {
+				const u = e.message.usage;
+				if (u) {
+					tracker.callbacks.onAssistantUsage({
+						input: u.input ?? 0,
+						output: u.output ?? 0,
+					});
+					scheduleFlush();
+				}
+			}
+		},
+	);
+
+	return () => {
+		if (timer) {
+			clearTimeout(timer);
+			timer = undefined;
+		}
+		flush();
+		unsub();
+	};
 }
 
 /**

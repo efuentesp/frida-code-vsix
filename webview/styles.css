@@ -633,6 +633,25 @@ body {
 	color: var(--vscode-textLink-foreground, #4daafc);
 	flex: none;
 }
+/* Brain "vivo" mientras el modelo razona en vivo (último segmento thinking
+   del turno activo): latido con escala + brillo del color de acento. Al
+   terminar el razonamiento se quita la clase y el icono vuelve a estar quieto. */
+.thinking-icon.thinking-live {
+	animation: thinkingPulse 1.2s ease-in-out infinite;
+}
+@keyframes thinkingPulse {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+		filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
+	}
+	50% {
+		opacity: 0.6;
+		transform: scale(1.2);
+		filter: drop-shadow(0 0 3px var(--vscode-textLink-foreground, #4daafc));
+	}
+}
 .thinking-name {
 	font-weight: 600;
 }
@@ -848,6 +867,17 @@ body {
 	opacity: 0.85;
 	flex: none;
 }
+/* Tool en ejecución: su icono late con el mismo pulso que el Brain de
+   "Razonamiento" (reutiliza @keyframes thinkingPulse). Sobrio y coherente
+   con el resto de la UI. Respeta prefers-reduced-motion. */
+.tc-icon.live {
+	animation: thinkingPulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.tc-icon.live {
+		animation: none;
+	}
+}
 .tc-name {
 	font-weight: 600;
 	font-size: 11px;
@@ -955,6 +985,33 @@ body {
 	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
 	max-height: 220px;
 	overflow: auto;
+}
+
+/* Vistazo en vivo de un sub-agente (agent / get_subagent_result mientras corre):
+   métricas muteadas + línea de actividad compacta. Reemplaza el <pre> partial. */
+.subagent-live {
+	padding: 6px 8px;
+	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
+	background: var(
+		--vscode-textBlockQuote-background,
+		rgba(255, 255, 255, 0.04)
+	);
+	border-radius: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.sl-stats {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.9;
+}
+.sl-activity {
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	opacity: 0.95;
+	white-space: pre-wrap;
+	word-break: break-word;
 }
 .tool-result.md {
 	padding: 0;
@@ -1465,24 +1522,27 @@ button.sec:hover {
 	border-width: 2px;
 }
 
-/* AnimatedLabel — ola de letras para el indicador "Procesando…" (proc-bar).
-   Cada carácter oscila con retardo escalonado; la ola recorre la palabra. */
-.proc-bar .proc-label.wave .ltr {
+/* AnimatedLabel — pulso para el indicador "Procesando…" (proc-bar).
+   Toda la etiqueta late (opacidad + brillo del color de acento) en bucle, como
+   el Brain de "Razonamiento". display:inline-block para que filter/opacity
+   rendericen de forma fiable. Respeta prefers-reduced-motion. */
+.proc-bar .proc-label.wave {
 	display: inline-block;
-	animation: proc-wave 1.4s ease-in-out infinite;
+	animation: proc-pulse 1.2s ease-in-out infinite;
 }
-@keyframes proc-wave {
+@keyframes proc-pulse {
 	0%,
 	100% {
-		transform: translateY(0);
+		opacity: 1;
+		filter: drop-shadow(0 0 0 transparent);
 	}
 	50% {
-		transform: translateY(-3px);
-		color: var(--vscode-textLink-foreground, #4daafc);
+		opacity: 0.55;
+		filter: drop-shadow(0 0 3px var(--vscode-textLink-foreground, #4daafc));
 	}
 }
 @media (prefers-reduced-motion: reduce) {
-	.proc-bar .proc-label.wave .ltr {
+	.proc-bar .proc-label.wave {
 		animation: none;
 	}
 }
@@ -3536,6 +3596,12 @@ kbd {
 }
 .bar-select:focus {
 	border-color: var(--vscode-focusBorder);
+}
+/* Combos deshabilitados mientras se procesa una petición (busy): el valor
+   actual sigue visible pero atenuado, y sin cursor de click. */
+.bar-select:disabled {
+	opacity: 0.5;
+	cursor: default;
 }
 /* Íconos planos (editor ampliado, modo aprobación): mismo morado que el toolbar. */
 .bar-ico {

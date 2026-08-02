@@ -1263,13 +1263,20 @@ export async function activate(
 					// Progreso parcial de un tool largo (extensiones/MCP). Se acumula en el
 					// segmento del tool (por toolCallId) y se muestra mientras sigue running.
 					const partial = summarizeResult(event.partialResult);
-					if (partial) {
-						post({
+					// details estructurado (p. ej. subagent_progress del tool agent /
+					// get_subagent_result): se reenvía al webview para render rico. Opcional.
+					const details = (
+						event.partialResult as { details?: unknown } | undefined
+					)?.details;
+					if (partial || details) {
+						const msg: Record<string, unknown> = {
 							type: "tool_update",
 							toolCallId: event.toolCallId,
 							tool: event.toolName,
-							partial,
-						});
+						};
+						if (partial) msg.partial = partial;
+						if (details) msg.details = details;
+						post(msg);
 					}
 					break;
 				}

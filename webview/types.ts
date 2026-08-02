@@ -5,6 +5,17 @@ export type ToolState = "running" | "ok" | "error";
 /** Nivel de un toast: error NO se auto-cierra (cierre manual); los demás sí. */
 export type ToastLevel = "info" | "warning" | "error" | "success";
 
+/** Progreso estructurado de un sub-agente (reenvía el host vía tool_update.details
+ *  cuando kind === "subagent_progress"). Se renderiza rico en el ToolCard. */
+export interface SubagentProgressDetails {
+	kind: "subagent_progress";
+	toolUses: number;
+	turnCount: number;
+	maxTurns?: number;
+	tokens: number;
+	activity: string;
+}
+
 export interface ToolEntry {
 	tool: string;
 	args: unknown;
@@ -15,6 +26,7 @@ export interface ToolEntry {
 	diff?: string;
 	toolCallId?: string; // del SDK: para emparejar updates/fin de tools largos
 	partial?: string; // progreso parcial (tool_execution_update) mientras running
+	partialDetails?: SubagentProgressDetails; // progreso estructurado del sub-agente
 }
 
 // Ejecución de bash del usuario (!command / !!command).
@@ -333,7 +345,13 @@ export type InMessage =
 	| { type: "delta"; text: string }
 	| { type: "thinking_delta"; text: string }
 	| { type: "tool_start"; tool: string; args?: unknown; toolCallId?: string }
-	| { type: "tool_update"; tool: string; toolCallId?: string; partial: string }
+	| {
+			type: "tool_update";
+			tool: string;
+			toolCallId?: string;
+			partial?: string;
+			details?: SubagentProgressDetails;
+	  }
 	| {
 			type: "tool_end";
 			tool: string;

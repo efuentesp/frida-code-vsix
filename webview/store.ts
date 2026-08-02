@@ -3,6 +3,7 @@ import type {
 	InMessage,
 	Segment,
 	State,
+	SubagentProgressDetails,
 	ToolState,
 	Turn,
 	Usage,
@@ -94,7 +95,8 @@ function markToolResult(
 function applyToolUpdate(
 	t: Turn,
 	toolCallId: string | undefined,
-	partial: string,
+	partial: string | undefined,
+	details: SubagentProgressDetails | undefined,
 ): Turn {
 	let done = false;
 	const segments = t.segments.map((s) => {
@@ -106,7 +108,11 @@ function applyToolUpdate(
 			s.toolCallId === toolCallId
 		) {
 			done = true;
-			return { ...s, partial } as Segment;
+			return {
+				...s,
+				partial: partial ?? s.partial,
+				partialDetails: details,
+			} as Segment;
 		}
 		return s;
 	});
@@ -276,7 +282,7 @@ export function reduce(state: State, msg: InMessage): State {
 			return {
 				...state,
 				turns: withLast(state.turns, (t) =>
-					applyToolUpdate(t, msg.toolCallId, msg.partial),
+					applyToolUpdate(t, msg.toolCallId, msg.partial, msg.details),
 				),
 			};
 

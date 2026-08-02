@@ -1,4 +1,4 @@
-import type { ToolEntry } from "../types";
+import type { SubagentProgressDetails, ToolEntry } from "../types";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { Tooltip } from "./Tooltip";
@@ -9,12 +9,15 @@ import {
 	FilePen,
 	FileText,
 	Folder,
+	Gauge,
 	ListChecks,
 	MessageCircleQuestion,
 	PencilLine,
 	ScanSearch,
 	Search,
 	Terminal,
+	UserCheck,
+	Users,
 	Wrench,
 } from "lucide-react";
 
@@ -225,9 +228,60 @@ function toolCallInfo(
 						: "";
 			return { icon: <Compass size={13} />, name: "agent_browser", label: url };
 		}
+		case "agent": {
+			// Sub-agente autónomo: label = la descripción corta (3-5 palabras) que pide
+			// el tool, o el tipo de agente si no trae descripción.
+			const desc = s(a.description);
+			return {
+				icon: <Users size={13} />,
+				name: "agent",
+				label: desc || s(a.subagent_type),
+			};
+		}
+		case "get_subagent_result": {
+			// Recupera el resultado de un sub-agente (background). UserCheck (agente
+			// con palomita = "resultado recibido") distingue la recuperación del
+			// lanzamiento (agent → Users). Label = agent_id que identifica al sub-agente.
+			return {
+				icon: <UserCheck size={13} />,
+				name: "get_subagent_result",
+				label: s(a.agent_id),
+			};
+		}
+		case "context":
+			// Reporte de uso del contexto (presión del context window, categorías,
+			// system prompt). El icono (Gauge) ya lo identifica; sin label.
+			return { icon: <Gauge size={13} />, name: "context", label: "" };
 		default:
 			return { icon: <Wrench size={13} />, name: tool, label: "" };
 	}
+}
+
+/** Token count legible: 1234 → "1.2k tokens", 500 → "500 tokens". */
+function formatTokens(n: number): string {
+	return n >= 1000 ? `${(n / 1000).toFixed(1)}k tokens` : `${n} tokens`;
+}
+
+/** Vista rica del progreso de un sub-agente mientras corre: métricas (turnos,
+ *  tools, tokens) + actividad compacta en una línea. Reemplaza el <pre> de
+ *  livePartial para los tools agent / get_subagent_result. */
+function renderSubagentLive(d: SubagentProgressDetails) {
+	const stats: string[] = [];
+	if (d.maxTurns) stats.push(`turn ${d.turnCount}/${d.maxTurns}`);
+	else if (d.turnCount > 1) stats.push(`turn ${d.turnCount}`);
+	if (d.toolUses > 0)
+		stats.push(`${d.toolUses} tool${d.toolUses === 1 ? "" : "s"}`);
+	if (d.tokens > 0) stats.push(formatTokens(d.tokens));
+	return (
+		<div className="tool-result-wrap">
+			<div className="subagent-live">
+				{stats.length > 0 ? (
+					<div className="sl-stats">{stats.join(" · ")}</div>
+				) : null}
+				<div className="sl-activity">⎿ {d.activity}</div>
+			</div>
+		</div>
+	);
 }
 
 // Render del resultado según el tipo de tool (estilo TUI: diff, código, terminal).
@@ -260,6 +314,31 @@ function renderResult(entry: ToolEntry) {
 		return (
 			<div className="tool-result md">
 				<Markdown>{`${fence}${ext}\n${entry.result}\n${fence}`}</Markdown>
+			</div>
+		);
+	}
+	// agent → resultado markdown del sub-agente (su resumen final; en background
+	// es un mensaje de estado, que también renderiza bien como párrafo).
+	if (entry.tool === "agent") {
+		return (
+			<div className="tool-result md">
+				<Markdown>{entry.result}</Markdown>
+			</div>
+		);
+	}
+	// get_subagent_result → metadatos (Agente:/Estado:/Error:) + contenido markdown
+	// del sub-agente tras "Resultado:". Se formatea: etiquetas en negrita y el
+	// contenido libre (tras una línea en blanco) para que encabezados/listas
+	// rendericen (sin esto, "Resultado: ## X" no se parsea como encabezado).
+	if (entry.tool === "get_subagent_result") {
+		const md = entry.result
+			.replace(/^Agente: /m, "**Agente:** ")
+			.replace(/^Estado: /m, "**Estado:** ")
+			.replace(/^Resultado: /m, "\n")
+			.replace(/^Error: /m, "\n> **Error:** ");
+		return (
+			<div className="tool-result md">
+				<Markdown>{md}</Markdown>
 			</div>
 		);
 	}
@@ -302,7 +381,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 				className={"tool-head" + (hasResult ? " has-result" : "")}
 				onClick={() => hasResult && setOpen(!open)}
 			>
-				<span className="tc-icon">{icon}</span>
+				<span className={"tc-icon" + (running ? " live" : "")}>{icon}</span>
 				<span className="tc-name">{name}</span>
 				{label ? <code className="tc-label">{label}</code> : null}
 				{diffStats ? (
@@ -348,11 +427,13 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			{open && hasResult && (
 				<div className="tool-result-wrap">{renderResult(entry)}</div>
 			)}
-			{livePartial && (
+			{running && entry.partialDetails ? (
+				renderSubagentLive(entry.partialDetails)
+			) : livePartial ? (
 				<div className="tool-result-wrap">
 					<pre className="tool-result partial">{entry.partial}</pre>
 				</div>
-			)}
+			) : null}
 		</div>
 	);
 }

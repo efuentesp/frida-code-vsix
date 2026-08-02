@@ -5,7 +5,7 @@
 // useSyncExternalStore(subscribeTodoState, getTodoState).
 //
 // Paridad visual con el TodoPanel nativo: header con count + indicador de
-// actividad, glifos ○/◐/✓, activeForm entre paréntesis, dependencias (⛓ #id).
+// actividad, glifos ○/◐/✓, activeForm entre paréntesis en su propia línea (debajo del subject), dependencias (⛓ #id).
 // Auto-hide: si no hay tareas visibles devuelve null → el reconciler envía
 // tree:null → el webview no renderiza nada (equivalente al setWidget(undefined)
 // de rpiv-todo cuando la lista está vacía).
@@ -94,29 +94,40 @@ function TaskRow({
 	const active = task.status === "in_progress";
 	const done = task.status === "completed";
 	const statusColor = STATUS_COLOR[task.status];
+	// El activeForm (present-continuous, p.ej. "Formulando preguntas…") va en su
+	// propia línea debajo del subject: antes compartía fila con el subject y, al
+	// aparecer sólo en tareas en progreso, hacía que esa fila fuera más larga que
+	// las demás y se desalineara en ventanas angostas.
+	const showActiveForm = active && !!task.activeForm;
 	return (
-		<fbox
-			flexDirection="row"
-			gap={6}
-			alignItems="center"
-			tone={active ? "active" : "default"}
-		>
-			{/* Rama de árbol (paridad rpiv-todo overlay): ├─ intermedia, └─ última. */}
-			<ftext color="var(--vscode-descriptionForeground)">
-				{isLast ? "└─" : "├─"}
-			</ftext>
-			<ftext color={statusColor}>{GLYPH[task.status]}</ftext>
-			{showIds ? (
-				<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
-			) : null}
-			<ftext bold={active} color={statusColor} strike={done}>
-				{task.subject}
-			</ftext>
-			{task.status === "in_progress" && task.activeForm ? (
-				<ftext>({task.activeForm})</ftext>
-			) : null}
-			{task.blockedBy && task.blockedBy.length > 0 ? (
-				<ftext>⛓ {task.blockedBy.map((id) => `#${id}`).join(",")}</ftext>
+		<fbox flexDirection="column" gap={2} tone={active ? "active" : "default"}>
+			{/* Línea 1: rama de árbol + glyph + (#id) + subject + (deps). */}
+			<fbox flexDirection="row" gap={6} alignItems="center">
+				{/* Rama de árbol (paridad rpiv-todo overlay): ├─ intermedia, └─ última. */}
+				<ftext color="var(--vscode-descriptionForeground)">
+					{isLast ? "└─" : "├─"}
+				</ftext>
+				<ftext color={statusColor}>{GLYPH[task.status]}</ftext>
+				{showIds ? (
+					<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
+				) : null}
+				<ftext bold={active} color={statusColor} strike={done}>
+					{task.subject}
+				</ftext>
+				{task.blockedBy && task.blockedBy.length > 0 ? (
+					<ftext>⛓ {task.blockedBy.map((id) => `#${id}`).join(",")}</ftext>
+				) : null}
+			</fbox>
+			{/* Línea 2 (sólo en progreso con activeForm): continuación de la rama (│) +
+			    label muteada en su propia línea. Tono gris + tamaño un pelín menor
+			    para subordinarlo al subject. */}
+			{showActiveForm ? (
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext color="var(--vscode-descriptionForeground)">│</ftext>
+					<ftext color="var(--vscode-descriptionForeground)" size={12} wrap>
+						({task.activeForm})
+					</ftext>
+				</fbox>
 			) : null}
 		</fbox>
 	);
