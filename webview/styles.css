@@ -359,9 +359,10 @@ body {
 	color: var(--vscode-testing-iconPassed, #3fb950);
 	border-color: var(--vscode-testing-iconPassed, #3fb950);
 }
-/* Badge de versión vX.Y.Z en el sub-header (click → /update). margin-left:auto lo empuja a la derecha. */
+/* Badge de versión vX.Y.Z en el header pegado al título (click → /update).
+   Pegado al badge de frida-lens, no margin-left:auto (que lo empujaría a la derecha). */
 .sub-version {
-	margin-left: auto;
+	margin-left: 4px;
 	padding: 1px 7px;
 	font-size: 10px;
 	font-family: var(--vscode-editor-font-family, monospace);
@@ -3815,12 +3816,4 @@ kbd {
 .bar-send.stop {
 	background: var(--vscode-errorForeground, #f85149);
 	color: #fff;
-}
-
-/* Cluster derecho de la fila de contexto: frida-lens + versión, pegados a la derecha. */
-.ctx-right {
-	margin-left: auto;
-	display: flex;
-	align-items: center;
-	gap: 8px;
 }

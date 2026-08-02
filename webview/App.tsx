@@ -44,6 +44,7 @@ import { ModelPanel } from "./components/ModelPanel";
 import { SettingsHub } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
+import { Icon } from "./components/Icon";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -288,6 +289,42 @@ export function App() {
 					</span>{" "}
 					Frida Code
 				</span>
+				{state.lensStatus?.loaded && (
+					<Tooltip
+						label={
+							state.lensStatus.active
+								? "frida-lens activo (emitiendo diagnósticos)"
+								: "frida-lens cargado (sin actividad aún este turno)"
+						}
+						side="bottom"
+					>
+						<span
+							className={
+								"lens-badge" + (state.lensStatus.active ? " active" : "")
+							}
+						>
+							<Icon
+								name={state.lensStatus.active ? "check" : "circle"}
+								size={12}
+							/>
+						</span>
+					</Tooltip>
+				)}
+				{state.version && (
+					<Tooltip
+						label="Versión instalada · click para comprobar actualizaciones (/update)"
+						side="bottom"
+					>
+						<button
+							className="sub-version"
+							onClick={() =>
+								post({ type: "submit", text: "/update", mode: "steer" })
+							}
+						>
+							v{state.version}
+						</button>
+					</Tooltip>
+				)}
 				<span className="spacer" />
 				<span className="tb-group">
 					<Tooltip label="Nueva sesión" side="bottom">
@@ -569,14 +606,7 @@ export function App() {
 					/>
 				)}
 				<WorkspaceBar ws={state.workspace} />
-				<ContextBar
-					usage={state.usage}
-					lensStatus={state.lensStatus}
-					version={state.version}
-					onVersionClick={() =>
-						post({ type: "submit", text: "/update", mode: "steer" })
-					}
-				/>
+				<ContextBar usage={state.usage} />
 			</div>
 			{sessionsOpen && state.sessions && (
 				<SessionsPanel
