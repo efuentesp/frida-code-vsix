@@ -377,19 +377,37 @@ export function appendSkillInput(skillBlock: string, args: string): string {
 // para ${SESSION_ID}.
 // ---------------------------------------------------------------------------
 
-export async function handleInput(
-	event: InputEvent,
-	ctx: ExtensionContext,
-	pi: ExtensionAPI,
-): Promise<InputEventResult> {
-	const text = event.text;
+// ---------------------------------------------------------------------------
+// Expansión reutilizable — única fuente de verdad para el bloque <skill>.
+// El hook `input` (handleInput) y el host de Frida (runPrompt, para mostrar el
+// bloque en vivo en el webview) llaman AMBOS a expandSkillText → el texto que
+// ve el modelo es idéntico al que se renderiza. El host envía el bloque ya
+// expandido a session.prompt; la guardia de re-entrada de handleInput lo deja
+// pasar intacto (empieza con "<skill "), así que NO hay doble expansión ni
+// doble ejecución de shell.
+// ---------------------------------------------------------------------------
 
-	// Re-entrada: texto ya envuelto pasa intacto.
-	if (text.startsWith(WRAPPED_PREFIX)) return { action: "continue" };
+export interface ExpandSkillDeps {
+	/** ExtensionAPI de Pi: provee getCommands() (índice de skills) y exec (shell). */
+	pi: ExtensionAPI;
+	/** ID de la sesión para ${SESSION_ID}. */
+	sessionId: string;
+	/** cwd para la ejecución de !`cmd` / ```! (normalmente el workspace). */
+	cwd: string;
+}
 
-	if (!text.startsWith(SKILL_PREFIX)) return { action: "continue" };
+/** Expande `/skill:<name> <args>` al bloque `<skill>` completo (mismo pipeline
+ *  que handleInput). Devuelve `null` cuando el texto no es invocación de skill,
+ *  la skill es desconocida o falla la lectura → el llamador cae al comportamiento
+ *  por defecto (texto crudo, que Pi/_expandSkillCommand manejará). Nunca lanza. */
+export async function expandSkillText(
+	text: string,
+	deps: ExpandSkillDeps,
+): Promise<string | null> {
+	if (text.startsWith(WRAPPED_PREFIX)) return null; // ya envuelto
+	if (!text.startsWith(SKILL_PREFIX)) return null;
 
-	// Tokenización por espacio simple.
+	// Tokenización por espacio simple — byte-match con Pi.
 	const spaceIndex = text.indexOf(" ");
 	const skillName =
 		spaceIndex === -1
@@ -397,14 +415,14 @@ export async function handleInput(
 			: text.slice(SKILL_PREFIX.length, spaceIndex);
 	const argsString = spaceIndex === -1 ? "" : text.slice(spaceIndex + 1).trim();
 
-	const entry = getSkillIndex(pi).get(skillName);
-	if (!entry) return { action: "continue" }; // skill desconocido → que Pi lo maneje
+	const entry = getSkillIndex(deps.pi).get(skillName);
+	if (!entry) return null; // skill desconocido → que Pi lo maneje
 
 	let content: string;
 	try {
 		content = readFileSync(entry.filePath, "utf-8");
 	} catch {
-		return { action: "continue" }; // que Pi emita su error vía _expandSkillCommand
+		return null; // que Pi emita su error vía _expandSkillCommand
 	}
 
 	const { frontmatter } = parseFrontmatter<{
@@ -424,17 +442,28 @@ export async function handleInput(
 		: body;
 	processed = substituteVariables(processed, {
 		skillDir: entry.baseDir,
-		sessionId: ctx.sessionManager.getSessionId(),
+		sessionId: deps.sessionId,
 	});
-	processed = await executeShellInBody(processed, pi, process.cwd(), timeoutMs);
+	processed = await executeShellInBody(processed, deps.pi, deps.cwd, timeoutMs);
 
 	const block = buildSkillBlock(entry, processed);
-	return {
-		action: "transform",
-		text: hadTokens
-			? appendSkillInput(block, argsString)
-			: appendArgs(block, argsString),
-	};
+	return hadTokens
+		? appendSkillInput(block, argsString)
+		: appendArgs(block, argsString);
+}
+
+export async function handleInput(
+	event: InputEvent,
+	ctx: ExtensionContext,
+	pi: ExtensionAPI,
+): Promise<InputEventResult> {
+	const expanded = await expandSkillText(event.text, {
+		pi,
+		sessionId: ctx.sessionManager.getSessionId(),
+		cwd: process.cwd(),
+	});
+	if (expanded === null) return { action: "continue" };
+	return { action: "transform", text: expanded };
 }
 
 // ---------------------------------------------------------------------------

@@ -87,7 +87,7 @@ export type TurnStatus = "thinking" | "executing" | null;
 // real (texto → tool → texto → …) en vez de separar texto y tools.
 export type Segment =
 	| { kind: "text"; text: string }
-	| { kind: "thinking"; text: string }
+	| { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
 	| ({ kind: "tool" } & ToolEntry);
 
 export interface Turn {

@@ -467,8 +467,14 @@ body {
 	text-overflow: ellipsis;
 }
 .compact-toggle {
-	font-size: 0.8em;
+	display: inline-flex;
+	align-items: center;
 	opacity: 0.7;
+	transform: rotate(90deg);
+	transition: transform 0.15s ease;
+}
+.compact-toggle.closed {
+	transform: rotate(0deg);
 }
 .compact-body {
 	padding: 4px 12px 12px;
@@ -655,6 +661,13 @@ body {
 .thinking-name {
 	font-weight: 600;
 }
+.thinking-time {
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.9;
+	font-variant-numeric: tabular-nums;
+}
 .thinking-chev {
 	margin-left: auto;
 	display: inline-flex;
@@ -691,13 +704,11 @@ body {
    <skill>; lo colapsamos como el SkillInvocationMessageComponent del TUI). */
 .skill-block {
 	margin: 2px 0;
-	border: 1px solid var(--vscode-panel-border);
-	border-radius: 6px;
+	border: 1px solid
+		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+	border-radius: 8px;
 	overflow: hidden;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
+	background: var(--vscode-list-hoverBackground);
 }
 .skill-head {
 	display: flex;
@@ -719,18 +730,52 @@ body {
 	color: var(--vscode-textLink-foreground, #4daafc);
 	font-size: 11px;
 }
+.skill-icon {
+	flex-shrink: 0;
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.skill-icon.live {
+	animation: thinkingPulse 1.2s ease-in-out infinite;
+}
 .skill-name {
 	font-weight: 600;
 }
+.skill-input {
+	font-size: 11px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
+	border-radius: 4px;
+	padding: 1px 6px;
+	max-width: 200px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .skill-chev {
 	margin-left: auto;
+	display: flex;
+	align-items: center;
 	color: var(--vscode-descriptionForeground);
+	transform: rotate(90deg);
+	transition: transform 0.15s ease;
+}
+.skill-chev.closed {
+	transform: rotate(0deg);
 }
 .skill-content {
 	padding: 6px 10px;
 	border-top: 1px solid var(--vscode-panel-border);
 	max-height: 320px;
 	overflow: auto;
+}
+.skill-path {
+	font-size: 11px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+	margin-bottom: 6px;
+	word-break: break-all;
 }
 
 /* Markdown */
@@ -1243,10 +1288,41 @@ body {
 	line-height: 1.2;
 }
 .approval .acts {
+	margin-top: 8px;
+}
+/* Fila de acciones principales: Aceptar (primario) + Rechazar. Botones con
+   ícono a la izquierda, centrados verticalmente. */
+.approval .acts-main {
 	display: flex;
 	gap: 8px;
-	flex-wrap: wrap;
-	margin-top: 8px;
+}
+.approval .acts-main button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+/* Acciones de sesión (patrón / todas): enlaces discretos, subordinados a
+   Aceptar/Rechazar. Sin fondo, color textLink, subrayado sólo en hover. */
+.approval .acts-more {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 6px;
+}
+.approval button.link {
+	background: transparent;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	padding: 2px 0;
+	border-radius: 0;
+	font-size: 12px;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	width: fit-content;
+}
+.approval button.link:hover {
+	background: transparent;
+	text-decoration: underline;
 }
 button {
 	background: var(--vscode-button-background);
@@ -2788,10 +2864,6 @@ kbd {
 	align-items: center;
 	justify-content: center;
 }
-.compact-toggle {
-	display: inline-flex;
-	align-items: center;
-}
 .res-bar .res-ic {
 	display: inline-flex;
 	align-items: center;
@@ -2986,7 +3058,14 @@ kbd {
 }
 .lens-caret {
 	margin-left: auto;
+	display: flex;
+	align-items: center;
 	color: var(--vscode-descriptionForeground);
+	transform: rotate(90deg);
+	transition: transform 0.15s ease;
+}
+.lens-caret.closed {
+	transform: rotate(0deg);
 }
 .lens-list {
 	list-style: none;

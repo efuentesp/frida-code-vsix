@@ -50,9 +50,61 @@ function appendSegment(t: Turn, text: string, kind: "text" | "thinking"): Turn {
 	if (last && last.kind === kind) {
 		segs[segs.length - 1] = { ...last, text: last.text + text } as Segment;
 	} else {
-		segs.push({ kind, text } as Segment);
+		// Cambio de tipo: si el último era un razonamiento abierto, cerrarlo
+		// (llegó texto → el bloque de razonamiento terminó). El paso a tool lo
+		// cierra closeOpenThinking en el case tool_start; el fin del agente, en
+		// agent_busy.
+		if (last && last.kind === "thinking" && last.endedAt === undefined) {
+			segs[segs.length - 1] = { ...last, endedAt: Date.now() };
+		}
+		segs.push(
+			kind === "thinking"
+				? { kind: "thinking", text, startedAt: Date.now() }
+				: { kind: "text", text },
+		);
 	}
 	return { ...t, segments: segs };
+}
+
+/** Cierra el último segmento si es un razonamiento aún abierto (sin endedAt):
+ *  marca endedAt=now. Lo llaman tool_start (el modelo dejó de razonar para
+ *  ejecutar un tool) y agent_busy busy=false (fin del agente). Así el
+ *  cronómetro del thinking congela su tiempo final al terminar. */
+function closeOpenThinking(t: Turn): Turn {
+	const segs = t.segments;
+	const last = segs[segs.length - 1];
+	if (last && last.kind === "thinking" && last.endedAt === undefined) {
+		const next = [...segs];
+		next[next.length - 1] = { ...last, endedAt: Date.now() };
+		return { ...t, segments: next };
+	}
+	return t;
+}
+
+/** Añade un segmento de tool: primero cierra cualquier razonamiento abierto
+ *  (congela su cronómetro) y luego appendinge el tool como running. Extraído del
+ *  case tool_start para evitar declaraciones léxicas dentro del switch. */
+function appendToolSegment(
+	t: Turn,
+	msg: { tool: string; args?: unknown; toolCallId?: string },
+): Turn {
+	const closed = closeOpenThinking(t);
+	return {
+		...closed,
+		status: "executing",
+		executingTool: msg.tool,
+		segments: [
+			...closed.segments,
+			{
+				kind: "tool",
+				tool: msg.tool,
+				args: msg.args ?? {},
+				state: "running",
+				startedAt: Date.now(),
+				toolCallId: msg.toolCallId,
+			},
+		],
+	};
 }
 
 function markToolResult(
@@ -142,7 +194,7 @@ function buildHistoryTurns(
 			const segs: Segment[] = raw.map((s): Segment => {
 				if (s.kind === "text") return { kind: "text", text: s.text ?? "" };
 				if (s.kind === "thinking")
-					return { kind: "thinking", text: s.text ?? "" };
+					return { kind: "thinking", text: s.text ?? "", startedAt: 0 };
 				return {
 					kind: "tool",
 					tool: s.tool ?? "",
@@ -210,12 +262,15 @@ export function reduce(state: State, msg: InMessage): State {
 			return {
 				...state,
 				busy: msg.busy,
-				// Al terminar el agente (busy=false) cerramos el status del último turn:
+				// Al terminar el agente (busy=false) cerramos el status del último turn
+				// y cualquier razonamiento abierto (congela su cronómetro):
 				// turn_active/appendSegment lo dejan en "thinking"/"executing" y ningún
 				// evento lo limpiaba → el turn quedaba "pensando" para siempre.
 				turns: msg.busy
 					? state.turns
-					: withLast(state.turns, (t) => ({ ...t, status: null })),
+					: withLast(state.turns, (t) =>
+							closeOpenThinking({ ...t, status: null }),
+						),
 			};
 		case "turn_active":
 			return {
@@ -243,22 +298,7 @@ export function reduce(state: State, msg: InMessage): State {
 		case "tool_start":
 			return {
 				...state,
-				turns: withLast(state.turns, (t) => ({
-					...t,
-					status: "executing",
-					executingTool: msg.tool,
-					segments: [
-						...t.segments,
-						{
-							kind: "tool",
-							tool: msg.tool,
-							args: msg.args ?? {},
-							state: "running",
-							startedAt: Date.now(),
-							toolCallId: msg.toolCallId,
-						},
-					],
-				})),
+				turns: withLast(state.turns, (t) => appendToolSegment(t, msg)),
 			};
 
 		case "tool_end":

@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import type { LensSummary } from "../types";
+import { Icon } from "./Icon";
 
 export function LensDiagnostics({
 	lens,
@@ -45,7 +46,9 @@ export function LensDiagnostics({
 				<span className="lens-head-icon">🔍</span>
 				<span className="lens-head-label">frida-lens</span>
 				{head}
-				<span className="lens-caret">{open ? "▾" : "▸"}</span>
+				<span className={"lens-caret" + (open ? "" : " closed")}>
+					<Icon name="chevron" size={12} />
+				</span>
 			</button>
 			{open && (
 				<ul className="lens-list">

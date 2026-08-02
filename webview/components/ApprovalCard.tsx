@@ -58,39 +58,51 @@ export function ApprovalCard({
 				</p>
 			)}
 			<div className="acts">
-				<button onClick={() => onRespond({ decision: "accept" })}>
-					Aceptar
-				</button>
-				<button
-					className="sec"
-					onClick={() => onRespond({ decision: "reject" })}
-				>
-					Rechazar
-				</button>
-				{/* Aprobar un patrón para la sesión (Fase 4): el gate sugiere (bash →
-			    `npm *`, diff → `src/*`); próximas llamadas que matcheen pasan solas. */}
-				{approval.suggestedPattern && (
+				{/* Acciones principales: Aceptar (primario) + Rechazar. Son las dos
+				    decisiones clave y deben destacar sobre las de sesión. El ícono a la
+				    izquierda refuerza el significado (✓ / ✕). */}
+				<div className="acts-main">
+					<button onClick={() => onRespond({ decision: "accept" })}>
+						<Icon name="check" size={13} /> Aceptar
+					</button>
 					<button
 						className="sec"
-						onClick={() =>
-							onRespond({
-								decision: "accept",
-								pattern: approval.suggestedPattern,
-							})
-						}
+						onClick={() => onRespond({ decision: "reject" })}
 					>
-						Aprobar «{approval.suggestedPattern}» (esta sesión)
+						<Icon name="x" size={13} /> Rechazar
 					</button>
-				)}
-				{/* "Aceptar todas" solo para diffs: bash siempre pide, y un tool
-            desconocido no debe silenciarse para toda la sesión. */}
-				{isDiff && (
-					<button
-						className="sec"
-						onClick={() => onRespond({ decision: "accept", acceptAll: true })}
-					>
-						Aceptar todas (esta sesión)
-					</button>
+				</div>
+				{/* Acciones de sesión (patrón / todas): se muestran como enlaces discretos,
+				    no como botones, para subordinarlas a Aceptar/Rechazar. El patrón lo
+				    sugiere el gate (bash → `npm *`, diff → `src/*`); «todas» sólo aplica a
+				    diffs (un bash siempre pide, y un tool desconocido no se silencia). */}
+				{(approval.suggestedPattern || isDiff) && (
+					<div className="acts-more">
+						{approval.suggestedPattern && (
+							<button
+								className="link"
+								onClick={() =>
+									onRespond({
+										decision: "accept",
+										pattern: approval.suggestedPattern,
+									})
+								}
+							>
+								<Icon name="link" size={12} /> Aprobar «
+								{approval.suggestedPattern}» (esta sesión)
+							</button>
+						)}
+						{isDiff && (
+							<button
+								className="link"
+								onClick={() =>
+									onRespond({ decision: "accept", acceptAll: true })
+								}
+							>
+								<Icon name="checkcheck" size={12} /> Aceptar todas (esta sesión)
+							</button>
+						)}
+					</div>
 				)}
 			</div>
 		</div>

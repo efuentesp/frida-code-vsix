@@ -69,6 +69,10 @@ function toggleable(
 
 export interface FridaSession {
 	session: any;
+	/** ExtensionAPI (pi) capturada al registrar frida-args. El host la usa para
+	 *  expandir /skill:name en runPrompt (B1: mostrar el bloque en vivo). Null si
+	 *  frida-args no se registró o aún no corrió el factory. */
+	extensionApi: any;
 	modelRuntime: any;
 	bridge: ApprovalBridge;
 	uiBridge: UiBridge;
@@ -322,6 +326,13 @@ export async function createFridaSession(
 	// descubrimiento estándar de Pi. Verificado en test/extensions-discovery.test.ts.
 	const projExtDir = path.join(opts.cwd, ".frida", "extensions");
 	const projSkillDir = path.join(opts.cwd, ".frida", "skills");
+	// Captura la ExtensionAPI (pi) que el SDK inyecta al factory de frida-args.
+	// El host la reutiliza para expandir /skill: en runPrompt y mostrar el bloque
+	// <skill> en vivo. Sólo la sesión principal registra frida-args → sin race
+	// con sesiones hijas (createChildSession usa una lista curada sin frida-args).
+	let capturedExtensionApi:
+		| import("@earendil-works/pi-coding-agent").ExtensionAPI
+		| null = null;
 	const loader = new DefaultResourceLoader({
 		cwd: opts.cwd,
 		agentDir: opts.agentDir,
@@ -390,7 +401,10 @@ export async function createFridaSession(
 			// activa: una skill sin placeholders ni shell emite bytes idénticos a Pi.
 			{
 				name: "frida-args",
-				factory: createFridaArgs(),
+				factory: (pi) => {
+					capturedExtensionApi = pi;
+					return createFridaArgs()(pi);
+				},
 			},
 			// frida-agent-browser (D34): tool `agent_browser` que envuelve el binario
 			// upstream agent-browser (Vercel) — automation de navegador real. Sesión
@@ -491,6 +505,7 @@ export async function createFridaSession(
 
 	return {
 		session,
+		extensionApi: capturedExtensionApi,
 		modelRuntime,
 		bridge,
 		uiBridge,

@@ -6,8 +6,8 @@
 import { useState } from "react";
 import type { BranchSummaryEntry } from "../types";
 import { Markdown } from "./Markdown";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { Tooltip } from "./Tooltip";
+import { Icon } from "./Icon";
 
 export function BranchSummaryCard({ entry }: { entry: BranchSummaryEntry }) {
 	const [open, setOpen] = useState(false);
@@ -22,8 +22,8 @@ export function BranchSummaryCard({ entry }: { entry: BranchSummaryEntry }) {
 					label={open ? "Contraer resumen" : "Mostrar resumen"}
 					side="top"
 				>
-					<span className="compact-toggle">
-						{open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+					<span className={"compact-toggle" + (open ? "" : " closed")}>
+						<Icon name="chevron" size={12} />
 					</span>
 				</Tooltip>
 			</button>

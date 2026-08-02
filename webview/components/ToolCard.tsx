@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
-function fmtDuration(ms: number): string {
+export function fmtDuration(ms: number): string {
 	if (!Number.isFinite(ms) || ms < 0) return "";
 	if (ms < 1000) return `${Math.round(ms)} ms`;
 	return `${(ms / 1000).toFixed(1)}s`;

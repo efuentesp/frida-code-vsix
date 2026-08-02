@@ -55,6 +55,7 @@ import {
 	getBundledSkillNames,
 } from "./tools/frida-pipeline";
 import { listAgents, getAvailableTypes } from "./tools/frida-subagents";
+import { expandSkillText } from "./tools/frida-args";
 import { wireAgentWidget } from "./tools/frida-subagents/panel";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
@@ -2299,6 +2300,28 @@ export async function activate(
 		}
 		const expanded = await expandAtFiles(trimmed, workspaceCwd());
 
+		// B1: si es /skill:, expandir AHORA (reutiliza frida-args) para que el
+		// webview muestre el bloque <skill> en vivo y el modelo reciba idéntico.
+		// El bloque ya envuelto pasa intacto por la guardia de re-entrada del hook
+		// input de frida-args → sin doble expansión ni doble ejecución de shell.
+		let skillBlock: string | null = null;
+		if (expanded.startsWith("/skill:") && session.extensionApi) {
+			try {
+				skillBlock = await expandSkillText(expanded, {
+					pi: session.extensionApi,
+					sessionId: session.sessionManager?.getSessionId?.() ?? "",
+					cwd: workspaceCwd(),
+				});
+			} catch {
+				skillBlock = null; // cualquier fallo → comportamiento por defecto
+			}
+		}
+		// toSend = lo que recibe el modelo; toPost = lo que ve el webview. Para
+		// skills ambos son el bloque; para @files/normal se preserva el comportamiento
+		// actual (post raw, send expandido con @files ya sustituidos).
+		const toSend = skillBlock ?? expanded;
+		const toPost = skillBlock ?? trimmed;
+
 		// Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
 		const imgs =
 			images && images.length > 0
@@ -2314,15 +2337,15 @@ export async function activate(
 		// (turn_start>0 en wireSession), para que los deltas del turno en curso
 		// sigan cayendo en su propio turno y no se mezclen.
 		if (session.session?.isStreaming) {
-			pendingQueue.push({ text: trimmed });
+			pendingQueue.push({ text: toPost });
 			postQueued();
 			try {
-				await session.session.prompt(expanded, {
+				await session.session.prompt(toSend, {
 					streamingBehavior: mode,
 					images: imgs,
 				});
 			} catch (e: any) {
-				const idx = pendingQueue.findIndex((q) => q.text === trimmed);
+				const idx = pendingQueue.findIndex((q) => q.text === toPost);
 				if (idx >= 0) pendingQueue.splice(idx, 1);
 				postQueued();
 				post({ type: "error", text: String(e?.message ?? e) });
@@ -2334,14 +2357,11 @@ export async function activate(
 		// reales de pi (no turn_start/turn_end manuales).
 		post({
 			type: "user",
-			text: trimmed,
+			text: toPost,
 			images: imgs?.map((i) => ({ data: i.data, mimeType: i.mimeType })),
 		});
 		try {
-			await session.session.prompt(
-				expanded,
-				imgs ? { images: imgs } : undefined,
-			);
+			await session.session.prompt(toSend, imgs ? { images: imgs } : undefined);
 		} catch (e: any) {
 			post({ type: "error", text: String(e?.message ?? e) });
 		}

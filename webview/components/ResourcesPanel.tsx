@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { ResourceSummary } from "../types";
 import { Tooltip } from "./Tooltip";
-import { ChevronRight } from "lucide-react";
+import { Icon } from "./Icon";
 
 // Sección colapsable dentro del panel.
 function Section({
@@ -19,7 +19,7 @@ function Section({
 		<div className={"res-section" + (open ? "" : " collapsed")}>
 			<div className="res-section-head" onClick={() => setOpen(!open)}>
 				<span className="chev">
-					<ChevronRight size={12} />
+					<Icon name="chevron" size={12} />
 				</span>
 				<span className="res-section-title">{title}</span>
 				<span className="res-section-count">{count}</span>
@@ -53,7 +53,7 @@ function LocationsSection() {
 		<div className={"res-section locations" + (open ? "" : " collapsed")}>
 			<div className="res-section-head" onClick={() => setOpen(!open)}>
 				<span className="chev">
-					<ChevronRight size={12} />
+					<Icon name="chevron" size={12} />
 				</span>
 				<span className="res-section-title">Dónde se cargan</span>
 				<span className="res-section-count">ref</span>

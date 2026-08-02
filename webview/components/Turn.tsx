@@ -1,7 +1,8 @@
 import type { Turn } from "../types";
+import { useEffect, useState } from "react";
 import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
-import { ToolCard } from "./ToolCard";
+import { ToolCard, fmtDuration } from "./ToolCard";
 import { BashCard } from "./BashCard";
 import { Icon } from "./Icon";
 import { parseSkillBlock } from "../skill-block";
@@ -45,12 +46,11 @@ export function TurnView({
 				<div className="body">
 					<div className="who">Tú</div>
 					{skill ? (
-						<>
-							<SkillBlockCard block={skill} />
-							{skill.userMessage && (
-								<div className="bubble">{skill.userMessage}</div>
-							)}
-						</>
+						<SkillBlockCard
+							block={skill}
+							live={live}
+							input={skill.userMessage?.replace(/^Skill input:\s*/, "")}
+						/>
 					) : (
 						<div className="bubble">{turn.user}</div>
 					)}
@@ -90,26 +90,17 @@ export function TurnView({
 						{turn.segments.map((s, i) =>
 							s.kind === "thinking" ? (
 								!hideThinking && s.text ? (
-									<details key={i} className="thinking">
-										<summary className="thinking-head">
-											<Brain
-												size={13}
-												className={
-													"thinking-icon" +
-													(live && i === turn.segments.length - 1
-														? " thinking-live"
-														: "")
-												}
-											/>
-											<span className="thinking-name">Razonamiento</span>
-											<span className="thinking-chev">
-												<Icon name="chevron" size={12} />
-											</span>
-										</summary>
-										<div className="thinking-body">
-											<Markdown>{s.text}</Markdown>
-										</div>
-									</details>
+									<ThinkingSegment
+										key={i}
+										text={s.text}
+										startedAt={s.startedAt}
+										endedAt={s.endedAt}
+										isLive={
+											!!live &&
+											i === turn.segments.length - 1 &&
+											s.endedAt === undefined
+										}
+									/>
 								) : null
 							) : s.kind === "text" ? (
 								s.text ? (
@@ -131,5 +122,50 @@ export function TurnView({
 				</div>
 			)}
 		</div>
+	);
+}
+
+/** Bloque de razonamiento colapsable con cronómetro (réplica del read):
+ *  - En vivo (isLive): 🧠 pulsa + timer sube cada 250 ms.
+ *  - Al terminar (endedAt set): 🧠 quieto + tiempo congelado.
+ *  startedAt===0 → historial reconstruido sin timestamp: no se muestra tiempo. */
+function ThinkingSegment({
+	text,
+	startedAt,
+	endedAt,
+	isLive,
+}: {
+	text: string;
+	startedAt: number;
+	endedAt?: number;
+	isLive: boolean;
+}) {
+	const [now, setNow] = useState(Date.now());
+	useEffect(() => {
+		if (!isLive) return;
+		const id = setInterval(() => setNow(Date.now()), 250);
+		return () => clearInterval(id);
+	}, [isLive]);
+	const hasTimer = startedAt > 0;
+	const elapsed = hasTimer ? (endedAt ?? now) - startedAt : 0;
+	return (
+		<details className="thinking">
+			<summary className="thinking-head">
+				<Brain
+					size={13}
+					className={"thinking-icon" + (isLive ? " thinking-live" : "")}
+				/>
+				<span className="thinking-name">Razonamiento</span>
+				{hasTimer && (
+					<span className="thinking-time">· {fmtDuration(elapsed)}</span>
+				)}
+				<span className="thinking-chev">
+					<Icon name="chevron" size={12} />
+				</span>
+			</summary>
+			<div className="thinking-body">
+				<Markdown>{text}</Markdown>
+			</div>
+		</details>
 	);
 }
