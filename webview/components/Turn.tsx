@@ -5,6 +5,7 @@ import { Markdown } from "./Markdown";
 import { ToolCard, fmtDuration } from "./ToolCard";
 import { BashCard } from "./BashCard";
 import { Icon } from "./Icon";
+import { Spinner } from "./Spinner";
 import { parseSkillBlock } from "../skill-block";
 import { SkillBlockCard } from "./SkillBlock";
 
@@ -157,7 +158,21 @@ function ThinkingSegment({
 				/>
 				<span className="thinking-name">Razonamiento</span>
 				{hasTimer && (
-					<span className="thinking-time">· {fmtDuration(elapsed)}</span>
+					<span
+						className={
+							"thinking-time " + (isLive ? "thinking-running" : "thinking-done")
+						}
+					>
+						{isLive ? (
+							<>
+								<Spinner size={13} /> {fmtDuration(elapsed)}
+							</>
+						) : (
+							<>
+								<Icon name="check" size={13} /> {fmtDuration(elapsed)}
+							</>
+						)}
+					</span>
 				)}
 				<span className="thinking-chev">
 					<Icon name="chevron" size={12} />

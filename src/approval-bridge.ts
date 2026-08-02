@@ -33,6 +33,9 @@ export interface ApprovalResponse {
 	/** Patrón a aprobar para la sesión (Fase 4): el gate lo registra y las próximas
 	 *  llamadas que matcheen pasan sin diálogo. Ej. `npm *`, `src/*`. */
 	pattern?: string;
+	/** Motivo del rechazo (opcional, opción "No, indicar motivo"): se inyecta en
+	 *  el tool_result que ve el modelo para que entienda por qué se bloqueó. */
+	reason?: string;
 }
 
 export class ApprovalBridge extends DialogBridge<

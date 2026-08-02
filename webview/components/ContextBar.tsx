@@ -1,4 +1,5 @@
 import type { Usage } from "../types";
+import { Icon } from "./Icon";
 import { Tooltip } from "./Tooltip";
 
 function fmt(n: number): string {
@@ -22,9 +23,13 @@ export function ContextBar({
 	onVersionClick?: () => void;
 }) {
 	// Presión ajustada por reserve (anticipa la compactación); fallback a la bruta.
-	const pct = usage
-		? Math.round(usage.pressurePercent ?? usage.contextPercent)
-		: 0;
+	// null = tamaño desconocido (post-compactación, antes de la próxima respuesta):
+	// mostramos "?" como el footer de la TUI de pi, en vez de un 0% engañoso.
+	const rawPct = usage
+		? (usage.pressurePercent ?? usage.contextPercent)
+		: undefined;
+	const pct = Math.round(rawPct ?? 0);
+	const unknown = rawPct == null || Number.isNaN(rawPct);
 	const level = pct >= 90 ? "high" : pct >= 70 ? "mid" : "low";
 	const hasCache = !!usage && (usage.cacheRead > 0 || usage.cacheWrite > 0);
 	return (
@@ -38,7 +43,7 @@ export function ContextBar({
 							style={{ width: Math.min(100, pct) + "%" }}
 						/>
 					</span>
-					<span className="ctx-pct">{pct}%</span>
+					<span className="ctx-pct">{unknown ? "?" : `${pct}%`}</span>
 					<span className="ctx-tokens">
 						{usage.contextWindow > 0
 							? `${fmt(usage.contextTokens)} / ${fmt(usage.contextWindow)}`
@@ -74,7 +79,7 @@ export function ContextBar({
 						<span
 							className={"lens-badge" + (lensStatus.active ? " active" : "")}
 						>
-							{lensStatus.active ? "✓" : "○"} frida-lens
+							<Icon name={lensStatus.active ? "check" : "circle"} size={12} />
 						</span>
 					</Tooltip>
 				)}

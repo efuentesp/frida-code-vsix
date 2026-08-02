@@ -143,8 +143,11 @@ export function App() {
 	}, [state.webRoots]);
 
 	// Doble Escape (mientras responde) → abort, como el botón Detener.
+	// PAUSADO mientras hay un approval pendiente: ahí Escape lo reclama el menú
+	// de permisos (rechazar la acción), como el selector de pi. Al resolver el
+	// approval y seguir ocupado, el doble-Escape vuelve a estar disponible.
 	useEffect(() => {
-		if (!state.busy) {
+		if (!state.busy || state.approvals.length > 0) {
 			setEscHint(false);
 			return;
 		}
@@ -165,7 +168,7 @@ export function App() {
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [state.busy]);
+	}, [state.busy, state.approvals.length]);
 
 	const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
@@ -513,10 +516,11 @@ export function App() {
 					// (como en la extensión original de pi). No tiene sentido dejar escribir
 					// mientras Frida espera Accept/Reject; la tarjeta trae los botones.
 					<div className="approval-inline">
-						{state.approvals.map((a) => (
+						{state.approvals.map((a, i) => (
 							<ApprovalCard
 								key={a.id}
 								approval={a}
+								active={i === 0}
 								onRespond={(r) =>
 									post({ type: "approval_response", id: a.id, ...r })
 								}

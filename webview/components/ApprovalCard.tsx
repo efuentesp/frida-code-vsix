@@ -1,9 +1,10 @@
 import type { ApprovalRequest } from "../types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { Diff } from "./Diff";
 
 // Tools propios de frida-lens (pi-lens): de lectura/análisis, no mutan archivos.
-// Se muestran con un mensaje distinto al de un MCP/extensión desconocida real.
+// Se muestran con un mensaje distinto al de un MCP/extensión desconocido real.
 const FRIDA_LENS_TOOLS = new Set([
 	"project_report",
 	"module_report",
@@ -15,26 +16,135 @@ const FRIDA_LENS_TOOLS = new Set([
 	"pi_lens_activate_tools",
 ]);
 
+type ItemKey = "yes" | "pattern" | "no" | "reason";
+
+interface MenuItem {
+	key: ItemKey;
+	label: string;
+	letter: string;
+}
+
+// Icono de cabecera según el tipo de approval (sin ternarios anidados).
+const ICON_BY_KIND: Record<ApprovalRequest["kind"], string> = {
+	bash: "term",
+	tool: "wrench",
+	diff: "edit",
+};
+
+/** Título legible de la cabecera según el tipo. */
+function approvalLabel(a: ApprovalRequest): string {
+	if (a.kind === "bash") return "Ejecución de comando";
+	if (a.kind === "tool") return `Herramienta — ${a.toolName}`;
+	return `Edición de archivo${a.path ? ` — ${a.path}` : ""}`;
+}
+
+/**
+ * Menú de aprobación navegable (réplica del selector de pi-permission-system).
+ * 4 opciones en el orden canónico: Sí · Sí+patrón · No · No+motivo. Navegación
+ * con ↑↓ + Enter + Esc, atajos de letra (Y/P/N/M) y mouse (clic / hover). La
+ * opción "No, indicar motivo" reemplaza el menú por un input inline; el motivo
+ * se inyecta en el tool_result que ve el modelo (vía el gate, index.ts).
+ */
 export function ApprovalCard({
 	approval,
+	active,
 	onRespond,
 }: {
 	approval: ApprovalRequest;
+	/** true → esta tarjeta captura el teclado (la primera/en foco). Las demás
+	 *  sólo responden a mouse, para que varios approvals simultáneos no peleen
+	 *  por las teclas. */
+	active?: boolean;
 	onRespond: (r: {
 		decision: "accept" | "reject";
-		acceptAll?: boolean;
 		pattern?: string;
+		reason?: string;
 	}) => void;
 }) {
-	const isBash = approval.kind === "bash";
-	const isDiff = approval.kind === "diff";
 	const isTool = approval.kind === "tool";
-	const icon = isBash ? "term" : isTool ? "wrench" : "edit";
-	const label = isBash
-		? "Ejecución de comando"
-		: isTool
-			? `Herramienta — ${approval.toolName}`
-			: "Edición de archivo" + (approval.path ? " — " + approval.path : "");
+	const icon = ICON_BY_KIND[approval.kind] ?? "edit";
+	const label = approvalLabel(approval);
+
+	// Opciones visibles: "Sí+patrón" sólo si el gate sugirió un patrón.
+	const items = useMemo<MenuItem[]>(
+		() => [
+			{ key: "yes", label: "Sí", letter: "Y" },
+			...(approval.suggestedPattern
+				? [
+						{
+							key: "pattern" as ItemKey,
+							label: `Sí, permitir «${approval.suggestedPattern}» esta sesión`,
+							letter: "P",
+						},
+					]
+				: []),
+			{ key: "no", label: "No", letter: "N" },
+			{ key: "reason", label: "No, indicar motivo", letter: "M" },
+		],
+		[approval.suggestedPattern],
+	);
+
+	const [sel, setSel] = useState(0);
+	const [reasonOpen, setReasonOpen] = useState(false);
+	const [reasonText, setReasonText] = useState("");
+	const reasonRef = useRef<HTMLInputElement>(null);
+
+	function choose(key: ItemKey) {
+		if (key === "yes") onRespond({ decision: "accept" });
+		else if (key === "pattern")
+			onRespond({ decision: "accept", pattern: approval.suggestedPattern });
+		else if (key === "no") onRespond({ decision: "reject" });
+		else if (key === "reason") setReasonOpen(true);
+	}
+
+	// Teclado del menú: sólo la tarjeta activa y mientras no estamos en el input
+	// de motivo (ése tiene su propio onKeyDown). ↑↓ navega, Enter confirma, Esc
+	// cancela (= rechazar, como el selector de pi), Y/P/N/M ejecutan directo.
+	useEffect(() => {
+		if (!active || reasonOpen) return;
+		const onKey = (e: KeyboardEvent) => {
+			const n = items.length;
+			const k = e.key;
+			if (k === "ArrowDown") {
+				e.preventDefault();
+				setSel((s) => (s + 1) % n);
+			} else if (k === "ArrowUp") {
+				e.preventDefault();
+				setSel((s) => (s - 1 + n) % n);
+			} else if (k === "Enter") {
+				e.preventDefault();
+				choose(items[sel].key);
+			} else if (k === "Escape") {
+				e.preventDefault();
+				onRespond({ decision: "reject" });
+			} else {
+				const idx = items.findIndex(
+					(it) => it.letter.toLowerCase() === k.toLowerCase(),
+				);
+				if (idx >= 0) {
+					e.preventDefault();
+					choose(items[idx].key);
+				}
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+		// choose/onRespond son estables durante la vida del componente; sel e
+		// items son las dependencias reales del cierre.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [active, reasonOpen, sel, items]);
+
+	// Al abrir el input de motivo, le damos el foco (sin autoFocus, que el linter
+	// desaconseja por accesibilidad).
+	useEffect(() => {
+		if (reasonOpen) reasonRef.current?.focus();
+	}, [reasonOpen]);
+
+	function submitReason() {
+		const t = reasonText.trim();
+		if (t) onRespond({ decision: "reject", reason: t });
+	}
+
 	return (
 		<div className="approval">
 			<div className="ttl">
@@ -47,7 +157,10 @@ export function ApprovalCard({
 			{approval.diff && <Diff text={approval.diff} />}
 			{approval.warning && (
 				<p className="warning">
-					<span className="ic">⚠</span> {approval.warning}
+					<span className="ic">
+						<Icon name="alert" />
+					</span>{" "}
+					{approval.warning}
 				</p>
 			)}
 			{isTool && (
@@ -57,54 +170,52 @@ export function ApprovalCard({
 						: "Herramienta no reconocida (MCP o extensión de terceros). Revisa la acción antes de aceptar."}
 				</p>
 			)}
-			<div className="acts">
-				{/* Acciones principales: Aceptar (primario) + Rechazar. Son las dos
-				    decisiones clave y deben destacar sobre las de sesión. El ícono a la
-				    izquierda refuerza el significado (✓ / ✕). */}
-				<div className="acts-main">
-					<button onClick={() => onRespond({ decision: "accept" })}>
-						<Icon name="check" size={13} /> Aceptar
-					</button>
-					<button
-						className="sec"
-						onClick={() => onRespond({ decision: "reject" })}
-					>
-						<Icon name="x" size={13} /> Rechazar
-					</button>
-				</div>
-				{/* Acciones de sesión (patrón / todas): se muestran como enlaces discretos,
-				    no como botones, para subordinarlas a Aceptar/Rechazar. El patrón lo
-				    sugiere el gate (bash → `npm *`, diff → `src/*`); «todas» sólo aplica a
-				    diffs (un bash siempre pide, y un tool desconocido no se silencia). */}
-				{(approval.suggestedPattern || isDiff) && (
-					<div className="acts-more">
-						{approval.suggestedPattern && (
-							<button
-								className="link"
-								onClick={() =>
-									onRespond({
-										decision: "accept",
-										pattern: approval.suggestedPattern,
-									})
-								}
-							>
-								<Icon name="link" size={12} /> Aprobar «
-								{approval.suggestedPattern}» (esta sesión)
-							</button>
-						)}
-						{isDiff && (
-							<button
-								className="link"
-								onClick={() =>
-									onRespond({ decision: "accept", acceptAll: true })
-								}
-							>
-								<Icon name="checkcheck" size={12} /> Aceptar todas (esta sesión)
-							</button>
-						)}
+
+			{reasonOpen ? (
+				<div className="ap-reason">
+					<input
+						ref={reasonRef}
+						className="ap-reason-input"
+						placeholder="Escribe el motivo y presiona Enter…"
+						value={reasonText}
+						onChange={(e) => setReasonText(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								submitReason();
+							} else if (e.key === "Escape") {
+								e.preventDefault();
+								setReasonOpen(false);
+							}
+						}}
+					/>
+					<div className="ap-keys">
+						⏎ rechazar con motivo · Esc volver al menú
 					</div>
-				)}
-			</div>
+				</div>
+			) : (
+				<div className="ap-menu" role="listbox">
+					{items.map((it, i) => (
+						<button
+							key={it.key}
+							type="button"
+							role="option"
+							className={"ap-item" + (i === sel ? " active" : "")}
+							onClick={() => choose(it.key)}
+							onMouseEnter={() => setSel(i)}
+							aria-selected={i === sel}
+						>
+							<span className="ap-bullet">{i === sel ? "❯" : ""}</span>
+							<span className="ap-label">{it.label}</span>
+							<span className="ap-letter">{it.letter}</span>
+						</button>
+					))}
+					<div className="ap-keys">
+						↑↓ navegar · ⏎ confirmar · Esc cancelar
+						{active ? " · Y/P/N/M" : ""}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

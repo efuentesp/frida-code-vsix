@@ -248,6 +248,25 @@ export async function runAgent(
 		return { agentId };
 	}
 
+	// A+D: vincular la señal de abort del tool padre (agent) al abort de la sesión
+	// hija. Antes el sub-agente ignoraba la señal → pulsar Detener no frenaba un
+	// skill que había lanzado un sub-agente (había que recargar la extensión).
+	// Ahora, al abortar el padre, abortamos la hija y su prompt() resuelve de
+	// inmediato. Sólo foreground: los background viven su propio ciclo (outlivan
+	// el turno del padre) y no deben morir con su señal.
+	const onParentAbort = () => {
+		void (session as AgentSession).abort();
+	};
+	if (!options.runInBackground && options.signal) {
+		if (options.signal.aborted) {
+			void (session as AgentSession).abort();
+		} else {
+			options.signal.addEventListener("abort", onParentAbort, {
+				once: true,
+			});
+		}
+	}
+
 	// Foreground: esperar el resultado.
 	try {
 		const result = await runSessionPrompt(
@@ -271,6 +290,7 @@ export async function runAgent(
 		);
 		throw e;
 	} finally {
+		options.signal?.removeEventListener("abort", onParentAbort);
 		stopLive?.();
 	}
 }

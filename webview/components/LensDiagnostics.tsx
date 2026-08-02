@@ -4,7 +4,8 @@
 // pi-lens calculó y de otro modo viaja oculto al modelo.
 //
 // Refleja el estado publicado por el host (post {type:"lens_diagnostics"}).
-// Auto-oculto cuando no hay errores ni warnings. Glifos: ✕ error · ⚠ warning.
+// Auto-oculto cuando no hay errores ni warnings. Iconos lucide: X = error ·
+// TriangleAlert = warning.
 
 import { useState } from "react";
 import type { LensSummary } from "../types";
@@ -23,10 +24,16 @@ export function LensDiagnostics({
 	const head = (
 		<>
 			{lens.totalErrors > 0 && (
-				<span className="lens-count err">✕ {lens.totalErrors}</span>
+				<span className="lens-count err">
+					<Icon name="x" size={11} />
+					{lens.totalErrors}
+				</span>
 			)}
 			{lens.totalWarnings > 0 && (
-				<span className="lens-count warn">⚠ {lens.totalWarnings}</span>
+				<span className="lens-count warn">
+					<Icon name="alert" size={11} />
+					{lens.totalWarnings}
+				</span>
 			)}
 			<span className="lens-files">
 				· {lens.fileCount} archivo{lens.fileCount === 1 ? "" : "s"}
@@ -43,7 +50,9 @@ export function LensDiagnostics({
 				onClick={() => setOpen((v) => !v)}
 				title={open ? "Contraer" : "Expandir"}
 			>
-				<span className="lens-head-icon">🔍</span>
+				<span className="lens-head-icon">
+					<Icon name="search" size={12} />
+				</span>
 				<span className="lens-head-label">frida-lens</span>
 				{head}
 				<span className={"lens-caret" + (open ? "" : " closed")}>
@@ -58,8 +67,18 @@ export function LensDiagnostics({
 								{f.path}
 							</span>
 							<span className="lens-item-counts">
-								{f.errors > 0 && <span className="err">✕ {f.errors}</span>}
-								{f.warnings > 0 && <span className="warn">⚠ {f.warnings}</span>}
+								{f.errors > 0 && (
+									<span className="err">
+										<Icon name="x" size={11} />
+										{f.errors}
+									</span>
+								)}
+								{f.warnings > 0 && (
+									<span className="warn">
+										<Icon name="alert" size={11} />
+										{f.warnings}
+									</span>
+								)}
 								{f.others > 0 && <span className="other">• {f.others}</span>}
 								{f.truncated && <span className="lens-trunc">+</span>}
 							</span>

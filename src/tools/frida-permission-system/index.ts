@@ -181,7 +181,14 @@ export function createPermissionSystem(
 					flags: decision.flags,
 				}),
 			);
-			return { block: true as const, reason: "El usuario rechazó la acción." };
+			// El motivo del usuario (opción "No, indicar motivo") se inyecta en el
+			// tool_result que ve el modelo, para que entienda por qué se bloqueó.
+			return {
+				block: true as const,
+				reason: resp.reason
+					? `El usuario rechazó la acción: ${resp.reason}`
+					: "El usuario rechazó la acción.",
+			};
 		}
 		if (isDiff && resp.acceptAll) acceptAllEdits = true;
 		// Fase 4: si el usuario aprobó un patrón, registrarlo para la sesión.

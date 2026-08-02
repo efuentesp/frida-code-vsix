@@ -61,6 +61,8 @@ import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { createWebQuestionnaireElement } from "./web-questionnaire";
+import { notifyCompletion } from "./notify";
+import { notifyAttention } from "./notify";
 import {
 	isAskUserQuestionEnabled,
 	isContextEnabled,
@@ -390,6 +392,16 @@ export async function activate(
 	let lensBusy = false;
 	let inRetry = false;
 	let lensActive = false;
+	// ¿Tiene el foco la ventana de VS Code? Se actualiza con
+	// onDidChangeWindowState. Sirve para emitir el sonido/notificación de fin de
+	// petición sólo cuando el usuario está en otra aplicación (no mientras mira
+	// a Frida, que sería molesto).
+	let vscodeWindowFocused = true;
+	// Conteo previo de pendientes, para emitir el sonido de atención sólo en la
+	// transición 0 → ≥1 (no en cada reenvío del callback mientras la misma
+	// aprobación/pregunta sigue esperando).
+	let lastApprovalCount = 0;
+	let lastUiCount = 0;
 	// Fix UX #1: detectar runs que terminan SIN respuesta visible (ni texto ni
 	// tools). Caso típico: el gateway DevEngine rechaza con 401 (key vencida) y el
 	// SDK openai lanza AuthenticationError ANTES de onResponse → after_provider_response
@@ -565,9 +577,24 @@ export async function activate(
 						delete keyCaches[id];
 						void promptKey(id, "unauthorized");
 					},
-					onPendingApprovals: (reqs: ApprovalRequest[]) =>
-						post({ type: "approvals", approvals: reqs }),
-					onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
+					onPendingApprovals: (reqs: ApprovalRequest[]) => {
+						post({ type: "approvals", approvals: reqs });
+						// Aviso sonoro de atención (Ping) al llegar un NUEVO permiso pendiente
+						// (transición 0 → ≥1). Evita repetir mientras la misma aprobación está
+						// esperando, ya que este callback puede dispararse varias veces.
+						if (reqs.length > 0 && lastApprovalCount === 0) {
+							void notifyAttention(vscodeWindowFocused, "approval");
+						}
+						lastApprovalCount = reqs.length;
+					},
+					onUiRequest: (reqs) => {
+						post({ type: "ui_requests", items: reqs });
+						// Igual que con approvals: sonar sólo al llegar una NUEVA pregunta.
+						if (reqs.length > 0 && lastUiCount === 0) {
+							void notifyAttention(vscodeWindowFocused, "ui");
+						}
+						lastUiCount = reqs.length;
+					},
 					onUiNotify: (message, level) =>
 						post({ type: "ui_notify", message, level }),
 					onWebCommit: (rootId, tree, placement) =>
@@ -669,15 +696,20 @@ export async function activate(
 					? (lastCacheRead / promptTokens) * 100
 					: undefined;
 			// Contexto ACTUAL: pi estima los tokens del contexto vivo (getContextUsage).
+			// Tras una compactación devuelve {tokens:null,percent:null} hasta la próxima
+			// respuesta del modelo (tamaño real desconocido); propagamos null para que la
+			// barra muestre "?" en vez de un 0% engañoso (paridad con el footer de la TUI).
 			const ctx = session?.getContextUsage?.();
-			const contextTokens = ctx?.tokens ?? 0;
 			const contextWindow =
 				ctx?.contextWindow ?? session?.model?.contextWindow ?? 0;
-			const contextPercent =
-				ctx?.percent ??
-				(contextWindow
-					? Math.min(100, (contextTokens / contextWindow) * 100)
-					: 0);
+			const unknown = ctx == null || ctx.tokens == null || ctx.percent == null;
+			const contextTokens = unknown ? 0 : (ctx?.tokens ?? 0);
+			const contextPercent = unknown
+				? null
+				: (ctx?.percent ??
+					(contextWindow
+						? Math.min(100, (contextTokens / contextWindow) * 100)
+						: 0));
 			// Presión ajustada por el reserve de compactación (paridad pressurePercent
 			// de frida-context): la barra la usa para ANTICIPAR la compactación, no sólo
 			// la ventana bruta. >100% ⇒ el agente debería compactar ya.
@@ -686,8 +718,9 @@ export async function activate(
 				contextWindow > reserveTokens
 					? contextWindow - reserveTokens
 					: contextWindow;
-			const pressurePercent =
-				effectiveCapacity > 0
+			const pressurePercent = unknown
+				? null
+				: effectiveCapacity > 0
 					? Math.min(100, (contextTokens / effectiveCapacity) * 100)
 					: contextPercent;
 			post({
@@ -1167,6 +1200,9 @@ export async function activate(
 				case "agent_end":
 					postUsage(session);
 					post({ type: "agent_busy", busy: false });
+					// Sonido + notificación al terminar (sólo si el setting está activo y la
+					// ventana de VS Code perdió el foco → el usuario está en otra app).
+					void notifyCompletion(vscodeWindowFocused);
 					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
 					if (event.errorMessage && !event.willRetry) {
 						post({ type: "provider_error", text: String(event.errorMessage) });
@@ -1250,6 +1286,13 @@ export async function activate(
 					) {
 						post({ type: "info", text: "Operación cancelada" });
 					}
+					// Cada respuesta del modelo actualiza los tokens reales del contexto
+					// (usageTokens del último assistant). Sin esto la barra se congela en
+					// medio de una corrida con muchos tools: sólo se refrescaba en agent_end.
+					// Paridad con el footer de la TUI de pi, que recalcula en cada render.
+					if (event.message?.role === "assistant") {
+						postUsage(session);
+					}
 					break;
 				case "tool_execution_start":
 					hadToolCall = true;
@@ -1293,6 +1336,10 @@ export async function activate(
 								? event.result.details.diff
 								: undefined,
 					});
+					// Cada tool_result añade trailingTokens al contexto vivo: refrescamos el %
+					// para que la barra crezca durante la corrida en vez de quedarse congelada
+					// hasta agent_end. estimateContextTokens es local (sin red) → barato.
+					postUsage(session);
 					// El tool `todo` muta el store reactivo y el panel Remote React se
 					// re-renderiza solo (ADR-0014): nada que publicar aquí.
 					break;
@@ -1407,6 +1454,7 @@ export async function activate(
 					decision: msg.decision === "accept" ? "accept" : "reject",
 					acceptAll: !!msg.acceptAll,
 					pattern: typeof msg.pattern === "string" ? msg.pattern : undefined,
+					reason: typeof msg.reason === "string" ? msg.reason : undefined,
 				});
 				break;
 			case "ui_response":
@@ -2449,15 +2497,35 @@ export async function activate(
 	async function abortRun(): Promise<void> {
 		try {
 			const { session } = await ensureSession();
+			// C: el botón Detener SIEMPRE aborta la corrida completa. Como primer paso
+			// (paridad TUI: el primer Esc mata el bash en vuelo) cesamos el bash y el
+			// retry en curso de inmediato — PERO sin return: después abortamos el
+			// agente entero. Antes los early-returns dejaban la corrida autónoma
+			// corriendo (solo mataban un bash/retry a la vez y el run seguía).
 			if (session.session?.isBashRunning) {
-				await session.session.abortBash?.();
-				return;
+				try {
+					await session.session.abortBash?.();
+				} catch {
+					/* noop */
+				}
 			}
 			if (inRetry) {
-				await session.session.abortRetry?.();
-				return;
+				try {
+					await session.session.abortRetry?.();
+				} catch {
+					/* noop */
+				}
 			}
-			await session.session.abort();
+			// B: session.abort() dispara agent.abort() (la señal) y luego await
+			// waitForIdle(). Si un tool largo no respeta la señal (frida-subagents ya
+			// la propaga vía signal→child.abort; un MCP de terceros podría no hacerlo),
+			// waitForIdle() podría tardar: carreramos con un timeout de 8s para no
+			// colgar el botón. El evento agent_end (al que ya nos suscribimos) bajará
+			// busy cuando el agente realmente pare, aun si esta promesa resuelve antes.
+			await Promise.race([
+				session.session.abort(),
+				new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+			]);
 		} catch {
 			/* noop */
 		}
@@ -2966,6 +3034,11 @@ export async function activate(
 	}
 
 	context.subscriptions.push(
+		// Trackear si la ventana de VS Code tiene el foco. Sirve para notificar con
+		// sonido al terminar una petición sólo si el usuario se fue a otra app.
+		vscode.window.onDidChangeWindowState((s) => {
+			vscodeWindowFocused = s.focused;
+		}),
 		vscode.window.registerWebviewViewProvider(
 			"frida.codeView",
 			{ resolveWebviewView: resolveFridaView },

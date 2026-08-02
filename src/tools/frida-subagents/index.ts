@@ -143,7 +143,7 @@ export function createFridaSubagents() {
 						resume?: string;
 						isolated?: boolean;
 					},
-					_signal: AbortSignal | undefined,
+					signal: AbortSignal | undefined,
 					onUpdate: AgentToolUpdateCallback | undefined,
 					ctx: ExtensionContext,
 				) => {
@@ -162,6 +162,7 @@ export function createFridaSubagents() {
 						resume: params.resume,
 						isolated: params.isolated,
 						onUpdate,
+						signal,
 					};
 
 					if (params.run_in_background) {
@@ -258,7 +259,7 @@ export function createFridaSubagents() {
 						wait?: boolean;
 						verbose?: boolean;
 					},
-					_signal: AbortSignal | undefined,
+					signal: AbortSignal | undefined,
 					onUpdate: AgentToolUpdateCallback | undefined,
 					_ctx: ExtensionContext,
 				) => {
@@ -276,7 +277,20 @@ export function createFridaSubagents() {
 							stopLive = forwardLiveProgress(agent.session, onUpdate);
 						}
 						try {
-							await agent.promise;
+							// Si el padre aborta (Detener), dejamos de esperar y devolvemos el
+							// estado actual; el sub-agente background sigue su curso independiente.
+							if (signal && !signal.aborted) {
+								await Promise.race([
+									agent.promise,
+									new Promise<void>((resolve) =>
+										signal.addEventListener("abort", () => resolve(), {
+											once: true,
+										}),
+									),
+								]);
+							} else if (!signal?.aborted) {
+								await agent.promise;
+							}
 						} catch {
 							// El error ya está en agent.error
 						} finally {

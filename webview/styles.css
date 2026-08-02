@@ -662,11 +662,32 @@ body {
 	font-weight: 600;
 }
 .thinking-time {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	font-size: 11px;
 	font-weight: 400;
-	color: var(--vscode-descriptionForeground);
 	opacity: 0.9;
 	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	flex: none;
+}
+/* Cronómetro de razonamiento vivo: spinner en color de acento (azul), como
+   actividad visible — paridad con el Brain que late a la izquierda. */
+.thinking-time.thinking-running {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+/* Cronómetro terminado: check en gris sobrio. Sin verde de "éxito": el
+   razonamiento no pasa ni falla, sólo termina. */
+.thinking-time.thinking-done {
+	color: var(--vscode-descriptionForeground);
+}
+/* Cuando hay cronómetro, éste empuja a la derecha (margin-left:auto) y el
+   chevron se pega a él; sin cronómetro, el chevron conserva su propio
+   margin-left:auto para ir a la derecha solo. */
+.thinking-time + .thinking-chev {
+	margin-left: 0;
 }
 .thinking-chev {
 	margin-left: auto;
@@ -1287,42 +1308,69 @@ body {
 	font-weight: 700;
 	line-height: 1.2;
 }
-.approval .acts {
-	margin-top: 8px;
-}
-/* Fila de acciones principales: Aceptar (primario) + Rechazar. Botones con
-   ícono a la izquierda, centrados verticalmente. */
-.approval .acts-main {
-	display: flex;
-	gap: 8px;
-}
-.approval .acts-main button {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-}
-/* Acciones de sesión (patrón / todas): enlaces discretos, subordinados a
-   Aceptar/Rechazar. Sin fondo, color textLink, subrayado sólo en hover. */
-.approval .acts-more {
+/* Menú de aprobación vertical navegable (réplica del selector de
+   pi-permission-system). Cada ítem es una fila: bullet ❯ + label + letra de
+   atajo. El ítem activo resalta con fondo (list-hoverBackground) y marca
+   lateral (activeSelectionForeground). Mouse: clic ejecuta, hover mueve el
+   foco para que teclado y ratón estén sincronizados. */
+.approval .ap-menu {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
-	margin-top: 6px;
+	margin-top: 8px;
 }
-.approval button.link {
-	background: transparent;
-	color: var(--vscode-textLink-foreground, #4daafc);
-	padding: 2px 0;
-	border-radius: 0;
-	font-size: 12px;
-	display: inline-flex;
+.approval .ap-item {
+	display: flex;
 	align-items: center;
-	gap: 5px;
-	width: fit-content;
-}
-.approval button.link:hover {
+	gap: 8px;
+	width: 100%;
+	text-align: left;
+	padding: 5px 8px;
+	border-radius: 4px;
 	background: transparent;
-	text-decoration: underline;
+	color: var(--vscode-foreground);
+	font-size: 13px;
+	border: none;
+	cursor: pointer;
+}
+.approval .ap-item:hover,
+.approval .ap-item.active {
+	background: var(--vscode-list-hoverBackground);
+}
+.approval .ap-item.active {
+	box-shadow: inset 2px 0 0
+		var(--vscode-list-activeSelectionForeground, var(--vscode-focusBorder));
+}
+.approval .ap-bullet {
+	width: 10px;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	flex: none;
+	font-weight: 700;
+}
+.approval .ap-label {
+	flex: 1;
+}
+.approval .ap-letter {
+	font-size: 11px;
+	opacity: 0.6;
+	font-family: var(--vscode-editor-font-family, monospace);
+	flex: none;
+}
+/* Input inline del motivo (opción "No, indicar motivo"): reemplaza el menú. */
+.approval .ap-reason {
+	margin-top: 8px;
+}
+.approval .ap-reason-input {
+	width: 100%;
+	padding: 6px 8px;
+	border-radius: 4px;
+	font-size: 13px;
+}
+/* Pista de teclas bajo el menú / input. */
+.approval .ap-keys {
+	font-size: 11px;
+	opacity: 0.6;
+	margin-top: 6px;
+	padding: 0 8px;
 }
 button {
 	background: var(--vscode-button-background);
@@ -3041,6 +3089,9 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 }
 .lens-count {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
 	font-weight: 600;
 }
 .lens-count.err {
@@ -3096,6 +3147,13 @@ kbd {
 	gap: 8px;
 	flex: 0 0 auto;
 	font-size: 11px;
+}
+.lens-item-counts .err,
+.lens-item-counts .warn,
+.lens-item-counts .other {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
 }
 .lens-item-counts .err {
 	color: var(--vscode-errorForeground, #f85149);
@@ -3208,6 +3266,23 @@ kbd {
 }
 .fbox.tone-active {
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.08));
+}
+/* Columna de filas del panel Todos: guía vertical única (border-left) que
+   reemplaza los caracteres de dibujo ├─└─│. Es CSS puro → no se desajusta al
+   cambiar fuente, zoom o ancho de ventana. El padding-left separa las filas
+   de la rama, como un árbol indentado. */
+.fbox.todo-rows {
+	border-left: 1px solid
+		var(
+			--vscode-editorWhitespace-foreground,
+			var(--vscode-descriptionForeground)
+		);
+	padding-left: 10px;
+}
+/* Sub-línea de activeForm: indentada bajo el glyph para leerse como anidada.
+   Padding fijo (robusto) en vez de alinear con un carácter │. */
+.fbox.todo-activeform {
+	padding-left: 16px;
 }
 /* fmarkdown: contenedor con borde + scroll para previews side-by-side */
 .fbox .md {

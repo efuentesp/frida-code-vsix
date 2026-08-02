@@ -107,4 +107,8 @@ export interface SpawnOptions {
 	 *  tool padre (agent foreground o get_subagent_result wait). Así se ve que el
 	 *  sub-agente genera contenido mientras corre, no que está trabado. */
 	onUpdate?: AgentToolUpdateCallback;
+	/** Señal de abort del tool padre (agent). Si se dispara (el usuario pulsó
+	 *  Detener), abortamos la sesión hija para que pare de inmediato. Sólo
+	 *  foreground: los background viven su propio ciclo. */
+	signal?: AbortSignal;
 }

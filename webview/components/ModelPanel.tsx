@@ -1,8 +1,10 @@
 import type { ProviderOption } from "../types";
 import { Tooltip } from "./Tooltip";
 import {
+	Brain,
 	Check,
 	Dot,
+	Image,
 	KeyRound,
 	LogIn,
 	LogOut,
@@ -74,7 +76,9 @@ export function ModelPanel({
 				)}
 
 				{refreshing && (
-					<div className="refresh-status">⟳ Refrescando catálogos…</div>
+					<div className="refresh-status">
+						<RefreshCw size={12} className="spinner" /> Refrescando catálogos…
+					</div>
 				)}
 				{!refreshing && refreshErrors && refreshErrors.length > 0 && (
 					<div className="refresh-status warn">
@@ -186,8 +190,18 @@ export function ModelPanel({
 														{mm.maxTokens
 															? ` · ${fmtTokens(mm.maxTokens)} out`
 															: null}
-														{mm.reasoning ? " · ✓thinking" : null}
-														{mm.input?.includes("image") ? " · 🖼️" : null}
+														{mm.reasoning ? (
+															<>
+																{" · "}
+																<Brain size={11} /> thinking
+															</>
+														) : null}
+														{mm.input?.includes("image") ? (
+															<>
+																{" · "}
+																<Image size={11} />
+															</>
+														) : null}
 													</span>
 												)}
 											</button>

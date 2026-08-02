@@ -171,6 +171,11 @@
           "type": "number",
           "default": 16000,
           "markdownDescription": "Máximo de tokens de salida (`max_tokens`) por defecto para los modelos Z.ai descubiertos. ADR-0017."
+        },
+        "frida.notifyOnComplete": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Emite un sonido del sistema y muestra una notificación cuando Frida termina una petición o necesita tu atención (un permiso o una pregunta) y la ventana de VS Code no tiene el foco (estás en otra aplicación). Sonido distinto para cada caso: listo (Glass) al terminar, atención (Ping) al pedir permiso o pregunta. Útil para regresar a Frida tras cambiar de ventana."
         }
       }
     }

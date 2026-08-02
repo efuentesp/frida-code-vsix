@@ -70,14 +70,11 @@ function TodoWebPanel(): ReactElement | null {
 					({completed}/{tasks.length})
 				</ftext>
 			</fbox>
-			{tasks.map((t, i) => (
-				<TaskRow
-					key={t.id}
-					task={t}
-					showIds={showIds}
-					isLast={i === tasks.length - 1}
-				/>
-			))}
+			<fbox flexDirection="column" gap={4} cls="todo-rows">
+				{tasks.map((t) => (
+					<TaskRow key={t.id} task={t} showIds={showIds} />
+				))}
+			</fbox>
 		</fbox>
 	);
 }
@@ -85,28 +82,23 @@ function TodoWebPanel(): ReactElement | null {
 function TaskRow({
 	task,
 	showIds,
-	isLast,
 }: {
 	task: Task;
 	showIds: boolean;
-	isLast: boolean;
 }): ReactElement {
 	const active = task.status === "in_progress";
 	const done = task.status === "completed";
 	const statusColor = STATUS_COLOR[task.status];
 	// El activeForm (present-continuous, p.ej. "Formulando preguntas…") va en su
-	// propia línea debajo del subject: antes compartía fila con el subject y, al
-	// aparecer sólo en tareas en progreso, hacía que esa fila fuera más larga que
-	// las demás y se desalineara en ventanas angostas.
+	// propia línea debajo del subject, indentada (padding-left) para leerse como
+	// sub-línea. Antes compartía fila con el subject y se desalineaba en ventanas
+	// angostas; el indent CSS es robusto sin importar fuente/zoom/ancho.
 	const showActiveForm = active && !!task.activeForm;
 	return (
 		<fbox flexDirection="column" gap={2} tone={active ? "active" : "default"}>
-			{/* Línea 1: rama de árbol + glyph + (#id) + subject + (deps). */}
+			{/* Línea 1: glyph + (#id) + subject + (deps). Sin caracteres de rama: la
+			    guía vertical la dibuja el contenedor .todo-rows (border-left CSS). */}
 			<fbox flexDirection="row" gap={6} alignItems="center">
-				{/* Rama de árbol (paridad rpiv-todo overlay): ├─ intermedia, └─ última. */}
-				<ftext color="var(--vscode-descriptionForeground)">
-					{isLast ? "└─" : "├─"}
-				</ftext>
 				<ftext color={statusColor}>{GLYPH[task.status]}</ftext>
 				{showIds ? (
 					<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
@@ -118,12 +110,15 @@ function TaskRow({
 					<ftext>⛓ {task.blockedBy.map((id) => `#${id}`).join(",")}</ftext>
 				) : null}
 			</fbox>
-			{/* Línea 2 (sólo en progreso con activeForm): continuación de la rama (│) +
-			    label muteada en su propia línea. Tono gris + tamaño un pelín menor
-			    para subordinarlo al subject. */}
+			{/* Línea 2 (sólo en progreso con activeForm): sub-línea muteada, indentada
+			    bajo el glyph vía .todo-activeform (padding-left). */}
 			{showActiveForm ? (
-				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext color="var(--vscode-descriptionForeground)">│</ftext>
+				<fbox
+					cls="todo-activeform"
+					flexDirection="row"
+					gap={6}
+					alignItems="center"
+				>
 					<ftext color="var(--vscode-descriptionForeground)" size={12} wrap>
 						({task.activeForm})
 					</ftext>

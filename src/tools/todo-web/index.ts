@@ -77,7 +77,30 @@ export function createTodoWeb() {
 
 			async execute(_toolCallId, params) {
 				const p = params as TaskMutationParams & { action: TaskAction };
-				const state: TaskState = getTodoState();
+				let state: TaskState = getTodoState();
+				// clear-on-new-create: si el primer action MUTANTE del turno es un
+				// `create` y quedan tareas no-completadas del plan anterior, descartarlas
+				// antes de crear — el plan nuevo arranca limpio y no acumula sobre
+				// pendientes stale. "Primer mutante del turno = create" detecta "plan
+				// nuevo": si el modelo RETOMA el plan, su primera acción es `update`, no
+				// `create`, así que no se limpia (preserva continuidad multi-turno). Las
+				// sólo-lectura (list/get) no setean mutatedThisTurn → un `list` previo no
+				// bloquea la limpieza. Robusto al reload: el estado limpio queda en el
+				// historial (cada create graba el estado completo) y el flag se resetea
+				// en agent_start/session_start (vs. el abort-detection, que perdía su
+				// flag efímero al recargar).
+				if (p.action === "create" && !mutatedThisTurn) {
+					const leftovers = state.tasks.filter((t) => t.status !== "completed");
+					if (leftovers.length > 0) {
+						state = {
+							tasks: state.tasks.filter((t) => t.status === "completed"),
+							nextId: state.nextId,
+						};
+					}
+				}
+				if (p.action !== "list" && p.action !== "get") {
+					mutatedThisTurn = true;
+				}
 				const result = applyTaskMutation(state, p.action, p);
 				// setTodoState EMITE → el panel persistente re-renderiza (Remote React)
 				// sin que el host tenga que publicar nada por separado.
@@ -90,9 +113,15 @@ export function createTodoWeb() {
 		// session_shutdown. El componente se suscribe al store reactivo y se
 		// re-renderiza ante cada mutation del tool.
 		let panel: { unmount: () => void } | undefined;
+		// clear-on-new-create: marca si ya hubo un action mutante (create/update/
+		// delete/clear) en el turno actual. Se resetea en agent_start/session_start.
+		// El primer mutante del turno, si es `create` y hay pendientes previas,
+		// dispara la limpieza del plan anterior (ver execute).
+		let mutatedThisTurn = false;
 
 		pi.on("session_start", async (_event, ctx) => {
 			// Reconstruir desde la rama (sobrevive recarga/switch/compaction).
+			mutatedThisTurn = false;
 			resetTodoState();
 			setTodoState(replayFromBranch({ sessionManager: ctx.sessionManager }));
 			panel = mountPanel(ctx, panel);
@@ -106,6 +135,9 @@ export function createTodoWeb() {
 		});
 
 		pi.on("agent_start", async () => {
+			// Nueva corrida: reset del flag de clear-on-new-create — el primer mutante
+			// de ESTE turno vuelve a poder disparar la limpieza del plan anterior.
+			mutatedThisTurn = false;
 			// Ocultar las tareas completadas de turnos anteriores (paridad con
 			// rpiv-todo hideCompletedTasksFromPreviousTurn): al iniciar un nuevo
 			// turno, las que ya están completed pasan a ocultas para reducir ruido.

@@ -17,6 +17,10 @@ import {
 	Search,
 	Terminal,
 	UserCheck,
+	Circle,
+	CircleCheck,
+	CircleDot,
+	CircleX,
 	Users,
 	Wrench,
 } from "lucide-react";
@@ -90,11 +94,11 @@ function readStats(entry: ToolEntry): string | null {
 
 // Status echo del tool `todo` (paridad renderTodoResult de rpiv-todo): glyph + label
 // coloreado según el status resultante de la acción.
-const TODO_STATUS_GLYPH: Record<string, { glyph: string; label: string }> = {
-	pending: { glyph: "○", label: "pendiente" },
-	in_progress: { glyph: "◐", label: "en progreso" },
-	completed: { glyph: "✓", label: "completado" },
-	deleted: { glyph: "✗", label: "eliminado" },
+const TODO_STATUS_GLYPH: Record<string, { glyph: ReactNode; label: string }> = {
+	pending: { glyph: <Circle size={11} />, label: "pendiente" },
+	in_progress: { glyph: <CircleDot size={11} />, label: "en progreso" },
+	completed: { glyph: <CircleCheck size={11} />, label: "completado" },
+	deleted: { glyph: <CircleX size={11} />, label: "eliminado" },
 };
 
 /** Infiere el status resultante de una acción `todo` parseando el content del
@@ -102,7 +106,7 @@ const TODO_STATUS_GLYPH: Record<string, { glyph: string; label: string }> = {
  *  null si no aplica (list/get/clear no tienen status echo, como rpiv). */
 function todoStatusEcho(
 	entry: ToolEntry,
-): { glyph: string; label: string; status: string } | null {
+): { glyph: ReactNode; label: string; status: string } | null {
 	if (entry.tool !== "todo" || !entry.result) return null;
 	const r = entry.result;
 	if (r.startsWith("Created")) {
