@@ -43,6 +43,8 @@ import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
 import { createFridaArgs } from "./tools/frida-args";
+import { createFridaMultiSkills } from "./tools/frida-multi-skills";
+import { createFridaPixSkills } from "./tools/frida-pix-skills";
 import { createFridaPipeline } from "./tools/frida-pipeline";
 import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
@@ -405,6 +407,22 @@ export async function createFridaSession(
 					capturedExtensionApi = pi;
 					return createFridaArgs()(pi);
 				},
+			},
+			// frida-multi-skills: invocación multi-skill con `$skill_name` inline
+			// (porte de pi-multi-skills). DEBE registrarse DESPUÉS de frida-args para
+			// reutilizar su índice de skills (getSkillIndex). Reutiliza el hook input
+			// como salvavidas; runPrompt (host) hace la expansión para display en vivo.
+			{
+				name: "frida-multi-skills",
+				factory: createFridaMultiSkills(),
+			},
+			// frida-pix-skills: tool `read_skills` para cargar skills on-demand +
+			// interpolación de directivas + skills.sh remoto (porte de pix-skills).
+			// Sin bundle propio: opera sobre skills existentes, no añade nuevas → no
+			// colisiona con frida-pipeline. Gate de directivas → frida-permission-system.
+			{
+				name: "frida-pix-skills",
+				factory: createFridaPixSkills(),
 			},
 			// frida-agent-browser (D34): tool `agent_browser` que envuelve el binario
 			// upstream agent-browser (Vercel) — automation de navegador real. Sesión

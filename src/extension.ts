@@ -56,6 +56,11 @@ import {
 } from "./tools/frida-pipeline";
 import { listAgents, getAvailableTypes } from "./tools/frida-subagents";
 import { expandSkillText } from "./tools/frida-args";
+import {
+	expandMultiSkillText,
+	type ExpandMultiSkillResult,
+} from "./tools/frida-multi-skills";
+import { createSkillsPanelElement } from "./tools/frida-multi-skills/SkillsPanel";
 import { wireAgentWidget } from "./tools/frida-subagents/panel";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
@@ -1665,6 +1670,15 @@ export async function activate(
 			description: "Estado del orquestador frida-pipeline",
 		},
 		{
+			name: "skills",
+			description: "Listar las skills disponibles con su sintaxis $name",
+		},
+		{
+			name: "skills-search",
+			description: "Buscar skills por nombre o descripción",
+			argumentHint: "<palabra>",
+		},
+		{
 			name: "agents",
 			description: "Listar sub-agentes corriendo y disponibles",
 		},
@@ -1766,6 +1780,12 @@ export async function activate(
 				break;
 			case "pipeline":
 				void postPipelineCommand();
+				break;
+			case "skills":
+				postSkillsCommand();
+				break;
+			case "skills-search":
+				postSkillsSearchCommand(arg);
 				break;
 			case "frida-models":
 				void postFridaModelsCommand();
@@ -1925,6 +1945,28 @@ export async function activate(
 			],
 			file: "docs/tools/frida-args.md",
 			label: "frida-args",
+		},
+		{
+			match: [
+				"multi-skills",
+				"multi-skill",
+				"$skill",
+				"skills",
+				"skills-search",
+			],
+			file: "docs/tools/frida-multi-skills.md",
+			label: "frida-multi-skills",
+		},
+		{
+			match: [
+				"pix-skills",
+				"read_skills",
+				"read skills",
+				"skills.sh",
+				"skill-loader",
+			],
+			file: "docs/tools/frida-pix-skills.md",
+			label: "frida-pix-skills",
 		},
 		{
 			match: ["extension", "extensions", "ext"],
@@ -2206,6 +2248,65 @@ export async function activate(
 		post({ type: "info", text: lines.join("\n") });
 	}
 
+	// /skills: lista las skills disponibles con su sintaxis $name (porte de
+	// pi-multi-skills). Lee el registry de skills de la sesión y muestra nombre +
+	// /skills y /skills-search: overlay navegable de skills (SkillsPanel, Remote
+	// React). Sustituye a la toast efímera — persistente, con búsqueda en vivo,
+	// scroll y botón "insertar" que manda $name al composer (composer_insert).
+	let skillsPanelHandle: { unmount: () => void } | undefined;
+	function mountSkillsPanel(initialQuery: string): void {
+		const skills: any[] =
+			frida?.session?.resourceLoader?.getSkills?.()?.skills ?? [];
+		if (skills.length === 0) {
+			post({
+				type: "info",
+				text: "No hay skills instaladas. Colócalas en ~/.frida/skills/ o .frida/skills/ y recarga con /reload.",
+			});
+			return;
+		}
+		const rows = skills.map((s) => ({
+			name: String(s.name),
+			description: String(s.description ?? ""),
+		}));
+		skillsPanelHandle?.unmount();
+		skillsPanelHandle = frida!.webBridge.mountPersistent(
+			() =>
+				createSkillsPanelElement(
+					rows,
+					initialQuery,
+					(text) => post({ type: "composer_insert", text }),
+					() => {
+						skillsPanelHandle?.unmount();
+						skillsPanelHandle = undefined;
+					},
+				),
+			"overlay",
+		);
+	}
+	function postSkillsCommand(): void {
+		if (!frida?.session) {
+			post({
+				type: "info",
+				text: "No hay sesión activa. Abre Frida para ver las skills.",
+			});
+			return;
+		}
+		mountSkillsPanel("");
+	}
+
+	// /skills-search <palabra>: abre el mismo overlay con el filtro precargado.
+	function postSkillsSearchCommand(arg: string): void {
+		if (!arg) {
+			post({ type: "info", text: "Uso: /skills-search <palabra>" });
+			return;
+		}
+		if (!frida?.session) {
+			post({ type: "info", text: "No hay sesión activa." });
+			return;
+		}
+		mountSkillsPanel(arg);
+	}
+
 	// /gates: auditoría navegable de permisos (overlay Remote React, ADR-0016 Fase 2).
 	// Lee el JSONL de approvals y lo muestra con filtros + colores. Snapshot puntual
 	// (no streaming): re-ejecutar /gates refresca.
@@ -2364,11 +2465,38 @@ export async function activate(
 				skillBlock = null; // cualquier fallo → comportamiento por defecto
 			}
 		}
+		// B2: si hay `$skill_name` inline (y no era /skill:), expandir AHORA vía
+		// frida-multi-skills. Paridad con /skill:: el webview muestra el bloque
+		// <skill> en vivo y el modelo recibe idéntico. Múltiples skills se mergean
+		// en UN bloque (name="a, b"). El bloque resultante empieza con `<skill ` →
+		// pasa intacto por la guardia de re-entrada del hook input de frida-args y
+		// de frida-multi-skills (sin $ que re-expandir). Precedencia: /skill: gana
+		// sobre $skill (son mutuamente excluyentes en la práctica).
+		let multiSkill: ExpandMultiSkillResult | null = null;
+		if (!skillBlock && expanded.includes("$") && session.extensionApi) {
+			try {
+				multiSkill = await expandMultiSkillText(expanded, {
+					pi: session.extensionApi,
+					sessionId: session.sessionManager?.getSessionId?.() ?? "",
+					cwd: workspaceCwd(),
+				});
+			} catch {
+				multiSkill = null; // cualquier fallo → comportamiento por defecto
+			}
+			if (multiSkill && multiSkill.unresolved.length > 0) {
+				post({
+					type: "info",
+					level: "warning",
+					text: `Skills desconocidas: ${multiSkill.unresolved.join(", ")}. Usa /skills para ver las disponibles.`,
+				});
+			}
+		}
 		// toSend = lo que recibe el modelo; toPost = lo que ve el webview. Para
-		// skills ambos son el bloque; para @files/normal se preserva el comportamiento
-		// actual (post raw, send expandido con @files ya sustituidos).
-		const toSend = skillBlock ?? expanded;
-		const toPost = skillBlock ?? trimmed;
+		// skills (/skill: o $skill) ambos son el bloque; para @files/normal se
+		// preserva el comportamiento actual (post raw, send expandido con @files
+		// ya sustituidos).
+		const toSend = multiSkill?.transformed ?? skillBlock ?? expanded;
+		const toPost = multiSkill?.transformed ?? skillBlock ?? trimmed;
 
 		// Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
 		const imgs =

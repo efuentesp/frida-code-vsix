@@ -194,6 +194,8 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | **frida-context** | Snapshot de presión del contexto para auto-regulación | [→](./docs/tools/frida-context.md) |
 | **frida-agent-browser** | Automatización de navegador real + búsqueda web (Exa/Brave) + apps Electron (tools `agent_browser` / `agent_browser_web_search`) | [→](./docs/tools/frida-agent-browser.md) |
 | **frida-args** | Argumentos (`$1`/`$ARGUMENTS`) y shell (`!`cmd``) en skills — porte de rpiv-args | [→](./docs/tools/frida-args.md) |
+| **frida-multi-skills** | Invoca skills desde cualquier parte del prompt con `$name` y combina varias por mensaje — porte de pi-multi-skills | [→](./docs/tools/frida-multi-skills.md) |
+| **frida-pix-skills** | Carga skills on-demand con el tool `read_skills`, interpola `!`cmd`` vivo y accede a Skills.sh — porte de pix-skills | [→](./docs/tools/frida-pix-skills.md) |
 | **ask-user-question-web** | El agente pregunta con opciones estructuradas (UI web) | [→](./docs/tools/ask-user-question-web.md) |
 | **todo** / **todo-web** | Seguimiento multi-paso de tareas + panel | [→](./docs/tools/todo.md) |
 | **frida-pipeline** | Orquestador con 27 skills, 15 sub-agentes y 3 workflows (porte de rpiv-pi) | [→](./docs/tools/frida-pipeline.md) |

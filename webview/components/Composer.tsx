@@ -77,6 +77,7 @@ export function Composer({
 	onCycleMode,
 	expanded,
 	onExpandedChange,
+	insertSignal,
 }: {
 	onSubmit: (
 		text: string,
@@ -104,6 +105,10 @@ export function Composer({
 	 *  .log se redimensiona → el botón saltaría de sitio. */
 	expanded: boolean;
 	onExpandedChange?: (expanded: boolean) => void;
+	/** Texto a insertar en el composer a petición de un overlay (p.ej. SkillsPanel
+	 *  al hacer clic en "insertar $name"). El host lo envía vía mensaje
+	 *  composer_insert; App pasa state.composerInsert aquí. */
+	insertSignal?: { text: string; n: number };
 }) {
 	const [text, setText] = useState("");
 	const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -112,6 +117,7 @@ export function Composer({
 	const draftRef = useRef("");
 	const [activeQuery, setActiveQuery] = useState<string | null>(null); // "@"
 	const [commandQuery, setCommandQuery] = useState<string | null>(null); // "/"
+	const [skillQuery, setSkillQuery] = useState<string | null>(null); // "$"
 	const [argQuery, setArgQuery] = useState<{
 		command: string;
 		prefix: string;
@@ -132,7 +138,27 @@ export function Composer({
 	}, []);
 	useEffect(() => {
 		setSel(0);
-	}, [activeQuery, commandQuery, argQuery, files]);
+	}, [activeQuery, commandQuery, skillQuery, argQuery, files]);
+
+	// Inserción solicitada por un overlay (SkillsPanel → composer_insert). Append
+	// al final del input + focus + grow. El nonce `n` dispara aun con texto igual.
+	useEffect(() => {
+		const sig = insertSignal;
+		if (!sig) return;
+		const el = ref.current;
+		setText((t) => {
+			const trimmed = t.replace(/\s+$/, "");
+			return trimmed ? `${trimmed} ${sig.text}` : sig.text;
+		});
+		requestAnimationFrame(() => {
+			if (!el) return;
+			el.focus();
+			const len = el.value.length;
+			el.setSelectionRange(len, len);
+			grow(el);
+		});
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [insertSignal?.n]);
 
 	// Comandos cuyo argumento se autocompleta (/login, /logout, /model).
 	const ARG_COMMANDS = new Set(["login", "logout", "model"]);
@@ -154,6 +180,23 @@ export function Composer({
 					.map((x) => x.c)
 			: [];
 	const commandOpen = commandMatches.length > 0;
+
+	// Autocompletado de skills ($): filtrado LOCAL sobre las skills que ya llegan
+	// en `commands` (kind === "skill", alimentadas por state.resources.skills).
+	// Patrón idéntico al de /: sin round-trip al host.
+	const skillItems = commands?.filter((c) => c.kind === "skill") ?? [];
+	const skillMatches =
+		skillQuery !== null
+			? skillItems
+					.map((s) => ({
+						s,
+						score: subseqScore(s.name.toLowerCase(), skillQuery.toLowerCase()),
+					}))
+					.filter((x) => x.score >= 0)
+					.sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name))
+					.map((x) => x.s)
+			: [];
+	const skillOpen = skillMatches.length > 0;
 
 	// Opciones del argumento según el comando (derivadas de models).
 	function argOptions(command: string): { value: string; label: string }[] {
@@ -212,6 +255,20 @@ export function Composer({
 		return q;
 	}
 
+	// Detecta `$skill_name` en el caret. Las skills son minúsculas por
+	// convención → exigimos [a-z0-9_-] en lo escrito tras el $ para no abrir
+	// popup sobre $PATH/$HOME ni sobre un precio como $5 (no matchearía skills).
+	function detectSkillRef(value: string, caret: number): string | null {
+		const before = value.slice(0, caret);
+		const dollar = before.lastIndexOf("$");
+		if (dollar === -1) return null;
+		if (dollar > 0 && !/\s/.test(before[dollar - 1])) return null; // $ debe iniciar token
+		const q = before.slice(dollar + 1);
+		if (q.includes("\n") || q.includes(" ")) return null; // cerró el token
+		if (q.length > 0 && !/^[a-z0-9_-]*$/.test(q)) return null; // sólo minúsculas
+		return q;
+	}
+
 	// Detecta modo argumento: "/login <prefix>" → { command, prefix }.
 	function detectArg(
 		value: string,
@@ -253,7 +310,12 @@ export function Composer({
 		} else if (activeQuery !== null) {
 			setActiveQuery(null);
 		}
-		// comandos (/) — se activa incluso con query vacío (muestra todos)
+		// skills ($) — se activa incluso con query vacío (muestra todas)
+		const sq = detectSkillRef(el.value, caret);
+		if (sq !== skillQuery) setSkillQuery(sq);
+		// comandos (/) — se activa incluso con query vacío (muestra todos).
+		// Mutuamente excluyente con $: si el caret está en un token $, el último
+		// "/" (si lo hay) dejó un espacio atrás → detectCommand ya retorna null.
 		const cq = detectCommand(el.value, caret);
 		if (cq !== commandQuery) setCommandQuery(cq);
 		// argumento de comandos (/login <prefix>, /model <prefix>)
@@ -325,6 +387,28 @@ export function Composer({
 		setText(next);
 		setCommandQuery(null);
 		const pos = slash + replacement.length;
+		requestAnimationFrame(() => {
+			el.focus();
+			el.setSelectionRange(pos, pos);
+			grow(el);
+		});
+	}
+
+	// Inserta una skill `$name` en el caret (sustituye el `$<parcial>` actual).
+	function insertSkillRef(s: CommandItem) {
+		const el = ref.current;
+		if (!el) return;
+		const caret = el.selectionStart ?? 0;
+		const value = el.value;
+		const before = value.slice(0, caret);
+		const after = value.slice(caret);
+		const dollar = before.lastIndexOf("$");
+		if (dollar === -1) return;
+		const replacement = "$" + s.name + " ";
+		const next = before.slice(0, dollar) + replacement + after;
+		setText(next);
+		setSkillQuery(null);
+		const pos = dollar + replacement.length;
 		requestAnimationFrame(() => {
 			el.focus();
 			el.setSelectionRange(pos, pos);
@@ -427,6 +511,27 @@ export function Composer({
 			if (e.key === "Escape") {
 				e.preventDefault();
 				setActiveQuery(null);
+				return;
+			}
+		} else if (skillOpen) {
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				setSel((s) => Math.min(s + 1, skillMatches.length - 1));
+				return;
+			}
+			if (e.key === "ArrowUp") {
+				e.preventDefault();
+				setSel((s) => Math.max(s - 1, 0));
+				return;
+			}
+			if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				insertSkillRef(skillMatches[sel]);
+				return;
+			}
+			if (e.key === "Escape") {
+				e.preventDefault();
+				setSkillQuery(null);
 				return;
 			}
 		} else if (commandOpen) {
@@ -540,6 +645,30 @@ export function Composer({
 							}}
 						>
 							{f}
+						</div>
+					))}
+				</div>
+			)}
+			{skillOpen && (
+				<div className="file-popup cmd-popup">
+					{skillMatches.map((s, i) => (
+						<div
+							key={s.label}
+							ref={i === sel ? scrollActiveIntoView : undefined}
+							className={"file-item cmd-item" + (i === sel ? " sel" : "")}
+							onMouseDown={(e) => {
+								e.preventDefault();
+								insertSkillRef(s);
+							}}
+						>
+							<span className={"cmd-kind skill"}>$skill</span>
+							<code className="cmd-label">
+								${"$"}
+								{s.name}
+							</code>
+							{s.description && (
+								<span className="cmd-desc">{s.description}</span>
+							)}
 						</div>
 					))}
 				</div>

@@ -595,6 +595,7 @@ export function App() {
 						pendingDialog={state.approvals.length > 0}
 						expanded={composerExpanded}
 						onExpandedChange={setComposerExpanded}
+						insertSignal={state.composerInsert}
 						onAbort={() => post({ type: "abort" })}
 						onSelectModel={(provider, modelId) =>
 							post({ type: "select_model", provider, model: modelId })

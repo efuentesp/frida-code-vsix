@@ -607,6 +607,18 @@ export function reduce(state: State, msg: InMessage): State {
 			// un nuevo mensaje (user). Ver ADR-0009 (401 invisible).
 			return { ...state, providerError: msg.text };
 
+		case "composer_insert":
+			// Un overlay (SkillsPanel) pidió insertar texto en el composer. El nonce `n`
+			// fuerza al useEffect del Composer a disparar incluso si el texto es igual
+			// al de la inserción anterior.
+			return {
+				...state,
+				composerInsert: {
+					text: msg.text,
+					n: (state.composerInsert?.n ?? 0) + 1,
+				},
+			};
+
 		default:
 			return state;
 	}

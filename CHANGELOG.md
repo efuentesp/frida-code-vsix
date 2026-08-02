@@ -11,6 +11,25 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
+### Añadido
+
+- **`frida-multi-skills`** — invoca skills desde **cualquier parte del prompt**
+  con la sintaxis `$skill_name` y combina **varias en un solo mensaje** (porte
+  de [`pi-multi-skills`](https://github.com/QuangThai/pi-multi-skills) v1.1.3).
+  La expansión produce el mismo bloque `<skill>` que `/skill:xxx`, así el modelo
+  lo procesa idéntico; la diferencia es ergonómica (posición libre + multi).
+  Incluye autocomplete `$` en el composer y comandos `/skills` +
+  `/skills-search`, que abren un **overlay navegable** (búsqueda en vivo + botón
+  "insertar" que manda `$name` al composer) en vez de una toast efímera. Ver [ADR-0024](./docs/adr/0024-frida-multi-skills-porter-pi-multi-skills.md).
+
+- **`frida-pix-skills`** — carga **skills on-demand** con el tool `read_skills`
+  (patrón "el agente se auto-promptea"), interpola directivas `` !`cmd` `` con
+  estado vivo del repo al leerlas y da acceso al ecosistema **Skills.sh**
+  (porte de [`@xynogen/pix-skills`](https://github.com/xynogen/pix-mono/tree/main/packages/pix-skills)
+  v0.7.4). Sin bundle propio: opera sobre skills existentes, no añade nuevas →
+  no colisiona con `frida-pipeline`. Gate de directivas → `frida-permission-system`.
+  Ver [ADR-0025](./docs/adr/0025-frida-pix-skills-porter-pix-skills.md).
+
 ## [0.4.0] - 2025-07-31
 
 ### Añadido

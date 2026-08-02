@@ -337,7 +337,10 @@ function buildSkillIndex(pi: ExtensionAPI): Map<string, SkillIndexEntry> {
 	return index;
 }
 
-function getSkillIndex(pi: ExtensionAPI): Map<string, SkillIndexEntry> {
+// Exportado para que frida-multi-skills reutilice el MISMO índice cacheado (y su
+// invalidación en session_start reload|startup) en vez de reconstruirlo. Única
+// fuente de verdad del set de skills disponibles.
+export function getSkillIndex(pi: ExtensionAPI): Map<string, SkillIndexEntry> {
 	if (!skillIndex) skillIndex = buildSkillIndex(pi);
 	return skillIndex;
 }

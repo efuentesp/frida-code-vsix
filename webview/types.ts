@@ -331,6 +331,10 @@ export interface State {
 	 *  NO en la conversación. Se limpia al recibir respuesta exitosa o nuevo run. */
 	providerError?: string;
 	lensStatus?: LensStatus;
+	/** Texto a insertar en el composer (vía un overlay, p.ej. SkillsPanel al hacer
+	 *  clic en "insertar $name"). `n` es un nonce: cada inserción lo incrementa para
+	 *  que el useEffect del Composer dispare aun cuando el texto sea idéntico. */
+	composerInsert?: { text: string; n: number };
 	nextId: number;
 }
 
@@ -429,6 +433,7 @@ export type InMessage =
 	  }
 	| { type: "retry_end"; success: boolean }
 	| { type: "lens_status"; loaded: boolean; active: boolean }
+	| { type: "composer_insert"; text: string }
 	| { type: "error"; text: string };
 
 // webview → host
