@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import type { AgentRecord, AgentStatus } from "./types";
 import { agentWidgetStore } from "./store";
+import { pruneWorktrees } from "./worktree";
 
 /** Registro de agentes por ID. */
 const agents = new Map<string, AgentRecord>();
@@ -143,11 +144,57 @@ export function cleanupCompleted(): void {
 	}
 }
 
-/** Sólo tests: limpia todo el registry + cola. */
+// ---------------------------------------------------------------------------
+// Worktree lifecycle / crash recovery
+// ---------------------------------------------------------------------------
+
+/**
+ * Repos base donde se crearon worktrees durante esta sesión.
+ * Se trackean para poder prunear worktrees huérfanos al cerrar la sesión
+ * (crash recovery), igual que `worktreeRepos` en pi-subagents.
+ */
+const worktreeRepos = new Set<string>();
+
+/**
+ * Registra un repo base donde se creó un worktree, para limpieza posterior.
+ * Debe llamarse al crear un worktree (en `agent-runner.ts`).
+ */
+export function registerWorktreeRepo(cwd: string): void {
+	if (cwd) worktreeRepos.add(cwd);
+}
+
+/**
+ * Prunea worktrees huérfanos de todos los repos donde se crearon worktrees
+ * durante la sesión (crash recovery), más el cwd actual.
+ *
+ * Llamarlo al cerrar/reiniciar la sesión para no dejar worktrees huérfanos
+ * en `~/.frida/worktrees/` cuando un agente worktree se interrumpió antes de
+ * su `cleanupWorktree`.
+ */
+export function pruneAllWorktrees(): void {
+	// El cwd actual primero (caso normal: worktree del repo abierto).
+	try {
+		pruneWorktrees(process.cwd());
+	} catch {
+		/* non-fatal */
+	}
+	// Cada repo trackeado (puede diferir del cwd si un agente usó cwd custom).
+	for (const repo of worktreeRepos) {
+		try {
+			pruneWorktrees(repo);
+		} catch {
+			/* non-fatal */
+		}
+	}
+	worktreeRepos.clear();
+}
+
+/** Sólo tests: limpia todo el registry + cola + repos trackeados. */
 export function _resetAgentManager(): void {
 	agents.clear();
 	queue.length = 0;
 	runningCount = 0;
 	maxConcurrent = 4;
 	onSlotFreed = undefined;
+	worktreeRepos.clear();
 }

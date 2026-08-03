@@ -37,6 +37,7 @@ import {
 	generateAgentId,
 	registerAgent,
 	updateAgentStatus,
+	registerWorktreeRepo,
 } from "./agent-manager";
 
 /** agentDir de Frida (~/.frida). */
@@ -79,10 +80,12 @@ export async function runAgent(
 
 	// --- Worktree isolation (Fase 5) ---
 	let worktreeInfo: WorktreeInfo | undefined;
+	const baseCwd = cwd; // repo base original; cleanup y prune lo necesitan
 	if (config.isolation === "worktree" || options.isolation === "worktree") {
 		worktreeInfo = createWorktree(cwd, agentId);
 		if (worktreeInfo) {
 			cwd = worktreeInfo.workPath;
+			registerWorktreeRepo(baseCwd); // trackear para prune al cerrar sesión
 		}
 	}
 
@@ -225,13 +228,35 @@ export async function runAgent(
 
 	// Si es background, no esperar — arrancar en fondo.
 	if (options.runInBackground) {
-		const promise = runSessionPrompt(
+		const runPromise = runSessionPrompt(
 			session as AgentSession,
 			options.prompt,
 			agentId,
 			config,
 			options,
 		);
+		// Worktree cleanup tras completar (background): encadenar al promise para
+		// que se ejecute al terminar, igual que el path foreground.
+		const promise = worktreeInfo
+			? runPromise.then(
+					(result) => {
+						try {
+							cleanupWorktree(baseCwd, worktreeInfo, description);
+						} catch {
+							/* best-effort */
+						}
+						return result;
+					},
+					(err) => {
+						try {
+							cleanupWorktree(baseCwd, worktreeInfo, description);
+						} catch {
+							/* best-effort */
+						}
+						throw err;
+					},
+				)
+			: runPromise;
 		// Guardar el promise para get_subagent_result(wait: true).
 		const record = {
 			id: agentId,
@@ -276,10 +301,6 @@ export async function runAgent(
 			config,
 			options,
 		);
-		// Worktree cleanup tras completar.
-		if (worktreeInfo) {
-			cleanupWorktree(worktreeInfo);
-		}
 		return { agentId, result };
 	} catch (e) {
 		updateAgentStatus(
@@ -290,6 +311,14 @@ export async function runAgent(
 		);
 		throw e;
 	} finally {
+		// Worktree cleanup tras completar (success, error o abort) — best-effort.
+		if (worktreeInfo) {
+			try {
+				cleanupWorktree(baseCwd, worktreeInfo, description);
+			} catch {
+				/* best-effort */
+			}
+		}
 		options.signal?.removeEventListener("abort", onParentAbort);
 		stopLive?.();
 	}

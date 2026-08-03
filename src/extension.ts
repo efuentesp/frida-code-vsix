@@ -58,6 +58,7 @@ import {
 	listAgents,
 	getAvailableTypes,
 	setAgentWidgetListener,
+	pruneAllWorktrees,
 } from "./tools/frida-subagents";
 import { expandSkillText } from "./tools/frida-args";
 import {
@@ -2781,6 +2782,11 @@ export async function activate(
 			// recrear la sesión) y suelta el listener del conteo de subagentes.
 			unmountAgentWidget();
 			setAgentWidgetListener(undefined);
+			// frida-subagents: prunear worktrees huérfanos de la sesión que cierra
+			// (crash recovery). El dispose del SDK no emite session_shutdown, así que
+			// un agente con isolation: worktree interrumpido dejaría un worktree en
+			// ~/.frida/worktrees/. Equivalente al session_shutdown de pi-subagents.
+			pruneAllWorktrees();
 			frida = undefined;
 			fridaPromise = undefined;
 		}

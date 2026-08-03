@@ -56,6 +56,29 @@ terminar.
 `~/.frida/global/agents/` (global). Los 15 agentes de frida-pipeline están
 disponibles automáticamente.
 
+## Aislamiento en worktree (`isolation: worktree`)
+
+Un agente con `isolation: worktree` (frontmatter) corre en una **copia aislada
+del repo** (git worktree *detached* en `~/.frida/worktrees/<id>`), de modo que
+su trabajo no toca el working tree actual. El ciclo de vida del worktree:
+
+1. **Creación** — worktree *detached* en `HEAD`, preservando el subdirectorio si
+   el agente se lanzó desde un cwd profundo de un monorepo (`workPath`).
+2. **Al completar** (`cleanupWorktree`) — siempre **elimina el worktree**:
+   - **Con cambios** → commitea (`pi-agent: <descripción>`), crea el branch
+     `pi-agent-<id>` (con sufijo anti-colisión `-<timestamp>` si ya existe) y
+     elimina el worktree. El **branch persiste** en el repo para revisión/merge.
+   - **Sin cambios** → elimina el worktree sin dejar branch.
+3. **Crash recovery** — al iniciar/cerrar sesión, `pruneAllWorktrees()` hace
+   `git worktree prune` de los repos donde se crearon worktrees, para limpiar
+   worktrees huérfanos de agentes interrumpidos antes de su cleanup.
+
+> **Nota:** versiones previas del porte **no eliminaban el worktree** al
+> completar (`cleanupWorktree` solo commiteaba), así que cada ejecución con
+> aislamiento dejaba un directorio huérfano en `~/.frida/worktrees/`. El ciclo
+> actual replica el comportamiento de `pi-subagents` y limpia tanto en
+> foreground como en background y en el path de error/abort.
+
 ## Arquitectura
 
 ```text
@@ -65,7 +88,8 @@ src/tools/frida-subagents/
 ├── default-agents.ts   # 3 defaults (general-purpose, Explore, Plan)
 ├── custom-agents.ts    # descubre .md de .frida/agents/ + global
 ├── agent-runner.ts     # createAgentSession + ejecución + extracción resultado
-└── agent-manager.ts    # registro de agentes (register/get/update/list)
+├── agent-manager.ts    # registro de agentes + cola concurrencia + lifecycle worktrees (prune)
+└── worktree.ts         # git worktree create/cleanup/prune (aislamiento por agente)
 ```
 
 ## Estado y madurez

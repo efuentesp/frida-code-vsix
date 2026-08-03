@@ -10,12 +10,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import {
 	resolveMemoryDir,
 	ensureMemoryDir,
 	buildMemoryBlock,
 	buildReadOnlyMemoryBlock,
-	buildMemoryForAgent,
 	hasWriteTools,
 } from "../../src/tools/frida-subagents/memory";
 import {
@@ -255,11 +255,110 @@ describe("frida-subagents / worktree", () => {
 	});
 
 	it("cleanupWorktree devuelve hasChanges=false si el path no existe", () => {
-		const result = cleanupWorktree({
-			workPath: "/nonexistent/path",
-			branch: "pi-agent-test",
-			baseSha: "abc123",
-		});
+		const result = cleanupWorktree(
+			tmpCwd,
+			{
+				path: "/nonexistent/path",
+				workPath: "/nonexistent/path",
+				branch: "pi-agent-test",
+				baseSha: "abc123",
+			},
+			"test agent",
+		);
 		expect(result.hasChanges).toBe(false);
+	});
+
+	// ---------------------------------------------------------------------------
+	// Worktree — integración git real
+	//
+	// Valida el FIX del porte: cleanupWorktree ELIMINA el worktree (antes lo dejaba
+	// huérfano en ~/.frida/worktrees/). Reproduce el ciclo createWorktree →
+	// trabajo → cleanupWorktree sobre un repo git real.
+	// ---------------------------------------------------------------------------
+
+	describe("frida-subagents / worktree / integración git real", () => {
+		let gitRepo: string;
+
+		beforeEach(() => {
+			// Crear un repo git real con un commit inicial (createWorktree requiere HEAD).
+			gitRepo = fs.mkdtempSync(path.join(os.tmpdir(), "frida-sub-git-"));
+			execSync("git init -q", { cwd: gitRepo });
+			execSync('git config user.email "test@test.com"', { cwd: gitRepo });
+			execSync('git config user.name "Test"', { cwd: gitRepo });
+			fs.writeFileSync(path.join(gitRepo, "README.md"), "init", "utf-8");
+			execSync("git add -A", { cwd: gitRepo });
+			execSync('git commit -q -m "init"', { cwd: gitRepo });
+		});
+
+		afterEach(() => {
+			// Prunear por si quedó algún worktree colgando del repo, luego borrar.
+			try {
+				execSync("git worktree prune", { cwd: gitRepo, stdio: "ignore" });
+			} catch {
+				/* ignore */
+			}
+			fs.rmSync(gitRepo, { recursive: true, force: true });
+		});
+
+		it("createWorktree crea un worktree detached válido en la raíz del repo", () => {
+			const wt = createWorktree(gitRepo, "integ001");
+			expect(wt).toBeDefined();
+			expect(wt?.path).toBeTruthy();
+			expect(wt?.workPath).toBe(wt?.path); // cwd era la raíz → workPath === path
+			expect(wt?.branch).toBe("pi-agent-integ001");
+			expect(fs.existsSync(wt!.path)).toBe(true);
+			// Limpieza del propio test.
+			cleanupWorktree(gitRepo, wt!, "test");
+		});
+
+		it("cleanupWorktree ELIMINA el worktree cuando el agente no hizo cambios", () => {
+			const wt = createWorktree(gitRepo, "nochange");
+			expect(fs.existsSync(wt!.path)).toBe(true);
+
+			const result = cleanupWorktree(gitRepo, wt!, "no-change agent");
+			expect(result.hasChanges).toBe(false);
+			// FIX principal: el directorio del worktree YA NO debe existir.
+			expect(fs.existsSync(wt!.path)).toBe(false);
+		});
+
+		it("cleanupWorktree commitea, crea branch y ELIMINA el worktree cuando hay cambios", () => {
+			const wt = createWorktree(gitRepo, "withchan");
+			// El agente hace un cambio dentro del worktree.
+			fs.writeFileSync(path.join(wt!.path, "new-file.txt"), "cambio", "utf-8");
+
+			const result = cleanupWorktree(gitRepo, wt!, "change agent");
+			expect(result.hasChanges).toBe(true);
+			expect(result.branch).toBe("pi-agent-withchan");
+			// El branch vive en el repo principal y apunta al commit del worktree.
+			const branches = execSync("git branch --list", {
+				cwd: gitRepo,
+				encoding: "utf-8",
+			});
+			expect(branches).toContain("pi-agent-withchan");
+			// El commit usa la descripción del agente (no "auto-commit").
+			const log = execSync(`git log --oneline -1 ${result.branch}`, {
+				cwd: gitRepo,
+				encoding: "utf-8",
+			});
+			expect(log).toContain("pi-agent: change agent");
+			// FIX principal: el directorio del worktree YA NO debe existir.
+			expect(fs.existsSync(wt!.path)).toBe(false);
+		});
+
+		it("cleanupWorktree usa sufijo anti-colisión si el branch ya existe", () => {
+			// Primer agente con ese ID (8 chars) → crea pi-agent-collide1.
+			const wt1 = createWorktree(gitRepo, "collide1");
+			fs.writeFileSync(path.join(wt1!.path, "a.txt"), "a", "utf-8");
+			cleanupWorktree(gitRepo, wt1!, "first");
+
+			// Segundo agente con el mismo ID → el branch colisiona.
+			const wt2 = createWorktree(gitRepo, "collide1");
+			fs.writeFileSync(path.join(wt2!.path, "b.txt"), "b", "utf-8");
+			const result = cleanupWorktree(gitRepo, wt2!, "second");
+			expect(result.hasChanges).toBe(true);
+			// Sufijo de timestamp → no se sobreescribe el trabajo previo.
+			expect(result.branch).toMatch(/^pi-agent-collide1-\d+$/);
+			expect(fs.existsSync(wt2!.path)).toBe(false);
+		});
 	});
 });

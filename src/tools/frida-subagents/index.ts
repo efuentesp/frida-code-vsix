@@ -375,6 +375,8 @@ export {
 	getMaxConcurrent,
 	queuedCount,
 	runningCountValue,
+	registerWorktreeRepo,
+	pruneAllWorktrees,
 	_resetAgentManager,
 } from "./agent-manager";
 export {

@@ -11,7 +11,31 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
-_Nada todavía._
+### Corregido
+
+- **`frida-subagents` — limpieza de worktrees (`isolation: worktree`).** El
+  `cleanupWorktree` del porte original **no eliminaba el worktree** tras
+  completar el agente, así que cada ejecución con aislamiento dejaba un
+  directorio huérfano en `~/.frida/worktrees/`. Ahora se alinea con el
+  comportamiento de `pi-subagents`:
+  - `cleanupWorktree` **siempre elimina el worktree** (con cambios o sin ellos);
+    el branch `pi-agent-<id>` persiste solo si hubo cambios, para revisión/merge.
+  - El auto-commit usa la **descripción del agente** (`pi-agent: <desc>`) en vez
+    del mensaje genérico `"auto-commit"`, y **sufijo anti-colisión** (`-<timestamp>`)
+    si el branch ya existe (no sobreescribe trabajo previo).
+  - Creación del worktree en modo **detached** (`--detach`) en vez de `-b`, para
+    no dejar branches colgando cuando el agente no modifica nada.
+  - **Manejo de subdirectorio** (`workPath`): un agente lanzado desde un cwd
+    profundo de un monorepo ahora trabaja en el subdirectorio equivalente dentro
+    de la copia, no en la raíz del repo.
+  - **Crash recovery**: se trackean los repos base y se hace `git worktree prune`
+    al iniciar/cerrar sesión (`pruneAllWorktrees` en `newSession`), equivalente al
+    `session_shutdown` de `pi-subagents` que faltaba (el SDK de Pi en Frida no
+    emite ese evento). Antes, un agente worktree interrumpido dejaba el worktree
+    para siempre.
+  - El cleanup ahora ocurre también en sub-agentes **background** (encadenado al
+    promise) y en el path de **error/abort** (`finally`), no solo en foreground
+    exitoso.
 
 ## [0.5.0] - 2025-08-02
 
