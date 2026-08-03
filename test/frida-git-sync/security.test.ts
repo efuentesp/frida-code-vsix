@@ -23,7 +23,10 @@ describe("frida-git-sync / security", () => {
 		});
 
 		it("detecta una OpenAI API key (sk-)", () => {
-			const findings = scanSecrets(`OPENAI_API_KEY=sk-${"b".repeat(32)}`, ".env");
+			const findings = scanSecrets(
+				`OPENAI_API_KEY=sk-${"b".repeat(32)}`,
+				".env",
+			);
 			expect(findings.some((f) => f.type === "OpenAI API Key")).toBe(true);
 		});
 
@@ -33,7 +36,10 @@ describe("frida-git-sync / security", () => {
 		});
 
 		it("detecta un AWS Access Key (AKIA...)", () => {
-			const findings = scanSecrets(`aws_access_key_id = AKIA${"0".repeat(16)}`, "x");
+			const findings = scanSecrets(
+				`aws_access_key_id = AKIA${"0".repeat(16)}`,
+				"x",
+			);
 			expect(findings.some((f) => f.type === "AWS Access Key")).toBe(true);
 		});
 
@@ -60,7 +66,9 @@ describe("frida-git-sync / security", () => {
 		});
 
 		it("texto limpio no produce hallazgos", () => {
-			expect(scanSecrets('{"defaultModel": "glm-5.2"}', "settings.json")).toEqual([]);
+			expect(
+				scanSecrets('{"defaultModel": "glm-5.2"}', "settings.json"),
+			).toEqual([]);
 		});
 	});
 

@@ -66,11 +66,7 @@ describe("frida-git-sync / glob", () => {
 	});
 
 	describe("isPathAllowed", () => {
-		const include = [
-			"settings.json",
-			"skills/**",
-			"extensions/**",
-		];
+		const include = ["settings.json", "skills/**", "extensions/**"];
 		const exclude = ["**/.DS_Store", "extensions/**/.cache/**"];
 
 		it("HARD-DENY gana sobre include (auth.json nunca se permite)", () => {
@@ -86,8 +82,12 @@ describe("frida-git-sync / glob", () => {
 		});
 
 		it("permite lo que está en include y no en exclude", () => {
-			expect(isPathAllowed("settings.json", include, exclude).allowed).toBe(true);
-			expect(isPathAllowed("skills/commit.md", include, exclude).allowed).toBe(true);
+			expect(isPathAllowed("settings.json", include, exclude).allowed).toBe(
+				true,
+			);
+			expect(isPathAllowed("skills/commit.md", include, exclude).allowed).toBe(
+				true,
+			);
 		});
 
 		it("exclude niega aunque esté en include", () => {

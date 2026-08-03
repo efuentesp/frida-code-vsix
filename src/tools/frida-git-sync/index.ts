@@ -304,7 +304,8 @@ async function handleFridaSync(
 		await runSyncOperation(cmds, pi, ctx);
 	} finally {
 		const st = syncWidgetStore.getSnapshot().status;
-		if (st === "running" || st === "stopping") syncWidgetStore.done("cancelled");
+		if (st === "running" || st === "stopping")
+			syncWidgetStore.done("cancelled");
 		scheduleIdleHide();
 	}
 }

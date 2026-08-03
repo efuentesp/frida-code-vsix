@@ -23,7 +23,9 @@ describe("frida-git-sync / git executor injection", () => {
 	});
 
 	it("el executor recibe el request con dir/gitArgs/timeoutMilliseconds", async () => {
-		let captured: { dir: string; gitArgs: string[]; timeoutMilliseconds: number } | undefined;
+		let captured:
+			| { dir: string; gitArgs: string[]; timeoutMilliseconds: number }
+			| undefined;
 		setGitExecutor(async (req) => {
 			captured = req;
 			return { stdout: "", stderr: "" };

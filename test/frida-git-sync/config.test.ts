@@ -10,7 +10,9 @@ import {
 	type PiSyncConfig,
 } from "../../src/tools/frida-git-sync/src/sync/config";
 
-function valid(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function valid(
+	overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
 	return {
 		schemaVersion: 2,
 		branch: "main",

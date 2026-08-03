@@ -96,9 +96,15 @@ export const syncWidgetStore = {
 };
 
 /** Vuelve a idle tras un breve delay (para que el usuario vea el resultado). */
-export function scheduleIdleHide(delayMs = 4000): ReturnType<typeof setTimeout> {
+export function scheduleIdleHide(
+	delayMs = 4000,
+): ReturnType<typeof setTimeout> {
 	return setTimeout(() => {
-		if (state.status === "done" || state.status === "error" || state.status === "cancelled") {
+		if (
+			state.status === "done" ||
+			state.status === "error" ||
+			state.status === "cancelled"
+		) {
 			state = IDLE;
 			emit();
 		}

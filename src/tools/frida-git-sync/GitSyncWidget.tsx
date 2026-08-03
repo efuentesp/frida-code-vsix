@@ -77,10 +77,7 @@ function GitSyncPanel(): ReactElement | null {
 				</ftext>
 			)}
 			{s.cancelFn && s.status === "running" && (
-				<fbutton
-					variant="secondary"
-					onClick={() => syncWidgetStore.cancel()}
-				>
+				<fbutton variant="secondary" onClick={() => syncWidgetStore.cancel()}>
 					Cancel
 				</fbutton>
 			)}

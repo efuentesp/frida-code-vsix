@@ -18,7 +18,9 @@ describe("frida-git-sync / settings-portability", () => {
 			expect(isPortablePackageSource("npm:@jachy/pi-git-sync")).toBe(true);
 			expect(isPortablePackageSource("git://github.com/x/y.git")).toBe(true);
 			expect(isPortablePackageSource("https://example.com/pkg")).toBe(true);
-			expect(isPortablePackageSource("ssh://git@github.com/x/y.git")).toBe(true);
+			expect(isPortablePackageSource("ssh://git@github.com/x/y.git")).toBe(
+				true,
+			);
 		});
 
 		it("rechaza file:, ./, ../, /, ~ y vacíos", () => {
