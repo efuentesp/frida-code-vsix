@@ -11,6 +11,18 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
+### Añadido
+
+- **`frida-git-sync`** — porte nativo de `@jachy/pi-git-sync` (v0.6.2) que
+  sincroniza el agentDir de frida (`~/.frida`) entre máquinas vía un **repo Git
+  privado**. Compara *three-way* (baseline → local → remoto), rebase no
+  destructivo, rama de recuperación por dispositivo, secret-scanning antes de
+  push, backups pre-apply con rollback y resolución de conflictos interactiva
+  (agente / local / remoto / abortar). Comandos `/fridasync` (sync),
+  `/fridasync status` y `/fridasync diff`. Panel persistente en el footer con
+  progreso (fase + elapsed) y botón **Cancel** que aborta la operación git en
+  curso. Ver [ADR-0026](./docs/adr/0026-frida-git-sync-porter-pi-git-sync.md).
+
 ### Corregido
 
 - **`frida-subagents` — limpieza de worktrees (`isolation: worktree`).** El
