@@ -1,85 +1,132 @@
 ---
 name: create-frida-extension
-description: Portea una extensión nativa de Pi (pi-*) a una extensión frida-* nativa dentro de este repo. Recibe el nombre de la extensión pi base y el de la extensión frida a crear, y ejecuta el porte siguiendo las reglas canónicas y lecciones acumuladas. Úsala cuando quieras portearte una extensión pi existente al modelo de frida (porte nativo, cero deps nuevas, agentDir ~/.frida, UI webview).
+description: Portea una extensión nativa de Pi (pi-*) a una extensión frida-* nativa dentro de este repo. Recibe el nombre de la extensión pi base y el de la frida a crear, y ejecuta el porte siguiendo las reglas canónicas y lecciones acumuladas. Úsala cuando se quiera portear una extensión pi existente al modelo de frida (porte nativo, cero deps nuevas, agentDir ~/.frida, UI webview).
 argument-hint: "<pi-extension-base> <frida-extension-a-crear>"
 disable-model-invocation: true
 allowed-tools: Bash(find *), Bash(grep *), Bash(ls *), Bash(wc *), Bash(cp *), Bash(sed *), Bash(node *), Bash(npx tsc *), Bash(npx vitest *), Bash(git *), Read, Edit, Write, Glob, Grep
 shell-timeout: 30
+progressive_disclosure:
+  entry_point:
+    summary: "Portear una extensión nativa de Pi (pi-*) a una extensión frida-* nativa dentro del repo, siguiendo las reglas canónicas y lecciones acumuladas en references/how-to-create-frida-extensions.md."
+    when_to_use: "Cuando se quiere portear una extensión pi existente al modelo de frida: porte nativo (no pi install del upstream), cero dependencias npm nuevas, agentDir ~/.frida, UI en webview (no TUI de Pi)."
+    quick_start: "1. Leer references/how-to-create-frida-extensions.md COMPLETO 2. Estudiar el upstream (package.json, index.ts, árbol, seams) 3. Confirmar decisiones con el usuario 4. Copiar árbol + normalizar imports + adaptar seams 5. Escribir index.ts factory y registrar en pi-session.ts 6. Verificar (tsc/vitest) 7. Documentar (ADR/doc/CHANGELOG) 8. Testear 9. Commitear por fases"
+  references:
+    - references/how-to-create-frida-extensions.md
 ---
 
-# Portea una extensión pi-*a frida-*
+# Portear una extensión pi-*a frida-*
 
-Argumentos: `$1` = nombre de la extensión **pi** base a portear (ej. `pi-git-sync`),
-`$2` = nombre de la extensión **frida** a crear (ej. `frida-git-sync`).
+Portea una extensión nativa de Pi al modelo nativo de frida dentro de
+`src/tools/frida-<nombre>/`. La extensión resultante es código propio (porte
+nativo), sin `pi install` del upstream, con cero dependencias npm nuevas.
 
-Si falta alguno, **pídelo al usuario** antes de continuar.
+## Argumentos
+
+- `$1` = nombre de la extensión **pi** base a portear (ej. `pi-git-sync`).
+- `$2` = nombre de la extensión **frida** a crear (ej. `frida-git-sync`).
+
+Si falta alguno, **pedirlo al usuario** antes de continuar.
 
 ## Regla de oro (consulta obligatoria)
 
-**Antes de tocar código, lee `docs/how-to-create-frida-extensions.md` (en la raíz del repo)
-COMPLETO.** Es la **fuente de verdad única** de porte: reglas canónicas, anatomía,
-runtime/UI, acoplamientos pi→frida, y —sobre todo— la sección
+**Antes de tocar código, leer `references/how-to-create-frida-extensions.md`
+COMPLETO.** Es la **fuente de verdad única** del porte: reglas canónicas,
+anatomía, runtime/UI, acoplamientos pi→frida y —sobre todo— la sección
 **Errores y lecciones registradas** (para no repetir errores previos).
 
-- **Decisiones clave** → resuélvelas en el how-to primero; si no están, ve al
-  código (extensiones frida-* existentes + el ADR correspondiente).
-- **Errores nuevos** que encuentres durante el porte → **documéntalos** en la
-  sección *Errores y lecciones* del how-to (síntoma → causa → solución). No crees
-  documentos adicionales.
+- **Decisiones clave** → resolverlas en el how-to primero; si no están resueltas,
+  ir al código (extensiones frida-* existentes + el ADR correspondiente).
+- **Errores nuevos** encontrados durante el porte → **documentarlos** en la
+  sección *Errores y lecciones* del how-to (síntoma → causa → solución). **No
+  crear documentos adicionales** de porte.
+
+## Cuándo usarlo
+
+- Portear una extensión `pi-*` existente al modelo de frida.
+- Crear una extensión frida-*nueva basada en el patrón de una pi-* existente.
+
+No usarlo para: instalar una extensión pi tal cual (frida requiere porte nativo,
+no `pi install`), ni para extensiones que ya existan como frida-*.
 
 ## Pasos del porte
 
-> Sigue el **Patrón porte probado** del how-to. Resumen ejecutivo:
+> Seguir el **Patrón porte probado** del how-to. Resumen ejecutivo:
 
-1. **Estudia el upstream.** Localízalo en `node_modules` (busca por el nombre
-   `$1` con `find ~/.pi ~/.nvm -type d -name "*$1*"`). Lee su `package.json`
-   (peerDeps: ¿`pi-tui`?, `files`), su `index.ts`/entrada y mapea el árbol +
-   dependencias entre capas. Identifica los **seams de acoplamiento a Pi**.
+1. **Estudiar el upstream.** Localizarlo en `node_modules` (buscar por `$1` con
+   `find ~/.pi ~/.nvm -type d -name "*$1*"`). Leer su `package.json` (peerDeps:
+   ¿`pi-tui`?, `files`), su `index.ts`/entrada, y mapear el árbol + dependencias
+   entre capas. **Identificar los seams de acoplamiento a Pi.**
 
-2. **Confirma las decisiones de porte** con el usuario (shell, paquetes, UI,
-   alcance) — usa `ask_user_question`. Documenta cada decisión en el ADR final.
+2. **Confirmar las decisiones de porte** con el usuario (shell, paquetes, UI,
+   alcance) vía `ask_user_question`. Documentar cada decisión en el ADR final.
 
-3. **Copia el árbol casi literal** preservando la estructura (mantiene imports
-   relativos) y normaliza imports (quita extensión `.ts`). Ver typecheck base.
+3. **Copiar el árbol casi literal** preservando la estructura (mantiene imports
+   relativos) y normalizar imports (quitar extensión `.ts`). Verificar typecheck
+   base.
 
-4. **Adapta SOLO los seams** (`pi-tui`, `ctx.ui` no-op, `getAgentDir`/paths,
+4. **Adaptar SOLO los seams** (`pi-tui`, `ctx.ui` no-op, `getAgentDir`/paths,
    spawn de shell → `pi.exec` vía setter, CLI `pi`, strings con el nombre
-   upstream). Aplica las lecciones del how-to.
+   upstream). Aplicar las lecciones del how-to (L1–L6).
 
-5. **Escribe el `index.ts` factory** `createFrida<$2>(): (pi) => void`.
+5. **Escribir el `index.ts` factory** `createFrida<$2>(): (pi) => void`.
 
-6. **Registra** la factory en `src/pi-session.ts` (`extensionFactories`). Si hay
-   widget footer (`fridaWebMount`) o comando con VS Code APIs, cablea en
+6. **Registrar** la factory en `src/pi-session.ts` (`extensionFactories`). Si hay
+   widget footer (`fridaWebMount`) o comando con VS Code APIs, cablear en
    `src/extension.ts` (`wire<$2>Widget`, `BUILTIN_COMMANDS`).
 
-7. **Verifica**: `npx tsc --noEmit` (0 errores en `src/`) y `npx vitest run`
+7. **Verificar**: `npx tsc --noEmit` (0 errores en `src/`) y `npx vitest run`
    (suite del módulo verde).
 
-8. **Documenta**: ADR `docs/adr/00XX-frida-<$2>-porter-<$1>.md`, doc
+8. **Documentar**: ADR `docs/adr/00XX-frida-<$2>-porter-<$1>.md`, doc
    `docs/tools/frida-<$2>.md`, CHANGELOG `[Unreleased] > ### Añadido`.
 
-9. **Testea**: portea los tests del upstream si los incluye `files`; si no,
-   escribe tests de las capas puras + integración.
+9. **Testear**: portear los tests del upstream si los incluye `files`; si no,
+   escribir tests de las capas puras + integración.
 
-10. **Commitea por fases** (árbol+adaptaciones / factory+integración / widget /
+10. **Commitear por fases** (árbol+adaptaciones / factory+integración / widget /
     docs / tests), mensajes estilo Conventional Commits (`feat(frida-<$2>): ...`).
 
-## Reglas canónicas (recordatorio rápido — ver how-to para detalle)
+Al terminar, **reportar** al usuario: commits hechos, typecheck/tests, y qué
+queda pendiente (ej. prueba en vivo, revisión manual de archivos grandes).
+
+## Reglas canónicas (recordatorio — ver how-to para detalle)
 
 - **R1** Porte nativo (no `pi install` del upstream). **R2** Cero deps npm
   nuevas. **R3** SDK en proceso. **R4** agentDir `~/.frida`. **R6** UI en webview
   (`setStatus`/`custom` son no-op; `pi-tui` NO disponible). **R9** shell vía
-  `pi.exec`. **R11** reexporta desde `index.ts`.
+  `pi.exec`. **R11** reexportar desde `index.ts`.
 
-## Errores conocidos a vigilar (ver how-to § Errores y lecciones)
+## Red Flags — STOP
 
-- **`duplicate-function-arg` (pi-lens)**: si brota, busca el **error de tipo real**
-  subyacente y corrígelo; los falsos positivos desaparecen. No suprimas a lo loco.
-- **API del SDK**: verifica que una función sea **export público del barrel**
-  antes de diseñar sobre ella (lección `handlePackageCommand`).
-- **Strings con el nombre upstream**: `sed` global seguro de `"pi-<ext>: "` →
-  `"frida-<ext>: "`; preserva nombres de paquete (`npm:.../pi-<ext>`).
-- **Inyección por setter** para capas shell gruesas: preserva la API pública.
+**Detenerse y revisar el how-to cuando** surja cualquiera de estos impulsos:
 
-Al terminar, **reporta** al usuario: commits hechos, typecheck/tests, y qué
-queda pendiente (ej. prueba en vivo, revisión manual de archivos grandes).
+- **"Voy a suprimir `duplicate-function-arg` (pi-lens) con un ignore"** → NO.
+  Es síntoma de un **error de tipo real** subyacente; corregir ese error y los
+  falsos positivos desaparecen (lección L1).
+- **"Voy a reescribir el árbol del upstream desde cero"** → NO. Hacer `cp` del
+  árbol + normalizar imports + adaptar solo los seams (L4). Preserva imports
+  relativos.
+- **"Voy a portear `pi install/remove` por `handlePackageCommand` del SDK"** →
+  Verificar PRIMERO si es **export público del barrel** del SDK y si el CLI `pi`
+  está en PATH. Suele funcionar tal cual (L2).
+- **"Voy a tocar `getAgentDir()`/paths `~/.pi` en cada call-site"** → NO. La
+  factory setea `process.env.PI_CODING_AGENT_DIR = ~/.frida` una vez (L5).
+- **"Voy a reescribir las ~40 funciones de la capa shell y sus callers"** → NO.
+  Usar **inyección por setter** (`setExecutor`) para preservar la API pública
+  (L3).
+- **"Voy a crear otro documento de porte"** → NO. Ampliar el how-to (única fuente
+  de verdad; "info lives in ONE place").
+- **"El entry point del skill supera 200 líneas"** → Aplicar progressive
+  disclosure (mover detalle a `references/`).
+
+## Navigation
+
+### Fuente de verdad (cargar siempre primero)
+
+- **[references/how-to-create-frida-extensions.md](./references/how-to-create-frida-extensions.md)**
+  — Todo el conocimiento de porte: reglas canónicas (ADRs 0002–0026), anatomía
+  de una extensión frida-*, modelo runtime/UI (ExtensionAPI completo, ctx.ui
+  parcial, pi-tui no disponible), agentDir `~/.frida` + mapeo de rutas,
+  integración en el host, patrón porte probado, inyección por setter, widget
+  fridaWeb, acoplamientos pi→frida, decisiones frecuentes, **Errores y lecciones
+  registradas (L1–L6)** y checklist de portes anteriores.
