@@ -350,19 +350,35 @@ en el ADR**.
 > **Esta sección crece.** Cada vez que un porte tropiece con algo no obvio,
 > regístralo aquí con: **síntoma → causa → solución**, para que no se repita.
 
-### L1 — `duplicate-function-arg` (pi-lens) es SÍNTOMA, no causa
+### L1 — `duplicate-function-arg` (pi-lens): diagnosticar con LSP antes de actuar
 
-- **Síntoma**: la regla `duplicate-function-arg` de pi-lens dispara falsos
-  positivos sobre funciones/tipos con múltiples parámetros (`(a, b) => ...`).
-- **Causa**: es **no determinista** y se manifiesta cuando hay un **error de tipo
-  real** en el archivo (ej. propiedad requerida faltante, tipo no asignable).
-- **Solución**: **busca y corrige el error de tipo subyacente**; los falsos
-  positivos desaparecen solos. NO suprimas la regla a lo loco.
+- **Síntoma**: la regla `duplicate-function-arg` de pi-lens dispara sobre
+  funciones con múltiples parámetros type-annotated (`(a: T, b: U) => ...`).
+- **Causa posible A — síntoma de un error de tipo real** (a veces): se manifiesta
+  cuando hay un error de tipo en el archivo (propiedad requerida faltante, tipo no
+  asignable). Corregir ese error hace desaparecer los falsos positivos.
   - *Ejemplo (frida-git-sync)*: 16 falsos positivos sobre handlers `(event, ctx)`
     desaparecieron al añadir `cancellationNoticeDelayMs` (campo requerido faltante).
-- **Excepción**: si el tipo función SÍ dispara sin error subyacente (raro), usa un
-  **único parámetro objeto** (`type F = (req: Req) => ...`) en vez de múltiples
-  params — evita el patrón que confunde al tree-sitter runner.
+- **Causa posible B — falso positivo sistemático del tree-sitter runner** (también
+  frecuente): el runner malfa con **cualquier** firma multi-parámetro type-annotated
+  y ni siquiera reemplaza `{{NAME}}` en el mensaje (señal del bug). No hay error de
+  tipo subyacente.
+  - *Ejemplo (frida-subagents)*: **53** falsos positivos en TODA la extensión
+    (LSP/tsc confirman 0 errores), la mayoría pre-existentes en funciones válidas.
+- **Solución — diagnosticar con LSP primero, NO actuar a ciegas**:
+  1. Corre `lsp_diagnostics` (o `tsc --noEmit`) sobre el archivo.
+  2. **Si LSP muestra un error** → es la causa A: corrígelo y los falsos positivos
+     desaparecen.
+  3. **Si LSP está limpio** → es la causa B: marca los findings como
+     `false-positive` con `lens_diagnostic_mark` (persistente entre sesiones, no
+     escribe código). **NO** suprimas la regla a lo loco ni refactorices a
+     object-param por pánico — eso contamina el código para perseguir un bug del
+     runner.
+- **No hay disable per-regla en `.pi-lens.json`**: pi-lens solo soporta `threshold`
+  para `high-complexity`/`high-fan-out`; no existe mecanismo para deshabilitar una
+  regla concreta a nivel proyecto (confirmado en `pi-lens/docs/custom-rules.md` y
+  `settings.md`). La supresión es por-finding (`lens_diagnostic_mark`) o por-línea
+  (`// pi-lens-ignore: <rule>`).
 
 ### L2 — Verifica la API del SDK ANTES de diseñar la adaptación
 
