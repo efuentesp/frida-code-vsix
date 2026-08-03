@@ -81,10 +81,7 @@ import {
 	approvePackagePlan,
 } from "../system/packages";
 import type { PackageApproval } from "../system/packages";
-import {
-	resolveRepoSyncRoot,
-	resolveWithinRoot,
-} from "../system/path-safety";
+import { resolveRepoSyncRoot, resolveWithinRoot } from "../system/path-safety";
 import {
 	formatGitStatus,
 	formatSyncStatusV2,

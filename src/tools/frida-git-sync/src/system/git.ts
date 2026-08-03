@@ -64,7 +64,9 @@ export interface GitExecutorRequest {
 }
 
 /** Host-provided git executor (e.g. a `pi.exec` adapter). See setGitExecutor. */
-export type GitExecutor = (request: GitExecutorRequest) => Promise<GitCommandOutput>;
+export type GitExecutor = (
+	request: GitExecutorRequest,
+) => Promise<GitCommandOutput>;
 
 let gitExecutorOverride: GitExecutor | undefined;
 

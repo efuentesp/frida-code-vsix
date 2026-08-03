@@ -35,7 +35,11 @@ import {
 	type SyncConflictRequest,
 } from "./src/orchestration/operation-result";
 import { setGitExecutor } from "./src/system/git";
+import { syncWidgetStore, scheduleIdleHide } from "./store";
 import { FRIDA_AGENT_DIR } from "./constants";
+
+// El host (extension.ts) monta el widget de estado en el footer.
+export { wireGitSyncWidget, unmountGitSyncWidget } from "./panel";
 
 const COMMAND_SETTLE_GRACE_MS = 100;
 const ELAPSED_REFRESH_MS = 1000;
@@ -189,13 +193,15 @@ function notifyOperationResult(
 
 // ========== Command handlers ==========
 
-async function handleFridaSync(
+async function runSyncOperation(
 	cmds: PiSyncCommands,
 	pi: ExtensionAPI,
 	ctx: ExtensionCommandContext,
 ): Promise<void> {
 	let gitUrl: string | undefined;
 	let packageApproval: RunOptions["packageApproval"];
+
+	syncWidgetStore.start();
 
 	const run = (options: RunOptions = {}) =>
 		runOperation({
@@ -206,17 +212,29 @@ async function handleFridaSync(
 			elapsedRefreshMs: ELAPSED_REFRESH_MS,
 			cancellationNoticeDelayMs: CANCELLATION_NOTICE_DELAY_MS,
 			host: {
-				formatProgress: (elapsedMs, message) =>
-					ctx.ui.theme.fg(
+				formatProgress: (elapsedMs, message) => {
+					// Publica progreso al widget del footer (elapsed + mensaje en vivo).
+					syncWidgetStore.update({ elapsedMs, message });
+					return ctx.ui.theme.fg(
 						"text",
 						`frida-git-sync [${formatElapsed(elapsedMs)}] ${message}`,
-					),
+					);
+				},
 				publishProgress: (message) => ctx.ui.notify(message, "info"),
-				// onCancel: en el upstream se cancela con Esc (pi-tui), no disponible
-				// en frida. El watchdog de operation-runner sigue aplicando timeouts.
-				onStopping: () => ctx.ui.notify("frida-git-sync: Stopping...", "info"),
-				onCancelled: () =>
-					ctx.ui.notify("frida-git-sync: Cancelled by user.", "warning"),
+				// Cancel manual: el botón Cancel del widget invoca esta función, que
+				// aborta la operación (pi.exec cancela el proceso git vía signal).
+				onCancel: (cancel) => {
+					syncWidgetStore.setCancellable(cancel);
+					return () => syncWidgetStore.setCancellable(undefined);
+				},
+				onStopping: () => {
+					syncWidgetStore.setStopping();
+					ctx.ui.notify("frida-git-sync: Stopping...", "info");
+				},
+				onCancelled: () => {
+					syncWidgetStore.setCancelled();
+					ctx.ui.notify("frida-git-sync: Cancelled by user.", "warning");
+				},
 			},
 		});
 
@@ -266,6 +284,28 @@ async function handleFridaSync(
 			"Synchronization updated your configuration. Reload now to apply the changes?",
 		);
 		if (shouldReload) await ctx.reload();
+	}
+	const level = notificationLevelForResult(result.code);
+	syncWidgetStore.done(level === "error" ? "error" : "done");
+}
+
+/**
+ * Wrapper: arranca el widget de estado, ejecuta la operación y siempre finaliza
+ * el estado del widget (ocultándolo tras unos segundos). Cubre todas las
+ * salidas: cancel del runner (onCancelled → "cancelled"), salidas lógicas
+ * tempranas (setup/approval/conflict → "cancelled") y el path normal (done).
+ */
+async function handleFridaSync(
+	cmds: PiSyncCommands,
+	pi: ExtensionAPI,
+	ctx: ExtensionCommandContext,
+): Promise<void> {
+	try {
+		await runSyncOperation(cmds, pi, ctx);
+	} finally {
+		const st = syncWidgetStore.getSnapshot().status;
+		if (st === "running" || st === "stopping") syncWidgetStore.done("cancelled");
+		scheduleIdleHide();
 	}
 }
 

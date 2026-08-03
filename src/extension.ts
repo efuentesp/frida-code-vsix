@@ -70,6 +70,7 @@ import {
 	wireAgentWidget,
 	unmountAgentWidget,
 } from "./tools/frida-subagents/panel";
+import { wireGitSyncWidget } from "./tools/frida-git-sync";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -636,6 +637,9 @@ export async function activate(
 				// persiste ("N subagentes en curso…") aunque el agente principal termine y
 				// queden subagentes corriendo; el widget del footer da el detalle por agente.
 				wireAgentWidget(s.webBridge);
+				// Widget de estado de frida-git-sync en el footer (sync en curso + botón
+				// Cancel). Idempotente; se actualiza vía syncWidgetStore.
+				wireGitSyncWidget(s.webBridge);
 				setAgentWidgetListener((snapshot) => {
 					const n = snapshot.filter(
 						(a) => a.status === "running" || a.status === "queued",
