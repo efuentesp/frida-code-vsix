@@ -411,7 +411,12 @@ export {
 	preloadSkills,
 } from "./skill-loader";
 export { wireAgentWidget, unmountAgentWidget } from "./panel";
-export { agentWidgetStore, startAutoPrune, stopAutoPrune } from "./store";
+export {
+	agentWidgetStore,
+	setAgentWidgetListener,
+	startAutoPrune,
+	stopAutoPrune,
+} from "./store";
 export type { AgentDisplay } from "./store";
 export type {
 	AgentConfig,

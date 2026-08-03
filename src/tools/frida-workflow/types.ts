@@ -408,6 +408,10 @@ export interface SpawnChildOptions {
 	 *  (el runner es dueño del layout: `<runsDir>/<runId>/sessions/`). */
 	sessionDir: string;
 	withSession: (child: WorkflowSessionContext) => Promise<void>;
+	/** Identidad de etapa para alimentar el transcript en vivo del WorkflowPanel:
+	 *  el host se suscribe a los eventos de la hija (tool_execution_start/end +
+	 *  message_update) y los vuelca al store reactivo. Undefined si no hay panel. */
+	transcriptTarget?: { runId: string; stage: string };
 }
 
 /** Contrato que Frida satisface; el runner sólo consume esto. */

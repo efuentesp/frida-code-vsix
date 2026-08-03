@@ -2,51 +2,61 @@ import type { BashRun } from "../types";
 import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
 import { TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { CollapsibleCard } from "./CollapsibleCard";
 
 // Tarjeta para un atajo de bash del usuario (!command / !!command).
-// Hermana visual de ToolCard: cabecera con estado + output en <pre>.
+// Hermana visual de ToolCard: usa el mismo CollapsibleCard (variante bash) y
+// permanece abierta por defecto para ver la salida según se genera.
 export function BashCard({ run }: { run: BashRun }) {
-  const [open, setOpen] = useState(true);
-  const running = run.status === "running";
-  const dim = run.excludeFromContext; // "!!" → el output no fue al modelo
+	const running = run.status === "running";
+	const dim = run.excludeFromContext; // "!!" → el output no fue al modelo
 
-  return (
-    <div className={"bash-run" + (open ? "" : " collapsed") + (dim ? " dim" : "")}>
-      <div className="bash-head" onClick={() => setOpen(!open)}>
-        <span className="ic">
-          <Icon name="term" />
-        </span>
-        <span className="chev">
-          <Icon name="chevron" size={12} />
-        </span>
-        <code className="cmd">$ {run.command}</code>
-        <span className="st">
-          {running ? (
-            <>
-              <Spinner size={13} /> ejecutando
-            </>
-          ) : run.status === "ok" ? (
-            <>
-              <Icon name="check" /> exit&nbsp;{run.exitCode ?? 0}
-            </>
-          ) : run.status === "cancelled" ? (
-            <>cancelado</>
-          ) : (
-            <>
-              <Icon name="x" /> exit&nbsp;{run.exitCode ?? "?"}
-            </>
-          )}
-        </span>
-      </div>
-      <div className="bash-out">
-        {run.output && <pre>{run.output}</pre>}
-        {!run.output && !running && <div className="empty">(sin salida)</div>}
-        {run.truncated && run.fullOutputPath && (
-          <div className="trunc"><TriangleAlert size={12} /> Salida truncada. Output completo: {run.fullOutputPath}</div>
-        )}
-        {dim && <div className="dim-note">No enviado al modelo (!!)</div>}
-      </div>
-    </div>
-  );
+	const leading = <code className="card-label">$ {run.command}</code>;
+
+	const status = (
+		<span className="card-status">
+			{running ? (
+				<>
+					<Spinner size={13} /> ejecutando
+				</>
+			) : run.status === "ok" ? (
+				<>
+					<Icon name="check" /> exit&nbsp;{run.exitCode ?? 0}
+				</>
+			) : run.status === "cancelled" ? (
+				<>cancelado</>
+			) : (
+				<>
+					<Icon name="x" /> exit&nbsp;{run.exitCode ?? "?"}
+				</>
+			)}
+		</span>
+	);
+
+	return (
+		<CollapsibleCard
+			variant="bash"
+			defaultOpen
+			hasContent
+			running={running}
+			className={dim ? "dim" : undefined}
+			icon={<Icon name="term" />}
+			leading={leading}
+			status={status}
+			chevronTooltip={(open) => (open ? "Contraer salida" : "Ver salida")}
+		>
+			{run.output ? (
+				<pre>{run.output}</pre>
+			) : !running ? (
+				<div className="bash-empty">(sin salida)</div>
+			) : null}
+			{run.truncated && run.fullOutputPath && (
+				<div className="bash-trunc">
+					<TriangleAlert size={12} /> Salida truncada. Output completo:{" "}
+					{run.fullOutputPath}
+				</div>
+			)}
+			{dim && <div className="bash-dim-note">No enviado al modelo (!!)</div>}
+		</CollapsibleCard>
+	);
 }

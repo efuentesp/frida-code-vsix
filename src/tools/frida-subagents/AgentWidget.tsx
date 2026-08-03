@@ -4,7 +4,7 @@
 // useSyncExternalStore sobre agentWidgetStore. Auto-hide cuando no hay
 // agentes. Muestra spinners animados, tipo, descripción y estado.
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { agentWidgetStore, type AgentDisplay } from "./store";
 
@@ -36,8 +36,19 @@ function formatElapsed(startedAt: number): string {
 	return `${minutes}m${remSeconds}s`;
 }
 
-function AgentRow({ agent }: { agent: AgentDisplay }): ReactElement {
-	const icon = STATUS_ICON[agent.status];
+function AgentRow({
+	agent,
+	frame,
+}: {
+	agent: AgentDisplay;
+	frame: number;
+}): ReactElement {
+	// running → spinner de braille animado (frame rota cada ~100ms desde el panel);
+	// el resto usa su glyph de estado.
+	const icon =
+		agent.status === "running"
+			? SPINNER_FRAMES[frame % SPINNER_FRAMES.length]
+			: STATUS_ICON[agent.status];
 	const color = STATUS_COLOR[agent.status];
 	const elapsed = agent.completedAt
 		? `${Math.floor((agent.completedAt - agent.startedAt) / 1000)}s`
@@ -60,6 +71,17 @@ function AgentWidgetPanel(): ReactElement | null {
 		agentWidgetStore.subscribe,
 		agentWidgetStore.getSnapshot,
 	);
+	// Reloj en vivo mientras haya agentes corriendo: rota el frame del spinner de
+	// braille y hace que el cronómetro (elapsed) avance en tiempo real. Sin esto el
+	// widget se ve "congelado" (icono fijo + elapsed estático) y el usuario no
+	// percibe que los subagentes siguen trabajando.
+	const [frame, setFrame] = useState(0);
+	const hasRunning = agents.some((a) => a.status === "running");
+	useEffect(() => {
+		if (!hasRunning) return;
+		const id = setInterval(() => setFrame((n) => n + 1), 100);
+		return () => clearInterval(id);
+	}, [hasRunning]);
 
 	if (agents.length === 0) return null;
 
@@ -83,13 +105,13 @@ function AgentWidgetPanel(): ReactElement | null {
 				</ftext>
 			</fbox>
 			{running.map((a) => (
-				<AgentRow key={a.id} agent={a} />
+				<AgentRow key={a.id} agent={a} frame={frame} />
 			))}
 			{queued.map((a) => (
-				<AgentRow key={a.id} agent={a} />
+				<AgentRow key={a.id} agent={a} frame={frame} />
 			))}
 			{done.map((a) => (
-				<AgentRow key={a.id} agent={a} />
+				<AgentRow key={a.id} agent={a} frame={frame} />
 			))}
 			{queued.length > 0 && (
 				<ftext color="var(--vscode-descriptionForeground)">

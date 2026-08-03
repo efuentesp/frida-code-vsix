@@ -1,6 +1,8 @@
-// Notificaciones al usuario cuando Frida termina una petición O necesita su
-// atención (un permiso o una pregunta) y NO está mirando (la ventana de VS Code
-// perdió el foco → está en otra aplicación).
+// Sonidos de sistema para avisar al usuario cuando Frida termina una petición O
+// necesita su atención (un permiso o una pregunta) y NO está mirando (la ventana
+// de VS Code perdió el foco → está en otra aplicación). Sólo sonido: no se
+// muestran toasts porque exigían cerrarlos a mano y resultaban molestos; el
+// sonido basta para avisar y el usuario vuelve al panel por sí mismo.
 //
 // VS Code NO expone una API nativa para que una extensión emita sonidos: se
 // verificó en @types/vscode (1.125) y en los 176 archivos de APIs propuestas del
@@ -39,7 +41,7 @@ const LINUX_SOUND: Record<SoundKind, string> = {
  * y nunca rompe el flujo. El proceso se suelta (.unref) para que no mantenga
  * vivo el proceso de la extensión al cerrar.
  */
-export function playSound(kind: SoundKind): void {
+function playSound(kind: SoundKind): void {
 	try {
 		const platform = os.platform();
 		if (platform === "darwin") {
@@ -86,45 +88,33 @@ export function playSound(kind: SoundKind): void {
  * ¿Está activada la notificación de Frida? Se lee en cada llamada para respetar
  * cambios del setting sin necesidad de recargar. Por defecto: true.
  */
-export function notifyOnCompleteEnabled(): boolean {
+function notifyOnCompleteEnabled(): boolean {
 	return vscode.workspace
 		.getConfiguration("frida")
 		.get<boolean>("notifyOnComplete", true);
 }
 
-/** Muestra un toast con un botón "Ver" que enfoca la vista del chat. */
-async function toastWithView(message: string): Promise<void> {
-	const action = await vscode.window.showInformationMessage(message, "Ver");
-	if (action === "Ver") {
-		void vscode.commands.executeCommand("frida.openPanel");
-	}
-}
-
 /**
- * Emite sonido "de listo" + notificación al TERMINAR una petición. Sólo actúa si
- * el setting está activo Y la ventana de VS Code no tiene el foco (estás en otra
- * app); si estás mirando a Frida, no hay nada que avisar.
+ * Emite sonido "de listo" al TERMINAR una petición. Sólo actúa si el setting
+ * está activo Y la ventana de VS Code no tiene el foco (estás en otra app); si
+ * estás mirando a Frida, no hay nada que avisar.
  */
-export async function notifyCompletion(windowFocused: boolean): Promise<void> {
+export function notifyCompletion(windowFocused: boolean): void {
 	if (!notifyOnCompleteEnabled() || windowFocused) return;
 	playSound("complete");
-	await toastWithView("Frida terminó de procesar tu petición.");
 }
 
 /**
- * Emite sonido "de atención" + notificación cuando Frida NECESITA al usuario
- * (un permiso Accept/Reject, o una pregunta ask_user_question). Mismo guard de
- * setting + foco que notifyCompletion. kind → mensaje del toast.
+ * Emite sonido "de atención" cuando Frida NECESITA al usuario (un permiso
+ * Accept/Reject, o una pregunta ask_user_question). Mismo guard de setting +
+ * foco que notifyCompletion.
  */
-export async function notifyAttention(
+export function notifyAttention(
 	windowFocused: boolean,
-	kind: "approval" | "ui",
-): Promise<void> {
+	// `kind` distingue permiso de pregunta: hoy ambos suenan "attention", pero se
+	// conserva para poder asignarles sonidos distintos en el futuro.
+	_kind: "approval" | "ui",
+): void {
 	if (!notifyOnCompleteEnabled() || windowFocused) return;
 	playSound("attention");
-	await toastWithView(
-		kind === "approval"
-			? "Frida necesita tu permiso para continuar."
-			: "Frida te hizo una pregunta.",
-	);
 }

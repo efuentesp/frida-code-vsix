@@ -427,67 +427,8 @@ body {
 	white-space: nowrap;
 }
 
-.compact-card {
-	margin: 10px 0;
-	border: 1px solid var(--vscode-panel-border);
-	border-radius: 8px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.08)
-	);
-	overflow: hidden;
-}
-.compact-card.open {
-	border-color: var(--vscode-textLink-foreground, #4daafc);
-}
-.compact-head {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-	padding: 8px 10px;
-	background: none;
-	border: none;
-	cursor: pointer;
-	color: inherit;
-	font-size: 0.9em;
-}
-.compact-head:hover {
-	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.08));
-}
-.compact-label {
-	color: var(--vscode-textLink-foreground, #4daafc);
-	font-weight: 600;
-}
-.compact-tokens {
-	color: var(--vscode-foreground);
-	flex: 1;
-	text-align: left;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.compact-toggle {
-	display: inline-flex;
-	align-items: center;
-	opacity: 0.7;
-	transform: rotate(90deg);
-	transition: transform 0.15s ease;
-}
-.compact-toggle.closed {
-	transform: rotate(0deg);
-}
-.compact-body {
-	padding: 4px 12px 12px;
-	border-top: 1px solid var(--vscode-panel-border);
-}
-.compact-intro {
-	font-weight: 600;
-	margin: 8px 0;
-}
-.compact-body > p:first-child {
-	margin-top: 0;
-}
+/* (Las tarjetas de compaction/branch ahora usan .card--compact — ver bloque
+   CollapsibleCard arriba.) */
 
 .proc-cancel {
 	margin-left: auto;
@@ -611,41 +552,41 @@ body {
 	opacity: 1 !important;
 	color: var(--vscode-foreground);
 }
-/* Razonamiento: tarjeta estilo ToolCard (mismo fondo/radio) con borde azul
-   textLink en los 4 lados. Header con icono Brain + chevron que rota. */
-.thinking {
-	margin: 6px 0;
+/* Variante thinking (Razonamiento): borde azul textLink en los 4 lados + fondo
+   blockquote, conservando el look del antiguo <details class="thinking">. El
+   Brain late vía .card-icon.live (→ thinkingPulse de abajo). Hereda de
+   CollapsibleCard el auto-expand mientras razona, el stick-to-bottom y la altura
+   limitada del cuerpo. */
+.card--thinking {
 	border: 1px solid var(--vscode-textLink-foreground, #4daafc);
-	border-radius: 6px;
 	background: var(
 		--vscode-textBlockQuote-background,
 		rgba(127, 127, 127, 0.06)
 	);
-	overflow: hidden;
-}
-.thinking > summary {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 6px 8px;
-	cursor: pointer;
-	user-select: none;
-	list-style: none;
 	font-size: 12px;
 }
-.thinking > summary::-webkit-details-marker {
-	display: none;
-}
-.thinking-icon {
+.card--thinking .card-icon {
 	color: var(--vscode-textLink-foreground, #4daafc);
-	flex: none;
 }
-/* Brain "vivo" mientras el modelo razona en vivo (último segmento thinking
-   del turno activo): latido con escala + brillo del color de acento. Al
-   terminar el razonamiento se quita la clase y el icono vuelve a estar quieto. */
-.thinking-icon.thinking-live {
-	animation: thinkingPulse 1.2s ease-in-out infinite;
+.card--thinking .card-title {
+	color: var(--vscode-foreground);
 }
+.card--thinking .card-status.running {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.card--thinking .card-status.done {
+	color: var(--vscode-descriptionForeground);
+}
+.card--thinking .card-body {
+	border-top: none;
+	padding: 2px 10px 8px;
+	font-size: 12px;
+	opacity: 0.85;
+}
+/* Brain "vivo" mientras el modelo razona en vivo (o un tool se ejecuta): latido
+   con escala + brillo del color de acento. Lo reutiliza .card-icon.live (tanto
+   el Brain del Razonamiento como el icono de un tool en ejecución). Respeta
+   prefers-reduced-motion (regla en .card-icon.live). */
 @keyframes thinkingPulse {
 	0%,
 	100% {
@@ -658,52 +599,6 @@ body {
 		transform: scale(1.2);
 		filter: drop-shadow(0 0 3px var(--vscode-textLink-foreground, #4daafc));
 	}
-}
-.thinking-name {
-	font-weight: 600;
-}
-.thinking-time {
-	margin-left: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	font-size: 11px;
-	font-weight: 400;
-	opacity: 0.9;
-	font-variant-numeric: tabular-nums;
-	white-space: nowrap;
-	flex: none;
-}
-/* Cronómetro de razonamiento vivo: spinner en color de acento (azul), como
-   actividad visible — paridad con el Brain que late a la izquierda. */
-.thinking-time.thinking-running {
-	color: var(--vscode-textLink-foreground, #4daafc);
-}
-/* Cronómetro terminado: check en gris sobrio. Sin verde de "éxito": el
-   razonamiento no pasa ni falla, sólo termina. */
-.thinking-time.thinking-done {
-	color: var(--vscode-descriptionForeground);
-}
-/* Cuando hay cronómetro, éste empuja a la derecha (margin-left:auto) y el
-   chevron se pega a él; sin cronómetro, el chevron conserva su propio
-   margin-left:auto para ir a la derecha solo. */
-.thinking-time + .thinking-chev {
-	margin-left: 0;
-}
-.thinking-chev {
-	margin-left: auto;
-	display: inline-flex;
-	opacity: 0.6;
-	transition: transform 0.1s;
-	transform: rotate(90deg);
-}
-.thinking:not([open]) > summary .thinking-chev {
-	transform: rotate(0deg);
-}
-.thinking-body {
-	padding: 2px 10px 8px;
-	font-size: 12px;
-	opacity: 0.85;
 }
 .imgs-inline {
 	display: flex;
@@ -904,7 +799,10 @@ body {
 }
 
 /* Tarjetas de tool */
-.tool {
+/* === Tarjeta colapsable unificada (CollapsibleCard) ============================
+   Base común de ToolCard, BashCard y la SummaryCard de compaction/branch.
+   Reemplaza a .tool, .tool-head, .tc-*, .bash-run, .bash-head y .compact-*. */
+.card {
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 6px;
 	background: var(
@@ -914,7 +812,10 @@ body {
 	margin: 6px 0;
 	overflow: hidden;
 }
-.tool-head {
+.card.collapsed .card-body {
+	display: none;
+}
+.card-head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -922,36 +823,39 @@ body {
 	cursor: default;
 	user-select: none;
 }
-.tool-head.has-result {
+.card-head.is-toggle {
 	cursor: pointer;
 }
-.tool-head:hover.has-result {
+.card-head.is-toggle:hover {
 	background: var(--vscode-list-hoverBackground);
 }
-.tc-icon {
+.card-icon {
 	width: 16px;
 	text-align: center;
 	opacity: 0.85;
 	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 /* Tool en ejecución: su icono late con el mismo pulso que el Brain de
-   "Razonamiento" (reutiliza @keyframes thinkingPulse). Sobrio y coherente
-   con el resto de la UI. Respeta prefers-reduced-motion. */
-.tc-icon.live {
+   "Razonamiento" (reutiliza @keyframes thinkingPulse). Respeta
+   prefers-reduced-motion. */
+.card-icon.live {
 	animation: thinkingPulse 1.2s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-	.tc-icon.live {
+	.card-icon.live {
 		animation: none;
 	}
 }
-.tc-name {
+.card-title {
 	font-weight: 600;
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
 	flex: none;
 }
-.tc-label {
+.card-label {
 	font-family: var(--vscode-editor-font-family, monospace);
 	font-size: 0.9em;
 	flex: 1;
@@ -961,6 +865,110 @@ body {
 	white-space: nowrap;
 	color: var(--vscode-foreground);
 }
+.card-badges {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+}
+.card-status {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11px;
+	opacity: 0.85;
+	white-space: nowrap;
+	flex: none;
+}
+.card-status.ok {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.card-status.error {
+	color: var(--vscode-testing-iconFailed, #f85149);
+}
+.card-status .spinner {
+	width: 13px;
+	height: 13px;
+}
+.card-chev {
+	transition: transform 0.1s;
+	transform: rotate(90deg);
+	opacity: 0.6;
+	display: flex;
+	flex: none;
+}
+.card-chev.closed {
+	transform: rotate(0deg);
+}
+.card-body {
+	border-top: 1px solid var(--vscode-panel-border);
+	max-height: 320px;
+	overflow-y: auto;
+}
+.card-body pre {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 0.82em;
+}
+
+/* Variante bash (tarjeta de bash del usuario !/!!): tono terminal. */
+.card--bash {
+	border-color: var(--vscode-terminal-border, var(--vscode-panel-border));
+	background: var(
+		--vscode-terminal-background,
+		var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08))
+	);
+}
+.card--bash.dim {
+	opacity: 0.75;
+}
+.card--bash .card-icon {
+	color: var(--vscode-terminal-ansiGreen, #3fb950);
+}
+.card--bash .card-label {
+	color: var(--vscode-terminal-ansiBrightGreen, var(--vscode-foreground));
+	word-break: break-all;
+}
+.card--bash .card-status:has(.icon) {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.card--bash .card-body {
+	padding: 0 8px 8px;
+	border-top: none;
+	max-height: none;
+}
+
+/* Variante compact (compaction / branch summary): márgenes y borde generosos. */
+.card--compact {
+	margin: 10px 0;
+	border-radius: 8px;
+}
+.card--compact.open {
+	border-color: var(--vscode-textLink-foreground, #4daafc);
+}
+.card--compact .card-head {
+	padding: 8px 10px;
+}
+.card--compact .card-title {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.card--compact .card-body {
+	padding: 4px 12px 12px;
+	border-top: 1px solid var(--vscode-panel-border);
+	max-height: none;
+}
+.card--compact .compact-intro {
+	font-weight: 600;
+	margin: 8px 0;
+}
+.card--compact .card-body > p:first-child {
+	margin-top: 0;
+}
+
+/* Badges específicos del header de ToolCard (van dentro de .card-badges). */
 .tc-diffstats {
 	display: inline-flex;
 	gap: 6px;
@@ -998,48 +1006,14 @@ body {
 .tc-todostatus.deleted {
 	color: var(--vscode-gitDecoration-deletedResourceForeground, #f85149);
 }
-.tc-status {
-	margin-left: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	font-size: 11px;
-	opacity: 0.85;
-	white-space: nowrap;
-	flex: none;
-}
-.tc-status .spin {
-	width: 11px;
-	height: 11px;
-	border-width: 2px;
-}
-.tc-status.ok {
-	color: var(--vscode-testing-iconPassed, #3fb950);
-}
-.tc-status.error {
-	color: var(--vscode-testing-iconFailed, #f85149);
-}
-.tc-chev {
-	transition: transform 0.1s;
-	transform: rotate(90deg);
-	opacity: 0.6;
-	display: flex;
-	flex: none;
-}
-.tc-chev.closed {
-	transform: rotate(0deg);
-}
-.tool-result-wrap {
-	border-top: 1px solid var(--vscode-panel-border);
-	max-height: 320px;
-	overflow-y: auto;
-}
-.tool-result-wrap pre {
-	margin: 0;
-	white-space: pre-wrap;
-	word-break: break-word;
-	font-family: var(--vscode-editor-font-family, monospace);
-	font-size: 0.82em;
+/* Placeholder “Ejecutando…” mientras una tool corre sin salida parcial: sólo se
+   ve cuando CollapsibleCard abre la tarjeta (tras el umbral). */
+.tool-running-placeholder {
+	padding: 6px 8px;
+	font-size: 12px;
+	font-style: italic;
+	opacity: 0.8;
+	color: var(--vscode-descriptionForeground);
 }
 .tool-result {
 	padding: 6px 8px;
@@ -1050,8 +1024,6 @@ body {
 .tool-result.partial {
 	opacity: 0.85;
 	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
-	max-height: 220px;
-	overflow: auto;
 }
 
 /* Vistazo en vivo de un sub-agente (agent / get_subagent_result mientras corre):
@@ -1106,9 +1078,6 @@ body {
 .diff-line.ctx {
 	color: var(--vscode-descriptionForeground);
 	opacity: 0.6;
-}
-.tool.collapsed .tool-result-wrap {
-	display: none;
 }
 .chev {
 	transition: transform 0.1s;
@@ -2290,57 +2259,10 @@ button.danger:hover {
 	margin: 0;
 }
 
-/* Tarjeta de atajo de bash del usuario (!command / !!command) */
-.bash-run {
-	border: 1px solid var(--vscode-terminal-border, var(--vscode-panel-border));
-	border-radius: 6px;
-	background: var(
-		--vscode-terminal-background,
-		var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08))
-	);
-	margin: 6px 0;
-	overflow: hidden;
-}
-.bash-run.dim {
-	opacity: 0.75;
-}
-.bash-head {
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	padding: 6px 8px;
-	cursor: pointer;
-	user-select: none;
-}
-.bash-head .ic {
-	display: flex;
-	color: var(--vscode-terminal-ansiGreen, #3fb950);
-}
-.bash-head .cmd {
-	font-family: var(--vscode-editor-font-family, monospace);
-	font-size: 0.9em;
-	color: var(--vscode-terminal-ansiBrightGreen, var(--vscode-foreground));
-	word-break: break-all;
-}
-.bash-head .st {
-	margin-left: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	font-size: 11px;
-	opacity: 0.85;
-	white-space: nowrap;
-}
-.bash-head .st:has(.icon) {
-	color: var(--vscode-testing-iconPassed, #3fb950);
-}
-.bash-out {
-	padding: 0 8px 8px;
-}
-.bash-out pre {
-	margin: 0;
-	white-space: pre-wrap;
-	word-break: break-word;
+/* Cuerpo de la tarjeta de bash del usuario (!command / !!command) — va dentro
+   de .card--bash .card-body. Sobreescribe la fuente base (.card-body pre)
+   con tipografía de terminal. */
+.card--bash .card-body pre {
 	font-family: var(
 		--vscode-terminal-font-family,
 		var(--vscode-editor-font-family, monospace)
@@ -2348,26 +2270,21 @@ button.danger:hover {
 	font-size: 0.85em;
 	color: var(--vscode-descriptionForeground);
 }
-.bash-out .empty {
+.bash-empty {
 	font-size: 12px;
 	opacity: 0.6;
+	padding: 2px 0;
 }
-.bash-out .trunc {
+.bash-trunc {
 	font-size: 11px;
 	color: var(--vscode-editorWarning-foreground, #d29922);
 	word-break: break-all;
 }
-.bash-out .dim-note {
+.bash-dim-note {
 	font-size: 11px;
 	opacity: 0.6;
 	font-style: italic;
 	margin-top: 4px;
-}
-.bash-run.collapsed .bash-out {
-	display: none;
-}
-.bash-run.collapsed .chev {
-	transform: rotate(0deg);
 }
 
 /* Modo bash en el Composer (texto que empieza con !) */
@@ -2907,11 +2824,6 @@ kbd {
 .ws-bar .ws-dirty {
 	display: inline-flex;
 	align-items: center;
-}
-.tc-icon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
 }
 .res-bar .res-ic {
 	display: inline-flex;

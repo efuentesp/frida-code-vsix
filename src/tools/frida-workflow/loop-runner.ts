@@ -75,6 +75,7 @@ export async function runLoop(
 			sessionDir,
 			signal,
 			preSnapshot,
+			{ runId: ctx.runId, stage: stageName },
 		);
 		await fire(
 			"onUnitEnd",

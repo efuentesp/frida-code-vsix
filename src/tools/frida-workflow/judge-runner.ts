@@ -212,6 +212,7 @@ export async function runVerify(
 			sessionDir,
 			signal,
 			preSnapshot,
+			{ runId: ctx.runId, stage: stageName },
 		);
 		if (!res.ok) return fail(res.error ?? "etapa falló");
 		let verdict: Output;
@@ -286,6 +287,7 @@ export async function runAssess(
 			sessionDir,
 			signal,
 			preSnapshot,
+			{ runId: ctx.runId, stage: stageName },
 		);
 		if (!res.ok) {
 			errored = res.error;

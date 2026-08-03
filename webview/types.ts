@@ -289,6 +289,8 @@ export interface LensStatus {
 export interface State {
 	keyNeeded: boolean;
 	busy: boolean;
+	/** Subagentes en background corriendo (alimenta el indicador "N en curso"). */
+	backgroundRunning?: number;
 	mode: ApprovalMode;
 	/** Stats footer (Fase 3): contadores del gate (✓N aprobadas / ✗M bloqueadas / ⚡Z auto). */
 	gateStats?: GateStats;
@@ -345,6 +347,7 @@ export type InMessage =
 	| { type: "session_ready" }
 	| { type: "user"; text: string; images?: ImageAttachment[] }
 	| { type: "agent_busy"; busy: boolean }
+	| { type: "agents_running"; count: number }
 	| { type: "turn_active" }
 	| { type: "delta"; text: string }
 	| { type: "thinking_delta"; text: string }

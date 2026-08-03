@@ -34,6 +34,9 @@ export async function executeUnit(
 	sessionDir: string,
 	signal: AbortSignal | undefined,
 	preSnapshot: StageSnapshot | undefined,
+	/** Identidad de etapa para el transcript en vivo del WorkflowPanel. Undefined
+	 *  ⇒ no se captura (sesiones de judges: su stage sintético no está en el panel). */
+	transcriptStage?: { runId: string; stage: string },
 ): Promise<UnitExecResult> {
 	const spec = stage.outcome;
 	const skill = stage.skill ?? stageName;
@@ -54,6 +57,7 @@ export async function executeUnit(
 				prompt,
 				signal,
 				sessionDir,
+				transcriptTarget: transcriptStage,
 				withSession: async (child) => {
 					if (!spec) return;
 					const ctx: CollectCtx = {

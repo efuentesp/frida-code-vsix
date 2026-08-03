@@ -22,9 +22,21 @@ export interface AgentDisplay {
 
 let agents: AgentDisplay[] = [];
 const listeners = new Set<() => void>();
+/** Listener del host: replica el snapshot al webview (conteo de subagentes en
+ *  background para el indicador "N en curso"). El host lo registra al iniciar la
+ *  sesión. */
+let onUpdate: ((snapshot: AgentDisplay[]) => void) | undefined;
+
+/** Registra el callback que el host usa para postear el conteo al webview. */
+export function setAgentWidgetListener(
+	cb: ((snapshot: AgentDisplay[]) => void) | undefined,
+): void {
+	onUpdate = cb;
+}
 
 function emit(): void {
 	for (const l of listeners) l();
+	onUpdate?.(agents);
 }
 
 export const agentWidgetStore = {

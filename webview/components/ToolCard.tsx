@@ -1,9 +1,9 @@
-import type { SubagentProgressDetails, ToolEntry } from "../types";
+import type { ReactNode } from "react";
+import type { SubagentProgressDetails, ToolEntry, ToolState } from "../types";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
-import { Tooltip } from "./Tooltip";
 import { Spinner } from "./Spinner";
-import { useEffect, useState, type ReactNode } from "react";
+import { CollapsibleCard } from "./CollapsibleCard";
 import {
 	Compass,
 	FilePen,
@@ -32,7 +32,6 @@ export function fmtDuration(ms: number): string {
 	return `${(ms / 1000).toFixed(1)}s`;
 }
 
-// Resumen legible de la llamada (icono + texto) según el tool, en vez de JSON.
 // Tools de frida-lens (pi-lens): label legible (Title Case, paridad con el TUI
 // de pi) + extractor del argumento principal para el header. Ícono ScanSearch.
 const LENS_INFO: Record<
@@ -123,142 +122,135 @@ function todoStatusEcho(
 	return null;
 }
 
-function toolCallInfo(
-	tool: string,
-	args: unknown,
-): { icon: ReactNode; name: string; label: string } {
-	const a = (args ?? {}) as Record<string, unknown>;
-	const s = (v: unknown) => String(v ?? "");
+type ToolInfo = { icon: ReactNode; name: string; label: string };
+type ToolArgs = Record<string, unknown>;
+
+/** String seguro: undefined → "". */
+const str = (v: unknown): string => String(v ?? "");
+
+/** Header del tool `todo`: glyph de acción + subject (paridad renderTodoCall de
+ *  rpiv-todo). El subject de update/get/delete llega en args._subject (resuelto
+ *  por enrichTodoArgs en el host, pues el webview no ve el store). */
+const TODO_ICON = <ListChecks size={13} />;
+const TODO_ACTION_LABEL: Record<string, (a: ToolArgs) => string> = {
+	create: (a) => `+ ${str(a._subject ?? a.subject)}`,
+	update: (a) => `→ #${str(a.id)} ${str(a._subject ?? a.subject)}`,
+	delete: (a) => `× #${str(a.id)} ${str(a._subject ?? a.subject)}`,
+	get: (a) => `› #${str(a.id)} ${str(a._subject ?? a.subject)}`,
+	clear: () => "∅",
+};
+function todoCallInfo(a: ToolArgs): ToolInfo {
+	const action = str(a.action);
+	const labeler = TODO_ACTION_LABEL[action];
+	if (labeler) return { icon: TODO_ICON, name: "todo", label: labeler(a) };
+	if (action === "list")
+		return {
+			icon: TODO_ICON,
+			name: "todo",
+			label: `☰ ${a.status ? str(a.status) : "all"}`,
+		};
+	return { icon: TODO_ICON, name: "todo", label: action };
+}
+
+/** ask_user_question: header (chip corto) de la primera pregunta, o su texto. */
+function askCallInfo(a: ToolArgs): ToolInfo {
+	const qs = Array.isArray(a.questions) ? a.questions : [];
+	const first = qs[0] as Record<string, unknown> | undefined;
+	const label = first ? String(first.header ?? first.question ?? "") : "";
+	return {
+		icon: <MessageCircleQuestion size={13} />,
+		name: "ask_user_question",
+		label,
+	};
+}
+
+/** agent_browser: la URL objetivo si es fácil de localizar (qa.url o el primer
+ *  arg http(s) del modo args). Si no, vacío (el icono ya identifica al tool). */
+function browserCallInfo(a: ToolArgs): ToolInfo {
+	const url =
+		typeof a.url === "string"
+			? a.url
+			: Array.isArray(a.args)
+				? String(
+						(a.args as unknown[]).find((x) => /^https?:\/\//.test(String(x))) ??
+							"",
+					)
+				: "";
+	return { icon: <Compass size={13} />, name: "agent_browser", label: url };
+}
+
+/** Resumen legible de la llamada (icono + texto) según el tool, en vez de JSON.
+ *  Tabla de datos → baja complejidad y facilita añadir tools nuevas (una entrada
+ *  por tool) en vez de un switch gigante. */
+const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
+	read: (a) => ({
+		icon: <FileText size={13} />,
+		name: "read",
+		label: str(a.path),
+	}),
+	bash: (a) => ({
+		icon: <Terminal size={13} />,
+		name: "bash",
+		label: str(a.command),
+	}),
+	// El impacto del cambio (líneas +/-) va como badge git en el header
+	// (tc-diffstats), calculado desde entry.diff en el componente; aquí sólo el path.
+	edit: (a) => ({
+		icon: <PencilLine size={13} />,
+		name: "edit",
+		label: str(a.path),
+	}),
+	write: (a) => ({
+		icon: <FilePen size={13} />,
+		name: "write",
+		label: str(a.path),
+	}),
+	grep: (a) => ({
+		icon: <Search size={13} />,
+		name: "grep",
+		label: `"${str(a.pattern)}"${a.path ? ` en ${str(a.path)}` : ""}`,
+	}),
+	find: (a) => ({
+		icon: <Search size={13} />,
+		name: "find",
+		label: `${str(a.pattern)}${a.path ? ` en ${str(a.path)}` : ""}`,
+	}),
+	ls: (a) => ({ icon: <Folder size={13} />, name: "ls", label: str(a.path) }),
+	todo: todoCallInfo,
+	ask_user_question: askCallInfo,
+	agent_browser: browserCallInfo,
+	// Sub-agente autónomo: label = descripción corta (3-5 palabras) que pide el
+	// tool, o el tipo de agente si no trae descripción.
+	agent: (a) => ({
+		icon: <Users size={13} />,
+		name: "agent",
+		label: str(a.description) || str(a.subagent_type),
+	}),
+	// Recupera el resultado de un sub-agente (background). UserCheck (agente con
+	// palomita = "resultado recibido") distingue la recuperación del lanzamiento
+	// (agent → Users). Label = agent_id que identifica al sub-agente.
+	get_subagent_result: (a) => ({
+		icon: <UserCheck size={13} />,
+		name: "get_subagent_result",
+		label: str(a.agent_id),
+	}),
+	// Reporte de uso del contexto (presión del context window, categorías,
+	// system prompt). El icono (Gauge) ya lo identifica; sin label.
+	context: () => ({ icon: <Gauge size={13} />, name: "context", label: "" }),
+};
+
+function toolCallInfo(tool: string, args: unknown): ToolInfo {
+	const a = (args ?? {}) as ToolArgs;
 	const lens = LENS_INFO[tool];
-	if (lens) {
+	if (lens)
 		return {
 			icon: <ScanSearch size={13} />,
 			name: lens.label,
 			label: lens.arg(a),
 		};
-	}
-	switch (tool) {
-		case "read":
-			return { icon: <FileText size={13} />, name: "read", label: s(a.path) };
-		case "bash":
-			return {
-				icon: <Terminal size={13} />,
-				name: "bash",
-				label: s(a.command),
-			};
-		case "edit":
-			// El impacto del cambio (líneas +/-) va como badge git en el header
-			// (tc-diffstats), calculado desde entry.diff en el componente; aquí sólo el path.
-			return { icon: <PencilLine size={13} />, name: "edit", label: s(a.path) };
-		case "write":
-			return { icon: <FilePen size={13} />, name: "write", label: s(a.path) };
-		case "grep":
-			return {
-				icon: <Search size={13} />,
-				name: "grep",
-				label: `"${s(a.pattern)}"${a.path ? ` en ${s(a.path)}` : ""}`,
-			};
-		case "find":
-			return {
-				icon: <Search size={13} />,
-				name: "find",
-				label: `${s(a.pattern)}${a.path ? ` en ${s(a.path)}` : ""}`,
-			};
-		case "ls":
-			return { icon: <Folder size={13} />, name: "ls", label: s(a.path) };
-		case "todo": {
-			// Header del tool `todo`: glyph de acción + subject (paridad renderTodoCall
-			// de rpiv-todo). El subject de update/get/delete llega en args._subject
-			// (resuelto por enrichTodoArgs en el host, pues el webview no ve el store).
-			const action = s(a.action);
-			const subject = s(a._subject ?? a.subject);
-			if (action === "create")
-				return {
-					icon: <ListChecks size={13} />,
-					name: "todo",
-					label: `+ ${subject}`,
-				};
-			if (action === "update")
-				return {
-					icon: <ListChecks size={13} />,
-					name: "todo",
-					label: `→ #${s(a.id)} ${subject}`,
-				};
-			if (action === "delete")
-				return {
-					icon: <ListChecks size={13} />,
-					name: "todo",
-					label: `× #${s(a.id)} ${subject}`,
-				};
-			if (action === "get")
-				return {
-					icon: <ListChecks size={13} />,
-					name: "todo",
-					label: `› #${s(a.id)} ${subject}`,
-				};
-			if (action === "list")
-				return {
-					icon: <ListChecks size={13} />,
-					name: "todo",
-					label: `☰ ${a.status ? s(a.status) : "all"}`,
-				};
-			if (action === "clear")
-				return { icon: <ListChecks size={13} />, name: "todo", label: "∅" };
-			return { icon: <ListChecks size={13} />, name: "todo", label: action };
-		}
-		case "ask_user_question": {
-			// Label: header (chip corto) de la primera pregunta, o su texto.
-			const qs = Array.isArray(a.questions) ? a.questions : [];
-			const first = qs[0] as Record<string, unknown> | undefined;
-			const label = first ? String(first.header ?? first.question ?? "") : "";
-			return {
-				icon: <MessageCircleQuestion size={13} />,
-				name: "ask_user_question",
-				label,
-			};
-		}
-		case "agent_browser": {
-			// Label: la URL objetivo si es fácil de localizar (qa.url o el primer
-			// arg http(s) del modo args). Si no, vacío (el icono ya identifica al tool).
-			const url =
-				typeof a.url === "string"
-					? a.url
-					: Array.isArray(a.args)
-						? String(
-								(a.args as unknown[]).find((x) =>
-									/^https?:\/\//.test(String(x)),
-								) ?? "",
-							)
-						: "";
-			return { icon: <Compass size={13} />, name: "agent_browser", label: url };
-		}
-		case "agent": {
-			// Sub-agente autónomo: label = la descripción corta (3-5 palabras) que pide
-			// el tool, o el tipo de agente si no trae descripción.
-			const desc = s(a.description);
-			return {
-				icon: <Users size={13} />,
-				name: "agent",
-				label: desc || s(a.subagent_type),
-			};
-		}
-		case "get_subagent_result": {
-			// Recupera el resultado de un sub-agente (background). UserCheck (agente
-			// con palomita = "resultado recibido") distingue la recuperación del
-			// lanzamiento (agent → Users). Label = agent_id que identifica al sub-agente.
-			return {
-				icon: <UserCheck size={13} />,
-				name: "get_subagent_result",
-				label: s(a.agent_id),
-			};
-		}
-		case "context":
-			// Reporte de uso del contexto (presión del context window, categorías,
-			// system prompt). El icono (Gauge) ya lo identifica; sin label.
-			return { icon: <Gauge size={13} />, name: "context", label: "" };
-		default:
-			return { icon: <Wrench size={13} />, name: tool, label: "" };
-	}
+	const fn = TOOL_INFO[tool];
+	if (fn) return fn(a);
+	return { icon: <Wrench size={13} />, name: tool, label: "" };
 }
 
 /** Token count legible: 1234 → "1.2k tokens", 500 → "500 tokens". */
@@ -277,13 +269,11 @@ function renderSubagentLive(d: SubagentProgressDetails) {
 		stats.push(`${d.toolUses} tool${d.toolUses === 1 ? "" : "s"}`);
 	if (d.tokens > 0) stats.push(formatTokens(d.tokens));
 	return (
-		<div className="tool-result-wrap">
-			<div className="subagent-live">
-				{stats.length > 0 ? (
-					<div className="sl-stats">{stats.join(" · ")}</div>
-				) : null}
-				<div className="sl-activity">⎿ {d.activity}</div>
-			</div>
+		<div className="subagent-live">
+			{stats.length > 0 ? (
+				<div className="sl-stats">{stats.join(" · ")}</div>
+			) : null}
+			<div className="sl-activity">⎿ {d.activity}</div>
 		</div>
 	);
 }
@@ -350,24 +340,94 @@ function renderResult(entry: ToolEntry) {
 	return <pre className="tool-result">{entry.result}</pre>;
 }
 
+/** Construye el cuerpo (children) de la tarjeta según el estado de la tool:
+ *  - corriendo + detalles de sub-agente → vista rica en vivo.
+ *  - corriendo + parcial textual → <pre> con la salida fluyendo.
+ *  - corriendo sin parcial → placeholder "Ejecutando…" (sólo visible tras el
+ *    umbral, porque CollapsibleCard abre entonces).
+ *  - terminado con resultado/diff → render rico del resultado. */
+function renderBody(entry: ToolEntry, running: boolean): ReactNode {
+	if (running) {
+		if (entry.partialDetails) return renderSubagentLive(entry.partialDetails);
+		if (entry.partial && entry.partial.trim())
+			return <pre className="tool-result partial">{entry.partial}</pre>;
+		return <div className="tool-running-placeholder">Ejecutando…</div>;
+	}
+	return renderResult(entry);
+}
+
+/** Contenido del header entre el icono y el estado (título, etiqueta, badges).
+ *  Extraído a función para mantener baja la complejidad de ToolCard. */
+function buildLeading(p: {
+	name: string;
+	label: string;
+	diffStats: { add: number; del: number } | null;
+	lines: string | null;
+	statusEcho: { glyph: ReactNode; label: string; status: string } | null;
+}): ReactNode {
+	return (
+		<>
+			<span className="card-title">{p.name}</span>
+			{p.label ? <code className="card-label">{p.label}</code> : null}
+			{(p.diffStats || p.lines) && (
+				<span className="card-badges">
+					{p.diffStats ? (
+						<span className="tc-diffstats">
+							<span className="add">+{p.diffStats.add}</span>
+							{p.diffStats.del > 0 ? (
+								<span className="del">-{p.diffStats.del}</span>
+							) : null}
+						</span>
+					) : null}
+					{p.lines ? <span className="tc-linestats">{p.lines}</span> : null}
+				</span>
+			)}
+			{p.statusEcho ? (
+				<span className={"tc-todostatus " + p.statusEcho.status}>
+					{p.statusEcho.glyph} {p.statusEcho.label}
+				</span>
+			) : null}
+		</>
+	);
+}
+
+/** Bloque de estado a la derecha (spinner/check/x + duración). Extraído a
+ *  función para mantener baja la complejidad de ToolCard. */
+function buildStatus(state: ToolState, elapsed: number): ReactNode {
+	const text = fmtDuration(elapsed);
+	return (
+		<span className={"card-status " + state}>
+			{state === "running" ? (
+				<>
+					<Spinner size={13} /> {text}
+				</>
+			) : state === "ok" ? (
+				<>
+					<Icon name="check" /> {text}
+				</>
+			) : (
+				<>
+					<Icon name="x" /> {text}
+				</>
+			)}
+		</span>
+	);
+}
+
 export function ToolCard({ entry }: { entry: ToolEntry }) {
-	const [open, setOpen] = useState(false);
-	const [now, setNow] = useState(Date.now());
 	const running = entry.state === "running";
 	const { icon, name, label } = toolCallInfo(entry.tool, entry.args);
 	const hasResult =
 		!running && (!!(entry.result && entry.result.trim()) || !!entry.diff);
-	// Progreso parcial en vivo (tool_execution_update) de un tool largo.
-	const livePartial = running && !!entry.partial && !!entry.partial.trim();
+	// Progreso parcial en vivo (tool_execution_update) de un tool largo. Fuerza la
+	// auto-apertura inmediata mientras corre.
+	const hasPartial =
+		running &&
+		((!!entry.partial && !!entry.partial.trim()) || !!entry.partialDetails);
 
-	// Cronómetro en vivo solo mientras ejecuta (re-render ligero cada 250 ms).
-	useEffect(() => {
-		if (!running) return;
-		const id = setInterval(() => setNow(Date.now()), 250);
-		return () => clearInterval(id);
-	}, [running]);
-
-	const elapsed = (entry.endedAt ?? now) - entry.startedAt;
+	// Cronómetro: CollapsibleCard re-renderiza cada 250 ms mientras corre, así que
+	// basta con leer Date.now() aquí para que el tiempo avance.
+	const elapsed = (entry.endedAt ?? Date.now()) - entry.startedAt;
 	// Badge git de líneas +/- (estilo GitHub) desde el diff, para edit/write.
 	const diffStats = entry.diff ? countDiff(entry.diff) : null;
 	// Conteo de líneas leídas (read) con rango si hubo offset.
@@ -376,68 +436,19 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 	const statusEcho = todoStatusEcho(entry);
 
 	return (
-		<div
-			className={
-				"tool" + (open && hasResult ? "" : livePartial ? "" : " collapsed")
-			}
+		<CollapsibleCard
+			running={running}
+			startedAt={entry.startedAt}
+			hasPartial={hasPartial}
+			hasContent={hasResult}
+			variant="tool"
+			icon={icon}
+			iconLive={running}
+			leading={buildLeading({ name, label, diffStats, lines, statusEcho })}
+			status={buildStatus(entry.state, elapsed)}
+			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
-			<div
-				className={"tool-head" + (hasResult ? " has-result" : "")}
-				onClick={() => hasResult && setOpen(!open)}
-			>
-				<span className={"tc-icon" + (running ? " live" : "")}>{icon}</span>
-				<span className="tc-name">{name}</span>
-				{label ? <code className="tc-label">{label}</code> : null}
-				{diffStats ? (
-					<span className="tc-diffstats">
-						<span className="add">+{diffStats.add}</span>
-						{diffStats.del > 0 ? (
-							<span className="del">-{diffStats.del}</span>
-						) : null}
-					</span>
-				) : null}
-				{lines ? <span className="tc-linestats">{lines}</span> : null}
-				{statusEcho ? (
-					<span className={"tc-todostatus " + statusEcho.status}>
-						{statusEcho.glyph} {statusEcho.label}
-					</span>
-				) : null}
-				<span className={"tc-status " + entry.state}>
-					{running ? (
-						<>
-							<Spinner size={13} /> {fmtDuration(elapsed)}
-						</>
-					) : entry.state === "ok" ? (
-						<>
-							<Icon name="check" /> {fmtDuration(elapsed)}
-						</>
-					) : (
-						<>
-							<Icon name="x" /> {fmtDuration(elapsed)}
-						</>
-					)}
-				</span>
-				{hasResult && (
-					<Tooltip
-						label={open ? "Contraer resultado" : "Ver resultado"}
-						side="top"
-					>
-						<span className={"tc-chev" + (open ? "" : " closed")}>
-							<Icon name="chevron" size={12} />
-						</span>
-					</Tooltip>
-				)}
-			</div>
-			{open && hasResult && (
-				<div className="tool-result-wrap">{renderResult(entry)}</div>
-			)}
-			{running && entry.partialDetails ? (
-				renderSubagentLive(entry.partialDetails)
-			) : livePartial ? (
-				<div className="tool-result-wrap">
-					<pre className="tool-result partial">{entry.partial}</pre>
-				</div>
-			) : null}
-		</div>
+			{running || hasResult ? renderBody(entry, running) : null}
+		</CollapsibleCard>
 	);
 }

@@ -258,6 +258,11 @@ export function reduce(state: State, msg: InMessage): State {
 				info: undefined,
 			};
 		}
+		case "agents_running":
+			// Conteo de subagentes en background (lo posta el host al cambiar el
+			// agentWidgetStore). Alimenta el indicador "N en curso" del procLabel
+			// cuando el agente principal ya está idle pero quedan subagentes.
+			return { ...state, backgroundRunning: msg.count };
 		case "agent_busy":
 			return {
 				...state,

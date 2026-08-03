@@ -21,6 +21,26 @@ export interface UnitView {
 	handle?: string;
 }
 
+/** Una entrada del transcript en vivo de una child session: una tool o un
+ *  fragmento de texto del sub-agente. Lo captura el host suscribiéndose a los
+ *  eventos del SDK (tool_execution_start/end + message_update) y lo renderiza
+ *  el WorkflowPanel al expandir la etapa. */
+export interface TranscriptEntry {
+	/** toolCallId (tools) o clave sintética (texto). */
+	id: string;
+	kind: "tool" | "text";
+	toolName?: string;
+	status?: "running" | "completed" | "failed";
+	/** edit/write/read/grep… — ruta o patrón extraído de los args. */
+	path?: string;
+	/** bash — comando extraído de los args. */
+	command?: string;
+	/** edit/write — «+X -Y» si el result lo expone. */
+	diffStat?: string;
+	/** text — fragmento del texto del sub-agente. */
+	text?: string;
+}
+
 export interface StageView {
 	name: string;
 	skill: string;
@@ -30,6 +50,10 @@ export interface StageView {
 	retries?: number;
 	/** Unidades de loop (Fase 6) bajo esta etapa. */
 	units?: UnitView[];
+	/** Transcript en vivo de la(s) child session(s) de esta etapa (tools + texto
+	 *  del sub-agente), capturado por el host vía suscripción a eventos del SDK.
+	 *  Lo renderiza el WorkflowPanel al expandir la etapa. */
+	transcript?: TranscriptEntry[];
 }
 
 export type RunStatus = "running" | "completed" | "failed" | "aborted";
@@ -224,6 +248,91 @@ export function unitEnd(
 			});
 			return { ...r, stages };
 		}),
+	);
+}
+
+// --- Transcript en vivo (capturado por el host desde eventos del SDK) ---
+
+/** Aplica fn a la última etapa con ese nombre (la running), o NO-OP si no existe
+ *  (p.ej. sesiones de judges con nombre sintético «<stage>-judge»: no crean filas
+ *  fantasma en el panel). Variante no-insertora de upsertStage. */
+function patchStage(
+	stages: StageView[],
+	name: string,
+	fn: (s: StageView) => StageView,
+): StageView[] {
+	const idx = [...stages].reverse().findIndex((s) => s.name === name);
+	if (idx < 0) return stages;
+	const realIdx = stages.length - 1 - idx;
+	return stages.map((s, i) => (i === realIdx ? fn(s) : s));
+}
+
+/** Añade una entrada de tool al transcript de la etapa (tool_execution_start). */
+export function appendTranscriptTool(
+	runId: string,
+	stage: string,
+	entry: TranscriptEntry,
+): void {
+	set(
+		mapRun(runId, (r) => ({
+			...r,
+			stages: patchStage(r.stages, stage, (s) => ({
+				...s,
+				transcript: [...(s.transcript ?? []), entry],
+			})),
+		})),
+	);
+}
+
+/** Actualiza la entrada de tool con ese toolCallId (tool_execution_end: estado +
+ *  diffStat). No-op si no existe (p.ej. start descartado). */
+export function updateTranscriptTool(
+	runId: string,
+	stage: string,
+	toolCallId: string,
+	patch: Partial<TranscriptEntry>,
+): void {
+	set(
+		mapRun(runId, (r) => ({
+			...r,
+			stages: patchStage(r.stages, stage, (s) => {
+				const entries = [...(s.transcript ?? [])];
+				const idx = entries.findIndex((e) => e.id === toolCallId);
+				if (idx >= 0) entries[idx] = { ...entries[idx], ...patch };
+				return { ...s, transcript: entries };
+			}),
+		})),
+	);
+}
+
+/** Acumula un fragmento de texto del sub-agente en el transcript de la etapa.
+ *  Si la última entrada ya es texto, la extiende (conserva el orden texto→tool). */
+export function appendTranscriptText(
+	runId: string,
+	stage: string,
+	text: string,
+): void {
+	set(
+		mapRun(runId, (r) => ({
+			...r,
+			stages: patchStage(r.stages, stage, (s) => {
+				const entries = [...(s.transcript ?? [])];
+				const last = entries[entries.length - 1];
+				if (last && last.kind === "text") {
+					entries[entries.length - 1] = {
+						...last,
+						text: (last.text ?? "") + text,
+					};
+				} else {
+					entries.push({
+						id: `text-${entries.length}`,
+						kind: "text",
+						text,
+					});
+				}
+				return { ...s, transcript: entries };
+			}),
+		})),
 	);
 }
 

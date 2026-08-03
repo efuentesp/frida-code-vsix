@@ -509,6 +509,7 @@ async function runStage(
 			sessionDir,
 			signal,
 			preSnapshot,
+			{ runId: ctx.runId, stage: stageName },
 		);
 		if (res.ok && res.output && spec?.name)
 			publishNamed(state, spec.name, res.output);
@@ -582,6 +583,7 @@ async function runStage(
 		sessionDir,
 		signal,
 		preSnapshot,
+		{ runId: ctx.runId, stage: stageName },
 	);
 	if (res.ok && res.output && spec?.name)
 		publishNamed(state, spec.name, res.output);

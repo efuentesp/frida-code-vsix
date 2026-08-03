@@ -3,9 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { Diff } from "./Diff";
 
-// Tools propios de frida-lens (pi-lens): de lectura/análisis, no mutan archivos.
-// Se muestran con un mensaje distinto al de un MCP/extensión desconocido real.
-const FRIDA_LENS_TOOLS = new Set([
+// Clasificación del tool para el hint del ApprovalCard: distinguimos las tools
+// internas/nativas conocidas de un MCP/extensión de terceros real.
+//   • READONLY_TOOLS: sólo leen/analizan, no mutan archivos del proyecto
+//     (frida-lens + las nativas de lectura del SDK + el reporte de contexto).
+//   • FRIDA_INTERNAL_TOOLS: extensiones de Frida que SÍ hacen cosas (mutan state,
+//     lanzan sub-agentes, navegan web, preguntan): conocidas, pero conviene
+//     revisar la acción antes de aceptar.
+const READONLY_TOOLS = new Set([
 	"project_report",
 	"module_report",
 	"symbol_search",
@@ -14,6 +19,21 @@ const FRIDA_LENS_TOOLS = new Set([
 	"lsp_diagnostics",
 	"lens_diagnostics",
 	"pi_lens_activate_tools",
+	"read",
+	"grep",
+	"find",
+	"ls",
+	"context",
+]);
+const FRIDA_INTERNAL_TOOLS = new Set([
+	"todo",
+	"ask_user_question",
+	"Agent",
+	"get_subagent_result",
+	"steer_subagent",
+	"web_search",
+	"web_fetch",
+	"agent_browser",
 ]);
 
 type ItemKey = "yes" | "pattern" | "no" | "reason";
@@ -165,9 +185,11 @@ export function ApprovalCard({
 			)}
 			{isTool && (
 				<p className="hint">
-					{FRIDA_LENS_TOOLS.has(approval.toolName)
-						? "Herramienta de frida-lens (sólo lectura/análisis; no modifica archivos). Revisa la acción antes de aceptar."
-						: "Herramienta no reconocida (MCP o extensión de terceros). Revisa la acción antes de aceptar."}
+					{READONLY_TOOLS.has(approval.toolName)
+						? "Herramienta de sólo lectura/análisis (no modifica archivos). Revisa la acción antes de aceptar."
+						: FRIDA_INTERNAL_TOOLS.has(approval.toolName)
+							? "Herramienta interna de Frida. Revisa la acción antes de aceptar."
+							: "Herramienta no reconocida (MCP o extensión de terceros). Revisa la acción antes de aceptar."}
 				</p>
 			)}
 

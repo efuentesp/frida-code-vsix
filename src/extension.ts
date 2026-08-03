@@ -54,14 +54,21 @@ import {
 	formatSyncReport,
 	getBundledSkillNames,
 } from "./tools/frida-pipeline";
-import { listAgents, getAvailableTypes } from "./tools/frida-subagents";
+import {
+	listAgents,
+	getAvailableTypes,
+	setAgentWidgetListener,
+} from "./tools/frida-subagents";
 import { expandSkillText } from "./tools/frida-args";
 import {
 	expandMultiSkillText,
 	type ExpandMultiSkillResult,
 } from "./tools/frida-multi-skills";
 import { createSkillsPanelElement } from "./tools/frida-multi-skills/SkillsPanel";
-import { wireAgentWidget } from "./tools/frida-subagents/panel";
+import {
+	wireAgentWidget,
+	unmountAgentWidget,
+} from "./tools/frida-subagents/panel";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -615,6 +622,17 @@ export async function activate(
 				});
 				frida = s;
 				wireSession(s.session);
+				// Monta el widget de agentes en el footer (idempotente) y publica el conteo
+				// de subagentes en background al webview. Así el indicador de procesamiento
+				// persiste ("N subagentes en curso…") aunque el agente principal termine y
+				// queden subagentes corriendo; el widget del footer da el detalle por agente.
+				wireAgentWidget(s.webBridge);
+				setAgentWidgetListener((snapshot) => {
+					const n = snapshot.filter(
+						(a) => a.status === "running" || a.status === "queued",
+					).length;
+					post({ type: "agents_running", count: n });
+				});
 				sendModelInfo();
 				// Diagnóstico: si la sesión se creó pero session.model es undefined (ej. el
 				// modelo guardado no se restaura), el proveedor/modelo quedarían en "---"
@@ -2625,6 +2643,24 @@ export async function activate(
 	async function abortRun(): Promise<void> {
 		try {
 			const { session } = await ensureSession();
+			// VACIAR LA COLA DE ENCOLADOS ANTES DE ABORTAR. El abort() del SDK NO vacía
+			// la cola interna de steer/followUp: si hay mensajes encolados, sobreviven
+			// al abort y el agente los procesa al cancelar el turno actual → parece que
+			// "no sucede nada" al presionar Detener. clearQueue() vacía
+			// _steeringMessages/_followUpMessages + agent.clearAllQueues() (paridad con
+			// el Esc de la TUI de pi: restoreQueuedMessagesToEditor({abort:true}) llama
+			// clearAllQueues() ANTES de agent.abort()). Restauramos los textos al
+			// composer (vía composer_insert) para no perder lo encolado.
+			const restoreTexts = pendingQueue.map((q) => q.text);
+			try {
+				session.session?.clearQueue?.();
+			} catch {
+				/* noop */
+			}
+			resetQueue();
+			if (restoreTexts.length > 0) {
+				post({ type: "composer_insert", text: restoreTexts.join("\n\n") });
+			}
 			// C: el botón Detener SIEMPRE aborta la corrida completa. Como primer paso
 			// (paridad TUI: el primer Esc mata el bash en vuelo) cesamos el bash y el
 			// retry en curso de inmediato — PERO sin return: después abortamos el
@@ -2731,6 +2767,10 @@ export async function activate(
 			frida.gateStats.reset(); // Fase 3: contadores a cero en el webview.
 			frida.sessionApprovals.clear(); // Fase 4: olvida patrones aprobados.
 			frida.webBridge.dispose();
+			// Desmonta el widget de agentes (para re-montarlo con el nuevo webBridge al
+			// recrear la sesión) y suelta el listener del conteo de subagentes.
+			unmountAgentWidget();
+			setAgentWidgetListener(undefined);
 			frida = undefined;
 			fridaPromise = undefined;
 		}

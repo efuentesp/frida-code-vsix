@@ -4,6 +4,7 @@ import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard, fmtDuration } from "./ToolCard";
 import { BashCard } from "./BashCard";
+import { CollapsibleCard } from "./CollapsibleCard";
 import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
 import { parseSkillBlock } from "../skill-block";
@@ -141,6 +142,8 @@ function ThinkingSegment({
 	endedAt?: number;
 	isLive: boolean;
 }) {
+	// Cronómetro en vivo mientras el modelo razona (re-render cada 250ms). Al
+	// terminar (isLive=false) se congela con endedAt.
 	const [now, setNow] = useState(Date.now());
 	useEffect(() => {
 		if (!isLive) return;
@@ -150,19 +153,17 @@ function ThinkingSegment({
 	const hasTimer = startedAt > 0;
 	const elapsed = hasTimer ? (endedAt ?? now) - startedAt : 0;
 	return (
-		<details className="thinking">
-			<summary className="thinking-head">
-				<Brain
-					size={13}
-					className={"thinking-icon" + (isLive ? " thinking-live" : "")}
-				/>
-				<span className="thinking-name">Razonamiento</span>
-				{hasTimer && (
-					<span
-						className={
-							"thinking-time " + (isLive ? "thinking-running" : "thinking-done")
-						}
-					>
+		<CollapsibleCard
+			running={isLive}
+			hasPartial={!!text}
+			hasContent={!!text}
+			variant="thinking"
+			icon={<Brain size={13} />}
+			iconLive={isLive}
+			leading={<span className="card-title">Razonamiento</span>}
+			status={
+				hasTimer ? (
+					<span className={"card-status " + (isLive ? "running" : "done")}>
 						{isLive ? (
 							<>
 								<Spinner size={13} /> {fmtDuration(elapsed)}
@@ -173,14 +174,13 @@ function ThinkingSegment({
 							</>
 						)}
 					</span>
-				)}
-				<span className="thinking-chev">
-					<Icon name="chevron" size={12} />
-				</span>
-			</summary>
-			<div className="thinking-body">
-				<Markdown>{text}</Markdown>
-			</div>
-		</details>
+				) : null
+			}
+			chevronTooltip={(open) =>
+				open ? "Contraer razonamiento" : "Ver razonamiento"
+			}
+		>
+			<Markdown>{text}</Markdown>
+		</CollapsibleCard>
 	);
 }

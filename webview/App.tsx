@@ -230,7 +230,14 @@ export function App() {
 			const secs = retrySecs ?? Math.ceil(state.retry.delayMs / 1000);
 			return `Reintentando (${state.retry.attempt}/${state.retry.maxAttempts}) en ${secs}s… (doble Esc para cancelar)`;
 		}
-		if (!state.busy) return null;
+		if (!state.busy) {
+			// El agente principal terminó, pero puede haber subagentes en background
+			// corriendo: el indicador persiste para que el usuario sepa que Frida sigue
+			// trabajando (el widget del footer da el detalle por agente).
+			const bg = state.backgroundRunning ?? 0;
+			if (bg > 0) return `${bg} subagente${bg === 1 ? "" : "s"} en curso…`;
+			return null;
+		}
 		const last = state.turns[state.turns.length - 1];
 		if (last?.bash?.status === "running") return "Ejecutando bash…";
 		if (last?.status === "executing" && last.executingTool)
