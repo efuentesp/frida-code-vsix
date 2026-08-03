@@ -11,6 +11,10 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ## [Unreleased]
 
+_Nada todavía._
+
+## [0.5.0] - 2025-08-02
+
 ### Añadido
 
 - **`frida-multi-skills`** — invoca skills desde **cualquier parte del prompt**
@@ -29,6 +33,64 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
   v0.7.4). Sin bundle propio: opera sobre skills existentes, no añade nuevas →
   no colisiona con `frida-pipeline`. Gate de directivas → `frida-permission-system`.
   Ver [ADR-0025](./docs/adr/0025-frida-pix-skills-porter-pix-skills.md).
+
+- **`frida-supi-web`** — porte nativo de
+  [`@mrclrchtr/supi-web`](https://www.npmjs.com/package/@mrclrchtr/supi-web) que
+  aporta tres tools web que Frida **no incluía** (supi-web vive en `~/.pi`, no en
+  el `agentDir` de Frida `~/.frida`). Mismo patrón de porte nativo que
+  `frida-agent-browser` (misma `ExtensionAPI` de Pi, **sin** renderers Ink, que
+  el webview ignora). Tres tools para el modelo:
+  - **`web_fetch_md`** — descarga una URL pública `http(s)` y la devuelve como
+    **Markdown limpio** (negociación de contenido en cascada: Markdown nativo
+    vía HEAD → sniff del content-type → URL sibling `.md` → HTML→Markdown con
+    Readability + Turndown + GFM). Soporta `output_mode` `auto`/`inline`/`file`,
+    `abs_links` y `timeout_ms`; trunca a 2000 líneas/50 KB y vuelca el resto a
+    un temp.
+  - **`web_docs_search`** / **`web_docs_fetch`** — búsqueda y fetch de
+    documentación de librerías vía **Context7**. La API key se gestiona con
+    **`/login context7`** (SecretStorage, como los proveedores de modelos), con
+    fallback a `CONTEXT7_API_KEY` del entorno.
+  - **Rendering en el webview** — a diferencia del referencia (UI colapsada en
+    el TUI de Pi), estas tools delegan en el `ToolCard` genérico, que ahora las
+    muestra como **Markdown** (no `<pre>`) con iconos `Globe`/`Library`/`BookOpen`
+    y el argumento principal (URL / `library_id`) en la cabecera.
+  Sin dependencia del paquete npm en runtime: la lógica de
+  fetch/conversión/Context7 es un porte. Documentación:
+  [`docs/tools/frida-supi-web.md`](./docs/tools/frida-supi-web.md).
+
+### Cambiado
+
+- **`/login context7`** / **`/logout context7`** — gestionan la API key de
+  Context7 en SecretStorage (`frida.context7Key`), inyectada en memoria a las
+  tools `web_docs_*` vía un getter síncrono (`getContext7Key`) que recorre
+  `CreateFridaSessionOptions` → `createFridaSupiWeb({ getKey })` → cliente REST.
+  Patrón ADR-0017 aplicado a un servicio **no-LLM** (Context7 no pertenece a
+  `API_KEY_PROVIDERS`). Fallback a `CONTEXT7_API_KEY` del entorno para sesiones
+  hijas offline / CI.
+- **`tsconfig.json`** — añadido `DOM` + `DOM.Iterable` al `lib` del host
+  (necesario para los tipos de `jsdom` y la iteración de `NodeListOf` en
+  `querySelectorAll`). No rompe código existente de `src/` (verificado).
+- **`src/pi-session.ts`** — montaje de `frida-supi-web` junto al resto de tools
+  nativas (tras `frida-agent-browser`).
+- **`webview/components/ToolCard.tsx`** — `TOOL_INFO` + caso Markdown para las
+  tres tools web.
+- **`esbuild.js`** — `jsdom` añadido a `external`. **Fix crítico:** jsdom, al
+  importarse, lee `default-stylesheet.css` con `path.resolve(__dirname, "../../../browser/...")`
+  asumiendo su estructura interna; si se bundlea, `__dirname` = `dist/` y la ruta
+  se rompe → `ENOENT` que tiraba `activate()`. Como `external`, jsdom se resuelve
+  desde `node_modules` en runtime (estructura intacta); además `extension.js`
+  baja ~12 MB (30 → 18 MB).
+
+### Dependencias
+
+- `jsdom@^30`, `@mozilla/readability@^0.6`, `turndown@^7`,
+  `turndown-plugin-gfm@^1` (dep runtime) — conversión HTML→Markdown.
+- `@types/jsdom`, `@types/turndown` (devDeps).
+
+### Limitaciones
+
+- **Sin setting de toggle** (`frida.supiWeb.enabled`); siempre activa. Main only
+  (las sesiones hijas de workflow no la cargan, igual que `frida-agent-browser`).
 
 ## [0.4.0] - 2025-07-31
 

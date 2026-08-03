@@ -14,6 +14,15 @@ const external = [
 	// dinámicamente con createRequire + fallbacks por plataforma.
 	"@napi-rs/keyring",
 	"@napi-rs/keyring-*",
+	// jsdom NO se puede bundlear: lee su stylesheet por defecto con
+	// `path.resolve(__dirname, "../../../browser/default-stylesheet.css")` (en
+	// lib/jsdom/living/css/helpers/computed-style.js) al importarse. En el bundle
+	// __dirname = dist/, así que la ruta relativa se rompe → ENOENT que tira
+	// activate(). Como external, jsdom carga desde node_modules en runtime (su
+	// estructura interna intacta) y resuelve default-stylesheet.css correctamente.
+	// Fruto: dist/extension.js más pequeño (~10-15 MB menos). vsce incluye jsdom
+	// (es dependency) y todo su árbol de sub-deps en el .vsix.
+	"jsdom",
 ];
 
 // pi-ai es dependencia TRANSITORIA (vive bajo pi-coding-agent) y NO resuelve

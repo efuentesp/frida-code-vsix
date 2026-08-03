@@ -23,6 +23,9 @@ import {
 	CircleX,
 	Users,
 	Wrench,
+	Globe,
+	Library,
+	BookOpen,
 } from "lucide-react";
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
@@ -219,6 +222,23 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	todo: todoCallInfo,
 	ask_user_question: askCallInfo,
 	agent_browser: browserCallInfo,
+	// frida-supi-web (porte de @mrclrchtr/supi-web): las 3 tools web. El cuerpo se
+	// renderiza como Markdown (ver renderResult), no como terminal plano.
+	web_fetch_md: (a) => ({
+		icon: <Globe size={13} />,
+		name: "Web Fetch",
+		label: str(a.url),
+	}),
+	web_docs_search: (a) => ({
+		icon: <Library size={13} />,
+		name: "Docs Search",
+		label: str(a.library_name),
+	}),
+	web_docs_fetch: (a) => ({
+		icon: <BookOpen size={13} />,
+		name: "Docs Fetch",
+		label: str(a.library_id),
+	}),
 	// Sub-agente autónomo: label = descripción corta (3-5 palabras) que pide el
 	// tool, o el tipo de agente si no trae descripción.
 	agent: (a) => ({
@@ -333,6 +353,19 @@ function renderResult(entry: ToolEntry) {
 		return (
 			<div className="tool-result md">
 				<Markdown>{md}</Markdown>
+			</div>
+		);
+	}
+	// frida-supi-web: web_fetch_md / web_docs_search / web_docs_fetch devuelven
+	// Markdown (la página convertida o la tabla de Context7). Renderizar como tal.
+	if (
+		entry.tool === "web_fetch_md" ||
+		entry.tool === "web_docs_search" ||
+		entry.tool === "web_docs_fetch"
+	) {
+		return (
+			<div className="tool-result md">
+				<Markdown>{entry.result}</Markdown>
 			</div>
 		);
 	}

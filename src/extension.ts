@@ -351,6 +351,13 @@ export async function activate(
 		const k = await context.secrets.get(def.secretKey);
 		if (k) keyCaches[def.id] = k;
 	}
+	// frida-supi-web: API key de Context7 en SecretStorage (patrón ADR-0017
+	// aplicado a un servicio NO-LLM). Cache síncrono + fallback a env para sesiones
+	// hijas/offline. Se gestiona con `/login context7` y `/logout context7`.
+	const CONTEXT7_SECRET_KEY = "frida.context7Key";
+	let context7KeyCache = (await context.secrets.get(CONTEXT7_SECRET_KEY)) ?? "";
+	const getContext7Key = (): string | undefined =>
+		context7KeyCache || process.env.CONTEXT7_API_KEY;
 	const sessionDirPath = path.join(context.globalStorageUri.fsPath, "sessions");
 	// Auditoría del gate de aprobación (Prioridad 2): JSONL append-only, chmod 0600.
 	// Vive junto a las sesiones en globalStorageUri (no bajo sync en nube: lleva
@@ -617,6 +624,7 @@ export async function activate(
 					contextEnabled: isContextEnabled,
 					getGatePatterns: readGatePatterns,
 					onLensDiagnostics: mergeLens,
+					getContext7Key,
 					onProviderError,
 					requestDumpPath,
 				});
@@ -1750,19 +1758,21 @@ export async function activate(
 				break;
 			}
 			case "login":
-				if (arg) void loginProvider(arg);
+				if (arg === "context7") void promptContext7Key();
+				else if (arg) void loginProvider(arg);
 				else
 					post({
 						type: "info",
-						text: "Uso: /login <provider>  (ej. github-copilot)",
+						text: "Uso: /login <provider | context7>  (ej. github-copilot, context7)",
 					});
 				break;
 			case "logout":
-				if (arg) void logoutProvider(arg);
+				if (arg === "context7") void clearContext7Key();
+				else if (arg) void logoutProvider(arg);
 				else
 					post({
 						type: "info",
-						text: "Uso: /logout <provider>  (ej. github-copilot)",
+						text: "Uso: /logout <provider | context7>  (ej. github-copilot, context7)",
 					});
 				break;
 			case "name":
@@ -2847,6 +2857,7 @@ export async function activate(
 				onWebCommit: (rootId, tree, placement) =>
 					post({ type: "web_commit", rootId, tree, placement }),
 				onGateStats: (s) => post({ type: "gate_stats", stats: s }),
+				getContext7Key,
 				getMode: () => approvalMode,
 				askUserQuestionEnabled: isAskUserQuestionEnabled,
 				todoEnabled: isTodoEnabled,
@@ -3006,6 +3017,36 @@ export async function activate(
 		}
 		post({ type: "key_set" });
 		post({ type: "session_ready" });
+	}
+
+	// frida-supi-web: API key de Context7 en SecretStorage (servicio NO-LLM, por eso
+	// vive fuera de API_KEY_PROVIDERS). Se gestiona con `/login context7` /
+	// `/logout context7`. El cache síncrono alimenta el getter getContext7Key.
+	async function setContext7Key(key: string): Promise<void> {
+		const trimmed = key.trim();
+		if (!trimmed) return;
+		await context.secrets.store(CONTEXT7_SECRET_KEY, trimmed);
+		context7KeyCache = trimmed;
+		post({
+			type: "info",
+			text: "API key de Context7 guardada. Las tools `web_docs_search`/`web_docs_fetch` ya pueden usarla.",
+		});
+	}
+
+	async function promptContext7Key(): Promise<void> {
+		const key = await vscode.window.showInputBox({
+			prompt:
+				"Introduce tu API key de Context7 (se envía como Authorization: Bearer). Consíguela gratis en https://context7.com/dashboard.",
+			password: true,
+			ignoreFocusOut: true,
+		});
+		if (key) await setContext7Key(key);
+	}
+
+	async function clearContext7Key(): Promise<void> {
+		await context.secrets.delete(CONTEXT7_SECRET_KEY);
+		context7KeyCache = "";
+		post({ type: "info", text: "API key de Context7 eliminada." });
 	}
 
 	async function promptKey(

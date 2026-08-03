@@ -42,6 +42,7 @@ import {
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
+import { createFridaSupiWeb } from "./tools/frida-supi-web";
 import { createFridaArgs } from "./tools/frida-args";
 import { createFridaMultiSkills } from "./tools/frida-multi-skills";
 import { createFridaPixSkills } from "./tools/frida-pix-skills";
@@ -157,6 +158,11 @@ export interface CreateFridaSessionOptions {
 	 *  (cuando pi-lens recalcula diagnósticos). El host acumula por turno y publica
 	 *  un resumen al webview. Es opt-in: si pi-lens no cargó, nunca se invoca. */
 	onLensDiagnostics: (payload: LensDiagnosticsPayload) => void;
+	/** API key de Context7 (frida-supi-web): cache síncrono que el host carga del
+	 *  SecretStorage (`frida.context7Key`) al arrancar, con fallback a
+	 *  `process.env.CONTEXT7_API_KEY`. Se inyecta en las tools web_docs_* para que
+	 *  la key NUNCA viva en disco/env en claro (patrón ADR-0017 aplicado a Context7). */
+	getContext7Key: () => string | undefined;
 }
 
 export async function createFridaSession(
@@ -430,6 +436,16 @@ export async function createFridaSession(
 			{
 				name: "frida-agent-browser",
 				factory: createFridaAgentBrowser({ agentDir: opts.agentDir }),
+			},
+			// frida-supi-web: porte nativo de @mrclrchtr/supi-web. Tools web_fetch_md
+			// (URL pública → Markdown limpio), web_docs_search y web_docs_fetch (docs de
+			// librerías vía Context7). Frida no incluye supi-web en ~/.frida, así que sin
+			// este porte el agente carecería de estas capacidades. Sin renderers TUI: el
+			// webview renderiza el Markdown vía ToolCard.tsx. Main only (igual que
+			// frida-agent-browser).
+			{
+				name: "frida-supi-web",
+				factory: createFridaSupiWeb({ getKey: opts.getContext7Key }),
 			},
 			// frida-pipeline (ADR-0021): orquestador puro — 0 tools propios. Registra
 			// los hooks invisibles de guidance recursiva (.frida/guidance/) y

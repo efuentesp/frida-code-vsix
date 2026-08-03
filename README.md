@@ -193,6 +193,7 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | **frida-permission-system** | Sistema de permisos y gates (registro, auditoría) | [→](./docs/tools/frida-permission-system.md) |
 | **frida-context** | Snapshot de presión del contexto para auto-regulación | [→](./docs/tools/frida-context.md) |
 | **frida-agent-browser** | Automatización de navegador real + búsqueda web (Exa/Brave) + apps Electron (tools `agent_browser` / `agent_browser_web_search`) | [→](./docs/tools/frida-agent-browser.md) |
+| **frida-supi-web** | Fetch de URL pública → Markdown + docs de librerías vía Context7 (tools `web_fetch_md` / `web_docs_search` / `web_docs_fetch`) — porte de `@mrclrchtr/supi-web` | [→](./docs/tools/frida-supi-web.md) |
 | **frida-args** | Argumentos (`$1`/`$ARGUMENTS`) y shell (`!`cmd``) en skills — porte de rpiv-args | [→](./docs/tools/frida-args.md) |
 | **frida-multi-skills** | Invoca skills desde cualquier parte del prompt con `$name` y combina varias por mensaje — porte de pi-multi-skills | [→](./docs/tools/frida-multi-skills.md) |
 | **frida-pix-skills** | Carga skills on-demand con el tool `read_skills`, interpola `!`cmd`` vivo y accede a Skills.sh — porte de pix-skills | [→](./docs/tools/frida-pix-skills.md) |
