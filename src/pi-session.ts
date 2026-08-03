@@ -49,6 +49,7 @@ import { createFridaPixSkills } from "./tools/frida-pix-skills";
 import { createFridaPipeline } from "./tools/frida-pipeline";
 import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
+import { createFridaGitSync } from "./tools/frida-git-sync";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import { createFridaUiContext } from "./extension-ui-context";
@@ -471,6 +472,14 @@ export async function createFridaSession(
 			{
 				name: "frida-mcp-adapter",
 				factory: createFridaMcpAdapter(),
+			},
+			// frida-git-sync (ADR-0026): sincroniza el agentDir (~/.frida) entre
+			// máquinas vía un repo Git privado. Porte nativo de @jachy/pi-git-sync.
+			// Registra /fridasync (status/diff). No interactúa con otros módulos;
+			// solo cablea el adapter git (pi.exec) y los comandos.
+			{
+				name: "frida-git-sync",
+				factory: createFridaGitSync(),
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens
