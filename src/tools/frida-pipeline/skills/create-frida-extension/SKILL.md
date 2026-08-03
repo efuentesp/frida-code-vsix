@@ -116,6 +116,9 @@ queda pendiente (ej. prueba en vivo, revisión manual de archivos grandes).
   (L3).
 - **"Voy a crear otro documento de porte"** → NO. Ampliar el how-to (única fuente
   de verdad; "info lives in ONE place").
+- **"Voy a poner el detalle del skill en un doc externo (`docs/...`)"** → NO.
+  El detalle vive en `references/` del skill (autocontenido, siempre accesible
+  sin importar el cwd). Forma `skill-creator`.
 - **"El entry point del skill supera 200 líneas"** → Aplicar progressive
   disclosure (mover detalle a `references/`).
 
