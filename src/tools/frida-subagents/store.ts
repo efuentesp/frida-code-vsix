@@ -4,20 +4,38 @@
 // para useSyncExternalStore. El agent-manager llama a las funciones de update
 // cuando los agentes cambian de estado.
 
+export type AgentWidgetStatus =
+	| "running"
+	| "queued"
+	| "completed"
+	| "error"
+	| "stopped"
+	| "steered"
+	| "aborted";
+
 export interface AgentDisplay {
 	id: string;
 	type: string;
 	description: string;
-	status:
-		| "running"
-		| "queued"
-		| "completed"
-		| "error"
-		| "stopped"
-		| "steered"
-		| "aborted";
+	status: AgentWidgetStatus;
 	startedAt: number;
 	completedAt?: number;
+	/** Progreso en vivo (D1+D2): desde el activity-tracker de la sesión hija. */
+	toolUses?: number;
+	tokens?: number;
+	turnCount?: number;
+	maxTurns?: number;
+	/** Resumen de una línea: "reading 3 files…", "thinking…". */
+	activity?: string;
+}
+
+/** Patch de progreso en vivo para `agentWidgetStore.agentProgress`. */
+export interface AgentProgressPatch {
+	toolUses?: number;
+	tokens?: number;
+	turnCount?: number;
+	maxTurns?: number;
+	activity?: string;
 }
 
 let agents: AgentDisplay[] = [];
@@ -55,7 +73,7 @@ export const agentWidgetStore = {
 	},
 
 	/** Un agente cambió de estado. */
-	agentUpdated(id: string, status: AgentDisplay["status"]): void {
+	agentUpdated(id: string, status: AgentWidgetStatus): void {
 		agents = agents.map((a) =>
 			a.id === id
 				? {
@@ -69,8 +87,14 @@ export const agentWidgetStore = {
 								? Date.now()
 								: a.completedAt,
 					}
-				: a,
+					: a,
 		);
+		emit();
+	},
+
+	/** Progreso en vivo de un agente (activity/stats desde el activity-tracker). */
+	agentProgress(id: string, patch: AgentProgressPatch): void {
+		agents = agents.map((a) => (a.id === id ? { ...a, ...patch } : a));
 		emit();
 	},
 

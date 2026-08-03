@@ -79,6 +79,34 @@ su trabajo no toca el working tree actual. El ciclo de vida del worktree:
 > actual replica el comportamiento de `pi-subagents` y limpia tanto en
 > foreground como en background y en el path de error/abort.
 
+## Panel de subagentes (widget footer)
+
+Mientras corren subagentes, un panel en el **footer** del webview muestra cada
+agente con **progreso en vivo** (paridad con el panel "above editor" de
+`pi-subagents`):
+
+```text
+● Agents (2 running)
+  ⠼ codebase-analyzer  Analizar internals · ↻17 · 48 tools · 87.1k tok · 184s
+    ⎿  reading 3 files…
+  ⠼ codebase-analyzer  Extraer patrón · ↻14 · 32 tools · 73.5k tok · 184s
+    ⎿  editing…
+```
+
+- **Stats**: `↻turnos≤max` · `N tools` · `N.Nk tok` · `elapsed`.
+- **Activity line** (`⎿`): qué hace AHORA el subagente — `reading`,
+  `editing 3 files`, `searching`, `thinking…` o un preview de su texto.
+- **Foreground + background**: el progreso se refleja para todos los agentes
+  (antes solo el foreground tenía vistazo en vivo).
+- **Auto-hide**: el panel desaparece cuando no hay agentes; los completados se
+  podan a los 10 s.
+
+El flujo: cada sesión hija se suscribe vía `subscribeAgentProgress`
+(`agent-runner.ts`), que alimenta un `activity-tracker` y, en cada cambio
+(throttle ~6/s), actualiza `agentWidgetStore` — el store reactivo que lee
+`AgentWidget.tsx`. El `details` `subagent_progress` también viaja al webview
+para un futuro render rico de la tarjeta inline del tool `Agent`.
+
 ## Arquitectura
 
 ```text
@@ -87,8 +115,12 @@ src/tools/frida-subagents/
 ├── types.ts            # AgentConfig, AgentRecord, SpawnOptions
 ├── default-agents.ts   # 3 defaults (general-purpose, Explore, Plan)
 ├── custom-agents.ts    # descubre .md de .frida/agents/ + global
-├── agent-runner.ts     # createAgentSession + ejecución + extracción resultado
+├── agent-runner.ts     # createAgentSession + ejecución + subscribeAgentProgress
 ├── agent-manager.ts    # registro de agentes + cola concurrencia + lifecycle worktrees (prune)
+├── activity-tracker.ts # tracker de actividad en vivo (tools, turnos, tokens) + describeActivity
+├── AgentWidget.tsx     # panel React del footer (fridaWeb) con progreso en vivo
+├── store.ts            # agentWidgetStore reactivo (useSyncExternalStore)
+├── panel.ts            # montaje idempotente del widget en el footer
 └── worktree.ts         # git worktree create/cleanup/prune (aislamiento por agente)
 ```
 

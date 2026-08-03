@@ -149,6 +149,79 @@ describe("frida-subagents / store / agentUpdated", () => {
 	});
 });
 
+describe("frida-subagents / store / agentProgress", () => {
+	it("actualiza toolUses/tokens/turnCount/activity de un agente", () => {
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "Explore",
+			description: "test",
+			status: "running",
+			startedAt: Date.now(),
+		});
+
+		agentWidgetStore.agentProgress("a1", {
+			toolUses: 5,
+			tokens: 12_300,
+			turnCount: 3,
+			maxTurns: 10,
+			activity: "reading 2 files…",
+		});
+
+		const snapshot = agentWidgetStore.getSnapshot();
+		expect(snapshot[0]).toMatchObject({
+			toolUses: 5,
+			tokens: 12_300,
+			turnCount: 3,
+			maxTurns: 10,
+			activity: "reading 2 files…",
+		});
+	});
+
+	it("conserva el resto de campos y notifica a los subscribers", () => {
+		let calls = 0;
+		agentWidgetStore.subscribe(() => calls++);
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "Explore",
+			description: "test",
+			status: "running",
+			startedAt: 1000,
+		});
+		const before = calls;
+
+		agentWidgetStore.agentProgress("a1", { activity: "thinking…" });
+
+		const snapshot = agentWidgetStore.getSnapshot();
+		expect(snapshot[0]!.activity).toBe("thinking…");
+		expect(snapshot[0]!.status).toBe("running"); // conservado
+		expect(snapshot[0]!.type).toBe("Explore"); // conservado
+		expect(calls).toBe(before + 1); // notificó
+	});
+
+	it("no afecta a otros agentes", () => {
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "Explore",
+			description: "t1",
+			status: "running",
+			startedAt: 1000,
+		});
+		agentWidgetStore.agentStarted({
+			id: "a2",
+			type: "Plan",
+			description: "t2",
+			status: "running",
+			startedAt: 2000,
+		});
+
+		agentWidgetStore.agentProgress("a1", { toolUses: 7 });
+
+		const snapshot = agentWidgetStore.getSnapshot();
+		expect(snapshot[0]!.toolUses).toBe(7);
+		expect(snapshot[1]!.toolUses).toBeUndefined();
+	});
+});
+
 describe("frida-subagents / store / pruneCompleted", () => {
 	it("elimina agentes completados hace más de maxAgeMs", () => {
 		const now = Date.now();

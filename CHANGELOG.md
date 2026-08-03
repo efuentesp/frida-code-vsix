@@ -23,6 +23,17 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
   progreso (fase + elapsed) y botón **Cancel** que aborta la operación git en
   curso. Ver [ADR-0026](./docs/adr/0026-frida-git-sync-porter-pi-git-sync.md).
 
+### Cambiado
+
+- **`frida-subagents` — panel de subagentes con progreso en vivo.** El widget
+  del footer ahora muestra, por cada agente, **stats y actividad en tiempo
+  real** (paridad con el panel "above editor" de `pi-subagents`): `↻turnos≤max`,
+  `N tools`, `N.Nk tok` y `elapsed`, más una **activity line** (`⎿ reading 3
+  files…`, `editing`, `thinking…`) con lo que hace el subagente ahora. Antes el
+  widget solo mostraba tipo + descripción + elapsed, y el progreso en vivo sólo
+  llegaba a la tarjeta inline del tool `Agent` (foreground). Ahora **foreground
+  y background** reflejan su progreso en el panel.
+
 ### Corregido
 
 - **`frida-subagents` — limpieza de worktrees (`isolation: worktree`).** El

@@ -37,6 +37,7 @@ import {
 	generateAgentId,
 	registerAgent,
 	updateAgentStatus,
+	updateAgentProgress,
 	registerWorktreeRepo,
 } from "./agent-manager";
 
@@ -214,17 +215,15 @@ export async function runAgent(
 		}
 	});
 
-	// Vistazo en vivo (sólo foreground): reenvía texto streaming + tools del
-	// sub-agente al webview como "partial" del tool padre. El background se ve vía
-	// get_subagent_result(wait:true), que adjunta su propio forwarder.
-	let stopLive: (() => void) | undefined;
-	if (!options.runInBackground && options.onUpdate) {
-		stopLive = forwardLiveProgress(
-			session,
-			options.onUpdate,
-			options.maxTurns ?? config.maxTurns,
-		);
-	}
+	// Progreso en vivo SIEMPRE (foreground + background): alimenta el widget
+	// footer con activity/stats (D1+D2) y, si es foreground, también la tarjeta
+	// inline del tool padre vía onUpdate.
+	const stopProgress = subscribeAgentProgress(
+		session,
+		agentId,
+		!options.runInBackground ? options.onUpdate : undefined,
+		options.maxTurns ?? config.maxTurns,
+	);
 
 	// Si es background, no esperar — arrancar en fondo.
 	if (options.runInBackground) {
@@ -235,28 +234,28 @@ export async function runAgent(
 			config,
 			options,
 		);
-		// Worktree cleanup tras completar (background): encadenar al promise para
-		// que se ejecute al terminar, igual que el path foreground.
-		const promise = worktreeInfo
-			? runPromise.then(
-					(result) => {
-						try {
-							cleanupWorktree(baseCwd, worktreeInfo, description);
-						} catch {
-							/* best-effort */
-						}
-						return result;
-					},
-					(err) => {
-						try {
-							cleanupWorktree(baseCwd, worktreeInfo, description);
-						} catch {
-							/* best-effort */
-						}
-						throw err;
-					},
-				)
-			: runPromise;
+		// Worktree + tracker cleanup tras completar (background): encadenar al
+		// promise para que se ejecuten al terminar, igual que el path foreground.
+		const cleanupAfter = (): void => {
+			stopProgress();
+			if (worktreeInfo) {
+				try {
+					cleanupWorktree(baseCwd, worktreeInfo, description);
+				} catch {
+					/* best-effort */
+				}
+			}
+		};
+		const promise = runPromise.then(
+			(result) => {
+				cleanupAfter();
+				return result;
+			},
+			(err) => {
+				cleanupAfter();
+				throw err;
+			},
+		);
 		// Guardar el promise para get_subagent_result(wait: true).
 		const record = {
 			id: agentId,
@@ -320,7 +319,7 @@ export async function runAgent(
 			}
 		}
 		options.signal?.removeEventListener("abort", onParentAbort);
-		stopLive?.();
+		stopProgress();
 	}
 }
 
@@ -390,20 +389,17 @@ function extractText(msg: { content?: unknown }): string {
 }
 
 /**
- * Suscribe la sesión hija y reenvía su actividad en vivo vía onUpdate como
- * "partial" estructurado del tool padre (agent foreground o get_subagent_result
- * wait). Usa un ActivityTracker (activeTools start/end, toolUses, turnos,
- * responseText, tokens) + describeActivity() para producir un resumen compacto
- * ("searching…", "editing…", "thinking…") con métricas, en vez de un volcado de
- * texto creciendo. Patrón de @tintinweb/pi-subagents.
+ * Suscribe la sesión de un sub-agente al activity-tracker y refleja su progreso
+ * en vivo en el widget footer (siempre: foreground + background → D1+D2) y,
+ * opcionalmente, en la tarjeta inline del tool padre (foreground o
+ * get_subagent_result(wait)) vía `onUpdate`.
  *
- * El details {kind:"subagent_progress",...} viaja por el pipeline
- * (tool_execution_update) hasta el webview, que lo renderiza rico. El content
- * lleva el activity one-liner como fallback. Throttle ~6/s. Devuelve un unsub.
+ * Throttle ~6/s. Devuelve un unsub.
  */
-export function forwardLiveProgress(
+export function subscribeAgentProgress(
 	session: unknown,
-	onUpdate: AgentToolUpdateCallback,
+	agentId: string,
+	onUpdate?: AgentToolUpdateCallback,
 	maxTurns?: number,
 ): () => void {
 	const tracker = createActivityTracker(maxTurns);
@@ -412,22 +408,32 @@ export function forwardLiveProgress(
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let lastFlush = 0;
 
-	const buildDetails = () => {
-		const s = tracker.state;
-		return {
-			kind: "subagent_progress" as const,
-			toolUses: s.toolUses,
-			turnCount: s.turnCount,
-			maxTurns: s.maxTurns,
-			tokens: s.tokens,
-			activity: describeActivity(s.activeTools, s.responseText),
-		};
-	};
-
 	const flush = (): void => {
 		lastFlush = Date.now();
-		const d = buildDetails();
-		onUpdate({ content: [{ type: "text", text: d.activity }], details: d });
+		const s = tracker.state;
+		const activity = describeActivity(s.activeTools, s.responseText);
+		// D1+D2: reflejar el progreso en el widget footer (siempre, fg+bg).
+		updateAgentProgress(agentId, {
+			toolUses: s.toolUses,
+			tokens: s.tokens,
+			turnCount: s.turnCount,
+			maxTurns: s.maxTurns,
+			activity,
+		});
+		// Tarjeta inline del tool padre (sólo si hay onUpdate). El details
+		// {kind:"subagent_progress",...} viaja por el pipeline (tool_execution_update)
+		// hasta el webview; el content lleva el activity one-liner como fallback.
+		onUpdate?.({
+			content: [{ type: "text", text: activity }],
+			details: {
+				kind: "subagent_progress",
+				toolUses: s.toolUses,
+				turnCount: s.turnCount,
+				maxTurns: s.maxTurns,
+				tokens: s.tokens,
+				activity,
+			},
+		});
 	};
 
 	const scheduleFlush = (): void => {

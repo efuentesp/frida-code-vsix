@@ -36,6 +36,13 @@ function formatElapsed(startedAt: number): string {
 	return `${minutes}m${remSeconds}s`;
 }
 
+/** Formato compacto de tokens: "33.8k", "1.2M". */
+function formatTokens(count: number): string {
+	if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+	if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+	return `${count}`;
+}
+
 function AgentRow({
 	agent,
 	frame,
@@ -45,23 +52,50 @@ function AgentRow({
 }): ReactElement {
 	// running → spinner de braille animado (frame rota cada ~100ms desde el panel);
 	// el resto usa su glyph de estado.
-	const icon =
-		agent.status === "running"
-			? SPINNER_FRAMES[frame % SPINNER_FRAMES.length]
-			: STATUS_ICON[agent.status];
+	const isRunning = agent.status === "running";
+	const icon = isRunning
+		? SPINNER_FRAMES[frame % SPINNER_FRAMES.length]
+		: STATUS_ICON[agent.status];
 	const color = STATUS_COLOR[agent.status];
 	const elapsed = agent.completedAt
 		? `${Math.floor((agent.completedAt - agent.startedAt) / 1000)}s`
 		: formatElapsed(agent.startedAt);
 
+	// Stats en vivo desde el activity-tracker de la sesión hija (D1+D2):
+	// ↻turns≤max · N tools · N.Nk tok · elapsed. Sólo se muestran cuando el
+	// tracker ya reportó progreso; mientras tanto queda solo el elapsed.
+	const stats: string[] = [];
+	if (agent.turnCount != null && agent.turnCount > 0) {
+		stats.push(
+			`↻${agent.turnCount}${agent.maxTurns != null ? `≤${agent.maxTurns}` : ""}`,
+		);
+	}
+	if (agent.toolUses && agent.toolUses > 0) {
+		stats.push(`${agent.toolUses} tool${agent.toolUses === 1 ? "" : "s"}`);
+	}
+	if (agent.tokens && agent.tokens > 0) {
+		stats.push(`${formatTokens(agent.tokens)} tok`);
+	}
+	stats.push(elapsed);
+
 	return (
-		<fbox flexDirection="row" gap={4} alignItems="center">
-			<ftext color={color}>{icon}</ftext>
-			<ftext bold>{agent.type}</ftext>
-			<ftext color="var(--vscode-descriptionForeground)">
-				{agent.description}
-			</ftext>
-			<ftext color="var(--vscode-descriptionForeground)">· {elapsed}</ftext>
+		<fbox flexDirection="column">
+			<fbox flexDirection="row" gap={4} alignItems="center">
+				<ftext color={color}>{icon}</ftext>
+				<ftext bold>{agent.type}</ftext>
+				<ftext color="var(--vscode-descriptionForeground)">
+					{agent.description}
+				</ftext>
+				<ftext color="var(--vscode-descriptionForeground)">
+					· {stats.join(" · ")}
+				</ftext>
+			</fbox>
+			{isRunning && agent.activity ? (
+				<ftext color="var(--vscode-descriptionForeground)">
+					{"  ⎿  "}
+					{agent.activity}
+				</ftext>
+			) : null}
 		</fbox>
 	);
 }

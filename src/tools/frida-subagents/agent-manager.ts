@@ -125,6 +125,24 @@ export function updateAgentStatus(
 	agentWidgetStore.agentUpdated(id, status);
 }
 
+/**
+ * Actualiza el progreso en vivo de un agente en el widget store (activity +
+ * stats: toolUses, tokens, turnCount, maxTurns). Lo llama `subscribeAgentProgress`
+ * en cada flush del activity-tracker de la sesión hija.
+ */
+export function updateAgentProgress(
+	id: string,
+	patch: {
+		toolUses?: number;
+		tokens?: number;
+		turnCount?: number;
+		maxTurns?: number;
+		activity?: string;
+	},
+): void {
+	agentWidgetStore.agentProgress(id, patch);
+}
+
 /** Lista todos los agentes (para /agents y UI). */
 export function listAgents(): AgentRecord[] {
 	return [...agents.values()];

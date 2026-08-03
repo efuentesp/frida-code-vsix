@@ -17,7 +17,7 @@ import {
 import {
 	resolveAgentConfig,
 	runAgent,
-	forwardLiveProgress,
+	subscribeAgentProgress,
 	getAvailableTypes,
 	steerAgent,
 } from "./agent-runner";
@@ -271,10 +271,15 @@ export function createFridaSubagents() {
 					// Si wait:true, esperar el promise.
 					if (params.wait && agent.promise) {
 						// Vistazo en vivo: mientras espera, reenvía texto/tools del sub-agente
-						// al webview como "partial" de esta tarjeta.
+						// al webview como "partial" de esta tarjeta (el progreso del widget
+						// footer ya lo alimenta el tracker de runAgent).
 						let stopLive: (() => void) | undefined;
 						if (onUpdate && agent.session) {
-							stopLive = forwardLiveProgress(agent.session, onUpdate);
+							stopLive = subscribeAgentProgress(
+								agent.session,
+								agent.id,
+								onUpdate,
+							);
 						}
 						try {
 							// Si el padre aborta (Detener), dejamos de esperar y devolvemos el
