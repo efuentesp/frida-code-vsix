@@ -11,20 +11,19 @@ import type {
 // real) para soportar selección por teclado (parity con ApprovalCard), cosa
 // imposible con el árbol serializado del host.
 //
-// La lógica (tabs, drafts, multiSelect ☑/☐, preview side-by-side, texto libre)
-// migra tal cual del WebQuestionnaire del host; los tags fbox/ftext/… se vuelven
-// div/span/button nativos con las mismas clases CSS (.q-opt, .q-tab, …).
+// Parity con el TUI de pi (examples/extensions/questionnaire.ts): con 2+ preguntas
+// hay una tab bar con una pestaña por pregunta + una pestaña final "✓ Enviar"
+// (review) que resume las respuestas, indica qué falta y envía con Enter. Al
+// responder la última pregunta (single-select) se salta ahí automáticamente.
 //
-// Foco por ZONAS (options | input | buttons), gestionado por el handler (no por
-// el navegador). Las opciones y botones llevan tabIndex={-1} para no entrar al
-// foco nativo; sólo el textarea es focuseable nativamente (para escribir).
+// Foco por ZONAS (options | input | buttons), gestionado por el handler. Las
+// opciones, tabs y botones llevan tabIndex={-1}; sólo el textarea es focuseable
+// nativamente (para escribir).
 //
-// Keymap (consistente con permisos): Tab/Shift+Tab cicla por TODAS las zonas en
-// orden (opciones → input → botones → opciones) · ↑↓ navega dentro de la zona
-// (opciones o botones) · ⏎/Espacio activa el foco actual (opción → confirma ·
-// botón → ejecuta) · 1-9 selección directa · ←/→ cambia de pregunta · Shift+⏎
-// envía · Esc cancela (por niveles: con foco+texto en el input, el 1er Esc sale
-// del input conservando el texto; el 2º cancela).
+// Keymap (consistente con permisos): Tab/Shift+Tab cicla zonas (opciones → input
+// → botones) · ↑↓ navega dentro de la zona · ⏎/Espacio activa el foco actual ·
+// 1-9 selección directa · ←/→ cambia de pestaña (pregunta o Enviar) · Shift+⏎
+// envía · Esc cancela (por niveles en el input).
 
 interface Props {
 	questions: WebQuestionSpec[];
@@ -34,85 +33,118 @@ interface Props {
 type Zone = "options" | "input" | "buttons";
 
 export function QuestionsPanel({ questions, onResult }: Props) {
+	// tab: 0..questions.length-1 = pregunta · questions.length = pestaña "Enviar" (review)
 	const [tab, setTab] = useState(0);
 	const [drafts, setDrafts] = useState<Record<number, WebQuestionAnswer>>({});
 	const [customText, setCustomText] = useState<Record<number, string>>({});
 	const [hoverLabel, setHoverLabel] = useState<string | undefined>();
-	// Foco por zonas: options (focusOpt) / input (textarea nativo) / buttons (focusBtn).
 	const [zone, setZone] = useState<Zone>("options");
 	const [focusOpt, setFocusOpt] = useState(0);
 	const [focusBtn, setFocusBtn] = useState(0);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
-	const q = questions[tab];
-	const isLast = tab === questions.length - 1;
+	const isReviewTab = tab === questions.length;
+	const isMulti = questions.length >= 2;
+	const q = isReviewTab ? undefined : questions[tab];
+	const isLastQuestion = tab === questions.length - 1;
 	const draft = drafts[tab];
 
-	// Botones de navegación visibles (dependen de tab/isLast). Se recalculan en
-	// cada render para que sus actions capturen el estado fresco (drafts, etc.).
+	// Botones de navegación visibles según el tab. Se recalculan en cada render
+	// para que sus actions capturen el estado fresco.
 	type NavBtn = {
 		key: string;
 		label: string;
 		cls: string;
 		action: () => void;
 	};
-	const navButtons: NavBtn[] = [];
-	if (tab > 0)
-		navButtons.push({
-			key: "prev",
-			label: "← Anterior",
-			cls: "q-btn secondary",
-			action: () => goToTab(tab - 1),
-		});
-	if (!isLast)
-		navButtons.push({
-			key: "next",
-			label: "Siguiente →",
-			cls: "q-btn",
-			action: () => goToTab(tab + 1),
-		});
-	else
-		navButtons.push({ key: "submit", label: "Enviar", cls: "q-btn", action: submit });
-	navButtons.push({
-		key: "cancel",
-		label: "Cancelar",
-		cls: "q-btn danger",
-		action: cancel,
-	});
+	const navButtons: NavBtn[] = isReviewTab
+		? [
+				{
+					key: "prev",
+					label: "← Anterior",
+					cls: "q-btn secondary",
+					action: () => goToTab(questions.length - 1),
+				},
+				{ key: "submit", label: "Enviar ✓", cls: "q-btn", action: submit },
+				{ key: "cancel", label: "Cancelar", cls: "q-btn danger", action: cancel },
+			]
+		: [
+				...(tab > 0
+					? [
+							{
+								key: "prev",
+								label: "← Anterior",
+								cls: "q-btn secondary",
+								action: () => goToTab(tab - 1),
+							},
+						]
+					: []),
+				isLastQuestion
+					? {
+							key: "review",
+							label: "Revisar y enviar →",
+							cls: "q-btn",
+							action: () => goToTab(questions.length),
+						}
+					: {
+							key: "next",
+							label: "Siguiente →",
+							cls: "q-btn",
+							action: () => goToTab(tab + 1),
+						},
+				{ key: "cancel", label: "Cancelar", cls: "q-btn danger", action: cancel },
+			];
 
 	// ¿La pregunta actual lleva panel de preview? Solo single-select con ≥1 opción
-	// que traiga `preview` (paridad con rpiv: previews sólo en single-select).
+	// con `preview` (paridad rpiv). El review tab no lleva opciones.
 	const hasPreviews =
-		!q.multiSelect &&
-		q.options.some((o) => (o.preview ?? "").trim().length > 0);
-	// inputMode: el usuario está escribiendo respuesta custom → ancho completo.
-	const inputMode = (customText[tab] ?? "").trim().length > 0;
+		!isReviewTab &&
+		!q!.multiSelect &&
+		q!.options.some((o) => (o.preview ?? "").trim().length > 0);
+	const inputMode = !isReviewTab && (customText[tab] ?? "").trim().length > 0;
 
 	const selectedLabel = draft?.kind === "option" ? draft.answer : undefined;
-	const withPreview = (o: WebQuestionOption) =>
-		(o.preview ?? "").trim().length > 0;
-	// Opción cuyo preview se muestra: la hovered > la seleccionada, SIN fallback.
-	const activePreviewOpt =
-		q.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
-		q.options.find((o) => o.label === selectedLabel && withPreview(o));
+	const withPreview = (o: WebQuestionOption) => (o.preview ?? "").trim().length > 0;
+	const activePreviewOpt = isReviewTab
+		? undefined
+		: (q!.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
+			q!.options.find((o) => o.label === selectedLabel && withPreview(o)));
 
-	// reset hoverLabel + foco al cambiar de pregunta
+	// Estado de respuestas para la pestaña "Enviar" (review).
+	function isAnswered(i: number): boolean {
+		const d = drafts[i];
+		if (!d) return false;
+		return d.kind === "multi" ? (d.selected?.length ?? 0) > 0 : !!d.answer;
+	}
+	const allAnswered = questions.every((_, i) => isAnswered(i));
+	const missing = questions
+		.map((qq, i) => ({ qq, i }))
+		.filter(({ i }) => !isAnswered(i))
+		.map(({ qq, i }) => qq.header || `Q${i + 1}`);
+
+	// reset foco al cambiar de pestaña
 	useEffect(() => {
 		setHoverLabel(undefined);
 		setFocusOpt(0);
-		setFocusBtn(0);
-		setZone("options");
+		if (isReviewTab) {
+			// En el review tab el foco va al botón "Enviar".
+			setZone("buttons");
+			setFocusBtn(Math.max(0, navButtons.findIndex((b) => b.key === "submit")));
+		} else {
+			setZone("options");
+			setFocusBtn(0);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [tab]);
 
-	// Sincroniza el foco nativo del textarea con la zona: si la zona es "input",
-	// le damos foco (para escribir); si no, lo quitamos.
+	// Sincroniza el foco nativo del textarea con la zona "input".
 	useEffect(() => {
 		if (zone === "input") inputRef.current?.focus();
 		else inputRef.current?.blur();
 	}, [zone]);
 
 	function isOptionSelected(label: string): boolean {
-		if (q.multiSelect) return !!draft?.selected?.includes(label);
+		if (q?.multiSelect) return !!draft?.selected?.includes(label);
 		return draft?.kind === "option" && draft.answer === label;
 	}
 	function chooseSingle(label: string) {
@@ -120,6 +152,10 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 			...drafts,
 			[tab]: { questionIndex: tab, kind: "option", answer: label },
 		});
+		// Parity pi: al elegir (single-select) saltar a la siguiente pestaña.
+		// Con 2+ preguntas avanza (a la siguiente pregunta o a "Enviar"); con 1
+		// sola no hay tab bar → el usuario envía con Shift+Enter / Enviar.
+		if (isMulti) goToTab(Math.min(tab + 1, questions.length));
 	}
 	function toggleMulti(label: string) {
 		const selected = new Set(draft?.selected ?? []);
@@ -158,27 +194,24 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		onResult({ answers: [], cancelled: true });
 	}
 	function goToTab(i: number) {
-		if (i < 0 || i >= questions.length) return;
+		if (i < 0 || i > questions.length) return;
 		setTab(i);
 	}
 
-	// Teclado por zonas (patrón ApprovalCard). En "input" las teclas van al
-	// textarea salvo Tab/Shift+Tab (cambian de zona), Shift+Enter (envía) y Esc.
+	// Teclado por zonas.
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
 			const k = e.key;
-			const n = q.options.length;
+			const n = q?.options.length ?? 0;
 			const nb = navButtons.length;
 
 			if (zone === "input") {
 				if (k === "Tab") {
 					e.preventDefault();
 					if (e.shiftKey) {
-						// input → options (reversa)
 						setZone("options");
 						setFocusOpt(Math.max(0, n - 1));
 					} else {
-						// input → buttons
 						setZone("buttons");
 						setFocusBtn(0);
 					}
@@ -186,41 +219,29 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					e.preventDefault();
 					submit();
 				} else if (k === "Escape") {
-					// Esc por niveles: con texto → salir del input (conserva texto);
-					// sin texto → cancelar el cuestionario.
 					e.preventDefault();
-					if ((customText[tab] ?? "").trim().length > 0) {
-						setZone("options");
-					} else {
-						cancel();
-					}
+					if ((customText[tab] ?? "").trim().length > 0) setZone("options");
+					else cancel();
 				}
-				return; // las demás teclas van al textarea
+				return;
 			}
 
 			if (k === "Tab") {
 				e.preventDefault();
 				if (e.shiftKey) {
-					// reversa: options → buttons · buttons → input
 					if (zone === "options") {
 						setZone("buttons");
 						setFocusBtn(Math.max(0, nb - 1));
-					} else {
-						setZone("input");
-					}
-				} else {
-					// options → input · buttons → options
-					if (zone === "options") setZone("input");
-					else {
-						setZone("options");
-						setFocusOpt(0);
-					}
+					} else setZone("input");
+				} else if (zone === "options") setZone("input");
+				else {
+					setZone("options");
+					setFocusOpt(0);
 				}
 			} else if (k === "ArrowDown") {
 				e.preventDefault();
 				if (zone === "options" && n > 0) setFocusOpt((s) => (s + 1) % n);
-				else if (zone === "buttons" && nb > 0)
-					setFocusBtn((s) => (s + 1) % nb);
+				else if (zone === "buttons" && nb > 0) setFocusBtn((s) => (s + 1) % nb);
 			} else if (k === "ArrowUp") {
 				e.preventDefault();
 				if (zone === "options" && n > 0)
@@ -228,12 +249,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				else if (zone === "buttons" && nb > 0)
 					setFocusBtn((s) => (s - 1 + nb) % nb);
 			} else if (k === "ArrowRight") {
-				if (questions.length >= 2 && tab < questions.length - 1) {
+				if (isMulti && tab < questions.length) {
 					e.preventDefault();
 					goToTab(tab + 1);
 				}
 			} else if (k === "ArrowLeft") {
-				if (questions.length >= 2 && tab > 0) {
+				if (isMulti && tab > 0) {
 					e.preventDefault();
 					goToTab(tab - 1);
 				}
@@ -242,7 +263,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				submit();
 			} else if (k === "Enter" || k === " ") {
 				e.preventDefault();
-				if (zone === "options") {
+				if (zone === "options" && q) {
 					const opt = q.options[focusOpt];
 					if (opt) {
 						if (q.multiSelect) toggleMulti(opt.label);
@@ -254,15 +275,14 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 			} else if (k === "Escape") {
 				e.preventDefault();
 				cancel();
-			} else if (/^[1-9]$/.test(k)) {
+			} else if (/^[1-9]$/.test(k) && q) {
 				const idx = Number(k) - 1;
-				if (idx < n) {
+				if (idx < q.options.length) {
 					e.preventDefault();
 					setZone("options");
 					setFocusOpt(idx);
-					const opt = q.options[idx];
-					if (q.multiSelect) toggleMulti(opt.label);
-					else chooseSingle(opt.label);
+					if (q.multiSelect) toggleMulti(q.options[idx]!.label);
+					else chooseSingle(q.options[idx]!.label);
 				}
 			}
 		}
@@ -274,7 +294,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	function renderOption(opt: WebQuestionOption, i: number) {
 		const selected = isOptionSelected(opt.label);
 		const focused = zone === "options" && i === focusOpt;
-		const indicator = q.multiSelect
+		const indicator = q!.multiSelect
 			? selected
 				? "☑"
 				: "☐"
@@ -292,7 +312,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				onClick={() => {
 					setZone("options");
 					setFocusOpt(i);
-					if (q.multiSelect) toggleMulti(opt.label);
+					if (q!.multiSelect) toggleMulti(opt.label);
 					else chooseSingle(opt.label);
 				}}
 			>
@@ -307,17 +327,11 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 
 	return (
 		<div className="q-panel">
-			{/* Tab bar: sólo con 2+ preguntas. ● respondida / ○ pendiente; la activa
-			    con borde. Clickable además de ←/→. */}
-			{questions.length >= 2 ? (
+			{/* Tab bar (sólo 2+ preguntas): una pestaña por pregunta + "✓ Enviar". */}
+			{isMulti ? (
 				<div className="q-tabs">
 					{questions.map((qq, i) => {
-						const d = drafts[i];
-						const answered =
-							!!d &&
-							(d.kind === "multi"
-								? (d.selected?.length ?? 0) > 0
-								: !!d.answer);
+						const answered = isAnswered(i);
 						return (
 							<button
 								key={i}
@@ -335,59 +349,98 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							</button>
 						);
 					})}
+					<button
+						type="button"
+						tabIndex={-1}
+						className={
+							"q-tab review" +
+							(isReviewTab ? " active" : "") +
+							(allAnswered ? " answered" : "")
+						}
+						onClick={() => goToTab(questions.length)}
+					>
+						✓ Enviar
+					</button>
 				</div>
 			) : null}
 
-			{questions.length < 2 && q.header ? (
-				<div className="q-header">{q.header}</div>
-			) : null}
-			<div className="q-question">{q.question}</div>
-
-			{/* Opciones (+ preview side-by-side si aplica y no se está escribiendo custom) */}
-			{hasPreviews && !inputMode ? (
-				<div className="q-with-preview">
-					<div className="q-options">{q.options.map(renderOption)}</div>
-					<div className="q-preview">
-						<div className="q-preview-title">
-							{activePreviewOpt
-								? `Preview · ${activePreviewOpt.label}`
-								: "Vista previa"}
-						</div>
-						{activePreviewOpt ? (
-							<Markdown>{activePreviewOpt.preview ?? ""}</Markdown>
-						) : (
-							<div className="q-preview-empty">
-								Vista previa no disponible para esta opción.
-							</div>
-						)}
+			{isReviewTab ? (
+				/* Pestaña "Enviar": resumen de respuestas + estado (parity pi "Submit"). */
+				<div className="q-review">
+					<div className="q-header">Listo para enviar</div>
+					<div className="q-review-list">
+						{questions.map((qq, i) => {
+							const d = drafts[i];
+							let value: string;
+							if (!d || !isAnswered(i)) value = "(sin responder)";
+							else if (d.kind === "multi")
+								value = (d.selected ?? []).join(", ");
+							else if (d.kind === "custom") value = `(escrito) ${d.answer}`;
+							else value = d.answer ?? "";
+							return (
+								<div key={i} className="q-review-row">
+									<span className="q-review-label">{qq.header || `Q${i + 1}`}:</span>{" "}
+									<span className="q-review-value">{value}</span>
+								</div>
+							);
+						})}
+					</div>
+					<div className={"q-review-status " + (allAnswered ? "ok" : "warn")}>
+						{allAnswered
+							? "✓ Enter para enviar"
+							: `Faltan: ${missing.join(", ")}`}
 					</div>
 				</div>
 			) : (
-				<div
-					className="q-options"
-					onMouseLeave={() => setHoverLabel(undefined)}
-				>
-					{q.options.map(renderOption)}
-				</div>
+				<>
+					{!isMulti && q!.header ? (
+						<div className="q-header">{q!.header}</div>
+					) : null}
+					<div className="q-question">{q!.question}</div>
+
+					{hasPreviews && !inputMode ? (
+						<div className="q-with-preview">
+							<div className="q-options">{q!.options.map(renderOption)}</div>
+							<div className="q-preview">
+								<div className="q-preview-title">
+									{activePreviewOpt
+										? `Preview · ${activePreviewOpt.label}`
+										: "Vista previa"}
+								</div>
+								{activePreviewOpt ? (
+									<Markdown>{activePreviewOpt.preview ?? ""}</Markdown>
+								) : (
+									<div className="q-preview-empty">
+										Vista previa no disponible para esta opción.
+									</div>
+								)}
+							</div>
+						</div>
+					) : (
+						<div
+							className="q-options"
+							onMouseLeave={() => setHoverLabel(undefined)}
+						>
+							{q!.options.map(renderOption)}
+						</div>
+					)}
+
+					<textarea
+						ref={inputRef}
+						className="q-input"
+						placeholder="O escribe tu propia respuesta… (Shift+Enter para enviar)"
+						value={customText[tab] ?? ""}
+						rows={Math.min(
+							4,
+							Math.max(1, (customText[tab] ?? "").split("\n").length),
+						)}
+						onChange={(e) => onCustomChange(e.target.value)}
+						onFocus={() => setZone("input")}
+					/>
+				</>
 			)}
 
-			{/* Texto libre (fila "Type something." del TUI). Focuseable nativamente:
-			    cuando la zona es "input" recibe foco para escribir. */}
-			<textarea
-				ref={inputRef}
-				className="q-input"
-				placeholder="O escribe tu propia respuesta… (Shift+Enter para enviar)"
-				value={customText[tab] ?? ""}
-				rows={Math.min(
-					4,
-					Math.max(1, (customText[tab] ?? "").split("\n").length),
-				)}
-				onChange={(e) => onCustomChange(e.target.value)}
-				onFocus={() => setZone("input")}
-			/>
-
-			{/* Navegación: tabIndex={-1} (el foco lo gestiona el handler por zona).
-			    ↑↓/Tab navegan entre ellos; ⏎ ejecuta el enfocado. */}
+			{/* Navegación: tabIndex={-1} (el foco lo gestiona el handler por zona). */}
 			<div className="q-nav">
 				{navButtons.map((b, i) => (
 					<button

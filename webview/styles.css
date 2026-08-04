@@ -2129,6 +2129,39 @@ button.danger:hover {
 .q-question {
 	font-size: 13px;
 }
+/* Pestaña "Enviar" (review): resumen de respuestas + estado (parity pi). */
+.q-review {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.q-review-list {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 8px 10px;
+	border: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	font-size: 13px;
+}
+.q-review-label {
+	font-weight: 600;
+}
+.q-review-value {
+	color: var(--vscode-descriptionForeground);
+}
+.q-review-status {
+	font-size: 12px;
+	font-weight: 600;
+}
+.q-review-status.ok {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.q-review-status.warn {
+	color: var(--vscode-editorWarning-foreground, #d29922);
+}
 /* Contenedor de opción (radio ◉/○ o checkbox ☑/☐ + cuerpo). */
 .q-opt {
 	display: flex;
