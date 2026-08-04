@@ -449,8 +449,35 @@ export function reduce(state: State, msg: InMessage): State {
 			};
 
 		case "usage": {
-			const { type: _t, ...rest } = msg;
-			return { ...state, usage: rest as Usage };
+			const { type: _t, turnInput, turnOutput, ...rest } = msg;
+			const base = { ...state, usage: rest as Usage };
+			// Repartir el delta de usage del turno entre las tarjetas (tool+thinking)
+			// del último turno como ~llm (atribución burda ÷ N). Se recalcula en
+			// cada usage y se estabiliza al cerrar el turno.
+			if (
+				typeof turnInput === "number" &&
+				typeof turnOutput === "number" &&
+				state.turns.length > 0
+			) {
+				const perTurn = turnInput + turnOutput;
+				const last = state.turns[state.turns.length - 1];
+				const n = last.segments.filter(
+					(s) => s.kind === "tool" || s.kind === "thinking",
+				).length;
+				if (n > 0) {
+					const perCard = Math.round(perTurn / n);
+					const segments = last.segments.map((s) =>
+						s.kind === "tool" || s.kind === "thinking"
+							? { ...s, tokensLLM: perCard }
+							: s,
+					);
+					return {
+						...base,
+						turns: [...state.turns.slice(0, -1), { ...last, segments }],
+					};
+				}
+			}
+			return base;
 		}
 
 		case "files":

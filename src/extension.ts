@@ -397,6 +397,9 @@ export async function activate(
 	// de turnos dentro del agent run actual (para saber cuándo se entrega uno).
 	const pendingQueue: { text: string }[] = [];
 	let turnsInRun = 0;
+	// Baseline de usage al iniciar el turno (agent_start) para calcular el delta
+	// (input+output) que consumió el turno y repartirlo entre sus tarjetas (~llm).
+	let turnUsageBaseline: { input: number; output: number } | undefined;
 
 	let view: vscode.WebviewView | undefined;
 	const fridaVersion = String(context.extension.packageJSON.version ?? "0.0.0");
@@ -713,6 +716,23 @@ export async function activate(
 		return cachedReserveTokens;
 	}
 
+	function sumUsage(session: any): { input: number; output: number } {
+		try {
+			const msgs: any[] = session?.agent?.state?.messages ?? [];
+			let input = 0,
+				output = 0;
+			for (const m of msgs) {
+				if (m?.role === "assistant" && m?.usage) {
+					input += m.usage.input ?? 0;
+					output += m.usage.output ?? 0;
+				}
+			}
+			return { input, output };
+		} catch {
+			return { input: 0, output: 0 };
+		}
+	}
+
 	function postUsage(session: any): void {
 		try {
 			const msgs: any[] = session?.agent?.state?.messages ?? [];
@@ -788,6 +808,10 @@ export async function activate(
 			//   firstTs = el más antiguo (memoria pierde los primeros al compactar)
 			//   lastTs  = el más reciente (disco va un turno atrás antes del flush)
 			//   tokens  = max(disco, memoria)
+			// Totales de MEMORIA (antes de combinar con disco): para el delta del turno
+			// vs el baseline (agent_start), que también es de memoria → consistencia.
+			const memInputTotal = inputTotal;
+			const memOutputTotal = outputTotal;
 			const disk = readSessionStats(
 				session?.sessionFile ?? session?.sessionManager?.getSessionFile?.(),
 			);
@@ -806,6 +830,14 @@ export async function activate(
 				cost = Math.max(cost, disk.cost);
 			}
 			const sessionDurationMs = firstTs && lastTs ? lastTs - firstTs : 0;
+			// Delta de usage del turno actual (memoria) vs el baseline de agent_start.
+			// Se reparte entre las tarjetas del último turno como ~llm (atribución).
+			const turnInput = turnUsageBaseline
+				? Math.max(0, memInputTotal - turnUsageBaseline.input)
+				: undefined;
+			const turnOutput = turnUsageBaseline
+				? Math.max(0, memOutputTotal - turnUsageBaseline.output)
+				: undefined;
 			post({
 				type: "usage",
 				inputTotal,
@@ -820,6 +852,8 @@ export async function activate(
 				pressurePercent,
 				reserveTokens,
 				sessionDurationMs,
+				turnInput,
+				turnOutput,
 			});
 		} catch {
 			/* noop */
@@ -1298,6 +1332,9 @@ export async function activate(
 			switch (event?.type) {
 				case "agent_start":
 					turnsInRun = 0;
+					// Snapshot del usage aggregate para repartir el delta del turno entre
+					// las tarjetas como ~llm (atribución burda ÷ N).
+					turnUsageBaseline = sumUsage(session);
 					hadText = false;
 					hadToolCall = false;
 					lensBusy = true;
@@ -3594,7 +3631,8 @@ export async function activate(
 			() => void newSession(),
 		),
 		vscode.commands.registerCommand("frida.approvalMode", async () => {
-			const next: PermissionMode = approvalMode === "manual" ? "auto" : "manual";
+			const next: PermissionMode =
+				approvalMode === "manual" ? "auto" : "manual";
 			if (next !== "manual") {
 				const ok = await requestYoloGate();
 				if (!ok) return;

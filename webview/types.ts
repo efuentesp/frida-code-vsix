@@ -27,6 +27,7 @@ export interface ToolEntry {
 	toolCallId?: string; // del SDK: para emparejar updates/fin de tools largos
 	partial?: string; // progreso parcial (tool_execution_update) mientras running
 	partialDetails?: SubagentProgressDetails; // progreso estructurado del sub-agente
+	tokensLLM?: number; // atribución ~llm del turno (usage ÷ tarjetas)
 }
 
 // Ejecución de bash del usuario (!command / !!command).
@@ -87,7 +88,7 @@ export type TurnStatus = "thinking" | "executing" | null;
 // real (texto → tool → texto → …) en vez de separar texto y tools.
 export type Segment =
 	| { kind: "text"; text: string }
-	| { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
+	| { kind: "thinking"; text: string; startedAt: number; endedAt?: number; tokensLLM?: number }
 	| ({ kind: "tool" } & ToolEntry);
 
 export interface Turn {
@@ -193,6 +194,8 @@ export interface Usage {
 	// Se reconstruye del JSONL en disco vía readSessionStats (robusto ante
 	// compactación/reload) y se combina con el estado en memoria (último turno).
 	sessionDurationMs?: number;
+	turnInput?: number; // delta de usage del turno (para atribución ~llm)
+	turnOutput?: number;
 }
 
 // === Reporte de uso (tab "Uso") — espeja UsageSnapshot del host (build separado) ===

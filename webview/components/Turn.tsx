@@ -97,6 +97,7 @@ export function TurnView({
 										text={s.text}
 										startedAt={s.startedAt}
 										endedAt={s.endedAt}
+										tokensLLM={s.tokensLLM}
 										isLive={
 											!!live &&
 											i === turn.segments.length - 1 &&
@@ -136,11 +137,13 @@ function ThinkingSegment({
 	startedAt,
 	endedAt,
 	isLive,
+	tokensLLM,
 }: {
 	text: string;
 	startedAt: number;
 	endedAt?: number;
 	isLive: boolean;
+	tokensLLM?: number;
 }) {
 	// Cronómetro en vivo mientras el modelo razona (re-render cada 250ms). Al
 	// terminar (isLive=false) se congela con endedAt.
@@ -154,6 +157,8 @@ function ThinkingSegment({
 	const elapsed = hasTimer ? (endedAt ?? now) - startedAt : 0;
 	const ctxStr =
 		estimateTokens(text) > 0 ? ` · ${fmtTok(estimateTokens(text))} ctx` : "";
+	const llmStr =
+		tokensLLM && tokensLLM > 0 ? ` · ~${fmtTok(tokensLLM)} llm` : "";
 	return (
 		<CollapsibleCard
 			running={isLive}
@@ -170,11 +175,13 @@ function ThinkingSegment({
 							<>
 								<Spinner size={13} /> {fmtDuration(elapsed)}
 								{ctxStr}
+								{llmStr}
 							</>
 						) : (
 							<>
 								<Icon name="check" size={13} /> {fmtDuration(elapsed)}
 								{ctxStr}
+								{llmStr}
 							</>
 						)}
 					</span>

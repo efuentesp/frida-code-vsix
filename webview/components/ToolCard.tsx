@@ -442,25 +442,30 @@ function buildStatus(
 	state: ToolState,
 	elapsed: number,
 	ctxTokens = 0,
+	llmTokens?: number,
 ): ReactNode {
 	const text = fmtDuration(elapsed);
 	const ctx = ctxTokens > 0 ? ` · ${fmtTok(ctxTokens)} ctx` : "";
+	const llm = llmTokens && llmTokens > 0 ? ` · ~${fmtTok(llmTokens)} llm` : "";
 	return (
 		<span className={"card-status " + state}>
 			{state === "running" ? (
 				<>
 					<Spinner size={13} /> {text}
 					{ctx}
+					{llm}
 				</>
 			) : state === "ok" ? (
 				<>
 					<Icon name="check" /> {text}
 					{ctx}
+					{llm}
 				</>
 			) : (
 				<>
 					<Icon name="x" /> {text}
 					{ctx}
+					{llm}
 				</>
 			)}
 		</span>
@@ -500,7 +505,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			icon={icon}
 			iconLive={running}
 			leading={buildLeading({ name, label, diffStats, lines, statusEcho })}
-			status={buildStatus(entry.state, elapsed, ctxTokens)}
+			status={buildStatus(entry.state, elapsed, ctxTokens, entry.tokensLLM)}
 			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
 			{running || hasResult ? renderBody(entry, running) : null}
