@@ -308,6 +308,12 @@ export function App() {
 		);
 	}
 
+	// Aviso de compactación: cuando el contexto ≥70%, el ícono del toolbar pulsa
+	// (color error) y la barra del footer también, para llamar la atención.
+	const ctxPct = Math.round(
+		state.usage?.pressurePercent ?? state.usage?.contextPercent ?? 0,
+	);
+	const ctxWarn = ctxPct >= 70;
 	return (
 		<div className="app">
 			<InfoToast toast={state.info} />
@@ -414,9 +420,16 @@ export function App() {
 				</span>
 				<span className="tb-sep" />
 				<span className="tb-group">
-					<Tooltip label="Compactar contexto" side="bottom">
+					<Tooltip
+						label={
+							ctxWarn
+								? `⚠ Contexto al ${ctxPct}% — compacta para liberar`
+								: "Compactar contexto"
+						}
+						side="bottom"
+					>
 						<button
-							className="ico"
+							className={"ico" + (ctxWarn ? " warn" : "")}
 							onClick={() => post({ type: "compact" })}
 							disabled={
 								state.busy || state.isCompacting || state.turns.length === 0

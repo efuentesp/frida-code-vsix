@@ -83,6 +83,10 @@ body {
 .toolbar button.ico.active {
 	color: var(--vscode-button-background);
 }
+.toolbar button.ico.warn {
+	color: var(--vscode-errorForeground, #f85149);
+	animation: pulse 1.6s ease-in-out infinite;
+}
 .toolbar button.ico.off {
 	opacity: 0.5;
 }
@@ -438,6 +442,9 @@ body {
 }
 .ctx-bar.high .ctx-fill {
 	background: var(--vscode-testing-iconFailed, #f85149);
+}
+.ctx-bar.pulse .ctx-fill {
+	animation: pulse 1.6s ease-in-out infinite;
 }
 .ctx-pct {
 	font-weight: 600;

@@ -18,11 +18,12 @@ export function ContextBar({ usage }: { usage?: Usage }) {
 	const pct = Math.round(rawPct ?? 0);
 	const unknown = rawPct == null || Number.isNaN(rawPct);
 	const level = pct >= 90 ? "high" : pct >= 70 ? "mid" : "low";
+	const warn = pct >= 70; // aviso de compactación desde el nivel mid
 	const hasCache = usage.cacheRead > 0 || usage.cacheWrite > 0;
 	return (
 		<div className="status-bar">
 			<span className="ctx-label">Contexto</span>
-			<span className={"ctx-bar " + level}>
+			<span className={"ctx-bar " + level + (warn ? " pulse" : "")}>
 				<span
 					className="ctx-fill"
 					style={{ width: Math.min(100, pct) + "%" }}
