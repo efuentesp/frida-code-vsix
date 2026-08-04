@@ -165,11 +165,12 @@ export function App() {
 	}, [state.webRoots]);
 
 	// Doble Escape (mientras responde) → abort, como el botón Detener.
-	// PAUSADO mientras hay un approval pendiente: ahí Escape lo reclama el menú
-	// de permisos (rechazar la acción), como el selector de pi. Al resolver el
-	// approval y seguir ocupado, el doble-Escape vuelve a estar disponible.
+	// GLOBAL: funciona incluso con un approval/cuestión pendiente. La 1ª Esc la
+	// reclama el menú de permisos (rechazar la acción); la 2ª (en <450ms) aborta
+	// el agente. Así nunca se queda sin opción de detener (bug previo: el Composer
+	// se ocultaba durante un approval y el doble-Esc estaba pausado).
 	useEffect(() => {
-		if (!state.busy || state.approvals.length > 0) {
+		if (!state.busy) {
 			setEscHint(false);
 			return;
 		}
@@ -190,7 +191,7 @@ export function App() {
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [state.busy, state.approvals.length]);
+	}, [state.busy]);
 
 	const post = (msg: OutMessage) => getVsCode().postMessage(msg);
 
@@ -374,7 +375,21 @@ export function App() {
 						</span>
 					</Tooltip>
 				)}
-				<span className="spacer" />
+				{state.busy &&
+				(state.approvals.length > 0 ||
+					state.modelChanges.length > 0 ||
+					!!state.questionnaire) && (
+				<Tooltip label="Detener agente (también doble Esc)" side="bottom">
+					<button
+						type="button"
+						className="tb-stop"
+						onClick={() => post({ type: "abort" })}
+					>
+						<CircleStop size={13} /> Detener
+					</button>
+				</Tooltip>
+			)}
+			<span className="spacer" />
 				<span className="tb-group">
 					<Tooltip label="Nueva sesión" side="bottom">
 						<button
@@ -629,7 +644,7 @@ export function App() {
 												id: mc.id,
 												decision: "accept",
 											})
-											}
+										}
 									>
 										{mc.source === "auto-detected" ? "Mantener" : "Aceptar"}
 									</button>
@@ -642,9 +657,11 @@ export function App() {
 												id: mc.id,
 												decision: "cancel",
 											})
-											}
+										}
 									>
-										{mc.source === "auto-detected" ? "Volver al anterior" : "Cancelar"}
+										{mc.source === "auto-detected"
+											? "Volver al anterior"
+											: "Cancelar"}
 									</button>
 								</div>
 							</div>

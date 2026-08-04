@@ -378,6 +378,24 @@ body {
 }
 /* Estadísticas de sesión en el header (⏱ tiempo + ↑↓ tokens acumulados), tenue
    como .sub-version. Siempre visible; el Tooltip explica la métrica. */
+.tb-stop {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-errorForeground, #f14c4c);
+	background: transparent;
+	color: var(--vscode-errorForeground, #f14c4c);
+	cursor: pointer;
+	font-size: 11px;
+	line-height: 1.4;
+}
+.tb-stop:hover {
+	background: var(--vscode-errorForeground, #f14c4c);
+	color: var(--vscode-button-foreground, #fff);
+}
+
 .session-stats {
 	margin-left: 6px;
 	font-family: var(--vscode-editor-font-family, monospace);
