@@ -45,6 +45,10 @@
         "title": "Frida: Detener respuesta"
       },
       {
+        "command": "frida.exportUsage",
+        "title": "Frida: Exportar reporte de uso"
+      },
+      {
         "command": "frida.newSession",
         "title": "Frida: Nueva sesión"
       },
@@ -94,6 +98,27 @@
     "configuration": {
       "title": "Frida Code",
       "properties": {
+        "frida.user.email": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Email para el reporte de uso (en claro; solo se incluye si activas el opt-in al exportar con `Frida: Exportar reporte de uso`). Si está vacío, se usa `git config user.email`."
+        },
+        "frida.org": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Organización/empresa para el reporte de uso."
+        },
+        "frida.user.role": {
+          "type": "string",
+          "enum": ["dev", "qa", "architect", "lead", "devops", "other"],
+          "default": "other",
+          "markdownDescription": "Rol declarado para el reporte de uso (lo evalúa el concentrador; Frida no juzga)."
+        },
+        "frida.telemetry.optIn": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Permite incluir tu identidad (email/org) al exportar el reporte de uso. Se pide también inline al exportar."
+        },
         "frida.askUserQuestion.enabled": {
           "type": "boolean",
           "default": true,

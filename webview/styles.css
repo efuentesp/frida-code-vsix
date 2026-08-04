@@ -2140,8 +2140,7 @@ button.danger:hover {
 	flex-direction: column;
 	gap: 3px;
 	padding: 8px 10px;
-	border: 1px solid
-		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
 	border-radius: 6px;
 	background: var(--vscode-editor-background);
 	font-size: 13px;
@@ -3996,4 +3995,205 @@ kbd {
 .bar-send.stop {
 	background: var(--vscode-errorForeground, #f85149);
 	color: #fff;
+}
+
+/* === Tab Uso (frida-usage-report/dashboard) === */
+.usage-dashboard {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.usage-period {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+.usage-period-btn {
+	padding: 4px 10px;
+	border: 1px solid var(--cfg-border, #333);
+	border-radius: 6px;
+	background: transparent;
+	color: var(--vscode-foreground, #ddd);
+	cursor: pointer;
+	font-size: 12px;
+}
+.usage-period-btn.active {
+	background: var(--vscode-button-background, #4f9cf9);
+	color: var(--vscode-button-foreground, #fff);
+	border-color: transparent;
+}
+.usage-kpis {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 8px;
+}
+.kpi-card {
+	padding: 10px;
+	border: 1px solid var(--cfg-border, #333);
+	border-radius: 8px;
+	text-align: center;
+}
+.kpi-value {
+	font-size: 18px;
+	font-weight: 600;
+}
+.kpi-label {
+	font-size: 11px;
+	opacity: 0.7;
+	margin-top: 2px;
+}
+.usage-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+.usage-card {
+	border: 1px solid var(--cfg-border, #333);
+	border-radius: 8px;
+	padding: 10px;
+}
+.usage-card-title {
+	font-size: 12px;
+	font-weight: 600;
+	margin-bottom: 8px;
+	opacity: 0.85;
+}
+.chart-empty {
+	font-size: 12px;
+	opacity: 0.5;
+	padding: 12px 0;
+	text-align: center;
+}
+.bar-v {
+	width: 100%;
+	height: 60px;
+	display: block;
+}
+.bar-v-fill {
+	fill: var(--vscode-button-background, #4f9cf9);
+}
+.bar-h-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.bar-h-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+}
+.bar-h-label {
+	width: 90px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	opacity: 0.8;
+}
+.bar-h-track {
+	flex: 1;
+	height: 8px;
+	background: var(--cfg-border, #333);
+	border-radius: 4px;
+	overflow: hidden;
+}
+.bar-h-fill {
+	height: 100%;
+	background: var(--vscode-button-background, #4f9cf9);
+}
+.bar-h-val {
+	width: 44px;
+	text-align: right;
+	opacity: 0.7;
+	font-variant-numeric: tabular-nums;
+}
+.donut-wrap {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+.donut {
+	width: 60px;
+	height: 60px;
+	flex-shrink: 0;
+}
+.donut-legend {
+	font-size: 11px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow: hidden;
+}
+.donut-leg-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.donut-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+.muted {
+	opacity: 0.6;
+}
+.heatmap {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.heatmap-strip {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.heatmap-label {
+	width: 32px;
+	font-size: 11px;
+	opacity: 0.7;
+}
+.heatmap-cells {
+	display: grid;
+	grid-template-columns: repeat(24, 1fr);
+	gap: 2px;
+	flex: 1;
+}
+.heatmap-cells.dow {
+	grid-template-columns: repeat(7, 1fr);
+}
+.heatmap-cell {
+	height: 16px;
+	background: var(--vscode-button-background, #4f9cf9);
+	border-radius: 2px;
+}
+.heatmap-cell.dow {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 10px;
+	color: #fff;
+}
+.usage-sessions {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.usage-session-row {
+	display: flex;
+	justify-content: space-between;
+	font-size: 11px;
+	padding: 3px 0;
+	border-bottom: 1px solid var(--cfg-border, #2a2a2a);
+}
+.usage-session-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	opacity: 0.85;
+}
+.usage-session-meta {
+	opacity: 0.6;
+	font-variant-numeric: tabular-nums;
+	flex-shrink: 0;
 }

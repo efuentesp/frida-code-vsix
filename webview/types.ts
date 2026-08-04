@@ -184,6 +184,85 @@ export interface Usage {
 	sessionDurationMs?: number;
 }
 
+// === Reporte de uso (tab "Uso") — espeja UsageSnapshot del host (build separado) ===
+
+export type UsagePeriod = "today" | "7d" | "30d" | "all";
+
+export interface UsageKpisView {
+	tokensIn: number;
+	tokensOut: number;
+	cacheRead: number;
+	cacheWrite: number;
+	cost: number;
+	sessions: number;
+	turns: number;
+	activeMs: number;
+	cacheHitPct: number;
+	avgTurnTokens: number;
+}
+export interface UsageByModel {
+	model: string;
+	provider: string;
+	tokens: number;
+	cost: number;
+	turns: number;
+}
+export interface UsageByTool {
+	tool: string;
+	count: number;
+}
+export interface UsageByLanguage {
+	language: string;
+	files: number;
+	edits: number;
+	assistedKloc: number;
+}
+export interface UsageByArtifact {
+	kind: string;
+	count: number;
+}
+export interface UsageByDay {
+	date: string;
+	tokens: number;
+	cost: number;
+	turns: number;
+}
+export interface UsageSession {
+	path: string;
+	cwd: string;
+	firstTs: number;
+	lastTs: number;
+	tokensIn: number;
+	tokensOut: number;
+	cost: number;
+	turns: number;
+	assistedKloc: number;
+}
+export interface UsageReportView {
+	kpis: UsageKpisView;
+	breakdowns: {
+		byModel: UsageByModel[];
+		byProvider: { provider: string; tokens: number; cost: number }[];
+		byTool: UsageByTool[];
+		byLanguage: UsageByLanguage[];
+		byArtifact: UsageByArtifact[];
+		byDay: UsageByDay[];
+		byHour: number[];
+		byDow: number[];
+	};
+	behavior: {
+		compactations: number;
+		subagentsLaunched: number;
+		questionsAsked: number;
+	};
+	adoption: {
+		browserUsed: boolean;
+		subagentsUsed: boolean;
+		contextToolUsed: boolean;
+	};
+	sessions: UsageSession[];
+}
+
 export interface SessionItem {
 	path: string;
 	/** cwd donde inició la sesión (para filtrar/etiquetar por proyecto). */
@@ -341,6 +420,12 @@ export interface State {
 	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
 	webRoots?: Record<string, { tree: WebNode | null; placement: WebPlacement }>;
 	usage?: Usage;
+	usageReport?: {
+		report: UsageReportView;
+		period: UsagePeriod;
+		periodFrom: number;
+		periodTo: number;
+	};
 	files?: { query: string; items: string[] };
 	sessions?: {
 		items: SessionItem[];
@@ -432,6 +517,13 @@ export type InMessage =
 	| { type: "provider_error"; text: string }
 	| { type: "cleared" }
 	| ({ type: "usage" } & Usage)
+	| {
+			type: "usage_report";
+			report: UsageReportView;
+			period: UsagePeriod;
+			periodFrom: number;
+			periodTo: number;
+	  }
 	| { type: "compact_start"; reason: CompactionReason }
 	| {
 			type: "compact_end";
@@ -532,6 +624,7 @@ export type OutMessage =
 	| { type: "search_files"; query: string }
 	| { type: "list_sessions"; scope?: "project" | "all" }
 	| { type: "list_resources" }
+	| { type: "list_usage"; period: UsagePeriod }
 	| { type: "workspace" }
 	| { type: "list_models" }
 	| { type: "select_model"; provider: string; model: string }

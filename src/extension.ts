@@ -33,6 +33,9 @@ import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
 import { getWebviewHtml } from "./webview-html";
 import { analyzeContext } from "./tools/frida-context/analysis";
 import { readSessionStats } from "./session-stats";
+import { indexUsage } from "./usage/indexer";
+import { buildReport } from "./usage/report-builder";
+import { resolveIdentity } from "./usage/identity";
 import { createContextReportElement } from "./tools/frida-context/ContextReport";
 import {
 	getCachedActiveTools,
@@ -80,9 +83,11 @@ import { notifyAttention } from "./notify";
 import {
 	isAskUserQuestionEnabled,
 	isContextEnabled,
+	isTelemetryOptIn,
 	isTodoEnabled,
 	readGatePatterns,
 	readToolToggles,
+	setTelemetryOptIn,
 	writeToolToggle,
 } from "./settings";
 import {
@@ -1605,6 +1610,27 @@ export async function activate(
 			case "list_resources":
 				postResources();
 				break;
+			case "list_usage": {
+				const period: "today" | "7d" | "30d" | "all" =
+					msg.period === "today" ||
+					msg.period === "7d" ||
+					msg.period === "30d" ||
+					msg.period === "all"
+						? msg.period
+						: "all";
+				const { snapshot, periodFrom, periodTo } = indexUsage({
+					sessionsDir: sessionDirPath,
+					period,
+				});
+				post({
+					type: "usage_report",
+					report: snapshot,
+					period,
+					periodFrom,
+					periodTo,
+				});
+				break;
+			}
 			case "list_models":
 				postModels();
 				void refreshModelsAsync(); // Fase B: refresh en background al abrir el selector
@@ -3323,9 +3349,82 @@ export async function activate(
 		diagChannel.appendLine("Ver fix-frida-gateway.md.");
 	}
 
+	// Exporta el reporte de uso (frida-usage-report/v1) para el concentrador externo.
+	// Opt-in inline: sólo incluye email/org si el usuario lo permite (exporta anónimo si no).
+	async function exportUsage(): Promise<void> {
+		const periodPick = await vscode.window.showQuickPick(
+			[
+				{ label: "Todo", value: "all" as const },
+				{ label: "Últimos 30 días", value: "30d" as const },
+				{ label: "Últimos 7 días", value: "7d" as const },
+				{ label: "Hoy", value: "today" as const },
+			],
+			{ placeHolder: "Periodo del reporte de uso" },
+		);
+		if (!periodPick) return;
+		const period = periodPick.value;
+
+		let optIn = isTelemetryOptIn();
+		if (!optIn) {
+			const consent = await vscode.window.showQuickPick(
+				[
+					{ label: "Sí, incluir mi email/org", value: true },
+					{ label: "No, exportar anónimo", value: false },
+				],
+				{
+					placeHolder:
+						"¿Incluir tu email/organización en el reporte? (puedes cambiarlo después en Configuración)",
+				},
+			);
+			if (consent === undefined) return;
+			optIn = consent.value;
+			if (optIn) await setTelemetryOptIn(true);
+		}
+
+		const { snapshot, periodFrom, periodTo } = indexUsage({
+			sessionsDir: sessionDirPath,
+			period,
+		});
+		const full = resolveIdentity();
+		const identity = optIn ? full : { ...full, email: "" };
+		const report = buildReport({
+			snapshot,
+			identity,
+			detailLevel: "structured",
+			period,
+			periodFrom,
+			periodTo,
+			clientVersion: fridaVersion,
+		});
+
+		const json = JSON.stringify(report, null, 2);
+		await vscode.window.showTextDocument(
+			await vscode.workspace.openTextDocument({
+				content: json,
+				language: "json",
+			}),
+		);
+		const uri = await vscode.window.showSaveDialog({
+			defaultUri: vscode.Uri.file(
+				`frida-usage-${new Date().toISOString().slice(0, 10)}.json`,
+			),
+			filters: { JSON: ["json"] },
+		});
+		if (uri) {
+			await vscode.workspace.fs.writeFile(uri, Buffer.from(json, "utf8"));
+			vscode.window.showInformationMessage(
+				`Reporte de uso guardado en ${uri.fsPath}`,
+			);
+		}
+	}
+
 	context.subscriptions.push(
 		// Trackear si la ventana de VS Code tiene el foco. Sirve para notificar con
 		// sonido al terminar una petición sólo si el usuario se fue a otra app.
+		vscode.commands.registerCommand(
+			"frida.exportUsage",
+			() => void exportUsage(),
+		),
 		vscode.window.onDidChangeWindowState((s) => {
 			vscodeWindowFocused = s.focused;
 		}),

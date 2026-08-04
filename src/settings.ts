@@ -7,6 +7,7 @@
 // (re-ejecuta las factories, que re-leen estos settings) sin perder historial.
 
 import * as vscode from "vscode";
+import type { UserRole } from "./usage/report-schema";
 
 export const CONFIG_SECTION = "frida";
 
@@ -133,4 +134,47 @@ export async function writeToolToggle(
 	await vscode.workspace
 		.getConfiguration(CONFIG_SECTION)
 		.update(settingKey, enabled, vscode.ConfigurationTarget.Global);
+}
+
+// === Reporte de uso (frida-usage-report/v1) ===
+
+/** Email del usuario para el reporte de uso (en claro; solo se incluye con opt-in).
+ *  Default ""; si está vacío, identity.ts hace fallback a `git config user.email`. */
+export function getUserEmail(): string {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string>("user.email", "");
+}
+
+/** Organización/empresa para el reporte de uso. Default "". */
+export function getOrg(): string {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string>("org", "");
+}
+
+/** Rol declarado del usuario. Default "other". */
+export function getUserRole(): UserRole {
+	const r = vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string>("user.role", "other");
+	return (
+		["dev", "qa", "architect", "lead", "devops", "other"].includes(r)
+			? r
+			: "other"
+	) as UserRole;
+}
+
+/** ¿El usuario optó a incluir su identidad al exportar el reporte de uso? */
+export function isTelemetryOptIn(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("telemetry.optIn", false);
+}
+
+/** Persiste el opt-in de telemetría (global). */
+export async function setTelemetryOptIn(on: boolean): Promise<void> {
+	await vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.update("telemetry.optIn", on, vscode.ConfigurationTarget.Global);
 }

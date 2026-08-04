@@ -439,6 +439,7 @@ export function reduce(state: State, msg: InMessage): State {
 					contextPercent: 0,
 				},
 				resources: undefined,
+				usageReport: undefined,
 				lens: null,
 				retry: null,
 			};
@@ -457,6 +458,16 @@ export function reduce(state: State, msg: InMessage): State {
 				sessions: { items: msg.items, currentPath: msg.currentPath },
 			};
 
+		case "usage_report":
+			return {
+				...state,
+				usageReport: {
+					report: msg.report,
+					period: msg.period,
+					periodFrom: msg.periodFrom,
+					periodTo: msg.periodTo,
+				},
+			};
 		case "resources":
 			return { ...state, resources: msg.data };
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+	BarChart3,
 	Library,
 	Plug,
 	RotateCw,
@@ -10,6 +11,7 @@ import {
 import type { OutMessage, State } from "../types";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
+import { UsageDashboard } from "./UsageDashboard";
 
 // Hub de Configuración (se abre con el engrane ⚙ o desde el onboarding). Pestañas:
 // Proveedores · Modelos · Auto-Aprobación · Herramientas. Reemplaza al viejo
@@ -20,7 +22,8 @@ export type SettingsTab =
 	| "models"
 	| "approval"
 	| "resources"
-	| "tools";
+	| "tools"
+	| "usage";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
 	{ id: "providers", label: "Proveedores", icon: Plug },
@@ -28,6 +31,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
 	{ id: "approval", label: "Auto-Aprobación", icon: SlidersHorizontal },
 	{ id: "resources", label: "Recursos", icon: Library },
 	{ id: "tools", label: "Herramientas", icon: Wrench },
+	{ id: "usage", label: "Uso", icon: BarChart3 },
 ];
 
 export function SettingsHub({
@@ -146,6 +150,8 @@ export function SettingsHub({
 						/>
 					</>
 				)}
+
+				{tab === "usage" && <UsageDashboard state={state} post={post} />}
 			</div>
 		</div>
 	);
