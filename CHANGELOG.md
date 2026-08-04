@@ -17,6 +17,16 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.12.0] - 2026-08-04
+### Añadido
+
+- **webview** — tokens atribuidos del modelo (~llm) al cerrar el turno
+- **webview** — tokens de contenido (ctx) en el status de cada tarjeta
+
+### Interno
+
+- **webview** — formato del linter en el botón Detener global
+
 ## [0.11.0] - 2026-08-04
 ### Añadido
 

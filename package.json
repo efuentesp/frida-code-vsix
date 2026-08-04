@@ -2,7 +2,7 @@
   "name": "frida-code",
   "displayName": "Frida Code",
   "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "softtek",
   "license": "UNLICENSED",
   "private": true,
