@@ -13,6 +13,14 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+### Cambiado
+
+### Corregido
+
+## [0.6.0] - 2026-08-03
+
+### Añadido
+
 - **Estadísticas de sesión en el header (tiempo + tokens).** El header ahora
   muestra siempre `⏱ <duración> · ↑<in> ↓<out>` a la derecha de la versión: el
   **tiempo invertido** (primer→último mensaje) y los **tokens acumulados** de la
