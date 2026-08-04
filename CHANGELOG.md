@@ -17,6 +17,11 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.10.0] - 2026-08-04
+### Añadido
+
+- **approval** — confirmación de cambio de proveedor (manual + vigilancia post-run)
+
 ## [0.9.2] - 2026-08-04
 ### Corregido
 
