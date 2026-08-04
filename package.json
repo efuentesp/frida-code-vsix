@@ -2,7 +2,7 @@
   "name": "frida-code",
   "displayName": "Frida Code",
   "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "softtek",
   "license": "UNLICENSED",
   "private": true,
@@ -110,7 +110,14 @@
         },
         "frida.user.role": {
           "type": "string",
-          "enum": ["dev", "qa", "architect", "lead", "devops", "other"],
+          "enum": [
+            "dev",
+            "qa",
+            "architect",
+            "lead",
+            "devops",
+            "other"
+          ],
           "default": "other",
           "markdownDescription": "Rol declarado para el reporte de uso (lo evalúa el concentrador; Frida no juzga)."
         },

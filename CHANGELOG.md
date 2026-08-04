@@ -13,6 +13,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+### Cambiado
+
+### Corregido
+
+## [0.7.0] - 2026-08-04
+
+### Añadido
+
+- **Dashboard de uso + export `frida-usage-report/v1`.** Nuevo tab "Uso" en Configuración con 6 KPIs (tokens, costo, sesiones, turnos, cache hit %, tiempo activo) y 6 gráficas SVG/CSS (tokens/costo por día, uso por modelo, top herramientas, artefactos por lenguaje, actividad por hora/día, top sesiones) sobre el histórico de sesiones JSONL. Comando `Frida: Exportar reporte de uso` que genera un JSON versionado (opt-in inline para incluir identidad) pensado para que una app concentradora externa lo agregue por usuario/proyecto/empresa. Indexer que modela `session-stats.ts` (caché por mtime), atribuye el uso al modelo activo y mide `assistedKloc` (líneas escritas/editadas por Frida).
 - **Política de versionado automático.** Nuevo `npm run release`
   (`scripts/release.mjs`) que determina el bump SemVer desde los commits
   Conventional Commits (`feat`→minor, `fix`→patch, `BREAKING`→major), actualiza
