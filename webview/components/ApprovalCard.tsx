@@ -33,6 +33,9 @@ const FRIDA_INTERNAL_TOOLS = new Set([
 	"steer_subagent",
 	"web_search",
 	"web_fetch",
+	"web_fetch_md",
+	"web_docs_search",
+	"web_docs_fetch",
 	"agent_browser",
 ]);
 
