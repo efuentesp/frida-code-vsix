@@ -319,7 +319,11 @@ export interface State {
 	webRoots?: Record<string, { tree: WebNode | null; placement: WebPlacement }>;
 	usage?: Usage;
 	files?: { query: string; items: string[] };
-	sessions?: { items: SessionItem[]; currentPath?: string; scope?: "project" | "all" };
+	sessions?: {
+		items: SessionItem[];
+		currentPath?: string;
+		scope?: "project" | "all";
+	};
 	resources?: ResourceSummary;
 	workspace?: WorkspaceInfo;
 	models?: {
@@ -411,7 +415,12 @@ export type InMessage =
 			errorMessage?: string;
 	  }
 	| { type: "files"; query: string; items: string[] }
-	| { type: "sessions"; items: SessionItem[]; currentPath?: string; scope?: "project" | "all" }
+	| {
+			type: "sessions";
+			items: SessionItem[];
+			currentPath?: string;
+			scope?: "project" | "all";
+	  }
 	| { type: "resources"; data: ResourceSummary }
 	| { type: "workspace"; cwd: string; branch?: string; dirty?: boolean }
 	| {

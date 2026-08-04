@@ -87,7 +87,7 @@ export const agentWidgetStore = {
 								? Date.now()
 								: a.completedAt,
 					}
-					: a,
+				: a,
 		);
 		emit();
 	},

@@ -81,9 +81,7 @@ function CmdBlock({ command }: { command: string }) {
 					</div>
 				))}
 			</div>
-			{overflow > 0 && (
-				<div className="cmd-more">⌄ {overflow} líneas más</div>
-			)}
+			{overflow > 0 && <div className="cmd-more">⌄ {overflow} líneas más</div>}
 		</div>
 	);
 }
