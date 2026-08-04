@@ -2,7 +2,7 @@ import type { Turn } from "../types";
 import { useEffect, useState } from "react";
 import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
-import { ToolCard, fmtDuration } from "./ToolCard";
+import { ToolCard, fmtDuration, estimateTokens, fmtTok } from "./ToolCard";
 import { BashCard } from "./BashCard";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { Icon } from "./Icon";
@@ -152,6 +152,8 @@ function ThinkingSegment({
 	}, [isLive]);
 	const hasTimer = startedAt > 0;
 	const elapsed = hasTimer ? (endedAt ?? now) - startedAt : 0;
+	const ctxStr =
+		estimateTokens(text) > 0 ? ` · ${fmtTok(estimateTokens(text))} ctx` : "";
 	return (
 		<CollapsibleCard
 			running={isLive}
@@ -167,10 +169,12 @@ function ThinkingSegment({
 						{isLive ? (
 							<>
 								<Spinner size={13} /> {fmtDuration(elapsed)}
+								{ctxStr}
 							</>
 						) : (
 							<>
 								<Icon name="check" size={13} /> {fmtDuration(elapsed)}
+								{ctxStr}
 							</>
 						)}
 					</span>

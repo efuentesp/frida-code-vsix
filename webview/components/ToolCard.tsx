@@ -278,6 +278,18 @@ function formatTokens(n: number): string {
 	return n >= 1000 ? `${(n / 1000).toFixed(1)}k tokens` : `${n} tokens`;
 }
 
+/** Compacto para el status de tarjeta: 1234 → "1.2k tok", 500 → "500 tok". */
+export function fmtTok(n: number): string {
+	return n >= 1000 ? `${(n / 1000).toFixed(1)}k tok` : `${n} tok`;
+}
+
+/** Estimación burda de tokens de un texto (~4 chars/token, sin tokenizer real).
+ *  Refleja cuánto contexto aporta ese contenido. */
+export function estimateTokens(text: string | undefined | null): number {
+	if (!text) return 0;
+	return Math.ceil(text.length / 4);
+}
+
 /** Vista rica del progreso de un sub-agente mientras corre: métricas (turnos,
  *  tools, tokens) + actividad compacta en una línea. Reemplaza el <pre> de
  *  livePartial para los tools agent / get_subagent_result. */
@@ -426,21 +438,29 @@ function buildLeading(p: {
 
 /** Bloque de estado a la derecha (spinner/check/x + duración). Extraído a
  *  función para mantener baja la complejidad de ToolCard. */
-function buildStatus(state: ToolState, elapsed: number): ReactNode {
+function buildStatus(
+	state: ToolState,
+	elapsed: number,
+	ctxTokens = 0,
+): ReactNode {
 	const text = fmtDuration(elapsed);
+	const ctx = ctxTokens > 0 ? ` · ${fmtTok(ctxTokens)} ctx` : "";
 	return (
 		<span className={"card-status " + state}>
 			{state === "running" ? (
 				<>
 					<Spinner size={13} /> {text}
+					{ctx}
 				</>
 			) : state === "ok" ? (
 				<>
 					<Icon name="check" /> {text}
+					{ctx}
 				</>
 			) : (
 				<>
 					<Icon name="x" /> {text}
+					{ctx}
 				</>
 			)}
 		</span>
@@ -461,6 +481,8 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 	// Cronómetro: CollapsibleCard re-renderiza cada 250 ms mientras corre, así que
 	// basta con leer Date.now() aquí para que el tiempo avance.
 	const elapsed = (entry.endedAt ?? Date.now()) - entry.startedAt;
+	// Tokens del contenido (resultado/partial) que aporta al contexto. Estimación.
+	const ctxTokens = estimateTokens(entry.result ?? entry.partial);
 	// Badge git de líneas +/- (estilo GitHub) desde el diff, para edit/write.
 	const diffStats = entry.diff ? countDiff(entry.diff) : null;
 	// Conteo de líneas leídas (read) con rango si hubo offset.
@@ -478,7 +500,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			icon={icon}
 			iconLive={running}
 			leading={buildLeading({ name, label, diffStats, lines, statusEcho })}
-			status={buildStatus(entry.state, elapsed)}
+			status={buildStatus(entry.state, elapsed, ctxTokens)}
 			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
 			{running || hasResult ? renderBody(entry, running) : null}
