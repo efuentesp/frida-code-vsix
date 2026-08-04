@@ -599,24 +599,24 @@ export function App() {
 								}
 							/>
 						))}
-				</div>
-			) : state.questionnaire ? (
-				// ask_user_question nativo (ADR-0027): QuestionsPanel ocupa el lugar del
-				// composer (como las aprobaciones), con selección por teclado.
-				<div className="approval-inline">
-					<QuestionsPanel
-						key={state.questionnaire.id}
-						questions={state.questionnaire.questions}
-						onResult={(r) =>
-							post({
-								type: "questionnaire_answer",
-								id: state.questionnaire!.id,
-								...r,
-							})
-						}
-					/>
-				</div>
-			) : composerDialogRoots.length > 0 ? (
+					</div>
+				) : state.questionnaire ? (
+					// ask_user_question nativo (ADR-0027): QuestionsPanel ocupa el lugar del
+					// composer (como las aprobaciones), con selección por teclado.
+					<div className="approval-inline">
+						<QuestionsPanel
+							key={state.questionnaire.id}
+							questions={state.questionnaire.questions}
+							onResult={(r) =>
+								post({
+									type: "questionnaire_answer",
+									id: state.questionnaire!.id,
+									...r,
+								})
+							}
+						/>
+					</div>
+				) : composerDialogRoots.length > 0 ? (
 					// Diálogo ask_user_question: ocupa el lugar del composer (como las
 					// aprobaciones). El cuestionario ya trae sus propios botones.
 					<div className="approval-inline">

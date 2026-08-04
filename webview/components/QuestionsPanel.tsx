@@ -66,7 +66,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					action: () => goToTab(questions.length - 1),
 				},
 				{ key: "submit", label: "Enviar ✓", cls: "q-btn", action: submit },
-				{ key: "cancel", label: "Cancelar", cls: "q-btn danger", action: cancel },
+				{
+					key: "cancel",
+					label: "Cancelar",
+					cls: "q-btn danger",
+					action: cancel,
+				},
 			]
 		: [
 				...(tab > 0
@@ -92,7 +97,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							cls: "q-btn",
 							action: () => goToTab(tab + 1),
 						},
-				{ key: "cancel", label: "Cancelar", cls: "q-btn danger", action: cancel },
+				{
+					key: "cancel",
+					label: "Cancelar",
+					cls: "q-btn danger",
+					action: cancel,
+				},
 			];
 
 	// ¿La pregunta actual lleva panel de preview? Solo single-select con ≥1 opción
@@ -104,7 +114,8 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	const inputMode = !isReviewTab && (customText[tab] ?? "").trim().length > 0;
 
 	const selectedLabel = draft?.kind === "option" ? draft.answer : undefined;
-	const withPreview = (o: WebQuestionOption) => (o.preview ?? "").trim().length > 0;
+	const withPreview = (o: WebQuestionOption) =>
+		(o.preview ?? "").trim().length > 0;
 	const activePreviewOpt = isReviewTab
 		? undefined
 		: (q!.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
@@ -129,7 +140,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		if (isReviewTab) {
 			// En el review tab el foco va al botón "Enviar".
 			setZone("buttons");
-			setFocusBtn(Math.max(0, navButtons.findIndex((b) => b.key === "submit")));
+			setFocusBtn(
+				Math.max(
+					0,
+					navButtons.findIndex((b) => b.key === "submit"),
+				),
+			);
 		} else {
 			setZone("options");
 			setFocusBtn(0);
@@ -244,8 +260,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				else if (zone === "buttons" && nb > 0) setFocusBtn((s) => (s + 1) % nb);
 			} else if (k === "ArrowUp") {
 				e.preventDefault();
-				if (zone === "options" && n > 0)
-					setFocusOpt((s) => (s - 1 + n) % n);
+				if (zone === "options" && n > 0) setFocusOpt((s) => (s - 1 + n) % n);
 				else if (zone === "buttons" && nb > 0)
 					setFocusBtn((s) => (s - 1 + nb) % nb);
 			} else if (k === "ArrowRight") {
@@ -289,7 +304,17 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [q, zone, focusOpt, focusBtn, tab, customText, drafts, questions, navButtons]);
+	}, [
+		q,
+		zone,
+		focusOpt,
+		focusBtn,
+		tab,
+		customText,
+		drafts,
+		questions,
+		navButtons,
+	]);
 
 	function renderOption(opt: WebQuestionOption, i: number) {
 		const selected = isOptionSelected(opt.label);
@@ -379,7 +404,9 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							else value = d.answer ?? "";
 							return (
 								<div key={i} className="q-review-row">
-									<span className="q-review-label">{qq.header || `Q${i + 1}`}:</span>{" "}
+									<span className="q-review-label">
+										{qq.header || `Q${i + 1}`}:
+									</span>{" "}
 									<span className="q-review-value">{value}</span>
 								</div>
 							);
@@ -448,8 +475,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 						type="button"
 						tabIndex={-1}
 						className={
-							b.cls +
-							(zone === "buttons" && i === focusBtn ? " focused" : "")
+							b.cls + (zone === "buttons" && i === focusBtn ? " focused" : "")
 						}
 						onClick={() => {
 							setZone("buttons");
