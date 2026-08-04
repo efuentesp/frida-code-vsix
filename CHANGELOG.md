@@ -17,6 +17,11 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.8.1] - 2026-08-04
+### Corregido
+
+- **usage** — Top sesiones trunca nombres (…) + grid del dashboard a 50/50 real
+
 ## [0.8.0] - 2026-08-04
 ### Añadido
 
