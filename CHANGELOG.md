@@ -23,6 +23,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
   progreso (fase + elapsed) y botón **Cancel** que aborta la operación git en
   curso. Ver [ADR-0026](./docs/adr/0026-frida-git-sync-porter-pi-git-sync.md).
 
+- **Paneles del footer colapsables.** Los paneles persistentes (Todo, Subagentes,
+  Workflow y el banner de frida-pipeline) y las tarjetas de aprobación
+  (`ApprovalCard`) ahora se colapsan con un clic en su cabecera (chevron ▼/▶),
+  para liberar espacio vertical cuando se acumulan varios a la vez. Arrancan
+  expandidos y recuerdan la decisión del usuario durante la sesión (estado local,
+  no persiste). Componente compartido `CollapsiblePanel` (Remote React)
+  reutilizado por los cuatro paneles; las `ApprovalCard` (webview nativo)
+  gestionan su propio colapso.
+
 ### Cambiado
 
 - **`frida-subagents` — panel de subagentes con progreso en vivo.** El widget

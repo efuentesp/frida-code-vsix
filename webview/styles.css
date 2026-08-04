@@ -2908,6 +2908,34 @@ kbd {
 	display: none;
 }
 
+/* ── Paneles colapsables del footer (Subagentes, Todo, Workflow, Pipeline) ──
+   El header (.panel-header) es clicable → alterna el cuerpo. Paridad visual
+   con .card-chev (chevron tenue, hover suave). El estado colapsado lo guarda
+   cada panel en useState local; no viaja por el árbol remoto. */
+.web-footer .panel-header {
+	cursor: pointer;
+}
+.web-footer .panel-header:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+/* Chevron ▼/▶ de los paneles y de la ApprovalCard (ancho fijo para alinear). */
+.panel-chev,
+.ap-chev {
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.7;
+	display: inline-block;
+	width: 10px;
+	text-align: center;
+	flex: none;
+}
+/* ── ApprovalCard colapsable: el .ttl hace de toggle del detalle ── */
+.approval .collapsible-ttl {
+	cursor: pointer;
+}
+.approval .collapsible-ttl:hover {
+	color: var(--vscode-textLinkForeground);
+}
+
 /* ── Tab bar de ask_user_question (sólo con 2+ preguntas) ──
    Pestañas clickeables: ● respondida (verde) / ○ pendiente (gris); la activa
    lleva borde inferior azul (textLink). Override de .fbutton.secondary vía

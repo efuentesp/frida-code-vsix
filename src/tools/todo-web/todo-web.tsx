@@ -12,10 +12,11 @@
 //
 // Tags intrinsic de frida-webview (fbox/ftext), tipados en src/frida-webview/index.ts.
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import type { Task, TaskStatus } from "../todo/types";
 import { getHiddenIds, getTodoState, subscribeTodoState } from "./store";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 const GLYPH: Record<TaskStatus, string> = {
 	pending: "○",
@@ -42,6 +43,7 @@ export function createTodoWebPanelElement(): ReactElement {
 function TodoWebPanel(): ReactElement | null {
 	const state = useSyncExternalStore(subscribeTodoState, getTodoState);
 	const hiddenIds = useSyncExternalStore(subscribeTodoState, getHiddenIds);
+	const [collapsed, setCollapsed] = useState(false);
 	// Tombstones (deleted) no se muestran; tampoco las completadas de turnos
 	// anteriores (hiddenIds). Una tarea descompletada (vuelve a in_progress) se
 	// muestra aunque esté en hiddenIds (status !== completed).
@@ -62,20 +64,26 @@ function TodoWebPanel(): ReactElement | null {
 	const showIds = tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
 	return (
-		<fbox flexDirection="column" padding={6}>
-			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext>{hasActive ? "●" : "○"}</ftext>
-				<ftext bold>Todos</ftext>
-				<ftext>
-					({completed}/{tasks.length})
-				</ftext>
-			</fbox>
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={() => setCollapsed((c) => !c)}
+			padding={6}
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext>{hasActive ? "●" : "○"}</ftext>
+					<ftext bold>Todos</ftext>
+					<ftext>
+						({completed}/{tasks.length})
+					</ftext>
+				</fbox>
+			}
+		>
 			<fbox flexDirection="column" gap={4} cls="todo-rows">
 				{tasks.map((t) => (
 					<TaskRow key={t.id} task={t} showIds={showIds} />
 				))}
 			</fbox>
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 

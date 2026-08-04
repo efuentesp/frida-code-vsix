@@ -7,6 +7,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { agentWidgetStore, type AgentDisplay } from "./store";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -110,6 +111,7 @@ function AgentWidgetPanel(): ReactElement | null {
 	// widget se ve "congelado" (icono fijo + elapsed estático) y el usuario no
 	// percibe que los subagentes siguen trabajando.
 	const [frame, setFrame] = useState(0);
+	const [collapsed, setCollapsed] = useState(false);
 	const hasRunning = agents.some((a) => a.status === "running");
 	useEffect(() => {
 		if (!hasRunning) return;
@@ -129,15 +131,21 @@ function AgentWidgetPanel(): ReactElement | null {
 	);
 
 	return (
-		<fbox flexDirection="column" padding={6}>
-			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext>●</ftext>
-				<ftext bold>Agents</ftext>
-				<ftext color="var(--vscode-descriptionForeground)">
-					({running.length} running
-					{queued.length > 0 ? `, ${queued.length} queued` : ""})
-				</ftext>
-			</fbox>
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={() => setCollapsed((c) => !c)}
+			padding={6}
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext>●</ftext>
+					<ftext bold>Agents</ftext>
+					<ftext color="var(--vscode-descriptionForeground)">
+						({running.length} running
+						{queued.length > 0 ? `, ${queued.length} queued` : ""})
+					</ftext>
+				</fbox>
+			}
+		>
 			{running.map((a) => (
 				<AgentRow key={a.id} agent={a} frame={frame} />
 			))}
@@ -152,7 +160,7 @@ function AgentWidgetPanel(): ReactElement | null {
 					{queued.length} en cola
 				</ftext>
 			)}
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 

@@ -21,6 +21,7 @@ import {
 	type TranscriptEntry,
 	type UnitView,
 } from "./store";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 const STAGE_GLYPH: Record<StageViewStatus, string> = {
 	pending: "○",
@@ -51,6 +52,7 @@ export function createWorkflowPanelElement(): ReactElement {
 function WorkflowPanel(): ReactElement | null {
 	const state = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
+	const [collapsed, setCollapsed] = useState(false);
 	if (state.runs.length === 0) return null; // auto-hide
 	// Más reciente primero.
 	const runs = [...state.runs].reverse();
@@ -62,11 +64,25 @@ function WorkflowPanel(): ReactElement | null {
 			return next;
 		});
 	return (
-		<fbox flexDirection="column" padding={6} gap={4}>
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={() => setCollapsed((c) => !c)}
+			padding={6}
+			gap={4}
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext>●</ftext>
+					<ftext bold>Workflow</ftext>
+					<ftext color="var(--vscode-descriptionForeground)">
+						({runs.length} run{runs.length === 1 ? "" : "s"})
+					</ftext>
+				</fbox>
+			}
+		>
 			{runs.map((r) => (
 				<RunBlock key={r.runId} run={r} expanded={expanded} onToggle={toggle} />
 			))}
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 

@@ -107,6 +107,7 @@ export function ApprovalCard({
 	const [sel, setSel] = useState(0);
 	const [reasonOpen, setReasonOpen] = useState(false);
 	const [reasonText, setReasonText] = useState("");
+	const [collapsed, setCollapsed] = useState(false);
 	const reasonRef = useRef<HTMLInputElement>(null);
 
 	function choose(key: ItemKey) {
@@ -121,7 +122,7 @@ export function ApprovalCard({
 	// de motivo (ése tiene su propio onKeyDown). ↑↓ navega, Enter confirma, Esc
 	// cancela (= rechazar, como el selector de pi), Y/P/N/M ejecutan directo.
 	useEffect(() => {
-		if (!active || reasonOpen) return;
+		if (!active || reasonOpen || collapsed) return;
 		const onKey = (e: KeyboardEvent) => {
 			const n = items.length;
 			const k = e.key;
@@ -152,7 +153,7 @@ export function ApprovalCard({
 		// choose/onRespond son estables durante la vida del componente; sel e
 		// items son las dependencias reales del cierre.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [active, reasonOpen, sel, items]);
+	}, [active, reasonOpen, collapsed, sel, items]);
 
 	// Al abrir el input de motivo, le damos el foco (sin autoFocus, que el linter
 	// desaconseja por accesibilidad).
@@ -167,76 +168,85 @@ export function ApprovalCard({
 
 	return (
 		<div className="approval">
-			<div className="ttl">
+			<div
+				className="ttl collapsible-ttl"
+				onClick={() => setCollapsed((c) => !c)}
+				title={collapsed ? "Expandir" : "Colapsar"}
+			>
+				<span className="ap-chev">{collapsed ? "▶" : "▼"}</span>
 				<span className="ic">
 					<Icon name={icon} />
 				</span>
 				<span>{label}</span>
 			</div>
-			{approval.command && <pre className="cmd">{approval.command}</pre>}
-			{approval.diff && <Diff text={approval.diff} />}
-			{approval.warning && (
-				<p className="warning">
-					<span className="ic">
-						<Icon name="alert" />
-					</span>{" "}
-					{approval.warning}
-				</p>
-			)}
-			{isTool && (
-				<p className="hint">
-					{READONLY_TOOLS.has(approval.toolName)
-						? "Herramienta de sólo lectura/análisis (no modifica archivos). Revisa la acción antes de aceptar."
-						: FRIDA_INTERNAL_TOOLS.has(approval.toolName)
-							? "Herramienta interna de Frida. Revisa la acción antes de aceptar."
-							: "Herramienta no reconocida (MCP o extensión de terceros). Revisa la acción antes de aceptar."}
-				</p>
-			)}
+			{!collapsed && (
+				<>
+					{approval.command && <pre className="cmd">{approval.command}</pre>}
+					{approval.diff && <Diff text={approval.diff} />}
+					{approval.warning && (
+						<p className="warning">
+							<span className="ic">
+								<Icon name="alert" />
+							</span>{" "}
+							{approval.warning}
+						</p>
+					)}
+					{isTool && (
+						<p className="hint">
+							{READONLY_TOOLS.has(approval.toolName)
+								? "Herramienta de sólo lectura/análisis (no modifica archivos). Revisa la acción antes de aceptar."
+								: FRIDA_INTERNAL_TOOLS.has(approval.toolName)
+									? "Herramienta interna de Frida. Revisa la acción antes de aceptar."
+									: "Herramienta no reconocida (MCP o extensión de terceros). Revisa la acción antes de aceptar."}
+						</p>
+					)}
 
-			{reasonOpen ? (
-				<div className="ap-reason">
-					<input
-						ref={reasonRef}
-						className="ap-reason-input"
-						placeholder="Escribe el motivo y presiona Enter…"
-						value={reasonText}
-						onChange={(e) => setReasonText(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Enter") {
-								e.preventDefault();
-								submitReason();
-							} else if (e.key === "Escape") {
-								e.preventDefault();
-								setReasonOpen(false);
-							}
-						}}
-					/>
-					<div className="ap-keys">
-						⏎ rechazar con motivo · Esc volver al menú
-					</div>
-				</div>
-			) : (
-				<div className="ap-menu" role="listbox">
-					{items.map((it, i) => (
-						<button
-							key={it.key}
-							type="button"
-							role="option"
-							className={"ap-item" + (i === sel ? " active" : "")}
-							onClick={() => choose(it.key)}
-							onMouseEnter={() => setSel(i)}
-							aria-selected={i === sel}
-						>
-							<span className="ap-bullet">{i === sel ? "❯" : ""}</span>
-							<span className="ap-label">{it.label}</span>
-							<span className="ap-letter">{it.letter}</span>
-						</button>
-					))}
-					<div className="ap-keys">
-						↑↓ navegar · ⏎ confirmar · Esc cancelar
-						{active ? " · Y/P/N/M" : ""}
-					</div>
-				</div>
+					{reasonOpen ? (
+						<div className="ap-reason">
+							<input
+								ref={reasonRef}
+								className="ap-reason-input"
+								placeholder="Escribe el motivo y presiona Enter…"
+								value={reasonText}
+								onChange={(e) => setReasonText(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										e.preventDefault();
+										submitReason();
+									} else if (e.key === "Escape") {
+										e.preventDefault();
+										setReasonOpen(false);
+									}
+								}}
+							/>
+							<div className="ap-keys">
+								⏎ rechazar con motivo · Esc volver al menú
+							</div>
+						</div>
+					) : (
+						<div className="ap-menu" role="listbox">
+							{items.map((it, i) => (
+								<button
+									key={it.key}
+									type="button"
+									role="option"
+									className={"ap-item" + (i === sel ? " active" : "")}
+									onClick={() => choose(it.key)}
+									onMouseEnter={() => setSel(i)}
+									aria-selected={i === sel}
+								>
+									<span className="ap-bullet">{i === sel ? "❯" : ""}</span>
+									<span className="ap-label">{it.label}</span>
+									<span className="ap-letter">{it.letter}</span>
+								</button>
+							))}
+							<div className="ap-keys">
+								↑↓ navegar · ⏎ confirmar · Esc cancelar
+								{active ? " · Y/P/N/M" : ""}
+							</div>
+						</div>
+					)}
+				</>
 			)}
 		</div>
 	);

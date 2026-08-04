@@ -8,9 +8,10 @@
 // reactivo propio. Las Fases 2+ añadirán un store que re-renderice al cambiar
 // el estado de las hermanas (ej. una extensión hermana se desinstala).
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import { computePipelineStatus, type PipelineStatus } from "./setup-command";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 // ---------------------------------------------------------------------------
 // Store del banner (Fase 1: snapshot estático, sin reactividad)
@@ -78,18 +79,23 @@ function BannerPanel(): ReactElement {
 	);
 	const allGlyph = status.siblings.allPresent ? "✅" : "⚠️";
 	const counts = status.counts;
+	const [collapsed, setCollapsed] = useState(false);
 
 	return (
-		<fbox flexDirection="column" padding={6}>
-			{/* Cabecera */}
-			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext>●</ftext>
-				<ftext bold>frida-pipeline</ftext>
-				<ftext color={STATE_COLOR[status.level]}>
-					v{status.siblings.fridaVersion} · {STATE_GLYPH[status.level]}
-				</ftext>
-			</fbox>
-
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={() => setCollapsed((c) => !c)}
+			padding={6}
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext>●</ftext>
+					<ftext bold>frida-pipeline</ftext>
+					<ftext color={STATE_COLOR[status.level]}>
+						v{status.siblings.fridaVersion} · {STATE_GLYPH[status.level]}
+					</ftext>
+				</fbox>
+			}
+		>
 			{/* Hermanas */}
 			<fbox flexDirection="row" gap={4} alignItems="center">
 				<ftext>
@@ -123,7 +129,7 @@ function BannerPanel(): ReactElement {
 						))}
 				</fbox>
 			)}
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 
