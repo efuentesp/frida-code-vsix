@@ -28,6 +28,7 @@ export type Period = "today" | "7d" | "30d" | "all";
 
 export interface SessionSummary {
 	path: string;
+	name?: string;
 	firstMessage: string;
 	cwd: string;
 	firstTs: number;

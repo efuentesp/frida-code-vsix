@@ -30,7 +30,12 @@ function projOf(cwd: string): string {
 }
 // Etiqueta legible de una sesión: su primer prompt (firstMessage) o, si no, el
 // nombre del archivo (timestamp+UUID). Paridad con SessionsPanel (name||firstMessage).
-function sessionLabel(s: { firstMessage: string; path: string }): string {
+function sessionLabel(s: {
+	name?: string;
+	firstMessage: string;
+	path: string;
+}): string {
+	if (s.name) return s.name;
 	if (s.firstMessage) return s.firstMessage;
 	return (s.path.split(/[/\\]/).pop() ?? s.path).replace(/\.jsonl$/, "");
 }
@@ -85,7 +90,9 @@ export function UsageDashboard({
 					{PERIODS.map((p) => (
 						<button
 							key={p.id}
-							className={"usage-period-btn" + (period === p.id ? " active" : "")}
+							className={
+								"usage-period-btn" + (period === p.id ? " active" : "")
+							}
 							onClick={() => setPeriod(p.id)}
 						>
 							{p.label}
@@ -159,7 +166,7 @@ export function UsageDashboard({
 							<div key={s.path} className="usage-session-row">
 								<span
 									className="usage-session-name"
-									title={s.firstMessage || s.path}
+									title={s.name || s.firstMessage || s.path}
 								>
 									{sessionLabel(s)}
 									{showProj && projOf(s.cwd) ? (

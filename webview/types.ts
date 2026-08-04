@@ -229,6 +229,7 @@ export interface UsageByDay {
 }
 export interface UsageSession {
 	path: string;
+	name?: string;
 	firstMessage: string;
 	cwd: string;
 	firstTs: number;

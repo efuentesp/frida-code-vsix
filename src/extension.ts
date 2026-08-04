@@ -1620,13 +1620,28 @@ export async function activate(
 						: "all";
 				const scope = msg.scope === "all" ? "all" : "project";
 				const projectCwd = scope === "project" ? workspaceCwd() : undefined;
-				const { snapshot, periodFrom, periodTo } = indexUsage({
-					sessionsDir: sessionDirPath,
-					period,
-					projectCwd,
-				});
-				post({
-					type: "usage_report",
+			const { snapshot, periodFrom, periodTo } = indexUsage({
+				sessionsDir: sessionDirPath,
+				period,
+				projectCwd,
+			});
+			// Enriquecer top sesiones con el name (renombrado por el usuario) del SDK,
+			// igual que la lista de sesiones (SessionManager). Best-effort: si falla,
+			// sessionLabel cae a firstMessage.
+			try {
+				const items = await SessionManager.listAll(sessionDirPath);
+				const nameByPath = new Map(
+					items.map((i: any) => [
+						String(i.path),
+						i.name as string | undefined,
+					]),
+				);
+				for (const s of snapshot.sessions) s.name = nameByPath.get(s.path);
+			} catch {
+				/* noop */
+			}
+			post({
+				type: "usage_report",
 					report: snapshot,
 					period,
 					scope,
