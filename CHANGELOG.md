@@ -17,6 +17,22 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.8.0] - 2026-08-04
+### Añadido
+
+- **usage** — Top herramientas por tokens (atribución por-mensaje) + tooltip de llamadas
+- **usage** — Top sesiones muestra el primer prompt (firstMessage) en vez del filename
+- **usage** — filtro Este proyecto/Todas en el tab Uso (paridad con sesiones)
+
+### Corregido
+
+- **usage** — Top sesiones prioriza el name renombrado (name||firstMessage)
+- **usage** — el BarChart vertical muestra día (MM-DD), valor y tooltip
+
+### Interno
+
+- **usage** — corrige indentación del linter (biome) en el tab Uso
+
 ## [0.7.0] - 2026-08-04
 
 ### Añadido
