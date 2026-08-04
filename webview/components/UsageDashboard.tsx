@@ -76,6 +76,7 @@ export function UsageDashboard({
 				<div className="usage-card">
 					<div className="usage-card-title">Tokens por día</div>
 					<BarChart
+						format={fmt}
 						data={report.breakdowns.byDay.map((d) => ({
 							label: d.date.slice(5),
 							value: d.tokens,

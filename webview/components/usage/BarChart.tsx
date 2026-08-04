@@ -1,4 +1,6 @@
-// BarChart SVG (vertical) o CSS (horizontal) para el tab "Uso".
+// BarChart para el tab "Uso": horizontal (CSS, con etiqueta+valor) o vertical
+// (CSS, valor encima + barra + día debajo + tooltip nativo). `format` opcional
+// formatea el valor mostrado (p.ej. tokens → "27.7M").
 
 interface BarDatum {
 	label: string;
@@ -7,12 +9,15 @@ interface BarDatum {
 export function BarChart({
 	data,
 	horizontal,
+	format,
 }: {
 	data: BarDatum[];
 	horizontal?: boolean;
+	format?: (v: number) => string;
 }) {
 	if (data.length === 0) return <div className="chart-empty">Sin datos</div>;
 	const max = Math.max(...data.map((d) => d.value), 1);
+	const fmtVal = (v: number) => (format ? format(v) : String(v));
 	if (horizontal) {
 		return (
 			<div className="bar-h-list">
@@ -27,30 +32,31 @@ export function BarChart({
 								style={{ width: `${(d.value / max) * 100}%` }}
 							/>
 						</div>
-						<span className="bar-h-val">{d.value}</span>
+						<span className="bar-h-val">{fmtVal(d.value)}</span>
 					</div>
 				))}
 			</div>
 		);
 	}
-	const w = 100,
-		h = 60,
-		bw = w / data.length;
+	// Vertical: valor encima + barra + día debajo; tooltip nativo (title) al hover.
 	return (
-		<svg className="bar-v" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-			{data.map((d, i) => {
-				const bh = (d.value / max) * h;
-				return (
-					<rect
-						key={i}
-						x={i * bw + 1}
-						y={h - bh}
-						width={Math.max(1, bw - 2)}
-						height={bh}
-						className="bar-v-fill"
-					/>
-				);
-			})}
-		</svg>
+		<div className="bar-v-list">
+			{data.map((d) => (
+				<div
+					key={d.label}
+					className="bar-v-col"
+					title={`${d.label} — ${fmtVal(d.value)}`}
+				>
+					<span className="bar-v-val">{fmtVal(d.value)}</span>
+					<div className="bar-v-col-track">
+						<div
+							className="bar-v-col-fill"
+							style={{ height: `${(d.value / max) * 100}%` }}
+						/>
+					</div>
+					<span className="bar-v-day">{d.label}</span>
+				</div>
+			))}
+		</div>
 	);
 }
