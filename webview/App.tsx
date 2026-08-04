@@ -72,7 +72,7 @@ function providerLabel(id: string): string {
 }
 
 function nextMode(m: ApprovalMode): ApprovalMode {
-	return m === "manual" ? "auto-edit" : m === "auto-edit" ? "auto" : "manual";
+	return m === "manual" ? "auto" : "manual";
 }
 
 export function App() {
@@ -475,8 +475,9 @@ export function App() {
 			)}
 			{state.mode === "auto" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> Auto ON: edit/write/bash corren sin
-					pedirte confirmación.
+					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte confirmación
+					(edit/write/bash, incl. comandos compuestos y rutas externas). Detén con el
+					botón Detener o doble Esc.
 				</div>
 			)}
 			{escHint && (

@@ -123,8 +123,9 @@ export function createPermissionSystem(
 		const isDiff = kind === "diff";
 		const forceAsk = decision.forceAsk;
 
-		// Override del modo: auto suelta todo ask (salvo force-ask).
-		if (mode === "auto" && !forceAsk) {
+		// Override del modo: YOLO (auto) suelta TODO ask, incl. force-ask
+		// (bash compuesto / path externo). auto-edit respeta force-ask (más abajo).
+		if (mode === "auto") {
 			record(makeEntry(event, sessionId, "allow", "mode", { kind }));
 			return;
 		}

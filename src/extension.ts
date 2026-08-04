@@ -1776,11 +1776,21 @@ export async function activate(
 			case "delete_session":
 				await deleteSession(String(msg.path ?? ""));
 				break;
-			case "set_mode":
-				approvalMode =
+			case "set_mode": {
+				const next: PermissionMode =
 					msg.mode === "auto-edit" || msg.mode === "auto" ? msg.mode : "manual";
+				// Gate YOLO: pedir confirmación al entrar a un modo sin permisos desde manual.
+				if (next !== "manual" && approvalMode === "manual") {
+					const ok = await requestYoloGate();
+					if (!ok) {
+						post({ type: "mode", mode: approvalMode });
+						break;
+					}
+				}
+				approvalMode = next;
 				post({ type: "mode", mode: approvalMode });
 				break;
+			}
 			case "set_tool_toggle":
 				await writeToolToggle(msg.key, !!msg.enabled);
 				postToolToggles();
@@ -2826,6 +2836,15 @@ export async function activate(
 		}
 	}
 
+	async function requestYoloGate(): Promise<boolean> {
+		const item = await vscode.window.showWarningMessage(
+			"Modo YOLO: Frida podrá ejecutar comandos (incl. bash compuestos), editar y crear archivos SIN pedir confirmación. Detén con el botón Detener o doble Esc.",
+			{ modal: true },
+			"Activar YOLO",
+		);
+		return item === "Activar YOLO";
+	}
+
 	async function abortRun(): Promise<void> {
 		try {
 			const { session } = await ensureSession();
@@ -3574,13 +3593,13 @@ export async function activate(
 			"frida.newSession",
 			() => void newSession(),
 		),
-		vscode.commands.registerCommand("frida.approvalMode", () => {
-			approvalMode =
-				approvalMode === "manual"
-					? "auto-edit"
-					: approvalMode === "auto-edit"
-						? "auto"
-						: "manual";
+		vscode.commands.registerCommand("frida.approvalMode", async () => {
+			const next: PermissionMode = approvalMode === "manual" ? "auto" : "manual";
+			if (next !== "manual") {
+				const ok = await requestYoloGate();
+				if (!ok) return;
+			}
+			approvalMode = next;
 			post({ type: "mode", mode: approvalMode });
 		}),
 		vscode.commands.registerCommand("frida.demoWebReact", async () => {

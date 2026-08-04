@@ -131,7 +131,7 @@ export function Composer({
 	const activeProvider = provs.find((p) => p.id === active?.provider);
 	const modelOptions = activeProvider?.models ?? [];
 	const modeLabel =
-		mode === "manual" ? "Manual" : mode === "auto-edit" ? "Auto-edit" : "Auto";
+		mode === "manual" ? "Normal" : mode === "auto-edit" ? "Auto-edit" : "YOLO";
 
 	useEffect(() => {
 		ref.current?.focus();
