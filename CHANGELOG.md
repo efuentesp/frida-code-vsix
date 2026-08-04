@@ -17,6 +17,11 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.9.0] - 2026-08-04
+### Añadido
+
+- **usage** — Artefactos por tipo de archivo (KLOCs + tokens) con familia en hover
+
 ## [0.8.1] - 2026-08-04
 ### Corregido
 
