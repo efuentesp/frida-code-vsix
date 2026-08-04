@@ -142,6 +142,26 @@ export interface UiRequest {
 	message?: string;
 }
 
+/** Opción de pregunta (ask_user_question nativo, ADR-0027). Espeja el host. */
+export interface WebQuestionOption {
+	label: string;
+	description: string;
+	/** Markdown opcional (single-select): se muestra al enfocar la opción. */
+	preview?: string;
+}
+export interface WebQuestionSpec {
+	question: string;
+	header: string;
+	multiSelect?: boolean;
+	options: WebQuestionOption[];
+}
+export interface WebQuestionAnswer {
+	questionIndex: number;
+	kind: "option" | "custom" | "multi";
+	answer: string | null;
+	selected?: string[];
+}
+
 export interface Usage {
 	// Tokens acumulados de la sesión (estilo pi: ↑/↓/R/W/CH)
 	inputTotal: number; // ↑ input acumulado
@@ -313,6 +333,9 @@ export interface State {
 	turns: Turn[];
 	approvals: ApprovalRequest[];
 	uiRequests: UiRequest[];
+	/** Cuestionario ask_user_question activo (ADR-0027): QuestionsPanel nativo.
+	 *  null = sin cuestionario pendiente. */
+	questionnaire?: { id: string; questions: WebQuestionSpec[] } | null;
 	/** Árbol Remote React actual (null = sin UI remota activa). */
 	/** Roots Remote React activos, keyados por rootId, cada uno con su zona
 	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
@@ -393,6 +416,10 @@ export type InMessage =
 	| { type: "queued"; items: string[] }
 	| { type: "approvals"; approvals: ApprovalRequest[] }
 	| { type: "ui_requests"; items: UiRequest[] }
+	| {
+			type: "questionnaire";
+			req: { id: string; questions: WebQuestionSpec[] } | null;
+	  }
 	| { type: "ui_notify"; message: string; level: "info" | "warning" | "error" }
 	| {
 			type: "web_commit";
@@ -480,6 +507,12 @@ export type OutMessage =
 			id: string;
 			value?: string;
 			cancelled: boolean;
+	  }
+	| {
+			type: "questionnaire_answer";
+			id: string;
+			cancelled: boolean;
+			answers: WebQuestionAnswer[];
 	  }
 	| {
 			type: "web_event";

@@ -1,11 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { ReactElement } from "react";
 import { Type } from "typebox";
-import {
-	createWebQuestionnaireElement,
-	type WebQuestionAnswer,
-	type WebQuestionSpec,
-} from "../web-questionnaire";
+import type {
+	WebQuestionSpec,
+	WebQuestionnaireResult,
+} from "../questionnaire-bridge";
 import {
 	MAX_HEADER_LENGTH,
 	MAX_LABEL_LENGTH,
@@ -14,14 +12,12 @@ import {
 	MIN_OPTIONS,
 } from "./types";
 
-// Extensión ask_user_question construida sobre Remote React (opción A, ADR-0012).
-// Reemplaza al ask-user-question empotrado (QuestionBridge/QuestionCard) y a la
-// versión RPC de rpiv: en vez de diálogos secuenciales o una QuestionCard propia,
-// monta un WebQuestionnaire con React+estado en el host, serializado al webview.
-//
-// El execute valida params, llama ctx.ui.fridaWeb(factory) —que monta el componente
-// y devuelve el resultado al cerrar— y envuelve todo en el envelope del tool
-// (content legible + details {answers, cancelled}).
+// Extensión ask_user_question nativa del webview (ADR-0027): reemplaza la
+// implementación sobre Remote React (ADR-0012) por un componente QuestionsPanel
+// nativo del webview, que soporta selección por teclado (parity con ApprovalCard).
+// El execute valida params, llama ctx.ui.askUserQuestion(questions) —que publica
+// el cuestionario al webview y devuelve el resultado al cerrar— y envuelve todo
+// en el envelope del tool (content legible + details {answers, cancelled}).
 
 const optionSchema = Type.Object({
 	label: Type.String({ maxLength: MAX_LABEL_LENGTH }),
@@ -51,17 +47,11 @@ const askSchema = Type.Object({
 	}),
 });
 
-/** Slice del ExtensionUIContext de Frida que expone fridaWeb (no está en el SDK). */
-type FridaWebUI = {
-	fridaWeb: <T = void>(
-		factory: (done: (result: T) => void) => ReactElement,
-		placement?: import("../web-protocol").WebPlacement,
-	) => Promise<T>;
-};
-
-type WebQuestionnaireResult = {
-	answers: WebQuestionAnswer[];
-	cancelled: boolean;
+/** Slice del ExtensionUIContext de Frida que expone askUserQuestion (no en SDK). */
+type AskUserQuestionUI = {
+	askUserQuestion: (
+		questions: WebQuestionSpec[],
+	) => Promise<WebQuestionnaireResult>;
 };
 
 type ToolResult = {
@@ -152,20 +142,16 @@ export function createAskUserQuestionWeb() {
 					}
 				}
 
-				// ctx.ui es el ExtensionUIContext de Frida, que añade fridaWeb (no tipado en el SDK).
-				const ui = (ctx?.ui ?? {}) as unknown as FridaWebUI;
-				if (typeof ui.fridaWeb !== "function") {
+				// ctx.ui es el ExtensionUIContext de Frida, que añade askUserQuestion (no tipado en el SDK).
+				const ui = (ctx?.ui ?? {}) as unknown as AskUserQuestionUI;
+				if (typeof ui.askUserQuestion !== "function") {
 					return invalid(
-						"no_frida_web",
-						"El host no soporta UI React remota (fridaWeb). No es un decline: pregunta en texto plano.",
+						"no_ask_user_question",
+						"El host no soporta el cuestionario nativo. No es un decline: pregunta en texto plano.",
 					);
 				}
 
-				const result = await ui.fridaWeb<WebQuestionnaireResult>(
-					(done) =>
-						createWebQuestionnaireElement(raw as WebQuestionSpec[], done),
-					"composer",
-				);
+				const result = await ui.askUserQuestion(raw as WebQuestionSpec[]);
 
 				if (result.cancelled) return declined();
 				return ok(summarize(typed, result), result);

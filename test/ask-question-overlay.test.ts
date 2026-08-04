@@ -1,19 +1,16 @@
-// Test foco: ¿monta el WebQuestionnaire (ask_user_question) un árbol válido?
-// Diagnóstico del reporte "la pregunta no apareció".
+// Test foco: ¿el puente del cuestionario (ADR-0027) publica y resuelve bien?
+// Reemplaza al test sobre Remote React (webBridge.render + inspección del árbol
+// WebNode), ya que ask_user_question migró a componente nativo del webview
+// (QuestionsPanel). La lógica que vive en el host es ahora QuestionnaireBridge:
+// request() publica el pendiente, resolve() entrega la respuesta, y el abort del
+// turn → cancelledResponse (decline). La UI (QuestionsPanel) es un componente
+// React del browser y se valida con el demo (frida.demoWebQuestionnaire).
 import { describe, it, expect } from "vitest";
-import { WebBridge } from "../src/web-bridge";
-import { createWebQuestionnaireElement } from "../src/web-questionnaire";
-import type {
-	WebQuestionSpec,
-	WebQuestionnaireResult,
-} from "../src/web-questionnaire";
-import type { WebNode } from "../src/web-protocol";
-
-interface Commit {
-	rootId: string;
-	tree: WebNode | null;
-	placement: string;
-}
+import {
+	QuestionnaireBridge,
+	type QuestionnaireRequest,
+	type WebQuestionSpec,
+} from "../src/questionnaire-bridge";
 
 const Q: WebQuestionSpec[] = [
 	{
@@ -26,95 +23,51 @@ const Q: WebQuestionSpec[] = [
 	},
 ];
 
-const Q2: WebQuestionSpec[] = [
-	{
-		question: "¿Auth method?",
-		header: "Auth",
-		options: [{ label: "Supabase", description: "d" }],
-	},
-	{
-		question: "¿Library?",
-		header: "Library",
-		options: [{ label: "Zod", description: "d" }],
-	},
-];
+describe("QuestionnaireBridge (ADR-0027)", () => {
+	it("request() publica el cuestionario pendiente y resolve() lo entrega", async () => {
+		const emitted: QuestionnaireRequest[][] = [];
+		const bridge = new QuestionnaireBridge((reqs) => emitted.push(reqs));
+		const p = bridge.request({ id: "q1", questions: Q });
 
-describe("ask_user_question — webBridge.render(WebQuestionnaire)", () => {
-	it("comete un árbol fbox con la pregunta + botones (footer)", async () => {
-		const commits: Commit[] = [];
-		const bridge = new WebBridge((rootId, tree, placement) =>
-			commits.push({ rootId, tree: tree as WebNode, placement }),
-		);
+		// Tras request, el puente emite la lista de pendientes (con nuestro req).
+		expect(emitted).toHaveLength(1);
+		expect(emitted[0]).toHaveLength(1);
+		expect(emitted[0]![0]!.questions).toEqual(Q);
 
-		const promise = bridge.render<WebQuestionnaireResult>(
-			(done) => createWebQuestionnaireElement(Q, done),
-			"composer",
-		);
-
-		// Debe haber al menos un commit con árbol no nulo (footer).
-		expect(commits.length).toBeGreaterThanOrEqual(1);
-		const tree = commits[0]!.tree!;
-		expect(tree).toBeTruthy();
-		expect((tree as { type: string }).type).toBe("fbox");
-		expect(commits[0]!.placement).toBe("composer");
-
-		// Contiene botones de acción (Enviar/Siguiente/Cancelar).
-		const labels = collectText(tree, "fbutton");
-		expect(labels.some((t) => /Enviar|Siguiente|Cancelar/i.test(t))).toBe(true);
-
-		// Con 1 pregunta no hay tab bar.
-		expect(collectCls(tree).some((c) => c.includes("q-tabs"))).toBe(false);
-		// Las opciones renderizan como filas (q-opt), no como botones.
-		expect(collectCls(tree).some((c) => c.includes("q-opt"))).toBe(true);
-
-		// La promesa de render() sólo resuelve al hacer Submit (done). No la
-		// esperamos (no hay fireEvent del host); descartamos para no colgar.
-		void promise.catch(() => undefined);
-		bridge.dispose();
+		// El webview (QuestionsPanel) responde con una opción elegida.
+		bridge.resolve({
+			id: "q1",
+			cancelled: false,
+			answers: [{ questionIndex: 0, kind: "option", answer: "A" }],
+		});
+		const result = await p;
+		expect(result.cancelled).toBe(false);
+		expect(result.answers[0]?.kind).toBe("option");
+		expect(result.answers[0]?.answer).toBe("A");
+		// Al resolver, emite de nuevo (lista vacía → el webview lo desmonta).
+		expect(emitted[1]).toEqual([]);
 	});
 
-	it("muestra tab bar (q-tabs) sólo con 2+ preguntas; una pestaña activa", async () => {
-		const commits: Commit[] = [];
-		const bridge = new WebBridge((rootId, tree, placement) =>
-			commits.push({ rootId, tree: tree as WebNode, placement }),
-		);
-		const promise = bridge.render<WebQuestionnaireResult>(
-			(done) => createWebQuestionnaireElement(Q2, done),
-			"composer",
-		);
-		const cls = collectCls(commits[0]!.tree!);
-		// Hay una barra de pestañas.
-		expect(cls.some((c) => c.includes("q-tabs"))).toBe(true);
-		// Una pestaña por pregunta (excluyendo el contenedor q-tabs).
-		const tabs = cls.filter((c) => /(^|\s)q-tab(\s|$)/.test(c));
-		expect(tabs.length).toBe(2);
-		// Exactamente una activa (la inicial, tab 0).
-		expect(tabs.filter((c) => c.includes("active")).length).toBe(1);
-		void promise.catch(() => undefined);
-		bridge.dispose();
+	it("resolve(cancelled: true) entrega decline (answers vacías)", async () => {
+		const bridge = new QuestionnaireBridge(() => {});
+		const p = bridge.request({ id: "q2", questions: Q });
+		bridge.resolve({ id: "q2", cancelled: true, answers: [] });
+		const result = await p;
+		expect(result.cancelled).toBe(true);
+		expect(result.answers).toEqual([]);
+	});
+
+	it("abort del turn → cancelledResponse (decline) y limpia el pendiente", async () => {
+		const published: unknown[] = [];
+		const bridge = new QuestionnaireBridge((reqs) => published.push(reqs));
+		const controller = new AbortController();
+		const p = bridge.request({ id: "q3", questions: Q }, controller.signal);
+		controller.abort();
+		const result = await p;
+		// El decline por abort tiene la misma forma que un cancel manual.
+		expect(result.cancelled).toBe(true);
+		expect(result.answers).toEqual([]);
+		// El puente emite la lista vacía (desmonta el diálogo del webview).
+		expect(published.at(-1)).toEqual([]);
 	});
 });
-
-function collectText(node: WebNode | null, type: string): string[] {
-	if (!node || typeof node !== "object" || !("type" in node)) return [];
-	const out: string[] = node.type === type ? [textOf(node)] : [];
-	for (const c of (node as any).children ?? [])
-		out.push(...collectText(c, type));
-	return out;
-}
-function collectCls(node: WebNode | null): string[] {
-	if (!node || typeof node !== "object" || !("type" in node)) return [];
-	const out: string[] = [];
-	const cls = (node as any).props?.cls;
-	if (typeof cls === "string") out.push(cls);
-	for (const c of (node as any).children ?? [])
-		if (typeof c === "object") out.push(...collectCls(c as WebNode));
-	return out;
-}
-function textOf(node: WebNode): string {
-	return ((node as any).children ?? [])
-		.map((c: any) =>
-			c?.__text ? c.value : typeof c === "string" ? c : textOf(c as WebNode),
-		)
-		.join("");
-}

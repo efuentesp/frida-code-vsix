@@ -52,6 +52,13 @@ import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
+import {
+	QuestionnaireBridge,
+	type QuestionnaireRequest,
+	type WebQuestionSpec,
+	type WebQuestionnaireResult,
+} from "./questionnaire-bridge";
+import { randomUUID } from "node:crypto";
 import { createFridaUiContext } from "./extension-ui-context";
 import { WebBridge } from "./web-bridge";
 import type { WebNode, WebPlacement } from "./web-protocol";
@@ -81,6 +88,12 @@ export interface FridaSession {
 	bridge: ApprovalBridge;
 	uiBridge: UiBridge;
 	webBridge: WebBridge;
+	/** ask_user_question nativo (ADR-0027): QuestionsPanel en el webview. */
+	questionnaireBridge: QuestionnaireBridge;
+	/** Helper: monta un cuestionario y devuelve el resultado (demo/tests). */
+	askUserQuestion: (
+		questions: WebQuestionSpec[],
+	) => Promise<WebQuestionnaireResult>;
 	/** Stats footer (Fase 3): contadores de la sesión. El host llama reset() al /new. */
 	gateStats: GateStatsStore;
 	/** Patrones aprobados por sesión (Fase 4): el host llama clear() al /new. */
@@ -145,6 +158,9 @@ export interface CreateFridaSessionOptions {
 		tree: WebNode | null,
 		placement: WebPlacement,
 	) => void;
+	/** ask_user_question nativo (ADR-0027): el host publica el cuestionario
+	 *  pendiente aquí; el webview responde vía questionnaire_answer. */
+	onQuestionnaire: (reqs: QuestionnaireRequest[]) => void;
 	getMode: () => PermissionMode;
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
@@ -274,7 +290,13 @@ export async function createFridaSession(
 	// ask-user-question) funcionan en el web sin su factory Ink del TUI.
 	const uiBridge = new UiBridge(opts.onUiRequest);
 	const webBridge = new WebBridge(opts.onWebCommit);
-	const uiContext = createFridaUiContext(uiBridge, opts.onUiNotify, webBridge);
+	const questionnaireBridge = new QuestionnaireBridge(opts.onQuestionnaire);
+	const uiContext = createFridaUiContext(
+		uiBridge,
+		opts.onUiNotify,
+		webBridge,
+		questionnaireBridge,
+	);
 	// Logger de auditoría del gate (Prioridad 2). Una instancia por sesión;
 	// escribe JSONL append-only con chmod 0600/0700 y nunca lanza.
 	const approvalLogger = new ApprovalLogger(opts.approvalLogPath);
@@ -553,6 +575,17 @@ export async function createFridaSession(
 		bridge,
 		uiBridge,
 		webBridge,
+		questionnaireBridge,
+		// Helper para diálogos/demo/tests: monta un cuestionario y devuelve el resultado.
+		askUserQuestion: async (
+			questions: WebQuestionSpec[],
+		): Promise<WebQuestionnaireResult> => {
+			const r = await questionnaireBridge.request({
+				id: randomUUID(),
+				questions,
+			});
+			return { answers: r.answers, cancelled: r.cancelled };
+		},
 		gateStats,
 		sessionApprovals,
 		sessionManager,

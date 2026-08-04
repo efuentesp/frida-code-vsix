@@ -22,6 +22,14 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Cambiado
 
+- **ask_user_question con selección por teclado.** El cuestionario migra de Remote
+  React (ADR-0012) a un componente nativo del webview (`QuestionsPanel`, ADR-0027),
+  con el mismo patrón que los permisos (`ApprovalCard`). Ahora se puede navegar y
+  responder por teclado: ↑↓ navega opciones, ⏎/Espacio confirma, 1-9 selección
+  directa, ←/→ cambia de pregunta, Tab va al texto libre, Shift+⏎ envía, Esc
+  cancela (por niveles). Remote React se mantiene para los widgets de pie
+  (subagentes/workflow/git-sync/todo).
+
 ### Corregido
 
 ## [0.6.0] - 2026-08-03

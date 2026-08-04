@@ -17,6 +17,11 @@
 import { randomUUID } from "node:crypto";
 import type { ReactElement } from "react";
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import type {
+	QuestionnaireBridge,
+	WebQuestionSpec,
+	WebQuestionnaireResult,
+} from "./questionnaire-bridge";
 import type { UiBridge } from "./ui-bridge";
 import type { WebBridge } from "./web-bridge";
 
@@ -34,6 +39,7 @@ export function createFridaUiContext(
 	bridge: UiBridge,
 	onNotify: (message: string, level: NotifyLevel) => void,
 	webBridge: WebBridge,
+	questionnaireBridge: QuestionnaireBridge,
 ): ExtensionUIContext {
 	const select: ExtensionUIContext["select"] = async (title, options, opts) => {
 		const resp = await bridge.request(
@@ -119,6 +125,16 @@ export function createFridaUiContext(
 			factory: () => ReactElement,
 			placement?: import("./web-protocol").WebPlacement,
 		) => webBridge.mountPersistent(factory, placement)) as any,
+		// ask_user_question nativo (ADR-0027): reemplaza fridaWeb para el
+		// cuestionario. El webview lo renderiza como QuestionsPanel (componente
+		// nativo con selección por teclado, parity con ApprovalCard). Resuelve al
+		// cerrar (enviar/cancelar) o al abortar el turn (→ decline).
+		askUserQuestion: ((
+			questions: WebQuestionSpec[],
+		): Promise<WebQuestionnaireResult> =>
+			questionnaireBridge
+				.request({ id: randomUUID(), questions })
+				.then((r) => ({ answers: r.answers, cancelled: r.cancelled }))) as any,
 	};
 
 	return ctx as unknown as ExtensionUIContext;

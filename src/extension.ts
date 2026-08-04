@@ -75,7 +75,6 @@ import { wireGitSyncWidget } from "./tools/frida-git-sync";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
-import { createWebQuestionnaireElement } from "./web-questionnaire";
 import { notifyCompletion } from "./notify";
 import { notifyAttention } from "./notify";
 import {
@@ -621,6 +620,8 @@ export async function activate(
 						post({ type: "ui_notify", message, level }),
 					onWebCommit: (rootId, tree, placement) =>
 						post({ type: "web_commit", rootId, tree, placement }),
+					onQuestionnaire: (reqs) =>
+						post({ type: "questionnaire", req: reqs[0] ?? null }),
 					getMode: () => approvalMode,
 					askUserQuestionEnabled: isAskUserQuestionEnabled,
 					todoEnabled: isTodoEnabled,
@@ -1528,6 +1529,14 @@ export async function activate(
 					acceptAll: !!msg.acceptAll,
 					pattern: typeof msg.pattern === "string" ? msg.pattern : undefined,
 					reason: typeof msg.reason === "string" ? msg.reason : undefined,
+				});
+				break;
+			case "questionnaire_answer":
+				// ask_user_question nativo (ADR-0027): el webview (QuestionsPanel) cerró.
+				(await ensureSession()).questionnaireBridge.resolve({
+					id: String(msg.id ?? ""),
+					cancelled: !!msg.cancelled,
+					answers: Array.isArray(msg.answers) ? msg.answers : [],
 				});
 				break;
 			case "ui_response":
@@ -2926,6 +2935,8 @@ export async function activate(
 					post({ type: "ui_notify", message, level }),
 				onWebCommit: (rootId, tree, placement) =>
 					post({ type: "web_commit", rootId, tree, placement }),
+				onQuestionnaire: (reqs) =>
+					post({ type: "questionnaire", req: reqs[0] ?? null }),
 				onGateStats: (s) => post({ type: "gate_stats", stats: s }),
 				getContext7Key,
 				getMode: () => approvalMode,
@@ -3521,13 +3532,10 @@ export async function activate(
 			];
 			try {
 				const s = await ensureSession();
-				const result = await s.webBridge.render<{
-					answers: unknown[];
-					cancelled: boolean;
-				}>((done) => createWebQuestionnaireElement(sample, done));
+				const result = await s.askUserQuestion(sample);
 				post({
 					type: "info",
-					text: `WebQuestionnaire: ${JSON.stringify(result)}`,
+					text: `QuestionsPanel: ${JSON.stringify(result)}`,
 				});
 			} catch (e) {
 				console.error("[frida-web] demoWebQuestionnaire ERROR:", e);
