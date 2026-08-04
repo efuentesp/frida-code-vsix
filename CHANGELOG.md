@@ -17,6 +17,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.9.1] - 2026-08-04
+### Corregido
+
+- **approval** — reconoce web_fetch_md / web_docs_* como tools internas de Frida
+
+### Interno
+
+- **usage** — formato del linter (biome) en BarChart e indexer.test
+
 ## [0.9.0] - 2026-08-04
 ### Añadido
 
