@@ -43,6 +43,13 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
   llegaba a la tarjeta inline del tool `Agent` (foreground). Ahora **foreground
   y background** reflejan su progreso en el panel.
 
+- **Recuadro de comando acotado y numerado en las aprobaciones.** Cuando un
+  comando bash trae muchas líneas, la tarjeta de aprobación ya no crece hasta
+  empujar los botones Accept/Reject fuera de pantalla: el recuadro se limita a
+  **10 líneas con scroll vertical** propio, **numera cada línea** (guía visual,
+  sin zebra) y muestra un contador **"⌄ N líneas más"** cuando hay contenido
+  oculto, para no aprobar a ciegas.
+
 ### Corregido
 
 - **`frida-subagents` — limpieza de worktrees (`isolation: worktree`).** El

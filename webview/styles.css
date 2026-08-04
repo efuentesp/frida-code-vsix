@@ -1246,8 +1246,45 @@ body {
 	background: var(--vscode-editor-background);
 	padding: 8px;
 	border-radius: 6px;
-	overflow-x: auto;
 	margin: 6px 0;
+	/* Antes era <pre> (monospace por defecto); ahora es <div> CmdBlock → fijamos
+	   el font monospace y el line-height para que max-height calcule bien. */
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+	font-size: var(--vscode-editor-font-size, 12px);
+	line-height: 1.6;
+}
+/* Cuerpo con scroll: acota a CMD_LINE_LIMIT (10) líneas (10 × line-height). */
+.approval .cmd-scroll {
+	max-height: calc(10 * 1.6em);
+	overflow: auto;
+}
+.approval .cmd-line {
+	display: flex;
+	align-items: baseline;
+}
+/* Número de línea: tenue y no seleccionable (no estorba al copiar el comando). */
+.approval .cmd-num {
+	flex: none;
+	min-width: 2.5ch;
+	margin-right: 10px;
+	text-align: right;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.55;
+	user-select: none;
+}
+.approval .cmd-txt {
+	white-space: pre;
+	flex: 1;
+	min-width: 0;
+}
+/* Contador de líneas ocultas cuando el comando excede el límite. */
+.approval .cmd-more {
+	margin-top: 6px;
+	padding-top: 5px;
+	border-top: 1px dashed var(--vscode-panel-border);
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
 }
 .approval .hint {
 	font-size: 12px;

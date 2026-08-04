@@ -58,6 +58,36 @@ function approvalLabel(a: ApprovalRequest): string {
 	return `Edición de archivo${a.path ? ` — ${a.path}` : ""}`;
 }
 
+/** Máximo de líneas de comando visibles antes de activar scroll vertical.
+ *  Más allá de este límite el recuadro hace scroll y muestra un contador
+ *  "⌄ N líneas más" para que el usuario sepa que no ve todo de un vistazo (y no
+ *  apruebe a ciegas un comando largo). */
+const CMD_LINE_LIMIT = 10;
+
+/** Recuadro del comando a ejecutar, con numeración de líneas y scroll vertical
+ *  acotado a CMD_LINE_LIMIT. Patrón de Diff.tsx: divide el comando en líneas y
+ *  renderiza cada una con su número a la izquierda (tenue, no seleccionable).
+ *  Sin zebra striping — el número basta como guía visual. */
+function CmdBlock({ command }: { command: string }) {
+	const lines = command.replace(/\n+$/, "").split("\n");
+	const overflow = Math.max(0, lines.length - CMD_LINE_LIMIT);
+	return (
+		<div className="cmd">
+			<div className="cmd-scroll">
+				{lines.map((ln, i) => (
+					<div className="cmd-line" key={i}>
+						<span className="cmd-num">{i + 1}</span>
+						<span className="cmd-txt">{ln.length > 0 ? ln : " "}</span>
+					</div>
+				))}
+			</div>
+			{overflow > 0 && (
+				<div className="cmd-more">⌄ {overflow} líneas más</div>
+			)}
+		</div>
+	);
+}
+
 /**
  * Menú de aprobación navegable (réplica del selector de pi-permission-system).
  * 4 opciones en el orden canónico: Sí · Sí+patrón · No · No+motivo. Navegación
@@ -181,7 +211,7 @@ export function ApprovalCard({
 			</div>
 			{!collapsed && (
 				<>
-					{approval.command && <pre className="cmd">{approval.command}</pre>}
+					{approval.command && <CmdBlock command={approval.command} />}
 					{approval.diff && <Diff text={approval.diff} />}
 					{approval.warning && (
 						<p className="warning">
