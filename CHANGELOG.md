@@ -17,6 +17,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.11.0] - 2026-08-04
+### Añadido
+
+- **approval** — modos Normal/YOLO + gate de confirmación
+
+### Corregido
+
+- **approval** — botón Detener global + doble-Esc funcional durante approvals
+
 ## [0.10.0] - 2026-08-04
 ### Añadido
 
