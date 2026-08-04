@@ -6,6 +6,8 @@ interface BarDatum {
 	label: string;
 	value: number;
 	hint?: string;
+	/** Texto visible custom (default: format(value)). Para mostrar 2 métricas. */
+	valText?: string;
 }
 export function BarChart({
 	data,
@@ -27,9 +29,7 @@ export function BarChart({
 						key={d.label}
 						className="bar-h-row"
 						title={
-							d.hint
-								? `${d.label} · ${d.hint} · ${fmtVal(d.value)} tokens ≈`
-								: d.label
+							d.hint ? `${d.label} · ${d.hint}` : d.label
 						}
 					>
 						<span className="bar-h-label" title={d.label}>
@@ -41,7 +41,7 @@ export function BarChart({
 								style={{ width: `${(d.value / max) * 100}%` }}
 							/>
 						</div>
-						<span className="bar-h-val">{fmtVal(d.value)}</span>
+						<span className="bar-h-val">{d.valText ?? fmtVal(d.value)}</span>
 					</div>
 				))}
 			</div>

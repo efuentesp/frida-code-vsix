@@ -79,6 +79,6 @@ describe("report-builder", () => {
 		});
 		expect(report.kpis.sessions).toBe(1);
 		expect(report.breakdowns.byModel).toEqual([]);
-		expect(report.breakdowns.byLanguage).toEqual([]);
+		expect(report.breakdowns.byFileType).toEqual([]);
 	});
 });

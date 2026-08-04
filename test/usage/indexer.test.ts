@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { indexUsage } from "../../src/usage/indexer";
+import { classifyFileType, fileTypeFamily } from "../../src/usage/artifact-classifier";
 
 const FIXTURE = [
 	'{"type":"session","version":3,"id":"s1","timestamp":"2026-08-01T10:00:00.000Z","cwd":"/proj/demo"}',
@@ -35,19 +36,23 @@ describe("indexer", () => {
 		expect(snapshot.breakdowns.byModel[0].provider).toBe("zai");
 	});
 
-	it("cuenta assistedKloc por lenguaje desde toolCall arguments", () => {
+	it("cuenta assistedKloc por tipo de archivo desde toolCall arguments", () => {
 		const { snapshot } = indexUsage({
 			sessionsDir: dir,
 			period: "all",
 			timezone: "UTC",
 			now: NOW,
 		});
-		const ts = snapshot.breakdowns.byLanguage.find(
-			(l) => l.language === "typescript",
+		const ts = snapshot.breakdowns.byFileType.find(
+			(f) => f.fileType === ".ts",
 		);
 		expect(ts?.files).toBe(1);
 		// 3 líneas = 0.003 kloc
 		expect(ts?.assistedKloc).toBeCloseTo(0.003, 5);
+		// familia legible + categoría
+		expect(ts?.family).toBe("TypeScript · backend");
+		// tokens del mensaje a1 (350) atribuidos al único tool (write)
+		expect(ts?.tokens).toBe(350);
 	});
 
 	it("bucketiza turnos por hora (UTC)", () => {
@@ -69,5 +74,25 @@ describe("indexer", () => {
 			now: NOW,
 		});
 		expect(snapshot.kpis.sessions).toBe(0);
+	});
+});
+
+describe("classifyFileType", () => {
+	it("devuelve la extensión con punto (sin agrupar)", () => {
+		expect(classifyFileType("src/a.ts")).toBe(".ts");
+		expect(classifyFileType("comp/b.tsx")).toBe(".tsx");
+		expect(classifyFileType("docs/README.md")).toBe(".md");
+		expect(classifyFileType("Dockerfile")).toBe(".dockerfile");
+		expect(classifyFileType("Makefile")).toBe(".makefile");
+		expect(classifyFileType("LICENSE")).toBe("(sin ext)");
+	});
+});
+
+describe("fileTypeFamily", () => {
+	it("familia legible + categoría para el tooltip", () => {
+		expect(fileTypeFamily("comp/b.tsx")).toBe("TypeScript JSX · frontend");
+		expect(fileTypeFamily("src/a.ts")).toBe("TypeScript · backend");
+		expect(fileTypeFamily("docs/README.md")).toBe("Markdown · docs");
+		expect(fileTypeFamily("pkg.json")).toBe("JSON · config");
 	});
 });

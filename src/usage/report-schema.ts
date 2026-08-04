@@ -94,12 +94,17 @@ export interface ByTool {
 	 *  entre las tools que ese mensaje invocó). */
 	tokens: number;
 }
-export interface ByLanguage {
-	language: string;
+export interface ByFileType {
+	fileType: string;
+	/** Familia legible + categoría para el tooltip (ej "TypeScript JSX · frontend"). */
+	family: string;
 	files: number;
 	edits: number;
 	/** Miles de líneas asistidas por Frida (write.content / edit.newText). */
 	assistedKloc: number;
+	/** Tokens aproximados atribuidos (usage del mensaje repartido entre las tools
+	 *  invocadas; la porción de write/edit va a este tipo de archivo). */
+	tokens: number;
 }
 export interface ByArtifact {
 	/** markdown | code | config | doc | data | other. */
@@ -125,7 +130,7 @@ export interface ReportBreakdowns {
 	byModel: ByModel[];
 	byProvider: ByProvider[];
 	byTool: ByTool[];
-	byLanguage: ByLanguage[];
+	byFileType: ByFileType[];
 	byArtifact: ByArtifact[];
 	byDay: ByDay[];
 	/** 24 buckets (0–23, hora local). */
@@ -216,7 +221,7 @@ export function emptyBreakdowns(): ReportBreakdowns {
 		byModel: [],
 		byProvider: [],
 		byTool: [],
-		byLanguage: [],
+		byFileType: [],
 		byArtifact: [],
 		byDay: [],
 		byHour: new Array(24).fill(0),

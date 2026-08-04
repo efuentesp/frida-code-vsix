@@ -54,7 +54,7 @@ export function buildReport(opts: BuildReportOptions): UsageReport {
 					byModel: [],
 					byProvider: [],
 					byTool: [],
-					byLanguage: [],
+					byFileType: [],
 					byArtifact: [],
 					byDay: [],
 				}

@@ -212,11 +212,13 @@ export interface UsageByTool {
 	count: number;
 	tokens: number;
 }
-export interface UsageByLanguage {
-	language: string;
+export interface UsageByFileType {
+	fileType: string;
+	family: string;
 	files: number;
 	edits: number;
 	assistedKloc: number;
+	tokens: number;
 }
 export interface UsageByArtifact {
 	kind: string;
@@ -247,7 +249,7 @@ export interface UsageReportView {
 		byModel: UsageByModel[];
 		byProvider: { provider: string; tokens: number; cost: number }[];
 		byTool: UsageByTool[];
-		byLanguage: UsageByLanguage[];
+		byFileType: UsageByFileType[];
 		byArtifact: UsageByArtifact[];
 		byDay: UsageByDay[];
 		byHour: number[];

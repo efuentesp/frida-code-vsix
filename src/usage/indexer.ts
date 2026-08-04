@@ -14,12 +14,13 @@ import {
 	type ByModel,
 	type ByProvider,
 	type ByTool,
-	type ByLanguage,
+	type ByFileType,
 	type ByArtifact,
 	type ByDay,
 } from "./report-schema";
 import {
-	classifyLanguage,
+	classifyFileType,
+	fileTypeFamily,
 	classifyArtifactKind,
 	countLines,
 } from "./artifact-classifier";
@@ -46,7 +47,7 @@ export interface UsageSnapshot {
 		byModel: ByModel[];
 		byProvider: ByProvider[];
 		byTool: ByTool[];
-		byLanguage: ByLanguage[];
+		byFileType: ByFileType[];
 		byArtifact: ByArtifact[];
 		byDay: ByDay[];
 		byHour: number[];
@@ -237,7 +238,7 @@ interface SessionAgg {
 	byModel: Map<string, ByModel>;
 	byProvider: Map<string, ByProvider>;
 	byTool: Map<string, { count: number; tokens: number }>;
-	byLanguage: Map<string, ByLanguage>;
+	byFileType: Map<string, ByFileType>;
 	byArtifact: Map<string, number>;
 	byDay: Map<string, ByDay>;
 	byHour: number[];
@@ -271,7 +272,7 @@ function aggregate(
 		byModel: new Map(),
 		byProvider: new Map(),
 		byTool: new Map(),
-		byLanguage: new Map(),
+		byFileType: new Map(),
 		byArtifact: new Map(),
 		byDay: new Map(),
 		byHour: new Array(24).fill(0),
@@ -377,18 +378,21 @@ function aggregate(
 					else if (Array.isArray(a.edits))
 						for (const ed of a.edits) lines += countLines(ed?.newText);
 					if (fp) {
-						const lang = classifyLanguage(fp);
+						const ft = classifyFileType(fp);
 						const kind = classifyArtifactKind(fp);
-						const L = agg.byLanguage.get(lang) ?? {
-							language: lang,
+						const F = agg.byFileType.get(ft) ?? {
+							fileType: ft,
+							family: fileTypeFamily(fp),
 							files: 0,
 							edits: 0,
 							assistedKloc: 0,
+							tokens: 0,
 						};
-						if (name === "write") L.files += 1;
-						else L.edits += 1;
-						L.assistedKloc += lines / 1000;
-						agg.byLanguage.set(lang, L);
+						if (name === "write") F.files += 1;
+						else F.edits += 1;
+						F.assistedKloc += lines / 1000;
+						F.tokens += nTools > 0 ? msgTk / nTools : 0;
+						agg.byFileType.set(ft, F);
 						agg.byArtifact.set(kind, (agg.byArtifact.get(kind) ?? 0) + 1);
 					}
 					agg.summary.assistedKloc += lines / 1000;
@@ -451,7 +455,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 	const byModel = new Map<string, ByModel>();
 	const byProvider = new Map<string, ByProvider>();
 	const byTool = new Map<string, { count: number; tokens: number }>();
-	const byLanguage = new Map<string, ByLanguage>();
+	const byFileType = new Map<string, ByFileType>();
 	const byArtifact = new Map<string, number>();
 	const byDay = new Map<string, ByDay>();
 	const byHour = new Array(24).fill(0);
@@ -525,9 +529,9 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 			cur.tokens += v.tokens;
 			byTool.set(k, cur);
 		}
-		for (const [k, v] of agg.byLanguage) {
-			const cur = byLanguage.get(k);
-			byLanguage.set(
+		for (const [k, v] of agg.byFileType) {
+			const cur = byFileType.get(k);
+			byFileType.set(
 				k,
 				cur
 					? {
@@ -535,6 +539,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 							files: cur.files + v.files,
 							edits: cur.edits + v.edits,
 							assistedKloc: cur.assistedKloc + v.assistedKloc,
+							tokens: cur.tokens + v.tokens,
 						}
 					: v,
 			);
@@ -589,7 +594,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 					(a, b) => b.tokens - a.tokens,
 				),
 				byTool: byToolArr,
-				byLanguage: [...byLanguage.values()].sort(
+				byFileType: [...byFileType.values()].sort(
 					(a, b) => b.assistedKloc - a.assistedKloc,
 				),
 				byArtifact: byArtifactArr,

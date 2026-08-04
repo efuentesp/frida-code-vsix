@@ -145,13 +145,15 @@ export function UsageDashboard({
 				</div>
 				<div className="usage-card">
 					<div className="usage-card-title">
-						Artefactos por lenguaje (líneas)
+						Artefactos por tipo de archivo (KLOCs)
 					</div>
 					<BarChart
 						horizontal
-						data={report.breakdowns.byLanguage.slice(0, 8).map((l) => ({
-							label: l.language,
+						data={report.breakdowns.byFileType.slice(0, 8).map((l) => ({
+							label: l.fileType,
 							value: Math.round(l.assistedKloc * 1000),
+							hint: l.family,
+							valText: `${fmt(Math.round(l.assistedKloc * 1000))} · ${fmt(l.tokens)} tok`,
 						}))}
 					/>
 				</div>
