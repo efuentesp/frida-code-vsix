@@ -376,20 +376,20 @@ export function App() {
 					</Tooltip>
 				)}
 				{state.busy &&
-				(state.approvals.length > 0 ||
-					state.modelChanges.length > 0 ||
-					!!state.questionnaire) && (
-				<Tooltip label="Detener agente (también doble Esc)" side="bottom">
-					<button
-						type="button"
-						className="tb-stop"
-						onClick={() => post({ type: "abort" })}
-					>
-						<CircleStop size={13} /> Detener
-					</button>
-				</Tooltip>
-			)}
-			<span className="spacer" />
+					(state.approvals.length > 0 ||
+						state.modelChanges.length > 0 ||
+						!!state.questionnaire) && (
+						<Tooltip label="Detener agente (también doble Esc)" side="bottom">
+							<button
+								type="button"
+								className="tb-stop"
+								onClick={() => post({ type: "abort" })}
+							>
+								<CircleStop size={13} /> Detener
+							</button>
+						</Tooltip>
+					)}
+				<span className="spacer" />
 				<span className="tb-group">
 					<Tooltip label="Nueva sesión" side="bottom">
 						<button
@@ -475,9 +475,9 @@ export function App() {
 			)}
 			{state.mode === "auto" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte confirmación
-					(edit/write/bash, incl. comandos compuestos y rutas externas). Detén con el
-					botón Detener o doble Esc.
+					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte
+					confirmación (edit/write/bash, incl. comandos compuestos y rutas
+					externas). Detén con el botón Detener o doble Esc.
 				</div>
 			)}
 			{escHint && (
