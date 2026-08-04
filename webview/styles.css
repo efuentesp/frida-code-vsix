@@ -2197,6 +2197,11 @@ button.danger:hover {
 .q-btn:hover {
 	background: var(--vscode-button-hoverBackground);
 }
+/* Foco de teclado en botones (zona "buttons"). */
+.q-btn.focused {
+	outline: 2px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
 .q-btn.secondary {
 	background: var(--vscode-button-secondaryBackground);
 	color: var(--vscode-button-secondaryForeground);

@@ -15,38 +15,82 @@ import type {
 // migra tal cual del WebQuestionnaire del host; los tags fbox/ftext/… se vuelven
 // div/span/button nativos con las mismas clases CSS (.q-opt, .q-tab, …).
 //
-// Keymap (consistente con permisos): ↑↓ navega foco · ⏎/Espacio confirma opción ·
-// 1-9 selección directa · ←/→ cambia de pregunta · Tab al texto libre ·
-// Shift+⏎ envía · Esc cancela (por niveles: si hay foco+texto en el input, el
-// 1er Esc sale del input y conserva el texto; el 2º cancela).
+// Foco por ZONAS (options | input | buttons), gestionado por el handler (no por
+// el navegador). Las opciones y botones llevan tabIndex={-1} para no entrar al
+// foco nativo; sólo el textarea es focuseable nativamente (para escribir).
+//
+// Keymap (consistente con permisos): Tab/Shift+Tab cicla por TODAS las zonas en
+// orden (opciones → input → botones → opciones) · ↑↓ navega dentro de la zona
+// (opciones o botones) · ⏎/Espacio activa el foco actual (opción → confirma ·
+// botón → ejecuta) · 1-9 selección directa · ←/→ cambia de pregunta · Shift+⏎
+// envía · Esc cancela (por niveles: con foco+texto en el input, el 1er Esc sale
+// del input conservando el texto; el 2º cancela).
 
 interface Props {
 	questions: WebQuestionSpec[];
 	onResult: (r: { answers: WebQuestionAnswer[]; cancelled: boolean }) => void;
 }
 
+type Zone = "options" | "input" | "buttons";
+
 export function QuestionsPanel({ questions, onResult }: Props) {
 	const [tab, setTab] = useState(0);
 	const [drafts, setDrafts] = useState<Record<number, WebQuestionAnswer>>({});
 	const [customText, setCustomText] = useState<Record<number, string>>({});
 	const [hoverLabel, setHoverLabel] = useState<string | undefined>();
-	const [focusIdx, setFocusIdx] = useState(0); // foco de teclado en opciones
-	const [inputFocused, setInputFocused] = useState(false);
+	// Foco por zonas: options (focusOpt) / input (textarea nativo) / buttons (focusBtn).
+	const [zone, setZone] = useState<Zone>("options");
+	const [focusOpt, setFocusOpt] = useState(0);
+	const [focusBtn, setFocusBtn] = useState(0);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
 	const q = questions[tab];
 	const isLast = tab === questions.length - 1;
 	const draft = drafts[tab];
 
+	// Botones de navegación visibles (dependen de tab/isLast). Se recalculan en
+	// cada render para que sus actions capturen el estado fresco (drafts, etc.).
+	type NavBtn = {
+		key: string;
+		label: string;
+		cls: string;
+		action: () => void;
+	};
+	const navButtons: NavBtn[] = [];
+	if (tab > 0)
+		navButtons.push({
+			key: "prev",
+			label: "← Anterior",
+			cls: "q-btn secondary",
+			action: () => goToTab(tab - 1),
+		});
+	if (!isLast)
+		navButtons.push({
+			key: "next",
+			label: "Siguiente →",
+			cls: "q-btn",
+			action: () => goToTab(tab + 1),
+		});
+	else
+		navButtons.push({ key: "submit", label: "Enviar", cls: "q-btn", action: submit });
+	navButtons.push({
+		key: "cancel",
+		label: "Cancelar",
+		cls: "q-btn danger",
+		action: cancel,
+	});
+
 	// ¿La pregunta actual lleva panel de preview? Solo single-select con ≥1 opción
 	// que traiga `preview` (paridad con rpiv: previews sólo en single-select).
 	const hasPreviews =
-		!q.multiSelect && q.options.some((o) => (o.preview ?? "").trim().length > 0);
+		!q.multiSelect &&
+		q.options.some((o) => (o.preview ?? "").trim().length > 0);
 	// inputMode: el usuario está escribiendo respuesta custom → ancho completo.
 	const inputMode = (customText[tab] ?? "").trim().length > 0;
 
 	const selectedLabel = draft?.kind === "option" ? draft.answer : undefined;
-	const withPreview = (o: WebQuestionOption) => (o.preview ?? "").trim().length > 0;
+	const withPreview = (o: WebQuestionOption) =>
+		(o.preview ?? "").trim().length > 0;
 	// Opción cuyo preview se muestra: la hovered > la seleccionada, SIN fallback.
 	const activePreviewOpt =
 		q.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
@@ -55,9 +99,17 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	// reset hoverLabel + foco al cambiar de pregunta
 	useEffect(() => {
 		setHoverLabel(undefined);
-		setFocusIdx(0);
-		setInputFocused(false);
+		setFocusOpt(0);
+		setFocusBtn(0);
+		setZone("options");
 	}, [tab]);
+
+	// Sincroniza el foco nativo del textarea con la zona: si la zona es "input",
+	// le damos foco (para escribir); si no, lo quitamos.
+	useEffect(() => {
+		if (zone === "input") inputRef.current?.focus();
+		else inputRef.current?.blur();
+	}, [zone]);
 
 	function isOptionSelected(label: string): boolean {
 		if (q.multiSelect) return !!draft?.selected?.includes(label);
@@ -110,15 +162,27 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		setTab(i);
 	}
 
-	// Teclado (patrón ApprovalCard). Mientras el foco está en el textarea, las
-	// teclas van a él (salvo Esc por niveles y Shift+Enter que envía).
+	// Teclado por zonas (patrón ApprovalCard). En "input" las teclas van al
+	// textarea salvo Tab/Shift+Tab (cambian de zona), Shift+Enter (envía) y Esc.
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
 			const k = e.key;
 			const n = q.options.length;
+			const nb = navButtons.length;
 
-			if (inputFocused) {
-				if (k === "Enter" && e.shiftKey) {
+			if (zone === "input") {
+				if (k === "Tab") {
+					e.preventDefault();
+					if (e.shiftKey) {
+						// input → options (reversa)
+						setZone("options");
+						setFocusOpt(Math.max(0, n - 1));
+					} else {
+						// input → buttons
+						setZone("buttons");
+						setFocusBtn(0);
+					}
+				} else if (k === "Enter" && e.shiftKey) {
 					e.preventDefault();
 					submit();
 				} else if (k === "Escape") {
@@ -126,8 +190,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					// sin texto → cancelar el cuestionario.
 					e.preventDefault();
 					if ((customText[tab] ?? "").trim().length > 0) {
-						inputRef.current?.blur();
-						setInputFocused(false);
+						setZone("options");
 					} else {
 						cancel();
 					}
@@ -135,12 +198,35 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				return; // las demás teclas van al textarea
 			}
 
-			if (k === "ArrowDown") {
+			if (k === "Tab") {
 				e.preventDefault();
-				setFocusIdx((s) => (n > 0 ? (s + 1) % n : 0));
+				if (e.shiftKey) {
+					// reversa: options → buttons · buttons → input
+					if (zone === "options") {
+						setZone("buttons");
+						setFocusBtn(Math.max(0, nb - 1));
+					} else {
+						setZone("input");
+					}
+				} else {
+					// options → input · buttons → options
+					if (zone === "options") setZone("input");
+					else {
+						setZone("options");
+						setFocusOpt(0);
+					}
+				}
+			} else if (k === "ArrowDown") {
+				e.preventDefault();
+				if (zone === "options" && n > 0) setFocusOpt((s) => (s + 1) % n);
+				else if (zone === "buttons" && nb > 0)
+					setFocusBtn((s) => (s + 1) % nb);
 			} else if (k === "ArrowUp") {
 				e.preventDefault();
-				setFocusIdx((s) => (n > 0 ? (s - 1 + n) % n : 0));
+				if (zone === "options" && n > 0)
+					setFocusOpt((s) => (s - 1 + n) % n);
+				else if (zone === "buttons" && nb > 0)
+					setFocusBtn((s) => (s - 1 + nb) % nb);
 			} else if (k === "ArrowRight") {
 				if (questions.length >= 2 && tab < questions.length - 1) {
 					e.preventDefault();
@@ -156,15 +242,15 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				submit();
 			} else if (k === "Enter" || k === " ") {
 				e.preventDefault();
-				const opt = q.options[focusIdx];
-				if (opt) {
-					if (q.multiSelect) toggleMulti(opt.label);
-					else chooseSingle(opt.label);
+				if (zone === "options") {
+					const opt = q.options[focusOpt];
+					if (opt) {
+						if (q.multiSelect) toggleMulti(opt.label);
+						else chooseSingle(opt.label);
+					}
+				} else if (zone === "buttons") {
+					navButtons[focusBtn]?.action();
 				}
-			} else if (k === "Tab") {
-				e.preventDefault();
-				inputRef.current?.focus();
-				setInputFocused(true);
 			} else if (k === "Escape") {
 				e.preventDefault();
 				cancel();
@@ -172,6 +258,8 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				const idx = Number(k) - 1;
 				if (idx < n) {
 					e.preventDefault();
+					setZone("options");
+					setFocusOpt(idx);
 					const opt = q.options[idx];
 					if (q.multiSelect) toggleMulti(opt.label);
 					else chooseSingle(opt.label);
@@ -181,11 +269,11 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [q, focusIdx, tab, inputFocused, customText, drafts, questions]);
+	}, [q, zone, focusOpt, focusBtn, tab, customText, drafts, questions, navButtons]);
 
 	function renderOption(opt: WebQuestionOption, i: number) {
 		const selected = isOptionSelected(opt.label);
-		const focused = i === focusIdx && !inputFocused;
+		const focused = zone === "options" && i === focusOpt;
 		const indicator = q.multiSelect
 			? selected
 				? "☑"
@@ -196,13 +284,17 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		return (
 			<div
 				key={`${opt.label}-${i}`}
+				tabIndex={-1}
 				className={
 					"q-opt" + (selected ? " selected" : "") + (focused ? " focused" : "")
 				}
 				onMouseEnter={() => setHoverLabel(opt.label)}
-				onClick={() =>
-					q.multiSelect ? toggleMulti(opt.label) : chooseSingle(opt.label)
-				}
+				onClick={() => {
+					setZone("options");
+					setFocusOpt(i);
+					if (q.multiSelect) toggleMulti(opt.label);
+					else chooseSingle(opt.label);
+				}}
 			>
 				<span className="q-opt-marker">{indicator}</span>
 				<div className="q-opt-body">
@@ -230,6 +322,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							<button
 								key={i}
 								type="button"
+								tabIndex={-1}
 								className={
 									"q-tab" +
 									(i === tab ? " active" : "") +
@@ -253,9 +346,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 			{/* Opciones (+ preview side-by-side si aplica y no se está escribiendo custom) */}
 			{hasPreviews && !inputMode ? (
 				<div className="q-with-preview">
-					<div className="q-options">
-						{q.options.map(renderOption)}
-					</div>
+					<div className="q-options">{q.options.map(renderOption)}</div>
 					<div className="q-preview">
 						<div className="q-preview-title">
 							{activePreviewOpt
@@ -280,45 +371,42 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				</div>
 			)}
 
-			{/* Texto libre (fila "Type something." del TUI) */}
+			{/* Texto libre (fila "Type something." del TUI). Focuseable nativamente:
+			    cuando la zona es "input" recibe foco para escribir. */}
 			<textarea
 				ref={inputRef}
 				className="q-input"
 				placeholder="O escribe tu propia respuesta… (Shift+Enter para enviar)"
 				value={customText[tab] ?? ""}
-				rows={Math.min(4, Math.max(1, (customText[tab] ?? "").split("\n").length))}
+				rows={Math.min(
+					4,
+					Math.max(1, (customText[tab] ?? "").split("\n").length),
+				)}
 				onChange={(e) => onCustomChange(e.target.value)}
-				onFocus={() => setInputFocused(true)}
-				onBlur={() => setInputFocused(false)}
+				onFocus={() => setZone("input")}
 			/>
 
-			{/* Navegación (clic; el teclado usa ←/→ y Shift+Enter) */}
+			{/* Navegación: tabIndex={-1} (el foco lo gestiona el handler por zona).
+			    ↑↓/Tab navegan entre ellos; ⏎ ejecuta el enfocado. */}
 			<div className="q-nav">
-				{tab > 0 ? (
+				{navButtons.map((b, i) => (
 					<button
+						key={b.key}
 						type="button"
-						className="q-btn secondary"
-						onClick={() => goToTab(tab - 1)}
+						tabIndex={-1}
+						className={
+							b.cls +
+							(zone === "buttons" && i === focusBtn ? " focused" : "")
+						}
+						onClick={() => {
+							setZone("buttons");
+							setFocusBtn(i);
+							b.action();
+						}}
 					>
-						← Anterior
+						{b.label}
 					</button>
-				) : null}
-				{!isLast ? (
-					<button
-						type="button"
-						className="q-btn"
-						onClick={() => goToTab(tab + 1)}
-					>
-						Siguiente →
-					</button>
-				) : (
-					<button type="button" className="q-btn" onClick={submit}>
-						Enviar
-					</button>
-				)}
-				<button type="button" className="q-btn danger" onClick={cancel}>
-					Cancelar
-				</button>
+				))}
 			</div>
 		</div>
 	);
