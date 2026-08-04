@@ -166,10 +166,16 @@ export interface Usage {
 
 export interface SessionItem {
 	path: string;
+	/** cwd donde inició la sesión (para filtrar/etiquetar por proyecto). */
+	cwd: string;
 	name?: string;
 	firstMessage: string;
 	messageCount: number;
 	modified: number; // epoch ms
+	/** Duración primer→último mensaje (epoch ms), del JSONL en disco. */
+	durationMs?: number;
+	inputTotal?: number;
+	outputTotal?: number;
 }
 
 // Recursos cargados por el resourceLoader de pi (ver panel de recursos).
@@ -313,7 +319,7 @@ export interface State {
 	webRoots?: Record<string, { tree: WebNode | null; placement: WebPlacement }>;
 	usage?: Usage;
 	files?: { query: string; items: string[] };
-	sessions?: { items: SessionItem[]; currentPath?: string };
+	sessions?: { items: SessionItem[]; currentPath?: string; scope?: "project" | "all" };
 	resources?: ResourceSummary;
 	workspace?: WorkspaceInfo;
 	models?: {
@@ -405,7 +411,7 @@ export type InMessage =
 			errorMessage?: string;
 	  }
 	| { type: "files"; query: string; items: string[] }
-	| { type: "sessions"; items: SessionItem[]; currentPath?: string }
+	| { type: "sessions"; items: SessionItem[]; currentPath?: string; scope?: "project" | "all" }
 	| { type: "resources"; data: ResourceSummary }
 	| { type: "workspace"; cwd: string; branch?: string; dirty?: boolean }
 	| {
@@ -482,7 +488,7 @@ export type OutMessage =
 	| { type: "abort" }
 	| { type: "new_session" }
 	| { type: "search_files"; query: string }
-	| { type: "list_sessions" }
+	| { type: "list_sessions"; scope?: "project" | "all" }
 	| { type: "list_resources" }
 	| { type: "workspace" }
 	| { type: "list_models" }

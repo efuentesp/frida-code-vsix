@@ -61,6 +61,16 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
   sin zebra) y muestra un contador **"⌄ N líneas más"** cuando hay contenido
   oculto, para no aprobar a ciegas.
 
+- **Lista de sesiones: stats por sesión + filtro por proyecto.** La ventana
+  "Sesiones anteriores" ahora muestra por cada sesión, en una segunda línea,
+  el **tiempo total** (primer→último mensaje) y los **tokens acumulados**
+  (`⏱ 1h 23m  ↑12k ↓8k`), leídos del JSONL en disco (`readSessionStats`, con
+  caché por mtime). Además, un toggle **[Este proyecto | Todas]** en la cabecera
+  filtra por el `cwd` del workspace (`SessionManager.list(cwd, …)` del SDK);
+  arranca en "Este proyecto" y recuerda la elección durante la sesión. En modo
+  "Todas", cada fila etiqueta a qué proyecto (`📁 <basename>`) pertenece. Antes
+  la lista era global (todos los proyectos mezclados) sin stats.
+
 ### Corregido
 
 - **`frida-subagents` — limpieza de worktrees (`isolation: worktree`).** El

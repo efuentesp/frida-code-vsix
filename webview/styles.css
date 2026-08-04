@@ -1806,6 +1806,49 @@ button.sec:hover {
 	opacity: 0.6;
 	margin-top: 2px;
 }
+/* Toggle de 2 segmentos (Este proyecto | Todas) en el header del panel.
+   margin-left:auto lo empuja junto a "Cerrar" a la derecha del head. */
+.seg-toggle {
+	display: inline-flex;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 8px;
+	overflow: hidden;
+	margin-left: auto;
+}
+.seg-toggle .seg {
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	padding: 3px 10px;
+	cursor: pointer;
+	border-radius: 0;
+}
+.seg-toggle .seg:hover {
+	color: var(--vscode-foreground);
+}
+.seg-toggle .seg.active {
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-foreground);
+	font-weight: 600;
+}
+/* Segunda línea de stats (tiempo + tokens) por sesión. */
+.session-stats-line {
+	display: flex;
+	gap: 14px;
+	font-size: 11px;
+	margin-top: 3px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+.session-stats-line .ss-tokens {
+	opacity: 0.9;
+}
+/* Etiqueta de proyecto (basename del cwd) en modo "Todas". */
+.session-proj {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	opacity: 0.85;
+}
 .session-rename {
 	display: flex;
 	gap: 4px;

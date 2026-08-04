@@ -1631,7 +1631,7 @@ export async function activate(
 				break;
 			}
 			case "list_sessions":
-				await sendSessions();
+				await sendSessions(msg.scope === "all" ? "all" : "project");
 				break;
 			case "switch_session":
 				await switchSession(String(msg.path ?? ""));
@@ -2841,25 +2841,48 @@ export async function activate(
 		if (Object.keys(keyCaches).length > 0) bootstrapSession(); // recrea la sesión para mostrar recursos
 	}
 
-	async function sendSessions(): Promise<void> {
+	async function sendSessions(
+		scope: "project" | "all" = "project",
+	): Promise<void> {
 		try {
-			const infos = await SessionManager.listAll(sessionDirPath);
+			// "project": SessionManager.list(cwd, sessionDir) filtra por el cwd del
+			// workspace (el SDK compara session.cwd vía sessionCwdMatches). "all":
+			// listAll muestra todas, sin filtrar.
+			const infos =
+				scope === "all"
+					? await SessionManager.listAll(sessionDirPath)
+					: await SessionManager.list(workspaceCwd(), sessionDirPath);
 			const items = infos
-				.map((i: any) => ({
-					path: String(i.path),
-					name: i.name as string | undefined,
-					firstMessage: String(i.firstMessage ?? "").slice(0, 160),
-					messageCount: Number(i.messageCount ?? 0),
-					modified:
-						i.modified instanceof Date
-							? i.modified.getTime()
-							: Number(i.modified) || 0,
-				}))
+				.map((i: any) => {
+					// Stats por sesión (tiempo + tokens) leídos del JSONL en disco.
+					// readSessionStats cachea por mtime; el SDK ya leyó el archivo para
+					// firstMessage/messageCount, así que el costo extra es indexar usage.
+					const stats = readSessionStats(i.path);
+					const durationMs =
+						stats && stats.firstTs && stats.lastTs
+							? stats.lastTs - stats.firstTs
+							: undefined;
+					return {
+						path: String(i.path),
+						cwd: String(i.cwd ?? ""),
+						name: i.name as string | undefined,
+						firstMessage: String(i.firstMessage ?? "").slice(0, 160),
+						messageCount: Number(i.messageCount ?? 0),
+						modified:
+							i.modified instanceof Date
+								? i.modified.getTime()
+								: Number(i.modified) || 0,
+						durationMs,
+						inputTotal: stats?.inputTotal,
+						outputTotal: stats?.outputTotal,
+					};
+				})
 				.sort((a: any, b: any) => b.modified - a.modified);
 			post({
 				type: "sessions",
 				items,
 				currentPath: frida?.session?.sessionFile,
+				scope,
 			});
 		} catch (e: any) {
 			post({
