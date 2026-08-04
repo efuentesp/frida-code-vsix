@@ -13,6 +13,13 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+- **Política de versionado automático.** Nuevo `npm run release`
+  (`scripts/release.mjs`) que determina el bump SemVer desde los commits
+  Conventional Commits (`feat`→minor, `fix`→patch, `BREAKING`→major), actualiza
+  `package.json` + `CHANGELOG.md` y commitea `chore(release):`. Aborta si solo
+  hay cambios que no publican (`docs`/`chore`/…). Documentación en
+  [docs/versioning.md](docs/versioning.md), con disclosure en `AGENTS.md`.
+
 ### Cambiado
 
 ### Corregido
