@@ -63,6 +63,9 @@ export interface IndexOptions {
 	timezone?: string;
 	/** Epoch ms; default Date.now(). Para tests deterministas. */
 	now?: number;
+	/** Si se define, sólo indexa las sesiones cuyo cwd coincide (modo "Este proyecto").
+	 *  Undefined → todas (modo "Todas"). */
+	projectCwd?: string;
 }
 
 export interface IndexResult {
@@ -374,6 +377,13 @@ function aggregate(
 	return agg;
 }
 
+/** ¿La sesión pertenece al proyecto indicado? Coincidencia de cwd normalizada
+ *  (sin trailing slash), mismo criterio que SessionManager.list del SDK. */
+function sameCwd(sessionCwd: string, projectCwd: string): boolean {
+	const norm = (p: string) => p.replace(/[\\/\\]+$/, "");
+	return !!sessionCwd && norm(sessionCwd) === norm(projectCwd);
+}
+
 /** Rango [from,to] (epoch ms) para un periodo relativo a `now`. */
 function periodRange(
 	period: Period,
@@ -398,6 +408,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 	const period: Period = opts.period ?? "all";
 	const now = opts.now ?? Date.now();
 	const tz = opts.timezone;
+	const projectCwd = opts.projectCwd;
 	const { from, to } = periodRange(period, now);
 
 	const kpis = emptyKpis();
@@ -432,6 +443,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 		if (!parsed || !parsed.firstTs) continue;
 		if (parsed.firstTs < from || parsed.firstTs > to) continue; // fuera de periodo
 		const agg = aggregate(parsed, file, tz);
+		if (projectCwd && !sameCwd(agg.summary.cwd, projectCwd)) continue; // fuera de proyecto
 		kpis.tokensIn += agg.summary.tokensIn;
 		kpis.tokensOut += agg.summary.tokensOut;
 		kpis.cost += agg.summary.cost;

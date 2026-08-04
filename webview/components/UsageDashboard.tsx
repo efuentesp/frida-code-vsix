@@ -5,6 +5,8 @@ import { BarChart } from "./usage/BarChart";
 import { DonutChart } from "./usage/DonutChart";
 import { Heatmap } from "./usage/Heatmap";
 
+type Scope = "project" | "all";
+
 const PERIODS: { id: UsagePeriod; label: string }[] = [
 	{ id: "today", label: "Hoy" },
 	{ id: "7d", label: "7 días" },
@@ -23,10 +25,13 @@ function fmtMs(ms: number): string {
 	const m = ms / 60_000;
 	return m >= 1 ? m.toFixed(0) + "m" : "<1m";
 }
+function projOf(cwd: string): string {
+	return cwd ? (cwd.split(/[/\\]/).pop() ?? cwd) : "";
+}
 
-// Tab "Uso": selector de periodo (pide el snapshot al host al cambiar) + 6 KPIs +
-// 6 gráficas SVG/CSS (0 dependencias). Modelo del patrón fetch-on-open de
-// SettingsHub (list_resources) y del fmt de ContextBar.
+// Tab "Uso": filtro de proyecto (Este proyecto | Todas — paridad con SessionsPanel)
+// + selector de periodo + 6 KPIs + 6 gráficas SVG/CSS. Pide el snapshot al host al
+// cambiar scope o periodo (patrón fetch-on-open de SettingsHub).
 export function UsageDashboard({
 	state,
 	post,
@@ -35,31 +40,52 @@ export function UsageDashboard({
 	post: (m: OutMessage) => void;
 }) {
 	const [period, setPeriod] = useState<UsagePeriod>("30d");
+	const [scope, setScope] = useState<Scope>("project");
 	useEffect(() => {
-		post({ type: "list_usage", period });
-	}, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+		post({ type: "list_usage", period, scope });
+	}, [period, scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const ur = state.usageReport;
-	if (!ur || ur.period !== period)
+	if (!ur || ur.period !== period || ur.scope !== scope)
 		return <div className="cfg-stub">Cargando uso…</div>;
 	const report = ur.report;
 	if (!report || report.kpis.sessions === 0)
 		return (
-			<div className="cfg-stub">Sin datos de uso en este periodo todavía.</div>
+			<div className="cfg-stub">
+				Sin datos de uso{scope === "project" ? " de este proyecto" : ""} en este
+				periodo todavía.
+			</div>
 		);
 	const k = report.kpis;
+	const showProj = scope === "all";
 	return (
 		<div className="usage-dashboard">
-			<div className="usage-period">
-				{PERIODS.map((p) => (
+			<div className="usage-head">
+				<div className="seg-toggle">
 					<button
-						key={p.id}
-						className={"usage-period-btn" + (period === p.id ? " active" : "")}
-						onClick={() => setPeriod(p.id)}
+						className={"seg" + (scope === "project" ? " active" : "")}
+						onClick={() => setScope("project")}
 					>
-						{p.label}
+						Este proyecto
 					</button>
-				))}
+					<button
+						className={"seg" + (scope === "all" ? " active" : "")}
+						onClick={() => setScope("all")}
+					>
+						Todas
+					</button>
+				</div>
+				<div className="usage-period">
+					{PERIODS.map((p) => (
+						<button
+							key={p.id}
+							className={"usage-period-btn" + (period === p.id ? " active" : "")}
+							onClick={() => setPeriod(p.id)}
+						>
+							{p.label}
+						</button>
+					))}
+				</div>
 			</div>
 			<div className="usage-kpis">
 				<KPICard label="Tokens ↑↓" value={fmt(k.tokensIn + k.tokensOut)} />
@@ -107,12 +133,10 @@ export function UsageDashboard({
 					</div>
 					<BarChart
 						horizontal
-						data={report.breakdowns.byLanguage
-							.slice(0, 8)
-							.map((l) => ({
-								label: l.language,
-								value: Math.round(l.assistedKloc * 1000),
-							}))}
+						data={report.breakdowns.byLanguage.slice(0, 8).map((l) => ({
+							label: l.language,
+							value: Math.round(l.assistedKloc * 1000),
+						}))}
 					/>
 				</div>
 				<div className="usage-card">
@@ -132,6 +156,12 @@ export function UsageDashboard({
 										/\.jsonl$/,
 										"",
 									)}
+									{showProj && projOf(s.cwd) ? (
+										<span className="usage-session-proj">
+											{" "}
+											· {projOf(s.cwd)}
+										</span>
+									) : null}
 								</span>
 								<span className="usage-session-meta">
 									{fmt(s.tokensIn + s.tokensOut)} · {s.turns} turnos

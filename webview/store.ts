@@ -464,6 +464,7 @@ export function reduce(state: State, msg: InMessage): State {
 				usageReport: {
 					report: msg.report,
 					period: msg.period,
+					scope: msg.scope,
 					periodFrom: msg.periodFrom,
 					periodTo: msg.periodTo,
 				},

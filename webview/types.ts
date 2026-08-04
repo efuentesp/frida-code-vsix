@@ -423,6 +423,7 @@ export interface State {
 	usageReport?: {
 		report: UsageReportView;
 		period: UsagePeriod;
+		scope: "project" | "all";
 		periodFrom: number;
 		periodTo: number;
 	};
@@ -521,6 +522,7 @@ export type InMessage =
 			type: "usage_report";
 			report: UsageReportView;
 			period: UsagePeriod;
+			scope: "project" | "all";
 			periodFrom: number;
 			periodTo: number;
 	  }
@@ -624,7 +626,7 @@ export type OutMessage =
 	| { type: "search_files"; query: string }
 	| { type: "list_sessions"; scope?: "project" | "all" }
 	| { type: "list_resources" }
-	| { type: "list_usage"; period: UsagePeriod }
+	| { type: "list_usage"; period: UsagePeriod; scope: "project" | "all" }
 	| { type: "workspace" }
 	| { type: "list_models" }
 	| { type: "select_model"; provider: string; model: string }

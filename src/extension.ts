@@ -1618,14 +1618,18 @@ export async function activate(
 					msg.period === "all"
 						? msg.period
 						: "all";
+				const scope = msg.scope === "all" ? "all" : "project";
+				const projectCwd = scope === "project" ? workspaceCwd() : undefined;
 				const { snapshot, periodFrom, periodTo } = indexUsage({
 					sessionsDir: sessionDirPath,
 					period,
+					projectCwd,
 				});
 				post({
 					type: "usage_report",
 					report: snapshot,
 					period,
+					scope,
 					periodFrom,
 					periodTo,
 				});
