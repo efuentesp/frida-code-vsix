@@ -2242,6 +2242,7 @@ button.danger:hover {
 	background: var(--vscode-button-secondaryHoverBackground);
 }
 .q-btn.danger {
+	margin-left: auto;
 	background: transparent;
 	color: var(--vscode-errorForeground);
 	border-color: var(--vscode-errorForeground);
