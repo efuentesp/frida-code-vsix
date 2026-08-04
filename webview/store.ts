@@ -390,6 +390,11 @@ export function reduce(state: State, msg: InMessage): State {
 		case "ui_requests":
 			return { ...state, uiRequests: msg.items };
 
+		case "questionnaire":
+			// ask_user_question nativo (ADR-0027): el host publica el cuestionario
+			// pendiente (o null al cerrar). QuestionsPanel lo renderiza en el composer.
+			return { ...state, questionnaire: msg.req };
+
 		case "ui_notify":
 			// MVP: mapear notify al banner info existente. Un toast dedicado es mejora futura.
 			return { ...state, info: { text: msg.message, level: msg.level } };
