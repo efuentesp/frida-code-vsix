@@ -136,13 +136,11 @@ export function UsageDashboard({
 					<BarChart
 						horizontal
 						format={fmt}
-						data={report.breakdowns.byTool
-							.slice(0, 8)
-							.map((t) => ({
-								label: t.tool,
-								value: Math.round(t.tokens),
-								hint: `${t.count} llamadas`,
-							}))}
+						data={report.breakdowns.byTool.slice(0, 8).map((t) => ({
+							label: t.tool,
+							value: Math.round(t.tokens),
+							hint: `${t.count} llamadas`,
+						}))}
 					/>
 				</div>
 				<div className="usage-card">
