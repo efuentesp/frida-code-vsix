@@ -376,6 +376,21 @@ body {
 	color: var(--vscode-textLink-foreground, #4daafc);
 	border-color: var(--vscode-textLink-foreground, #4daafc);
 }
+/* Estadísticas de sesión en el header (⏱ tiempo + ↑↓ tokens acumulados), tenue
+   como .sub-version. Siempre visible; el Tooltip explica la métrica. */
+.session-stats {
+	margin-left: 6px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	user-select: none;
+}
+.session-stats .ss-sep {
+	opacity: 0.5;
+}
 .ctx-label {
 	opacity: 0.7;
 }

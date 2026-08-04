@@ -158,6 +158,10 @@ export interface Usage {
 	// barra la usa para anticipar la compactación; >100% ⇒ compactar ya.
 	pressurePercent?: number | null;
 	reserveTokens?: number;
+	// Duración de la sesión (primer→último mensaje, epoch ms), para el header.
+	// Se reconstruye del JSONL en disco vía readSessionStats (robusto ante
+	// compactación/reload) y se combina con el estado en memoria (último turno).
+	sessionDurationMs?: number;
 }
 
 export interface SessionItem {

@@ -13,6 +13,17 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+- **Estadísticas de sesión en el header (tiempo + tokens).** El header ahora
+  muestra siempre `⏱ <duración> · ↑<in> ↓<out>` a la derecha de la versión: el
+  **tiempo invertido** (primer→último mensaje) y los **tokens acumulados** de la
+  sesión, para fines estadísticos. La duración y los tokens se reconstruyen del
+  **JSONL de la sesión en disco** (fuente de verdad: guarda todo el histórico,
+  incluido el evento `compaction`), combinados con el estado en memoria con
+  `min`/`max` para ser robustos en cualquier caso (turno nuevo antes del flush,
+  reload de sesión compactada). Así **no se pierden al recargar** la sesión ni
+  tras una compactación, y **se acumulan** con cada turno. Nuevo módulo
+  `src/session-stats.ts` (`readSessionStats`) con caché por mtime.
+
 - **`frida-git-sync`** — porte nativo de `@jachy/pi-git-sync` (v0.6.2) que
   sincroniza el agentDir de frida (`~/.frida`) entre máquinas vía un **repo Git
   privado**. Compara *three-way* (baseline → local → remoto), rebase no

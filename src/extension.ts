@@ -32,6 +32,7 @@ import {
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
 import { getWebviewHtml } from "./webview-html";
 import { analyzeContext } from "./tools/frida-context/analysis";
+import { readSessionStats } from "./session-stats";
 import { createContextReportElement } from "./tools/frida-context/ContextReport";
 import {
 	getCachedActiveTools,
@@ -712,7 +713,17 @@ export async function activate(
 			let lastInput = 0,
 				lastCacheRead = 0,
 				lastCacheWrite = 0;
+			// Timestamps de los mensajes en memoria (epoch ms): para el tiempo de
+			// sesión, combinado luego con los del JSONL en disco (que es más robusto
+			// ante compactación/reload, pero puede ir un turno atrás antes del flush).
+			let memFirstTs = Infinity,
+				memLastTs = 0;
 			for (const m of msgs) {
+				const mts = typeof m?.timestamp === "number" ? m.timestamp : 0;
+				if (mts) {
+					if (mts < memFirstTs) memFirstTs = mts;
+					if (mts > memLastTs) memLastTs = mts;
+				}
 				if (m?.role === "assistant" && m?.usage) {
 					const u = m.usage;
 					inputTotal += u.input ?? 0;
@@ -759,6 +770,31 @@ export async function activate(
 				: effectiveCapacity > 0
 					? Math.min(100, (contextTokens / effectiveCapacity) * 100)
 					: contextPercent;
+			// Refuerzo desde el JSONL en disco (fuente de verdad: conserva TODO el
+			// histórico, incluso tras compactación, cuando el estado en memoria puede
+			// estar truncado). Combinamos con max/min para ser robustos en cualquier
+			// caso (turno nuevo antes del flush, reload de sesión compactada, …):
+			//   firstTs = el más antiguo (memoria pierde los primeros al compactar)
+			//   lastTs  = el más reciente (disco va un turno atrás antes del flush)
+			//   tokens  = max(disco, memoria)
+			const disk = readSessionStats(
+				session?.sessionFile ?? session?.sessionManager?.getSessionFile?.(),
+			);
+			const firstTs =
+				memFirstTs === Infinity
+					? (disk?.firstTs ?? 0)
+					: disk?.firstTs
+						? Math.min(memFirstTs, disk.firstTs)
+						: memFirstTs;
+			const lastTs = Math.max(memLastTs, disk?.lastTs ?? 0);
+			if (disk) {
+				inputTotal = Math.max(inputTotal, disk.inputTotal);
+				outputTotal = Math.max(outputTotal, disk.outputTotal);
+				cacheRead = Math.max(cacheRead, disk.cacheRead);
+				cacheWrite = Math.max(cacheWrite, disk.cacheWrite);
+				cost = Math.max(cost, disk.cost);
+			}
+			const sessionDurationMs = firstTs && lastTs ? lastTs - firstTs : 0;
 			post({
 				type: "usage",
 				inputTotal,
@@ -772,6 +808,7 @@ export async function activate(
 				contextPercent,
 				pressurePercent,
 				reserveTokens,
+				sessionDurationMs,
 			});
 		} catch {
 			/* noop */
