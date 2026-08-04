@@ -58,6 +58,19 @@ function getVsCode(): VsCodeApi {
 	return _vscode;
 }
 
+function providerLabel(id: string): string {
+	switch (id) {
+		case "softtek-devengine":
+			return "Softtek DevEngine";
+		case "zai":
+			return "z.ai";
+		case "github-copilot":
+			return "GitHub Copilot";
+		default:
+			return id;
+	}
+}
+
 function nextMode(m: ApprovalMode): ApprovalMode {
 	return m === "manual" ? "auto-edit" : m === "auto-edit" ? "auto" : "manual";
 }
@@ -584,7 +597,60 @@ export function App() {
 						))}
 				</div>
 				<LensDiagnostics lens={state.lens} />
-				{state.approvals.length > 0 ? (
+				{state.modelChanges.length > 0 ? (
+					// Confirmación de cambio de proveedor pendiente (red de seguridad):
+					// ocupa el lugar del composer como las aprobaciones.
+					<div className="approval-inline">
+						{state.modelChanges.map((mc) => (
+							<div key={mc.id} className="model-change-card">
+								<div className="model-change-ttl">
+									Cambio de proveedor
+									{mc.source === "auto-detected" ? " ⚠" : ""}
+								</div>
+								<div className="model-change-flow">
+									<span>
+										{providerLabel(mc.from.provider)}/{mc.from.modelId}
+									</span>
+									<span className="model-change-arrow">→</span>
+									<span>
+										{providerLabel(mc.to.provider)}/{mc.to.modelId}
+									</span>
+								</div>
+								{mc.reason ? (
+									<div className="model-change-reason">{mc.reason}</div>
+								) : null}
+								<div className="model-change-btns">
+									<button
+										type="button"
+										className="q-btn"
+										onClick={() =>
+											post({
+												type: "model_change_response",
+												id: mc.id,
+												decision: "accept",
+											})
+											}
+									>
+										{mc.source === "auto-detected" ? "Mantener" : "Aceptar"}
+									</button>
+									<button
+										type="button"
+										className="q-btn danger"
+										onClick={() =>
+											post({
+												type: "model_change_response",
+												id: mc.id,
+												decision: "cancel",
+											})
+											}
+									>
+										{mc.source === "auto-detected" ? "Volver al anterior" : "Cancelar"}
+									</button>
+								</div>
+							</div>
+						))}
+					</div>
+				) : state.approvals.length > 0 ? (
 					// Aprobación pendiente: el input cede su lugar a la tarjeta de permiso
 					// (como en la extensión original de pi). No tiene sentido dejar escribir
 					// mientras Frida espera Accept/Reject; la tarjeta trae los botones.

@@ -15,6 +15,7 @@ import {
 	type FridaSession,
 } from "./pi-session";
 import type { ApprovalRequest } from "./approval-bridge";
+import { ModelChangeBridge } from "./model-change-bridge";
 import type { PermissionMode } from "./tools/frida-permission-system";
 import { readAuditLog } from "./tools/frida-permission-system/audit-log";
 import { createAuditPanelElement } from "./tools/frida-permission-system/AuditPanel";
@@ -388,6 +389,10 @@ export async function activate(
 	let fridaPromise: Promise<FridaSession> | undefined;
 	let activeModel: { provider: string; modelId: string } | undefined =
 		context.globalState.get(ACTIVE_MODEL_KEY);
+	// Puente de confirmación de cambio de proveedor/modelo (red de seguridad anti
+	// cambio silencioso). El host llama request() y espera; el webview responde vía
+	// model_change_response → resolve().
+	let modelChangeBridge: ModelChangeBridge | undefined;
 	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
 	// de turnos dentro del agent run actual (para saber cuándo se entrega uno).
 	const pendingQueue: { text: string }[] = [];
@@ -905,6 +910,29 @@ export async function activate(
 			postModels();
 			return;
 		}
+		// Confirmar cambio de PROVEEDOR (no de modelo dentro del mismo provider):
+		// anti-error (click/escritura sin querer). Si cancela, se queda en el actual.
+		const fromProvider = activeModel?.provider;
+		if (fromProvider && fromProvider !== providerId) {
+			modelChangeBridge ??= new ModelChangeBridge((reqs) =>
+				post({ type: "model_changes", items: reqs }),
+			);
+			const resp = await modelChangeBridge.request({
+				id: `mc-${Date.now()}`,
+				from: {
+					provider: fromProvider,
+					modelId: activeModel?.modelId ?? frida.session?.model?.id ?? "",
+				},
+				to: { provider: providerId, modelId },
+				source: "manual",
+				reason: "Cambio manual de proveedor.",
+			});
+			if (resp.decision === "cancel") {
+				post({ type: "info", text: "Cambio de proveedor cancelado." });
+				postModels();
+				return;
+			}
+		}
 		try {
 			await frida.session.setModel(m);
 			activeModel = { provider: providerId, modelId };
@@ -1279,6 +1307,51 @@ export async function activate(
 				case "agent_end":
 					postUsage(session);
 					post({ type: "agent_busy", busy: false });
+					// Vigilancia: ¿el proveedor/modelo cambió durante el turno SIN pasar por
+					// selectModel? (ciclo del SDK, restore corrupto de skill-bracket,
+					// failover). Comparamos activeModel (lo que Frida cree) vs session.model
+					// (lo real). Si difieren, alertamos y ofrecemos revertir al anterior.
+					{
+						const cur = session?.model;
+						if (
+							cur &&
+							activeModel &&
+							(cur.provider !== activeModel.provider ||
+								cur.id !== activeModel.modelId)
+						) {
+							modelChangeBridge ??= new ModelChangeBridge((reqs) =>
+								post({ type: "model_changes", items: reqs }),
+							);
+							const prev = { ...activeModel };
+							void modelChangeBridge
+								.request({
+									id: `mc-${Date.now()}`,
+									from: {
+										provider: prev.provider,
+										modelId: prev.modelId,
+									},
+									to: { provider: cur.provider, modelId: cur.id },
+									source: "auto-detected",
+									reason:
+										"El proveedor cambió durante el turno sin que tú lo pidieras (¿fallo de conexión, ciclo o restore de skill?).",
+								})
+								.then((resp) => {
+									if (resp.decision === "accept") {
+										// Acepta el nuevo proveedor: sincroniza activeModel para no
+										// volver a flaggear en el próximo agent_end.
+										activeModel = { provider: cur.provider, modelId: cur.id };
+										void context.globalState.update(
+											ACTIVE_MODEL_KEY,
+											activeModel,
+										);
+										sendModelInfo();
+									} else {
+										// Revertir al proveedor anterior.
+										void selectModel(prev.provider, prev.modelId);
+									}
+								});
+						}
+					}
 					// Sonido + notificación al terminar (sólo si el setting está activo y la
 					// ventana de VS Code perdió el foco → el usuario está en otra app).
 					void notifyCompletion(vscodeWindowFocused);
@@ -1550,6 +1623,13 @@ export async function activate(
 					id: String(msg.id ?? ""),
 					value: typeof msg.value === "string" ? msg.value : undefined,
 					cancelled: !!msg.cancelled,
+				});
+				break;
+			case "model_change_response":
+				// Respuesta del diálogo de confirmación de cambio de proveedor.
+				modelChangeBridge?.resolve({
+					id: String(msg.id ?? ""),
+					decision: msg.decision === "accept" ? "accept" : "cancel",
 				});
 				break;
 			case "web_event":

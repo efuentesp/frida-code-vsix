@@ -16,6 +16,7 @@ export const initialState: State = {
 	mode: "manual",
 	turns: [],
 	approvals: [],
+	modelChanges: [],
 	uiRequests: [],
 	queued: [],
 	isCompacting: false,
@@ -386,6 +387,8 @@ export function reduce(state: State, msg: InMessage): State {
 
 		case "approvals":
 			return { ...state, approvals: msg.approvals };
+		case "model_changes":
+			return { ...state, modelChanges: msg.items };
 
 		case "ui_requests":
 			return { ...state, uiRequests: msg.items };
@@ -418,6 +421,7 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				turns: [],
 				approvals: [],
+				modelChanges: [],
 				uiRequests: [],
 				webRoots: {},
 				queued: [],
@@ -559,6 +563,7 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				turns,
 				approvals: [],
+				modelChanges: [],
 				uiRequests: [],
 				busy: false,
 				isCompacting: false,

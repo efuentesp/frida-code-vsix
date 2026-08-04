@@ -2251,6 +2251,37 @@ button.danger:hover {
 	background: var(--vscode-errorForeground);
 	color: var(--vscode-button-foreground);
 }
+.model-change-card {
+	border: 1px solid var(--vscode-focusBorder, #454545);
+	border-radius: 6px;
+	padding: 10px 12px;
+	background: var(--vscode-editor-background);
+	font-size: 12px;
+}
+.model-change-ttl {
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+.model-change-flow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-variant-numeric: tabular-nums;
+	opacity: 0.9;
+}
+.model-change-arrow {
+	opacity: 0.6;
+}
+.model-change-reason {
+	margin: 6px 0;
+	opacity: 0.75;
+	font-size: 11px;
+}
+.model-change-btns {
+	display: flex;
+	gap: 6px;
+	margin-top: 8px;
+}
 /* Pestaña respondida (●). El CSS viejo usa .done; QuestionsPanel usa .answered. */
 .q-tab.answered {
 	color: inherit;

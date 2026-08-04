@@ -116,6 +116,17 @@ export interface ApprovalRequest {
 	suggestedPattern?: string;
 }
 
+/** Solicitud de confirmación de cambio de proveedor/modelo (red de seguridad).
+ *  source: "manual" (ModelPanel//model/login), "skill" (skill-bracket override),
+ *  "auto-detected" (cambio durante un turno, ¿fallo/ciclo/restore?). */
+export interface ModelChangeRequest {
+	id: string;
+	from: { provider: string; modelId: string };
+	to: { provider: string; modelId: string };
+	source: "manual" | "skill" | "auto-detected";
+	reason?: string;
+}
+
 /** Nodo del árbol Remote React (opción A). El host serializa cada commit; el
  *  webview lo materializa en RemoteRoot. Los handlers viajan como IDs "h#N". */
 export interface WebNode {
@@ -416,6 +427,8 @@ export interface State {
 	version?: string;
 	turns: Turn[];
 	approvals: ApprovalRequest[];
+	/** Confirmaciones de cambio de proveedor pendientes (red de seguridad). */
+	modelChanges: ModelChangeRequest[];
 	uiRequests: UiRequest[];
 	/** Cuestionario ask_user_question activo (ADR-0027): QuestionsPanel nativo.
 	 *  null = sin cuestionario pendiente. */
@@ -506,6 +519,7 @@ export type InMessage =
 	  }
 	| { type: "queued"; items: string[] }
 	| { type: "approvals"; approvals: ApprovalRequest[] }
+	| { type: "model_changes"; items: ModelChangeRequest[] }
 	| { type: "ui_requests"; items: UiRequest[] }
 	| {
 			type: "questionnaire";
@@ -606,6 +620,11 @@ export type OutMessage =
 			id: string;
 			value?: string;
 			cancelled: boolean;
+	  }
+	| {
+			type: "model_change_response";
+			id: string;
+			decision: "accept" | "cancel";
 	  }
 	| {
 			type: "questionnaire_answer";
