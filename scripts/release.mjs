@@ -35,7 +35,8 @@ const RULES = {
 const SECTION_ORDER = ["Añadido", "Cambiado", "Corregido", "Interno"];
 const SEP = "\x1e"; // entre campos
 const END = "\x1f"; // entre commits
-const RE_CC = /^(?<type>\w+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s*(?<desc>.+)$/;
+const RE_CC =
+	/^(?<type>\w+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s*(?<desc>.+)$/;
 
 function git(args, opts = {}) {
 	try {
@@ -64,7 +65,10 @@ function readJson(p) {
 function main() {
 	// --- 1) Versión actual + árbol limpio --------------------------------
 	const status = git("status --porcelain");
-	if (status) fail("El árbol no está limpio: commitea o descarta los cambios antes de releasear.");
+	if (status)
+		fail(
+			"El árbol no está limpio: commitea o descarta los cambios antes de releasear.",
+		);
 
 	const pkgPath = "package.json";
 	const pkg = readJson(pkgPath);
@@ -88,7 +92,8 @@ function main() {
 			body: (body || "").trim(),
 		}));
 
-	if (commits.length === 0) fail("No hay commits desde el último release. Nada que releasear.");
+	if (commits.length === 0)
+		fail("No hay commits desde el último release. Nada que releasear.");
 
 	// --- 4) Clasificar + bump --------------------------------------------
 	const bySection = Object.fromEntries(SECTION_ORDER.map((s) => [s, []]));
@@ -145,14 +150,19 @@ function main() {
 	let content;
 	if (hasManualContent) {
 		content = oldContent.trimEnd(); // respeta el trabajo manual (rico)
-		console.log("→ CHANGELOG: se preserva el contenido escrito a mano de [Unreleased].");
+		console.log(
+			"→ CHANGELOG: se preserva el contenido escrito a mano de [Unreleased].",
+		);
 	} else {
 		const lines = [];
 		for (const sec of SECTION_ORDER) {
-			if (bySection[sec].length) lines.push(`### ${sec}\n\n${bySection[sec].join("\n")}`);
+			if (bySection[sec].length)
+				lines.push(`### ${sec}\n\n${bySection[sec].join("\n")}`);
 		}
 		content = lines.join("\n\n");
-		console.log("→ CHANGELOG: [Unreleased] vacío → se autogenera de los commits.");
+		console.log(
+			"→ CHANGELOG: [Unreleased] vacío → se autogenera de los commits.",
+		);
 	}
 
 	const today = new Date().toISOString().slice(0, 10);
