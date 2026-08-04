@@ -17,6 +17,11 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.9.2] - 2026-08-04
+### Corregido
+
+- **questions** — el botón Cancelar se justifica a la derecha
+
 ## [0.9.1] - 2026-08-04
 ### Corregido
 
