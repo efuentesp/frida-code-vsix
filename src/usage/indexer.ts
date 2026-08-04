@@ -236,7 +236,7 @@ interface SessionAgg {
 	summary: SessionSummary;
 	byModel: Map<string, ByModel>;
 	byProvider: Map<string, ByProvider>;
-	byTool: Map<string, number>;
+	byTool: Map<string, { count: number; tokens: number }>;
 	byLanguage: Map<string, ByLanguage>;
 	byArtifact: Map<string, number>;
 	byDay: Map<string, ByDay>;
@@ -355,9 +355,20 @@ function aggregate(
 				day.turns += 1;
 				agg.byDay.set(date, day);
 			}
+			// Tokens del mensaje, para atribuir (repartidos) a las tools que invocó.
+			const utk = r.usage ?? {};
+			const msgTk =
+				(Number(utk.input ?? 0) || 0) +
+				(Number(utk.output ?? 0) || 0) +
+				(Number(utk.cacheRead ?? 0) || 0) +
+				(Number(utk.cacheWrite ?? 0) || 0);
+			const nTools = r.tools?.length ?? 0;
 			for (const tool of r.tools ?? []) {
 				const name = tool.name;
-				agg.byTool.set(name, (agg.byTool.get(name) ?? 0) + 1);
+				const tcur = agg.byTool.get(name) ?? { count: 0, tokens: 0 };
+				tcur.count += 1;
+				tcur.tokens += nTools > 0 ? msgTk / nTools : 0;
+				agg.byTool.set(name, tcur);
 				const a = tool.args ?? {};
 				if (name === "write" || name === "edit") {
 					const fp = String(a.path ?? a.file_path ?? a.filePath ?? "");
@@ -439,7 +450,7 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 	const kpis = emptyKpis();
 	const byModel = new Map<string, ByModel>();
 	const byProvider = new Map<string, ByProvider>();
-	const byTool = new Map<string, number>();
+	const byTool = new Map<string, { count: number; tokens: number }>();
 	const byLanguage = new Map<string, ByLanguage>();
 	const byArtifact = new Map<string, number>();
 	const byDay = new Map<string, ByDay>();
@@ -508,7 +519,12 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 					: v,
 			);
 		}
-		for (const [k, v] of agg.byTool) byTool.set(k, (byTool.get(k) ?? 0) + v);
+		for (const [k, v] of agg.byTool) {
+			const cur = byTool.get(k) ?? { count: 0, tokens: 0 };
+			cur.count += v.count;
+			cur.tokens += v.tokens;
+			byTool.set(k, cur);
+		}
 		for (const [k, v] of agg.byLanguage) {
 			const cur = byLanguage.get(k);
 			byLanguage.set(
@@ -551,8 +567,12 @@ export function indexUsage(opts: IndexOptions): IndexResult {
 	// sesión consolidado; byModel.tokens lo aproxima). Se refina en F2 si hace falta.
 
 	const byToolArr: ByTool[] = [...byTool.entries()]
-		.map(([tool, count]) => ({ tool, count }))
-		.sort((a, b) => b.count - a.count);
+		.map(([tool, v]) => ({
+			tool,
+			count: v.count,
+			tokens: Math.round(v.tokens),
+		}))
+		.sort((a, b) => b.tokens - a.tokens);
 	const byArtifactArr: ByArtifact[] = [...byArtifact.entries()]
 		.map(([kind, count]) => ({ kind, count }))
 		.sort((a, b) => b.count - a.count);

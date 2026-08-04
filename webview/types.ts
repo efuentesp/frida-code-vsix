@@ -210,6 +210,7 @@ export interface UsageByModel {
 export interface UsageByTool {
 	tool: string;
 	count: number;
+	tokens: number;
 }
 export interface UsageByLanguage {
 	language: string;

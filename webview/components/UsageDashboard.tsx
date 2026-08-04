@@ -132,12 +132,17 @@ export function UsageDashboard({
 					/>
 				</div>
 				<div className="usage-card">
-					<div className="usage-card-title">Top herramientas</div>
+					<div className="usage-card-title">Top herramientas (tokens)</div>
 					<BarChart
 						horizontal
+						format={fmt}
 						data={report.breakdowns.byTool
 							.slice(0, 8)
-							.map((t) => ({ label: t.tool, value: t.count }))}
+							.map((t) => ({
+								label: t.tool,
+								value: Math.round(t.tokens),
+								hint: `${t.count} llamadas`,
+							}))}
 					/>
 				</div>
 				<div className="usage-card">

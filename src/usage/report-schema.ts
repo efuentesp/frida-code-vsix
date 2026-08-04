@@ -90,6 +90,9 @@ export interface ByProvider {
 export interface ByTool {
 	tool: string;
 	count: number;
+	/** Tokens aproximados atribuidos a la tool (usage del mensaje repartido
+	 *  entre las tools que ese mensaje invocó). */
+	tokens: number;
 }
 export interface ByLanguage {
 	language: string;

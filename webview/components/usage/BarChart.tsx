@@ -5,6 +5,7 @@
 interface BarDatum {
 	label: string;
 	value: number;
+	hint?: string;
 }
 export function BarChart({
 	data,
@@ -22,8 +23,16 @@ export function BarChart({
 		return (
 			<div className="bar-h-list">
 				{data.map((d) => (
-					<div key={d.label} className="bar-h-row">
-						<span className="bar-h-label" title={d.label}>
+				<div
+					key={d.label}
+					className="bar-h-row"
+					title={
+						d.hint
+							? `${d.label} · ${d.hint} · ${fmtVal(d.value)} tokens ≈`
+							: d.label
+					}
+				>
+					<span className="bar-h-label" title={d.label}>
 							{d.label}
 						</span>
 						<div className="bar-h-track">
