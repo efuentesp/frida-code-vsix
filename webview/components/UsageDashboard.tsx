@@ -28,6 +28,12 @@ function fmtMs(ms: number): string {
 function projOf(cwd: string): string {
 	return cwd ? (cwd.split(/[/\\]/).pop() ?? cwd) : "";
 }
+// Etiqueta legible de una sesión: su primer prompt (firstMessage) o, si no, el
+// nombre del archivo (timestamp+UUID). Paridad con SessionsPanel (name||firstMessage).
+function sessionLabel(s: { firstMessage: string; path: string }): string {
+	if (s.firstMessage) return s.firstMessage;
+	return (s.path.split(/[/\\]/).pop() ?? s.path).replace(/\.jsonl$/, "");
+}
 
 // Tab "Uso": filtro de proyecto (Este proyecto | Todas — paridad con SessionsPanel)
 // + selector de periodo + 6 KPIs + 6 gráficas SVG/CSS. Pide el snapshot al host al
@@ -151,11 +157,11 @@ export function UsageDashboard({
 					<div className="usage-sessions">
 						{report.sessions.slice(0, 8).map((s) => (
 							<div key={s.path} className="usage-session-row">
-								<span className="usage-session-name">
-									{(s.path.split(/[/\\]/).pop() ?? s.path).replace(
-										/\.jsonl$/,
-										"",
-									)}
+								<span
+									className="usage-session-name"
+									title={s.firstMessage || s.path}
+								>
+									{sessionLabel(s)}
 									{showProj && projOf(s.cwd) ? (
 										<span className="usage-session-proj">
 											{" "}

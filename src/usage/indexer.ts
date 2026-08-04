@@ -28,6 +28,7 @@ export type Period = "today" | "7d" | "30d" | "all";
 
 export interface SessionSummary {
 	path: string;
+	firstMessage: string;
 	cwd: string;
 	firstTs: number;
 	lastTs: number;
@@ -80,6 +81,7 @@ interface Parsed {
 	mtime: number;
 	firstTs: number;
 	lastTs: number;
+	firstMessage?: string;
 	rows: Row[];
 }
 interface Row {
@@ -144,6 +146,18 @@ function localParts(ms: number, tz: string | undefined) {
 }
 
 /** Parsea el JSONL a rows planos (cacheado por mtime). La agregación va aparte. */
+/** Extrae texto plano del content de un mensaje (string o array de bloques). */
+function extractText(content: unknown): string {
+	if (typeof content === "string") return content;
+	if (Array.isArray(content)) {
+		return content
+			.map((b: any) => (typeof b?.text === "string" ? b.text : ""))
+			.join("")
+			.trim();
+	}
+	return "";
+}
+
 function parseRows(file: string): Parsed | null {
 	try {
 		const st = fs.statSync(file);
@@ -154,6 +168,7 @@ function parseRows(file: string): Parsed | null {
 		const rows: Row[] = [];
 		let first = Infinity;
 		let last = 0;
+		let firstMessage: string | undefined;
 		for (const line of raw.split("\n")) {
 			const t = line.trim();
 			if (!t) continue;
@@ -167,6 +182,13 @@ function parseRows(file: string): Parsed | null {
 			if (ts !== null) {
 				if (ts < first) first = ts;
 				if (ts > last) last = ts;
+			}
+			if (
+				!firstMessage &&
+				e?.type === "message" &&
+				e?.message?.role === "user"
+			) {
+				firstMessage = extractText(e?.message?.content).slice(0, 120);
 			}
 			const row: Row = { ts, kind: "other" };
 			if (e?.type === "session") {
@@ -199,6 +221,7 @@ function parseRows(file: string): Parsed | null {
 			mtime: st.mtimeMs,
 			firstTs: first === Infinity ? 0 : first,
 			lastTs: last,
+			firstMessage,
 			rows,
 		};
 		parseCache.set(file, parsed);
@@ -234,6 +257,7 @@ function aggregate(
 	const agg: SessionAgg = {
 		summary: {
 			path: file,
+			firstMessage: parsed.firstMessage ?? "",
 			cwd: "",
 			firstTs: parsed.firstTs,
 			lastTs: parsed.lastTs,
