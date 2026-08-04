@@ -28,9 +28,7 @@ export function BarChart({
 					<div
 						key={d.label}
 						className="bar-h-row"
-						title={
-							d.hint ? `${d.label} · ${d.hint}` : d.label
-						}
+						title={d.hint ? `${d.label} · ${d.hint}` : d.label}
 					>
 						<span className="bar-h-label" title={d.label}>
 							{d.label}

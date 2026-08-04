@@ -3,7 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { indexUsage } from "../../src/usage/indexer";
-import { classifyFileType, fileTypeFamily } from "../../src/usage/artifact-classifier";
+import {
+	classifyFileType,
+	fileTypeFamily,
+} from "../../src/usage/artifact-classifier";
 
 const FIXTURE = [
 	'{"type":"session","version":3,"id":"s1","timestamp":"2026-08-01T10:00:00.000Z","cwd":"/proj/demo"}',
@@ -43,9 +46,7 @@ describe("indexer", () => {
 			timezone: "UTC",
 			now: NOW,
 		});
-		const ts = snapshot.breakdowns.byFileType.find(
-			(f) => f.fileType === ".ts",
-		);
+		const ts = snapshot.breakdowns.byFileType.find((f) => f.fileType === ".ts");
 		expect(ts?.files).toBe(1);
 		// 3 líneas = 0.003 kloc
 		expect(ts?.assistedKloc).toBeCloseTo(0.003, 5);
