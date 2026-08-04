@@ -17,6 +17,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.13.0] - 2026-08-04
+### Añadido
+
+- **webview** — aviso visual de compactación al 70% (ícono pulsante + barra)
+
+### Interno
+
+- **webview** — formato del linter
+
 ## [0.12.0] - 2026-08-04
 ### Añadido
 
