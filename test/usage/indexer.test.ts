@@ -76,6 +76,32 @@ describe("indexer", () => {
 		});
 		expect(snapshot.kpis.sessions).toBe(0);
 	});
+
+	it("consolida totales: ΣbyDay y Σsesiones == KPI (incluye caché)", () => {
+		const { snapshot } = indexUsage({
+			sessionsDir: dir,
+			period: "all",
+			timezone: "UTC",
+			now: NOW,
+		});
+		const kpiTotal = snapshot.kpis.tokensIn + snapshot.kpis.tokensOut;
+		const byDayTotal = snapshot.breakdowns.byDay.reduce(
+			(a, b) => a + b.tokens,
+			0,
+		);
+		const sessionsTotal = snapshot.sessions.reduce(
+			(a, s) => a + s.tokensIn + s.tokensOut,
+			0,
+		);
+		// a1: in=100+cacheRead200, out=50 ; a2: in=20, out=10
+		// tokensIn=320, tokensOut=60 → total 380; ΣbyDay idéntico (ya incluye caché).
+		expect(kpiTotal).toBe(380);
+		expect(byDayTotal).toBe(kpiTotal); // cuadre exacto: el bug del caché ya no existe
+		expect(sessionsTotal).toBe(kpiTotal);
+		// caché poblado (antes siempre 0) y cache hit real
+		expect(snapshot.kpis.cacheRead).toBe(200);
+		expect(snapshot.kpis.cacheHitPct).toBe(63); // 200/(100+200+20)=62.5→63
+	});
 });
 
 describe("classifyFileType", () => {
