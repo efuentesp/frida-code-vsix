@@ -118,10 +118,11 @@ body {
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: 60;
-	background: var(--vscode-editorHoverWidget-background, #252526);
-	color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
-	border: 1px solid
-		var(--vscode-editorHoverWidget-border, var(--vscode-panel-border));
+	/* Sólido y opaco (sin depender de variables del tema que pueden traer alfa):
+	   el contenido de atrás no se trasluce y el texto siempre es legible. */
+	background: #252526;
+	color: #f0f0f0;
+	border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
 	border-radius: 4px;
 	padding: 3px 8px;
 	font-size: 11px;
@@ -131,6 +132,7 @@ body {
 	width: max-content;
 	max-width: 240px;
 	text-align: center;
+	white-space: pre-line;
 }
 .tip-top {
 	bottom: 100%;
@@ -138,6 +140,23 @@ body {
 }
 .tip-bottom {
 	top: 100%;
+	margin-top: 6px;
+}
+.tip-wide {
+	max-width: 340px;
+	text-align: left;
+}
+.tip-bottom-right {
+	top: 100%;
+	left: 0;
+	transform: none;
+	margin-top: 6px;
+}
+.tip-bottom-left {
+	top: 100%;
+	left: auto;
+	right: 0;
+	transform: none;
 	margin-top: 6px;
 }
 .avatar.sm {
@@ -4099,6 +4118,24 @@ kbd {
 	opacity: 0.7;
 	margin-top: 2px;
 }
+.kpi-label-tip {
+	cursor: help;
+}
+.kpi-info {
+	font-size: 10px;
+	opacity: 0.55;
+	margin-left: 2px;
+	cursor: help;
+}
+.kpi-value.tone-ok {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.kpi-value.tone-warn {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.kpi-value.tone-bad {
+	color: var(--vscode-errorForeground, #f85149);
+}
 .usage-grid {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -4174,14 +4211,15 @@ kbd {
 	font-size: 11px;
 }
 .bar-h-label {
-	width: 90px;
+	flex: 1 1 0;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	opacity: 0.8;
 }
 .bar-h-track {
-	flex: 1;
+	flex: 2 1 0;
 	height: 8px;
 	background: var(--cfg-border, #333);
 	border-radius: 4px;
@@ -4192,8 +4230,9 @@ kbd {
 	background: var(--vscode-button-background, #4f9cf9);
 }
 .bar-h-val {
-	width: 44px;
+	flex: 1 1 0;
 	text-align: right;
+	white-space: nowrap;
 	opacity: 0.7;
 	font-variant-numeric: tabular-nums;
 }
