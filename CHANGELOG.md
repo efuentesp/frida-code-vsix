@@ -17,6 +17,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.14.0] - 2026-08-05
+### Añadido
+
+- **webview** — tooltips de tokens/cache hit + layout de barras en el dashboard de uso
+
+### Corregido
+
+- **usage** — consolidar el indexer en una sola fuente de verdad
+
 ## [0.13.0] - 2026-08-04
 ### Añadido
 
