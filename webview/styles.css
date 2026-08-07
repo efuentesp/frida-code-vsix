@@ -924,6 +924,14 @@ body {
 	white-space: nowrap;
 	color: var(--vscode-foreground);
 }
+/* Tooltip que envuelve al .card-label (ruta en el header de un tool): hereda el
+   crecimiento flex + min-width:0 para que un basename largo pueda ellipsizar.
+   Scopeado con :has() (VS Code ≥1.86) para no tocar el tooltip del chevron ni
+   otros .tip-wrap (session-row, etc.). */
+.tip-wrap:has(> .card-label) {
+	flex: 1 1 auto;
+	min-width: 0;
+}
 .card-badges {
 	display: inline-flex;
 	align-items: center;

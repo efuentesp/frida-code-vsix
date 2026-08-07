@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { Spinner } from "./Spinner";
 import { CollapsibleCard } from "./CollapsibleCard";
+import { Tooltip } from "./Tooltip";
 import {
 	Compass,
 	FilePen,
@@ -125,11 +126,16 @@ function todoStatusEcho(
 	return null;
 }
 
-type ToolInfo = { icon: ReactNode; name: string; label: string };
+type ToolInfo = { icon: ReactNode; name: string; label: string; path?: string };
 type ToolArgs = Record<string, unknown>;
 
 /** String seguro: undefined → "". */
 const str = (v: unknown): string => String(v ?? "");
+
+/** Basename de una ruta (último segmento). Para mostrar sólo el archivo en el
+ *  header de read/edit/write/ls; la ruta completa va en el tooltip. */
+const basename = (p: string): string =>
+	p.split(/[/\\]/).filter(Boolean).pop() ?? p;
 
 /** Header del tool `todo`: glyph de acción + subject (paridad renderTodoCall de
  *  rpiv-todo). El subject de update/get/delete llega en args._subject (resuelto
@@ -186,28 +192,41 @@ function browserCallInfo(a: ToolArgs): ToolInfo {
  *  Tabla de datos → baja complejidad y facilita añadir tools nuevas (una entrada
  *  por tool) en vez de un switch gigante. */
 const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
-	read: (a) => ({
-		icon: <FileText size={13} />,
-		name: "read",
-		label: str(a.path),
-	}),
+	read: (a) => {
+		const p = str(a.path);
+		return {
+			icon: <FileText size={13} />,
+			name: "read",
+			label: basename(p),
+			path: p,
+		};
+	},
 	bash: (a) => ({
 		icon: <Terminal size={13} />,
 		name: "bash",
 		label: str(a.command),
 	}),
 	// El impacto del cambio (líneas +/-) va como badge git en el header
-	// (tc-diffstats), calculado desde entry.diff en el componente; aquí sólo el path.
-	edit: (a) => ({
-		icon: <PencilLine size={13} />,
-		name: "edit",
-		label: str(a.path),
-	}),
-	write: (a) => ({
-		icon: <FilePen size={13} />,
-		name: "write",
-		label: str(a.path),
-	}),
+	// (tc-diffstats), calculado desde entry.diff en el componente; el label es
+	// sólo el basename del archivo (la ruta completa va en el tooltip).
+	edit: (a) => {
+		const p = str(a.path);
+		return {
+			icon: <PencilLine size={13} />,
+			name: "edit",
+			label: basename(p),
+			path: p,
+		};
+	},
+	write: (a) => {
+		const p = str(a.path);
+		return {
+			icon: <FilePen size={13} />,
+			name: "write",
+			label: basename(p),
+			path: p,
+		};
+	},
 	grep: (a) => ({
 		icon: <Search size={13} />,
 		name: "grep",
@@ -218,7 +237,15 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 		name: "find",
 		label: `${str(a.pattern)}${a.path ? ` en ${str(a.path)}` : ""}`,
 	}),
-	ls: (a) => ({ icon: <Folder size={13} />, name: "ls", label: str(a.path) }),
+	ls: (a) => {
+		const p = str(a.path);
+		return {
+			icon: <Folder size={13} />,
+			name: "ls",
+			label: basename(p),
+			path: p,
+		};
+	},
 	todo: todoCallInfo,
 	ask_user_question: askCallInfo,
 	agent_browser: browserCallInfo,
@@ -406,6 +433,7 @@ function renderBody(entry: ToolEntry, running: boolean): ReactNode {
 function buildLeading(p: {
 	name: string;
 	label: string;
+	path?: string;
 	diffStats: { add: number; del: number } | null;
 	lines: string | null;
 	statusEcho: { glyph: ReactNode; label: string; status: string } | null;
@@ -413,7 +441,15 @@ function buildLeading(p: {
 	return (
 		<>
 			<span className="card-title">{p.name}</span>
-			{p.label ? <code className="card-label">{p.label}</code> : null}
+			{p.label ? (
+				p.path && p.path !== p.label ? (
+					<Tooltip label={p.path} side="top">
+						<code className="card-label">{p.label}</code>
+					</Tooltip>
+				) : (
+					<code className="card-label">{p.label}</code>
+				)
+			) : null}
 			{(p.diffStats || p.lines) && (
 				<span className="card-badges">
 					{p.diffStats ? (
@@ -474,7 +510,7 @@ function buildStatus(
 
 export function ToolCard({ entry }: { entry: ToolEntry }) {
 	const running = entry.state === "running";
-	const { icon, name, label } = toolCallInfo(entry.tool, entry.args);
+	const { icon, name, label, path } = toolCallInfo(entry.tool, entry.args);
 	const hasResult =
 		!running && (!!(entry.result && entry.result.trim()) || !!entry.diff);
 	// Progreso parcial en vivo (tool_execution_update) de un tool largo. Fuerza la
@@ -504,7 +540,14 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			variant="tool"
 			icon={icon}
 			iconLive={running}
-			leading={buildLeading({ name, label, diffStats, lines, statusEcho })}
+			leading={buildLeading({
+				name,
+				label,
+				path,
+				diffStats,
+				lines,
+				statusEcho,
+			})}
 			status={buildStatus(entry.state, elapsed, ctxTokens, entry.tokensLLM)}
 			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
