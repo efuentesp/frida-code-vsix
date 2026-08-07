@@ -2648,6 +2648,17 @@ button.danger:hover {
 	opacity: 0.85;
 }
 
+/* Modo YOLO (auto-aprobación total sin confirmación): borde rojo enfático en
+   el textbox que persiste al focus + anillo al enfocar, para señalar el modo
+   peligroso de un vistazo. */
+.bar.yolo-mode .input,
+.bar.yolo-mode .input:focus {
+	border-color: var(--vscode-errorForeground, #f85149);
+}
+.bar.yolo-mode .input:focus {
+	box-shadow: 0 0 0 1px var(--vscode-errorForeground, #f85149);
+}
+
 /* Autocompletado de comandos (/) — reutiliza .file-popup/.file-item */
 .cmd-item {
 	display: flex;

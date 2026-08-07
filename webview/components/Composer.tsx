@@ -126,6 +126,9 @@ export function Composer({
 	const ref = useRef<HTMLTextAreaElement>(null);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const bashMode = text.trimStart().startsWith("!");
+	// Modo YOLO (auto): todo se auto-aprueba sin confirmación. Pone el borde del
+	// textbox en rojo como señal enfática del modo activo (ver .bar.yolo-mode).
+	const yolo = mode === "auto";
 	// Selects de la fila 2: proveedor/modelo/esfuerzo derivados del estado.
 	const provs = models?.providers ?? [];
 	const activeProvider = provs.find((p) => p.id === active?.provider);
@@ -627,7 +630,11 @@ export function Composer({
 	const atFiles = extractAtFiles(text);
 
 	return (
-		<div className={"bar" + (bashMode ? " bash-mode" : "")}>
+		<div
+			className={
+				"bar" + (bashMode ? " bash-mode" : "") + (yolo ? " yolo-mode" : "")
+			}
+		>
 			{fileOpen && (
 				<div className="file-popup">
 					{suggestions.map((f, i) => (
