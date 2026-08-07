@@ -3579,6 +3579,12 @@ kbd {
 	background: #b3261e;
 	color: #fff;
 }
+/* Botón Detener del WorkflowPanel: compacto, rojo (danger), icono + texto. */
+.fbutton.wf-stop {
+	padding: 2px 8px;
+	font-size: 11px;
+	line-height: 1;
+}
 .finput {
 	padding: 6px 8px;
 	border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder));
@@ -4037,9 +4043,10 @@ kbd {
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
 	outline: 1px solid var(--vscode-button-background);
 }
-/* Acento según el modo de aprobación (sólo ícono, sin texto). */
+/* Acento según el modo de aprobación (sólo ícono, sin texto).
+   Degradado de peligro: Normal (neutro) → Auto-edit (ámbar) → YOLO (rojo). */
 .bar-ico.mode-auto {
-	color: var(--vscode-testing-iconPassed, #3fb950);
+	color: var(--vscode-testing-iconFailed, #f85149);
 }
 .bar-ico.mode-auto-edit {
 	color: var(--vscode-editorWarning-foreground, #d29922);

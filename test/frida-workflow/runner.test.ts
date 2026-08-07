@@ -267,9 +267,10 @@ describe("handleWfSlash — registry + preview/lista (Fase 1)", () => {
 			cwd: "/tmp",
 			agentDir: "/tmp",
 		});
-		// Fase 4: con un default (only es el único ⇒ default por cascada), un token
-		// desconocido corre el default en vez de "no encontrado".
-		expect(notes.some((n) => /only iniciado/.test(n))).toBe(true);
+		// (c) default removido: un token desconocido NO corre el default — error
+		// explícito "no encontrado" (no quema tokens con otro workflow).
+		expect(notes.some((n) => /no encontrado/.test(n))).toBe(true);
+		expect(notes.some((n) => /only iniciado/.test(n))).toBe(false);
 	});
 
 	it("/wf <name> <input> → corre detached y notifica al completar", async () => {

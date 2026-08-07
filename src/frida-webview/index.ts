@@ -94,6 +94,17 @@ export interface MarkdownProps {
 	key?: string | number;
 }
 
+/** Props de icono lucide (ficon → el webview mapea `name` al componente lucide).
+ *  `name` es el nombre lucide en kebab-case (ej. "loader-circle", "check",
+ *  "circle-stop"). `cls` es passthrough de clase CSS (ej. "spinner" para animar). */
+export interface IconProps {
+	name: string;
+	size?: number;
+	color?: string;
+	strokeWidth?: number;
+	cls?: string;
+}
+
 // Tipos de host (strings). Se usan como tags intrinsic en JSX (`<fbox>`), pero los
 // exponemos también como constantes por si una extensión los necesita dinámicamente.
 export const HOST = {
@@ -102,6 +113,7 @@ export const HOST = {
 	Button: "fbutton",
 	Input: "finput",
 	Select: "fselect",
+	Icon: "ficon",
 } as const;
 
 // Declaración global para que TS tipa los tags intrinsic en JSX. Sin esto, `<fbox>`
@@ -118,6 +130,7 @@ declare global {
 			finput: InputProps;
 			fselect: SelectProps;
 			fmarkdown: MarkdownProps;
+			ficon: IconProps;
 		}
 	}
 }

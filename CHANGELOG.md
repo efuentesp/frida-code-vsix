@@ -13,11 +13,23 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+- **frida-workflow** — integración del motor de workflows (ADR-0020, porte nativo
+  de `rpiv-workflow`) como feature usable. Comando `/wf`: picker QuickPick agrupado
+  por origen (Internos/Globales/Proyecto), `/wf <nombre> "<input>"`, `/wf @<ref>` y
+  `/wf check` (validación con saltar a archivo:línea). Panel `WorkflowPanel`
+  reactivo en el footer con estado por etapa y botón **Detener** (abort
+  cooperativo → `childSession.abort()`, parity con rpiv-workflow). Runs en sesiones
+  hijas desprendidas (el chat sigue usable) con trail JSONL auditable y resume.
+  Workflows en `.workflow.ts` (`~/.frida/workflows/` o `<cwd>/.frida/workflows/`)
+  con DSL vía alias jiti → `dist/frida-workflow.js`. Ver
+  `docs/frida-workflow-e2e-checklist.md`.
+
 ### Cambiado
 
 ### Corregido
 
 ## [0.15.0] - 2026-08-07
+
 ### Añadido
 
 - **frida-extensible-workflows** — orquestación multi-agente determinista (porte

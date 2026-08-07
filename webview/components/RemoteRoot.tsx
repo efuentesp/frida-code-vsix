@@ -1,6 +1,38 @@
-import type { ReactNode, CSSProperties } from "react";
+import type { ComponentType, ReactNode, CSSProperties } from "react";
 import type { WebNode } from "../types";
 import { Markdown } from "./Markdown";
+import {
+	Check,
+	ChevronDown,
+	ChevronRight,
+	Circle,
+	CircleStop,
+	LoaderCircle,
+	RotateCw,
+	Square,
+	X,
+} from "lucide-react";
+
+/** Registro nombre-lucide (kebab) → componente. `ficon` lo consulta por `name`. */
+const F_ICONS: Record<
+	string,
+	ComponentType<{
+		size?: number;
+		color?: string;
+		strokeWidth?: number;
+		className?: string;
+	}>
+> = {
+	circle: Circle,
+	"loader-circle": LoaderCircle,
+	check: Check,
+	x: X,
+	"circle-stop": CircleStop,
+	square: Square,
+	"chevron-down": ChevronDown,
+	"chevron-right": ChevronRight,
+	"rotate-cw": RotateCw,
+};
 
 // Renderer espejo de Remote React (opción A). Recibe el árbol WebNode serializado
 // por el host (web-renderer.ts) y lo materializa en DOM real, mapeando tipos de
@@ -213,6 +245,30 @@ function renderNode(
 			// children del WebNode son strings/arrays; los aplanamos a un string markdown
 			// y lo delegamos al renderer del webview (react-markdown + gfm + highlight).
 			return <Markdown>{flattenText(node.children)}</Markdown>;
+		}
+		case "ficon": {
+			// Icono lucide por nombre. El host sólo pasa `name` (+size/color/cls);
+			// el webview es quien tiene lucide-react y materializa el SVG. `cls` se
+			// aplica como className (ej. "spinner" para rotar el loader-circle).
+			const name = typeof node.props.name === "string" ? node.props.name : "";
+			const Icon = F_ICONS[name];
+			if (!Icon) return null;
+			const ip: {
+				size?: number;
+				color?: string;
+				strokeWidth?: number;
+				className?: string;
+			} = {};
+			if (typeof node.props.size === "number") ip.size = node.props.size;
+			if (typeof node.props.color === "string") ip.color = node.props.color;
+			if (typeof node.props.strokeWidth === "number")
+				ip.strokeWidth = node.props.strokeWidth;
+			const cls =
+				typeof node.props.cls === "string" && node.props.cls
+					? node.props.cls
+					: "";
+			if (cls) ip.className = cls;
+			return <Icon {...ip} />;
 		}
 		default:
 			return (

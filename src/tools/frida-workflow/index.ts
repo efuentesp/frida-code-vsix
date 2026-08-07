@@ -91,7 +91,12 @@ export type { ValidationIssue } from "./validate";
 
 // Carga por capas (Fase 4)
 export { loadWorkflows } from "./load";
-export type { LoadedWorkflows, LoadIssue, LoadOptions } from "./load";
+export type {
+	LoadedWorkflows,
+	LoadIssue,
+	LoadOptions,
+	WorkflowOrigin,
+} from "./load";
 
 // Lifecycle + store (Fase 5)
 export { registerLifecycle, fire, _resetLifecycle } from "./lifecycle";

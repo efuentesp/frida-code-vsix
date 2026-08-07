@@ -7,11 +7,17 @@
 // expandir muestra el transcript vivo de su child session (tools + texto del
 // sub-agente), capturado por el host vía suscripción a los eventos del SDK.
 //
-// Tags intrinsic de frida-webview (fbox/ftext), tipados en src/frida-webview/index.ts.
+// Estado visual por iconos lucide (ficon): el loader-circle de la etapa/run en
+// curso rota (.spinner) para indicar "en progreso"; el botón Detener cancela el
+// run vía abortRun (AbortController por run, análogo al run.signal + Ctrl-C del
+// rpiv-workflow original).
+//
+// Tags intrinsic de frida-webview (fbox/ftext/ficon), tipados en src/frida-webview/index.ts.
 
 import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import {
+	abortRun,
 	getWorkflowRuns,
 	subscribeWorkflowRuns,
 	type RunStatus,
@@ -23,13 +29,6 @@ import {
 } from "./store";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
-const STAGE_GLYPH: Record<StageViewStatus, string> = {
-	pending: "○",
-	running: "⟳",
-	completed: "✓",
-	failed: "✗",
-	aborted: "⏹",
-};
 const STAGE_COLOR: Record<StageViewStatus, string | undefined> = {
 	pending: "#888",
 	running: "#569cd6",
@@ -37,12 +36,34 @@ const STAGE_COLOR: Record<StageViewStatus, string | undefined> = {
 	failed: "#f14c4c",
 	aborted: "#dcdcaa",
 };
-const RUN_GLYPH: Record<RunStatus, string> = {
-	running: "⟳",
-	completed: "✓",
-	failed: "✗",
-	aborted: "⏹",
+
+// Ícono lucide (vía ficon) por estado. En `running`, StatusIcon añade .spinner
+// para rotar el loader-circle y transmitir "en progreso" (antes era un ⟳ estático).
+const STATUS_ICON: Record<StageViewStatus, string> = {
+	pending: "circle",
+	running: "loader-circle",
+	completed: "check",
+	failed: "x",
+	aborted: "circle-stop",
 };
+
+/** Ícono de estado lucide (ficon). En `running` rota con .spinner. */
+function StatusIcon({
+	status,
+	size = 13,
+}: {
+	status: StageViewStatus;
+	size?: number;
+}): ReactElement {
+	return (
+		<ficon
+			name={STATUS_ICON[status]}
+			size={size}
+			color={STAGE_COLOR[status]}
+			cls={status === "running" ? "spinner" : undefined}
+		/>
+	);
+}
 
 /** Factory del elemento raíz que monta el host vía webBridge.mountPersistent. */
 export function createWorkflowPanelElement(): ReactElement {
@@ -71,7 +92,11 @@ function WorkflowPanel(): ReactElement | null {
 			gap={4}
 			header={
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext>●</ftext>
+					<ficon
+						name="circle"
+						size={8}
+						color="var(--vscode-descriptionForeground)"
+					/>
 					<ftext bold>Workflow</ftext>
 					<ftext color="var(--vscode-descriptionForeground)">
 						({runs.length} run{runs.length === 1 ? "" : "s"})
@@ -96,16 +121,31 @@ function RunBlock({
 	onToggle: (key: string) => void;
 }): ReactElement {
 	const done = run.stages.filter((s) => s.status === "completed").length;
+	const running = run.status === "running";
 	return (
 		<fbox flexDirection="column" gap={2}>
 			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext color={STAGE_COLOR[runStatusToStage(run.status)]}>
-					{RUN_GLYPH[run.status]}
-				</ftext>
+				<StatusIcon status={runStatusToStage(run.status)} />
 				<ftext bold>workflow: {run.workflow}</ftext>
 				<ftext color="#888">
 					({done}/{run.stages.length})
 				</ftext>
+				{running ? (
+					<ftext color={STAGE_COLOR.running} size={11}>
+						ejecutando…
+					</ftext>
+				) : null}
+				<fbox flex={1} />
+				{running ? (
+					<fbutton
+						variant="danger"
+						cls="wf-stop"
+						onClick={() => abortRun(run.runId)}
+					>
+						<ficon name="square" size={11} />
+						<ftext>Detener</ftext>
+					</fbutton>
+				) : null}
 			</fbox>
 			{run.stages.map((s, i) => (
 				<StageRow
@@ -142,14 +182,16 @@ function StageRow({
 				flexDirection="row"
 				gap={6}
 				alignItems="center"
+				tone={stage.status === "running" ? "active" : undefined}
 				onClick={hasTranscript ? () => onToggle(stageKey) : undefined}
 			>
-				<ftext color={STAGE_COLOR[stage.status]}>
-					{STAGE_GLYPH[stage.status]}
-				</ftext>
+				<StatusIcon status={stage.status} />
 				<ftext>{stage.name}</ftext>
 				{stage.retries && stage.retries > 0 ? (
-					<ftext color="#888">↻{stage.retries}</ftext>
+					<fbox flexDirection="row" gap={2} alignItems="center">
+						<ficon name="rotate-cw" size={10} color="#888" />
+						<ftext color="#888">{stage.retries}</ftext>
+					</fbox>
 				) : null}
 				{tools.length > 0 ? (
 					<ftext color="#888">
@@ -166,7 +208,11 @@ function StageRow({
 					</ftext>
 				) : null}
 				{hasTranscript ? (
-					<ftext color="#888">{expanded ? "▾" : "▸"}</ftext>
+					<ficon
+						name={expanded ? "chevron-down" : "chevron-right"}
+						size={12}
+						color="#888"
+					/>
 				) : null}
 			</fbox>
 			{expanded && stage.transcript && stage.transcript.length > 0
@@ -182,19 +228,15 @@ function StageRow({
 }
 
 function UnitRow({ unit }: { unit: UnitView }): ReactElement {
-	const isRunning = unit.status === "running";
-	const glyph = isRunning ? "⟳" : unit.status === "completed" ? "✓" : "✗";
-	const color =
-		STAGE_COLOR[
-			isRunning
-				? "running"
-				: unit.status === "completed"
-					? "completed"
-					: "failed"
-		];
+	const status: StageViewStatus =
+		unit.status === "running"
+			? "running"
+			: unit.status === "completed"
+				? "completed"
+				: "failed";
 	return (
 		<fbox flexDirection="row" gap={6} alignItems="center">
-			<ftext color={color}>{glyph}</ftext>
+			<StatusIcon status={status} size={12} />
 			<ftext color="#888">{unit.label}</ftext>
 		</fbox>
 	);
@@ -204,19 +246,17 @@ function TranscriptLine({ entry }: { entry: TranscriptEntry }): ReactElement {
 	if (entry.kind === "text") {
 		return <ftext color="#9aa5ce"> «{truncate(entry.text ?? "", 140)}»</ftext>;
 	}
-	const status = entry.status ?? "running";
-	const glyph = status === "running" ? "⟳" : status === "failed" ? "✗" : "✓";
-	const color =
-		status === "running"
-			? STAGE_COLOR.running
-			: status === "failed"
-				? STAGE_COLOR.failed
-				: STAGE_COLOR.completed;
+	const status: StageViewStatus =
+		entry.status === "failed"
+			? "failed"
+			: entry.status === "completed"
+				? "completed"
+				: "running";
 	return (
-		<ftext color={color}>
-			{"  "}
-			{glyph} {toolLabel(entry)}
-		</ftext>
+		<fbox flexDirection="row" gap={4} alignItems="center">
+			<StatusIcon status={status} size={11} />
+			<ftext color={STAGE_COLOR[status]}>{toolLabel(entry)}</ftext>
+		</fbox>
 	);
 }
 

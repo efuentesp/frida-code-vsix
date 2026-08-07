@@ -74,6 +74,18 @@ export interface WorkflowRunsState {
 let current: WorkflowRunsState = { runs: [] };
 const listeners = new Set<() => void>();
 
+/** Handles de abort por run, separados del RunView (que es sólo vista serializable).
+ *  El runner registra el AbortController de cada run; abortRun(runId) lo dispara
+ *  (análogo al setLaneAbort + tap Ctrl-C del rpiv-workflow original). */
+const aborts = new Map<string, () => void>();
+export function registerAbort(runId: string, abort: () => void): void {
+	aborts.set(runId, abort);
+}
+/** Dispara el abort de un run (botón Detener del panel). No-op si ya terminó. */
+export function abortRun(runId: string): void {
+	aborts.get(runId)?.();
+}
+
 function emit(): void {
 	for (const l of [...listeners]) l();
 }
@@ -99,6 +111,7 @@ export function subscribeWorkflowRuns(listener: () => void): () => void {
 /** Sólo tests. */
 export function _resetWorkflowRuns(): void {
 	current = { runs: [] };
+	aborts.clear();
 	emit();
 }
 
@@ -203,6 +216,8 @@ export function endRun(
 			error: result.success ? undefined : result.error,
 		})),
 	);
+	// El run dejó de correr: soltar el handle de abort para que no filtre.
+	aborts.delete(ctx.runId);
 }
 
 // --- Unidades de loop (Fase 6) ---

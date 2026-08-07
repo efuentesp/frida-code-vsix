@@ -7,7 +7,12 @@
 
 import { join } from "node:path";
 import { encodeCwd, readHeader, resolveRef } from "./audit";
-import { loadWorkflows } from "./load";
+import {
+	loadWorkflows,
+	type LoadedWorkflows,
+	type LoadIssue,
+	type WorkflowOrigin,
+} from "./load";
 import { resumeWorkflow, runWorkflow } from "./runner";
 import { validateWorkflow, hasErrors } from "./validate";
 import type { WorkflowHost, Workflow } from "./types";
@@ -53,6 +58,13 @@ export interface WfSlashDeps {
 	/** Path al bundle DSL (dist/frida-workflow.js) para que los configs importen
 	 *  el DSL vía alias jiti. Omitir → sólo plain-data. */
 	dslBundlePath?: string;
+	/** `/wf` sola → picker; devuelve {name, input} o undefined si se cancela. */
+	pickWorkflow?: (
+		loaded: LoadedWorkflows,
+	) => Promise<{ name: string; input: string } | undefined>;
+	/** `/wf check` → presenta todos los issues (carga + validación) y deja abrir
+	 *  el archivo:línea. */
+	checkWorkflows?: (loaded: LoadedWorkflows) => Promise<void>;
 }
 
 export async function handleWfSlash(
@@ -73,19 +85,41 @@ export async function handleWfSlash(
 	const wfs = loaded.workflows;
 	const wfNames = [...wfs.keys()];
 
-	// Errores de carga (config que no compiló, pack con envelope, etc.).
+	// /wf check — valida TODO y presenta los issues (abrir archivo:línea). Se sirve
+	// ANTES del abort por errores de carga: justamente los muestra.
+	if (trimmed === "check") {
+		if (deps.checkWorkflows) return await deps.checkWorkflows(loaded);
+		host.notify("/wf check no disponible en este host.", "warning");
+		return;
+	}
+
+	// Abortar si hay errores de carga: no enmascaramos la intención del usuario
+	// corriendo otro workflow (mirror del MSG_LOAD_ABORTED del rpiv-workflow).
 	const loadErrs = loaded.issues.filter((i) => i.severity === "error");
 	if (loadErrs.length) {
+		for (const issue of loadErrs) host.notify(formatLoadIssue(issue), "error");
 		host.notify(
-			`⚠ Errores de carga: ${loadErrs.map((i) => i.message).join("; ")}`,
-			"warning",
+			`Carga abortada: ${loadErrs.length} error(es). Corrige y reintenta (¿/wf check?).`,
+			"error",
 		);
+		return;
 	}
 
 	if (!trimmed) {
+		// /wf sola → picker (si el host lo provee); si no, lista plana.
+		if (deps.pickWorkflow) {
+			const choice = await deps.pickWorkflow(loaded);
+			if (!choice) return; // cancelado
+			const wf = wfs.get(choice.name);
+			if (!wf) {
+				host.notify(`Workflow '${choice.name}' no disponible.`, "error");
+				return;
+			}
+			return runResolved(wf, choice.input, deps, loaded, runsDir);
+		}
 		host.notify(
 			wfNames.length
-				? `Workflows: ${wfNames.join(", ")}${loaded.default ? `  (default: ${loaded.default})` : ""}  ·  /wf <nombre> "<input>"  ·  /wf @<ref>`
+				? `Workflows: ${wfNames.join(", ")}  ·  /wf <nombre> "<input>"  ·  /wf @<ref>  ·  /wf check`
 				: "No hay workflows. Crea <cwd>/.frida/workflows/config.ts o registra con registerWorkflow().",
 			"info",
 		);
@@ -143,21 +177,35 @@ export async function handleWfSlash(
 	const [first, ...rest] = body.split(/\s+/);
 	const input = rest.join(" ").trim();
 
-	// Resolución: <name> <input> | <input> (default) | no-encontrado.
-	let wf = wfs.get(first);
-	let runInput = input;
-	if (!wf && loaded.default && body) {
-		wf = wfs.get(loaded.default);
-		runInput = body; // todo el body es el input del default
-	}
+	// Resolución: <name> <input> | no-encontrado. SIN default fallback: si el
+	// nombre no existe, error explícito (no quema tokens corriendo otro workflow).
+	const wf = wfs.get(first);
 	if (!wf) {
 		host.notify(
-			`Workflow "${first}" no encontrado. Disponibles: ${wfNames.join(", ") || "(ninguno)"}`,
-			"warning",
+			`Workflow '${first}' no encontrado. Disponibles: ${wfNames.join(", ") || "(ninguno)"}  ·  /wf para listar`,
+			"error",
 		);
 		return;
 	}
-	if (!runInput) {
+	return runResolved(wf, input, deps, loaded, runsDir, name);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers de resolución + formato de issues
+// ---------------------------------------------------------------------------
+
+/** Valida + lanza un workflow resuelto. Reusa validateWorkflow (rehúsa correr
+ *  si hay errores del grafo, un toast por issue con atribución). */
+function runResolved(
+	wf: Workflow,
+	input: string,
+	deps: WfSlashDeps,
+	loaded: LoadedWorkflows,
+	runsDir: string,
+	name?: string,
+): void {
+	const { host } = deps;
+	if (!input) {
 		const stageList = Object.keys(wf.stages).join(" → ");
 		host.notify(
 			`${wf.name}: ${stageList} → stop  ·  usa /wf ${wf.name} "<input>" para correr`,
@@ -165,21 +213,49 @@ export async function handleWfSlash(
 		);
 		return;
 	}
-
-	// Validación de grafo: rehúsa correr si hay errores.
-	const issues = validateWorkflow(wf);
-	if (hasErrors(issues)) {
-		const errs = issues
-			.filter((i) => i.severity === "error")
-			.map((i) => i.message);
-		host.notify(`✗ ${wf.name} no valida: ${errs.join("; ")}`, "error");
+	const errs = validateWorkflow(wf).filter((i) => i.severity === "error");
+	if (errs.length) {
+		for (const i of errs)
+			host.notify(formatValidationIssue(wf, i, loaded), "error");
+		host.notify(
+			`✗ ${wf.name} no valida: ${errs.length} error(es). ¿/wf check?`,
+			"error",
+		);
 		return;
 	}
-
 	host.notify(`▶ ${wf.name} iniciado (detached)…`, "info");
-	void runWorkflow({ workflow: wf, input: runInput, runsDir, host, name })
+	void runWorkflow({ workflow: wf, input, runsDir, host, name })
 		.then(notifyResult(host, wf.name))
 		.catch(notifyCatch(host, wf.name));
+}
+
+function renderOrigin(o: WorkflowOrigin | undefined): string {
+	return o === "builtin"
+		? "internos"
+		: o === "user"
+			? "globales"
+			: o === "project"
+				? "proyecto"
+				: "config";
+}
+
+/** Issue de carga → "[config (<archivo>)] <mensaje>". El path ya delata la capa. */
+function formatLoadIssue(issue: LoadIssue): string {
+	const where = issue.path ? ` (${issue.path})` : "";
+	return `[config${where}] ${issue.message}`;
+}
+
+/** Issue de validación → "[<capa> (<archivo>)] workflow "x" — stage "y": <msg>". */
+function formatValidationIssue(
+	wf: Workflow,
+	issue: { message: string; stage?: string },
+	loaded: LoadedWorkflows,
+): string {
+	const origin = loaded.origins.get(wf.name);
+	const source = loaded.sources.get(wf.name);
+	const where = source && source !== "(built-in)" ? ` (${source})` : "";
+	const stageTag = issue.stage ? ` — stage "${issue.stage}"` : "";
+	return `[${renderOrigin(origin)}${where}] workflow "${wf.name}"${stageTag}: ${issue.message}`;
 }
 
 function notifyResult(host: WorkflowHost, wfName: string) {

@@ -22,7 +22,14 @@ export interface LoadedWorkflows {
 	workflows: Map<string, Workflow>;
 	default: string | undefined;
 	issues: LoadIssue[];
+	/** Capa ganadora por nombre — para agrupar (Internos/Globales/Proyecto). */
+	origins: Map<string, WorkflowOrigin>;
+	/** Archivo que define cada workflow — para /wf check ("abrir archivo"). */
+	sources: Map<string, string>;
 }
+
+/** De dónde vino un workflow (capa que ganó por nombre). */
+export type WorkflowOrigin = "builtin" | "user" | "project";
 
 export interface LoadOptions {
 	cwd: string;
@@ -74,11 +81,17 @@ function unwrapDefault(mod: unknown): unknown {
 export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 	const issues: LoadIssue[] = [];
 	const workflows = new Map<string, Workflow>();
+	const origins = new Map<string, WorkflowOrigin>();
+	const sources = new Map<string, string>();
 	let defaultName: string | undefined;
 	const aliases: Record<string, string> = {};
 
 	for (const w of opts.builtIns ?? [])
-		if (isWorkflow(w)) workflows.set(w.name, w);
+		if (isWorkflow(w)) {
+			workflows.set(w.name, w);
+			origins.set(w.name, "builtin");
+			sources.set(w.name, "(built-in)");
+		}
 
 	const loadFile = (file: string): unknown => {
 		try {
@@ -97,14 +110,24 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 		}
 	};
 
-	const addLayer = (mod: unknown, path: string, isPack: boolean): void => {
+	const addLayer = (
+		mod: unknown,
+		path: string,
+		isPack: boolean,
+		origin: WorkflowOrigin,
+	): void => {
+		const put = (w: Workflow): void => {
+			workflows.set(w.name, w);
+			origins.set(w.name, origin);
+			sources.set(w.name, path);
+		};
 		if (mod == null) return;
 		if (isWorkflow(mod)) {
-			workflows.set(mod.name, mod);
+			put(mod);
 			return;
 		}
 		if (Array.isArray(mod)) {
-			for (const w of mod) if (isWorkflow(w)) workflows.set(w.name, w);
+			for (const w of mod) if (isWorkflow(w)) put(w);
 			return;
 		}
 		const env = mod as {
@@ -126,8 +149,7 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 				return;
 			}
 			if (Array.isArray(env.workflows)) {
-				for (const w of env.workflows)
-					if (isWorkflow(w)) workflows.set(w.name, w);
+				for (const w of env.workflows) if (isWorkflow(w)) put(w);
 			}
 			if (typeof env.default === "string") defaultName = env.default;
 			if (env.skillAliases)
@@ -145,12 +167,14 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 	const projectDir = join(opts.cwd, ".frida", "workflows");
 
 	// Orden: user packs → user config → project packs → project config.
-	for (const f of listPacks(userDir)) addLayer(loadFile(f), f, true);
+	for (const f of listPacks(userDir)) addLayer(loadFile(f), f, true, "user");
 	const userCfg = join(userDir, "config.ts");
-	if (existsSync(userCfg)) addLayer(loadFile(userCfg), userCfg, false);
-	for (const f of listPacks(projectDir)) addLayer(loadFile(f), f, true);
+	if (existsSync(userCfg)) addLayer(loadFile(userCfg), userCfg, false, "user");
+	for (const f of listPacks(projectDir))
+		addLayer(loadFile(f), f, true, "project");
 	const projCfg = join(projectDir, "config.ts");
-	if (existsSync(projCfg)) addLayer(loadFile(projCfg), projCfg, false);
+	if (existsSync(projCfg))
+		addLayer(loadFile(projCfg), projCfg, false, "project");
 
 	// default cascade: project config (último defaultName asignado) > user config
 	// > primer workflow registrado (built-in más bajo).
@@ -163,7 +187,7 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 		final = applyAliases(workflows, aliases, issues);
 	}
 
-	return { workflows: final, default: def, issues };
+	return { workflows: final, default: def, issues, origins, sources };
 }
 
 // ---------------------------------------------------------------------------

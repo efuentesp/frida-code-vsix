@@ -45,7 +45,16 @@ import {
 	getCachedSystemPrompt,
 } from "./tools/frida-context/store";
 import { getTodoState } from "./tools/todo-web/store";
-import { createFridaWorkflowHost, handleWfSlash } from "./tools/frida-workflow";
+import {
+	createFridaWorkflowHost,
+	handleWfSlash,
+	validateWorkflow,
+} from "./tools/frida-workflow";
+import type {
+	LoadedWorkflows,
+	Workflow,
+	WorkflowOrigin,
+} from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
 import {
 	computePipelineStatus,
@@ -2364,7 +2373,7 @@ export async function activate(
 		const host = createFridaWorkflowHost({
 			frida: s,
 			cwd: workspaceCwd(),
-			notify: (message) => post({ type: "info", text: message }),
+			notify: (message, level) => post({ type: "info", text: message, level }),
 		});
 		await handleWfSlash(arg, {
 			host,
@@ -2376,7 +2385,134 @@ export async function activate(
 				"dist",
 				"frida-workflow.js",
 			),
+			pickWorkflow,
+			checkWorkflows,
 		});
+	}
+
+	// /wf sola → QuickPick agrupado (Internos/Globales/Proyecto). Los workflows con
+	// error de validación se marcan ⚠ (no se ocultan). Al elegir → InputBox (input).
+	async function pickWorkflow(
+		loaded: LoadedWorkflows,
+	): Promise<{ name: string; input: string } | undefined> {
+		type WfPickItem = vscode.QuickPickItem & {
+			name?: string;
+			broken?: boolean;
+		};
+		const GROUP: Record<WorkflowOrigin, string> = {
+			builtin: "Internos (extensión)",
+			user: "Globales (~/.frida/workflows)",
+			project: "Proyecto (.frida/workflows)",
+		};
+		const byOrigin = new Map<WorkflowOrigin, Workflow[]>();
+		for (const [name, wf] of loaded.workflows) {
+			const o = loaded.origins.get(name) ?? "builtin";
+			const arr = byOrigin.get(o) ?? [];
+			arr.push(wf);
+			byOrigin.set(o, arr);
+		}
+		const items: WfPickItem[] = [];
+		for (const o of ["builtin", "user", "project"] as WorkflowOrigin[]) {
+			const list = byOrigin.get(o);
+			if (!list || list.length === 0) continue;
+			items.push({ label: GROUP[o], kind: vscode.QuickPickItemKind.Separator });
+			for (const wf of list) {
+				const errs = validateWorkflow(wf).filter((i) => i.severity === "error");
+				items.push({
+					name: wf.name,
+					label: errs.length ? `⚠ ${wf.name}` : wf.name,
+					description: Object.keys(wf.stages).join(" → "),
+					detail: errs.length
+						? `No valida: ${errs
+								.map((e) => (e.stage ? `${e.stage}: ${e.message}` : e.message))
+								.join("; ")}`
+						: undefined,
+					broken: errs.length > 0,
+				});
+			}
+		}
+		if (items.length === 0) {
+			vscode.window.showInformationMessage(
+				"No hay workflows. Crea .frida/workflows/config.ts.",
+			);
+			return undefined;
+		}
+		const pick = await vscode.window.showQuickPick(items, {
+			title: "Workflows · selecciona",
+			placeHolder: "Elige un workflow para ejecutar",
+			matchOnDescription: true,
+			matchOnDetail: true,
+		});
+		if (!pick || !pick.name) return undefined;
+		if (pick.broken) {
+			vscode.window.showErrorMessage(
+				`'${pick.name}' no valida. Usa /wf check para ver los errores y corregirlos.`,
+			);
+			return undefined;
+		}
+		const input = await vscode.window.showInputBox({
+			title: `Input para ${pick.name}`,
+			prompt: "¿Qué quieres que haga el workflow?",
+		});
+		if (input === undefined) return undefined;
+		return { name: pick.name, input: input.trim() };
+	}
+
+	// /wf check → QuickPick con todos los issues (carga + validación); al elegir,
+	// abre el archivo (en la línea si se parsea del mensaje de carga).
+	async function checkWorkflows(loaded: LoadedWorkflows): Promise<void> {
+		type IssuePickItem = vscode.QuickPickItem & {
+			file?: string;
+			line?: number;
+		};
+		const items: IssuePickItem[] = [];
+		for (const issue of loaded.issues) {
+			items.push({
+				label: issue.severity === "error" ? "✗ carga" : "⚠ carga",
+				description: issue.path ?? "",
+				detail: issue.message,
+				file: issue.path,
+				line: parseLineNum(issue.message),
+			});
+		}
+		for (const [name, wf] of loaded.workflows) {
+			const source = loaded.sources.get(name);
+			const file = source && source !== "(built-in)" ? source : undefined;
+			for (const i of validateWorkflow(wf)) {
+				items.push({
+					label: i.severity === "error" ? `✗ ${name}` : `⚠ ${name}`,
+					description: i.stage ? `stage ${i.stage}` : "",
+					detail: i.message,
+					file,
+				});
+			}
+		}
+		if (items.length === 0) {
+			vscode.window.showInformationMessage("✓ Todos los workflows validan OK.");
+			return;
+		}
+		const pick = await vscode.window.showQuickPick(items, {
+			title: `Workflows · ${items.length} issue(s)`,
+			placeHolder: "Selecciona un issue para abrir su archivo",
+			matchOnDetail: true,
+		});
+		if (!pick || !pick.file) return;
+		await openAtLine(pick.file, pick.line);
+	}
+
+	async function openAtLine(file: string, line?: number): Promise<void> {
+		const doc = await vscode.workspace.openTextDocument(file);
+		const ln = line && line > 0 ? line - 1 : 0;
+		const pos = new vscode.Position(ln, 0);
+		await vscode.window.showTextDocument(doc, {
+			selection: new vscode.Range(pos, pos),
+		});
+	}
+
+	/** Primer nº de línea en un mensaje de error (":12:3" o "(12,3)"). */
+	function parseLineNum(msg: string): number | undefined {
+		const m = msg.match(/(?::|\()\s*(\d+)/);
+		return m ? Number(m[1]) : undefined;
 	}
 
 	// /pipeline: estado del orquestador frida-pipeline (ADR-0021). Fase 1: monta el

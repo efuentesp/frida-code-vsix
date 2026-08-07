@@ -681,6 +681,10 @@ export async function createFridaSession(
 				cwd: opts.cwd,
 			} as any);
 			await childSession.bindExtensions({ uiContext, mode: "rpc" });
+			// Abort cooperativo: al cancelar el run (botón Detener del WorkflowPanel),
+			// abortamos la child session en pleno vuelo — parity con rpiv-workflow
+			// (run.signal → session.abort()).
+			childOpts.signal?.addEventListener("abort", () => childSession.abort?.());
 			return { session: childSession, sessionManager: childSM };
 		},
 	};

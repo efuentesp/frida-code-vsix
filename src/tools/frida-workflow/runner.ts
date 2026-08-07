@@ -41,6 +41,7 @@ import type {
 	Workflow,
 	WorkflowHost,
 } from "./types";
+import { registerAbort } from "./store";
 
 const STOP = "stop";
 /** Techo anti-ciclo (los loops verdaderos + su cap propio llegan en Fase 6). */
@@ -53,13 +54,23 @@ const MAX_STAGES = 64;
 export async function runWorkflow(
 	opts: RunWorkflowOptions,
 ): Promise<RunWorkflowResult> {
-	const { workflow, input, runsDir, host, signal } = opts;
+	const { workflow, input, runsDir, host } = opts;
 
 	if (!workflow.stages[workflow.start]) {
 		return fail0(`start "${workflow.start}" no es una etapa declarada`);
 	}
 
 	const runId = generateRunId();
+	// Abort cooperativo: un AbortController por run, registrado en el store para
+	// que el botón Detener del panel pueda cancelarlo (análogo al run.signal que
+	// rpiv-workflow cablea desde onTerminalInput). Merge con opts.signal externo.
+	const ac = new AbortController();
+	registerAbort(runId, () => ac.abort());
+	if (opts.signal) {
+		if (opts.signal.aborted) ac.abort();
+		else
+			opts.signal.addEventListener("abort", () => ac.abort(), { once: true });
+	}
 
 	// --name: valida + colisión + persiste ANTES del header (nada se escribe si falla).
 	if (opts.name) {
@@ -90,7 +101,7 @@ export async function runWorkflow(
 		runsDir,
 		sessionDir,
 		host,
-		signal,
+		signal: ac.signal,
 		start: workflow.start,
 	});
 }
