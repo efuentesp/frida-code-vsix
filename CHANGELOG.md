@@ -13,11 +13,21 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+- **frida-extensible-workflows** — orquestación multi-agente determinista (porte
+  nativo de `pi-extensible-workflows`, ADR-0028). 7 tools del modelo, DSL en
+  sandbox `node:vm`, journal/replay determinista, persistencia en `~/.frida`,
+  background + follow-up, checkpoints + `workflow_respond`, presupuestos
+  (`agentLaunches` hard), `workflow_retry`/`workflow_resume` (recuperación sin
+  repetir lo completado), `withWorktree` aislado y **roles** `.md`. UI: panel
+  reactivo de runs activas (`WorkflowPanel`). 41 tests vitest. Ver
+  `docs/tools/frida-extensible-workflows.md`.
+
 ### Cambiado
 
 ### Corregido
 
 ## [0.14.0] - 2026-08-05
+
 ### Añadido
 
 - **webview** — tooltips de tokens/cache hit + layout de barras en el dashboard de uso
@@ -27,6 +37,7 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **usage** — consolidar el indexer en una sola fuente de verdad
 
 ## [0.13.0] - 2026-08-04
+
 ### Añadido
 
 - **webview** — aviso visual de compactación al 70% (ícono pulsante + barra)
@@ -36,6 +47,7 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **webview** — formato del linter
 
 ## [0.12.0] - 2026-08-04
+
 ### Añadido
 
 - **webview** — tokens atribuidos del modelo (~llm) al cerrar el turno
@@ -46,6 +58,7 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **webview** — formato del linter en el botón Detener global
 
 ## [0.11.0] - 2026-08-04
+
 ### Añadido
 
 - **approval** — modos Normal/YOLO + gate de confirmación
@@ -55,16 +68,19 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **approval** — botón Detener global + doble-Esc funcional durante approvals
 
 ## [0.10.0] - 2026-08-04
+
 ### Añadido
 
 - **approval** — confirmación de cambio de proveedor (manual + vigilancia post-run)
 
 ## [0.9.2] - 2026-08-04
+
 ### Corregido
 
 - **questions** — el botón Cancelar se justifica a la derecha
 
 ## [0.9.1] - 2026-08-04
+
 ### Corregido
 
 - **approval** — reconoce web_fetch_md / web_docs_* como tools internas de Frida
@@ -74,16 +90,19 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **usage** — formato del linter (biome) en BarChart e indexer.test
 
 ## [0.9.0] - 2026-08-04
+
 ### Añadido
 
 - **usage** — Artefactos por tipo de archivo (KLOCs + tokens) con familia en hover
 
 ## [0.8.1] - 2026-08-04
+
 ### Corregido
 
 - **usage** — Top sesiones trunca nombres (…) + grid del dashboard a 50/50 real
 
 ## [0.8.0] - 2026-08-04
+
 ### Añadido
 
 - **usage** — Top herramientas por tokens (atribución por-mensaje) + tooltip de llamadas

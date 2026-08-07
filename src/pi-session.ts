@@ -48,6 +48,7 @@ import { createFridaMultiSkills } from "./tools/frida-multi-skills";
 import { createFridaPixSkills } from "./tools/frida-pix-skills";
 import { createFridaPipeline } from "./tools/frida-pipeline";
 import { createFridaSubagents } from "./tools/frida-subagents";
+import { createFridaExtensibleWorkflows } from "./tools/frida-extensible-workflows";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
 import { createTodoWeb } from "./tools/todo-web";
@@ -486,6 +487,13 @@ export async function createFridaSession(
 			{
 				name: "frida-subagents",
 				factory: createFridaSubagents(),
+			},
+			// frida-extensible-workflows (ADR-0028): orquestación multi-agente
+			// determinista (porte de pi-extensible-workflows). Fase 2: registra el
+			// tool `workflow` foreground-only. Sin dependencia de orden.
+			{
+				name: "frida-extensible-workflows",
+				factory: createFridaExtensibleWorkflows(),
 			},
 			// frida-mcp-adapter (ADR-0023): integración MCP (Model Context Protocol).
 			// Un único tool proxy mcp({}) (~200 tokens) da acceso a cientos de
