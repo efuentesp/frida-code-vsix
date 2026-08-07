@@ -13,6 +13,13 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+### Cambiado
+
+### Corregido
+
+## [0.15.0] - 2026-08-07
+### Añadido
+
 - **frida-extensible-workflows** — orquestación multi-agente determinista (porte
   nativo de `pi-extensible-workflows`, ADR-0028). 7 tools del modelo, DSL en
   sandbox `node:vm`, journal/replay determinista, persistencia en `~/.frida`,
