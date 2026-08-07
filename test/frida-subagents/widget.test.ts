@@ -106,6 +106,55 @@ describe("frida-subagents / store / agentStarted", () => {
 
 		expect(agentWidgetStore.getSnapshot()).toHaveLength(2);
 	});
+
+	it("es idempotente por id: no duplica al re-registrar (mismo id)", () => {
+		// Reproduce el bug del path background: registerAgent se llamaba dos veces
+		// con el mismo agentId → el panel mostraba cada agente dos veces.
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "general-purpose",
+			description: "Conteo COSMIC #1",
+			status: "running",
+			startedAt: 1000,
+		});
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "general-purpose",
+			description: "Conteo COSMIC #1",
+			status: "running",
+			startedAt: 1000,
+		});
+
+		expect(agentWidgetStore.getSnapshot()).toHaveLength(1);
+	});
+
+	it("es idempotente y conserva el progreso acumulado", () => {
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "Explore",
+			description: "t1",
+			status: "running",
+			startedAt: 1000,
+		});
+		agentWidgetStore.agentProgress("a1", {
+			toolUses: 9,
+			activity: "thinking…",
+		});
+
+		// Re-registro (resume que reusa el id): no pierde progreso ni duplica.
+		agentWidgetStore.agentStarted({
+			id: "a1",
+			type: "Explore",
+			description: "t1",
+			status: "running",
+			startedAt: 1000,
+		});
+
+		const snapshot = agentWidgetStore.getSnapshot();
+		expect(snapshot).toHaveLength(1);
+		expect(snapshot[0]!.toolUses).toBe(9);
+		expect(snapshot[0]!.activity).toBe("thinking…");
+	});
 });
 
 describe("frida-subagents / store / agentUpdated", () => {

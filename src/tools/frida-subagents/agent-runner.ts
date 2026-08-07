@@ -35,6 +35,7 @@ import {
 import { preloadSkills } from "./skill-loader";
 import {
 	generateAgentId,
+	getAgent,
 	registerAgent,
 	updateAgentStatus,
 	updateAgentProgress,
@@ -256,18 +257,13 @@ export async function runAgent(
 				throw err;
 			},
 		);
-		// Guardar el promise para get_subagent_result(wait: true).
-		const record = {
-			id: agentId,
-			type: config.name,
-			description,
-			status: "running" as const,
-			toolUses: 0,
-			startedAt: Date.now(),
-			session,
-			promise,
-		};
-		registerAgent(record);
+		// Adjuntar el promise al record registrado arriba (al crear la sesión).
+		// El agente se registra una sola vez, como pi-subagents (muta el record en
+		// vez de re-registrarlo). Antes este bloque re-llamaba registerAgent() →
+		// duplicaba la entrada en el widget store (agentStarted hace append sin
+		// dedup) y el panel mostraba cada agente background dos veces.
+		const rec = getAgent(agentId);
+		if (rec) rec.promise = promise;
 
 		return { agentId };
 	}

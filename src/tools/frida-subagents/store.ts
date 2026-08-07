@@ -66,9 +66,15 @@ export const agentWidgetStore = {
 		return agents;
 	},
 
-	/** Un agente empezó a correr. */
+	/** Un agente empezó a correr. Idempotente por id: si el agente ya está en
+	 *  el store (re-registro, o un resume que reusa el id) actualiza la entrada
+	 *  en vez de duplicarla — misma garantía de no-duplicación que el Map del
+	 *  agent-manager. */
 	agentStarted(display: AgentDisplay): void {
-		agents = [...agents, display];
+		const exists = agents.some((a) => a.id === display.id);
+		agents = exists
+			? agents.map((a) => (a.id === display.id ? { ...a, ...display } : a))
+			: [...agents, display];
 		emit();
 	},
 
