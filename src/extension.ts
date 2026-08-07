@@ -349,6 +349,59 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 	return out;
 }
 
+// --- Parseo de `git status --porcelain -b` (rama + sync + diff en 1 llamada) ---
+
+/** Cuenta archivos added/modified/deleted a partir de las líneas porcelain (XY path). */
+function parseGitDiff(porcelain: string): {
+	added: number;
+	modified: number;
+	deleted: number;
+} {
+	let added = 0;
+	let modified = 0;
+	let deleted = 0;
+	for (const raw of porcelain.split("\n")) {
+		if (!raw) continue; // línea vacía (trailing newline)
+		const x = raw[0];
+		const y = raw[1];
+		if (x === "?" && y === "?")
+			added++; // sin seguimiento → nuevo
+		else if (x === "!" && y === "!")
+			continue; // ignorado
+		else if (x === "D" || y === "D")
+			deleted++; // eliminado
+		else if (x === "A" || y === "A")
+			added++; // agregado
+		else modified++; // M/R/C/T/U-conflict → modificado
+	}
+	return { added, modified, deleted };
+}
+
+/** Parsea la 1ª línea de `git status -b`: `## branch...up [ahead N, behind M]`. */
+function parseStatusHead(line: string): {
+	branch?: string;
+	ahead?: number;
+	behind?: number;
+} {
+	if (!line.startsWith("## ")) return {};
+	const rest = line.slice(3);
+	if (rest.startsWith("HEAD ")) return {}; // detaché: "## HEAD (no branch)"
+	const fresh = rest.match(/^No commits yet on (.+)$/); // repo sin commits
+	if (fresh) return { branch: fresh[1].trim() };
+	const bracket = rest.indexOf(" [");
+	const tracking = bracket >= 0 ? rest.slice(0, bracket) : rest;
+	const branch = tracking.split("...")[0].trim();
+	const out: { branch?: string; ahead?: number; behind?: number } = { branch };
+	if (bracket >= 0) {
+		const note = rest.slice(bracket + 2).replace(/\]\s*$/, "");
+		const a = note.match(/ahead (\d+)/);
+		const b = note.match(/behind (\d+)/);
+		if (a) out.ahead = Number(a[1]);
+		if (b) out.behind = Number(b[1]);
+	}
+	return out;
+}
+
 export async function activate(
 	context: vscode.ExtensionContext,
 ): Promise<void> {
@@ -1269,36 +1322,43 @@ export async function activate(
 		post({ type: "tool_toggles", ...readToolToggles() });
 	}
 
-	// Info del workspace: carpeta de trabajo + branch git (y si hay cambios
-	// sin committer). Lo ejecuta el HOST directamente (no el modelo), así que no
-	// pasa por el gate de bash de D7. No depende de la extensión Git de VS Code.
+	// Info del workspace: carpeta de trabajo + branch git, conteo de cambios
+	// (added/modified/deleted) y commits ahead/behind vs origin. Una sola llamada
+	// `git status --porcelain -b` da los tres. La ejecuta el HOST directamente
+	// (no el modelo), así que no pasa por el gate de bash de D7. No depende de la
+	// extensión Git de VS Code.
 	async function collectWorkspace(): Promise<{
 		cwd: string;
 		branch?: string;
 		dirty?: boolean;
 		sessionName?: string;
+		diff?: { added: number; modified: number; deleted: number };
+		ahead?: number;
+		behind?: number;
 	}> {
 		const cwd = workspaceCwd();
 		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
 		try {
-			const { stdout: branchOut } = await execFileP(
+			const { stdout } = await execFileP(
 				"git",
-				["rev-parse", "--abbrev-ref", "HEAD"],
+				["status", "--porcelain", "-b"],
 				{ cwd, timeout: 3000 },
 			);
-			const branch = branchOut.trim();
-			let dirty = false;
-			try {
-				const { stdout: status } = await execFileP(
-					"git",
-					["status", "--porcelain"],
-					{ cwd, timeout: 3000 },
-				);
-				dirty = status.trim().length > 0;
-			} catch {
-				/* ignore */
-			}
-			return { cwd, branch, dirty, sessionName };
+			const lines = stdout.split("\n");
+			// 1ª línea "## branch...up [ahead N, behind M]" (o "## HEAD (no branch)").
+			const head = parseStatusHead(lines[0] ?? "");
+			// Resto: líneas porcelain XY path → conteo added/modified/deleted.
+			const diff = parseGitDiff(lines.slice(1).join("\n"));
+			const dirty = diff.added + diff.modified + diff.deleted > 0;
+			return {
+				cwd,
+				branch: head.branch,
+				dirty,
+				sessionName,
+				diff,
+				ahead: head.ahead,
+				behind: head.behind,
+			};
 		} catch {
 			return { cwd, sessionName }; // no es repo o git no disponible
 		}

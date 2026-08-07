@@ -344,11 +344,23 @@ export interface ResourceSummary {
 	errors: { path: string; error: string }[];
 }
 
+/** Conteo de cambios del árbol de trabajo (parse de `git status --porcelain`). */
+export interface WorkspaceDiff {
+	added: number;
+	modified: number;
+	deleted: number;
+}
+
 export interface WorkspaceInfo {
 	cwd: string;
 	branch?: string;
 	dirty?: boolean;
 	sessionName?: string;
+	/** Conteo de archivos added/modified/deleted. */
+	diff?: WorkspaceDiff;
+	/** Commits adelantados / atrasados vs upstream (origin). */
+	ahead?: number;
+	behind?: number;
 }
 
 // Selector de proveedor/modelo (fase 2: multi-proveedor + GitHub Copilot).
@@ -571,7 +583,16 @@ export type InMessage =
 			scope?: "project" | "all";
 	  }
 	| { type: "resources"; data: ResourceSummary }
-	| { type: "workspace"; cwd: string; branch?: string; dirty?: boolean }
+	| {
+			type: "workspace";
+			cwd: string;
+			branch?: string;
+			dirty?: boolean;
+			sessionName?: string;
+			diff?: WorkspaceDiff;
+			ahead?: number;
+			behind?: number;
+	  }
 	| {
 			type: "models";
 			providers: ProviderOption[];

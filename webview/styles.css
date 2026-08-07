@@ -1678,6 +1678,35 @@ button.sec:hover {
 .ws-bar .ws-branch.dirty {
 	color: var(--vscode-editorWarning-foreground, #d29922);
 }
+/* Conteo de cambios +N ~N -N (colores semánticos de git de VS Code). */
+.ws-bar .ws-diff {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin-left: 4px;
+}
+.ws-bar .ws-add {
+	color: var(--vscode-gitDecoration-addedResourceForeground, #73c991);
+}
+.ws-bar .ws-mod {
+	color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+}
+.ws-bar .ws-del {
+	color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+}
+/* Sync vs origin ↑N ↓N. */
+.ws-bar .ws-sync {
+	display: inline-flex;
+	align-items: center;
+	gap: 1px;
+	margin-left: 4px;
+}
+.ws-bar .ws-ahead {
+	color: var(--vscode-charts-blue, #75beff);
+}
+.ws-bar .ws-behind {
+	color: var(--vscode-charts-orange, #d18616);
+}
 .ws-bar .ws-dirty {
 	opacity: 0.9;
 }
