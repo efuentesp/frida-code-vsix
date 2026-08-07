@@ -13,6 +13,13 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+### Cambiado
+
+### Corregido
+
+## [0.16.0] - 2026-08-07
+### Añadido
+
 - **frida-workflow** — integración del motor de workflows (ADR-0020, porte nativo
   de `rpiv-workflow`) como feature usable. Comando `/wf`: picker QuickPick agrupado
   por origen (Internos/Globales/Proyecto), `/wf <nombre> "<input>"`, `/wf @<ref>` y
