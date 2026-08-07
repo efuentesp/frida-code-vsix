@@ -59,6 +59,11 @@ function TodoWebPanel(): ReactElement | null {
 	const hasActive = tasks.some(
 		(t) => t.status === "in_progress" || t.status === "pending",
 	);
+	// Tarea en progreso (el protocolo todo mantiene una sola in_progress a la
+	// vez). Cuando el panel está COLAPSADO mostramos su subject en el header
+	// (◐ ámbar) para dar contexto de qué se está haciendo sin expandir.
+	// Expandido / sin tarea en progreso → header sin cambios.
+	const activeTask = tasks.find((t) => t.status === "in_progress");
 	// Mostrar #id en cada fila sólo si alguna tarea tiene dependencias (blockedBy),
 	// para anclar las referencias ⛓ #N (paridad con rpiv-todo selectShowTaskIds).
 	const showIds = tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
@@ -75,6 +80,11 @@ function TodoWebPanel(): ReactElement | null {
 					<ftext>
 						({completed}/{tasks.length})
 					</ftext>
+					{collapsed && activeTask ? (
+						<ftext color="var(--vscode-list-warningForeground, #cca700)">
+							◐ {activeTask.subject}
+						</ftext>
+					) : null}
 				</fbox>
 			}
 		>
