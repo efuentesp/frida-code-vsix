@@ -1437,6 +1437,21 @@ export async function activate(
 		}
 	}
 
+	// issue #3: debounced refresco del estado de Git durante una corrida. Antes
+	// postWorkspace() sólo se llamaba en eventos puntuales (compactación,
+	// visibilidad, fin de bash, switch de sesión…), así que el footer "main ~N"
+	// se congelaba mientras el agente editaba/escribía archivos. Ahora, tras cada
+	// edit/write (y en turn_end como red de seguridad) reagrupamos las escrituras
+	// y lanzamos un único `git status --porcelain -b` a los 500 ms.
+	let wsRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+	function scheduleWorkspaceRefresh(): void {
+		if (wsRefreshTimer) clearTimeout(wsRefreshTimer);
+		wsRefreshTimer = setTimeout(() => {
+			wsRefreshTimer = undefined;
+			void postWorkspace();
+		}, 500);
+	}
+
 	// Crea la sesión en segundo plano (onboarding/listo/inicio) para poder mostrar
 	// los recursos cuanto antes. Captura errores para no dejar promesas sin manejar.
 	function bootstrapSession(): void {
@@ -1570,6 +1585,9 @@ export async function activate(
 				case "turn_end":
 					// Fin de turno del agente: publica el resumen de diagnósticos acumulados.
 					flushLens();
+					// issue #3: red de seguridad — asegura que el footer de git refleje el
+					// estado final del turno aunque falte una tool del set {edit, write}.
+					scheduleWorkspaceRefresh();
 					break;
 				case "auto_retry_start":
 					// El provider falló con un error retriable: el SDK reintentará. Mostramos
@@ -1673,6 +1691,11 @@ export async function activate(
 					postUsage(session);
 					// El tool `todo` muta el store reactivo y el panel Remote React se
 					// re-renderiza solo (ADR-0014): nada que publicar aquí.
+					// issue #3: edit/write mutan el working tree → refrescar el footer de git
+					// de forma reactiva (debounced). `bash` ya refresca por su cuenta.
+					if (event.toolName === "edit" || event.toolName === "write") {
+						scheduleWorkspaceRefresh();
+					}
 					break;
 				case "compaction_start":
 					post({ type: "compact_start", reason: event.reason });
