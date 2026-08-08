@@ -645,6 +645,20 @@ export function runWorkflow(
 				skipNext = false;
 				continue;
 			}
+			// El child del sandbox no debe heredar flags de inspector del host (p.ej.
+			// --inspect-brk cuando pi corre bajo F5 / `node --inspect-brk`). Bajo
+			// --permission, --inspect-brk dispara ERR_ACCESS_DENIED permission:'Inspector'
+			// en Module._compile (callAndPauseOnStart exige --allow-inspector) y mata el
+			// boot antes de ejecutar el script -> state:failed / durationMs:0. Se descarta
+			// toda la familia --inspect* + --experimental-network-inspection: es inofensivo
+			// para el child (no es debuggeable) y robusto ante versiones de node. Estos
+			// flags no toman valor separado por espacio -> no se toca skipNext.
+			if (
+				arg.startsWith("--inspect") ||
+				arg === "--experimental-network-inspection"
+			) {
+				continue;
+			}
 			if (skip.has(arg) || skip.has(arg.split("=")[0] ?? "")) {
 				if (!arg.includes("=")) skipNext = true;
 				continue;
