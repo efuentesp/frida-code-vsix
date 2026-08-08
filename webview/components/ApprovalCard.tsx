@@ -24,6 +24,8 @@ const READONLY_TOOLS = new Set([
 	"find",
 	"ls",
 	"context",
+	"workflow_status",
+	"workflow_catalog",
 ]);
 const FRIDA_INTERNAL_TOOLS = new Set([
 	"todo",
@@ -37,6 +39,11 @@ const FRIDA_INTERNAL_TOOLS = new Set([
 	"web_docs_search",
 	"web_docs_fetch",
 	"agent_browser",
+	"workflow",
+	"workflow_stop",
+	"workflow_respond",
+	"workflow_retry",
+	"workflow_resume",
 ]);
 
 type ItemKey = "yes" | "pattern" | "no" | "reason";
