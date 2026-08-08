@@ -1,6 +1,7 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
@@ -475,6 +476,33 @@ export async function activate(
 	// loguea abortRun() + el ciclo de vida del agente, todo en una sola línea de
 	// tiempo para localizar dónde se rompe la cadena.
 	const abortChannel = vscode.window.createOutputChannel("Frida Abort");
+	// [frida-abort] Persistencia a archivo del mismo diagnóstico, para que el agente
+	// (frida-code) pueda leer la traza con sus herramientas sin depender del panel
+	// Output. Rotación por tamaño con un único backup (.1); tamaño máx. 1 MB.
+	const abortLogPath = path.join(homedir(), ".frida", "logs", "abort.log");
+	const abortLogMax = 1024 * 1024;
+	let abortLogReady = false;
+	let abortLogBytes = -1;
+	function appendAbortLog(line: string): void {
+		try {
+			if (!abortLogReady) {
+				mkdirSync(path.dirname(abortLogPath), { recursive: true });
+				abortLogReady = true;
+			}
+			if (abortLogBytes < 0) {
+				try { abortLogBytes = statSync(abortLogPath).size; } catch { abortLogBytes = 0; }
+			}
+			if (abortLogBytes >= abortLogMax) {
+				try { copyFileSync(abortLogPath, `${abortLogPath}.1`); } catch { /* noop */ }
+				try { writeFileSync(abortLogPath, ""); } catch { /* noop */ }
+				abortLogBytes = 0;
+			}
+			appendFileSync(abortLogPath, line + "\n");
+			abortLogBytes += Buffer.byteLength(line) + 1;
+		} catch {
+			/* noop */
+		}
+	}
 	function abortDiag(msg: string): void {
 		const line = `[${new Date().toISOString()}] ${msg}`;
 		try {
@@ -482,6 +510,7 @@ export async function activate(
 		} catch {
 			/* noop */
 		}
+		appendAbortLog(line);
 		console.log("[frida-abort]", msg);
 	}
 
