@@ -676,6 +676,7 @@ export type OutMessage =
 	| { type: "cancel_compaction" }
 	| { type: "reload" }
 	| { type: "abort" }
+	| { type: "abort_diag"; text: string }
 	| { type: "new_session" }
 	| { type: "search_files"; query: string }
 	| { type: "list_sessions"; scope?: "project" | "all" }

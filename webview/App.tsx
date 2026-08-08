@@ -171,18 +171,24 @@ export function App() {
 	// se ocultaba durante un approval y el doble-Esc estaba pausado).
 	useEffect(() => {
 		if (!state.busy) {
+			diagLog(
+				`listener Esc DESACTIVADO (busy=false) — el doble-Esc no disparará`,
+			);
 			setEscHint(false);
 			return;
 		}
+		diagLog(`listener Esc ACTIVADO (busy=true) — esperando doble-Esc`);
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
 			const now = Date.now();
 			if (now - lastEscRef.current < 450) {
+				diagLog(`Esc#2 (<450ms) → post {abort}`);
 				lastEscRef.current = 0;
 				if (escTimerRef.current) clearTimeout(escTimerRef.current);
 				setEscHint(false);
-				getVsCode().postMessage({ type: "abort" });
+				post({ type: "abort" });
 			} else {
+				diagLog(`Esc#1 (espera 2ª Esc en <450ms)`);
 				lastEscRef.current = now;
 				setEscHint(true);
 				if (escTimerRef.current) clearTimeout(escTimerRef.current);
@@ -194,6 +200,14 @@ export function App() {
 	}, [state.busy]);
 
 	const post = (msg: OutMessage) => getVsCode().postMessage(msg);
+
+	// Trazado del flujo de Detener: además de la consola del webview (DevTools),
+	// reenvía al host para que caiga en el canal "Frida Abort" y se correlacione
+	// con abortRun()/eventos del agente en una sola línea de tiempo.
+	const diagLog = (text: string) => {
+		console.log("[frida-abort]", text);
+		post({ type: "abort_diag", text });
+	};
 
 	// Comandos para el autocompletado de "/": built-in (del host vía
 	// state.resources.commands) + skills + prompts. FUENTE ÚNICA: BUILTIN_COMMANDS
@@ -389,7 +403,10 @@ export function App() {
 							<button
 								type="button"
 								className="tb-stop"
-								onClick={() => post({ type: "abort" })}
+								onClick={() => {
+									diagLog("botón Detener (toolbar approvals) → post {abort}");
+									post({ type: "abort" });
+								}}
 							>
 								<CircleStop size={13} /> Detener
 							</button>
@@ -745,7 +762,10 @@ export function App() {
 						expanded={composerExpanded}
 						onExpandedChange={setComposerExpanded}
 						insertSignal={state.composerInsert}
-						onAbort={() => post({ type: "abort" })}
+						onAbort={() => {
+							diagLog("botón Detener (Composer) → post {abort}");
+							post({ type: "abort" });
+						}}
 						onSelectModel={(provider, modelId) =>
 							post({ type: "select_model", provider, model: modelId })
 						}

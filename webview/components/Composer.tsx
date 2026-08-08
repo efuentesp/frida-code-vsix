@@ -869,7 +869,16 @@ export function Composer({
 					</Tooltip>
 					{busy ? (
 						<Tooltip label="Detener" side="top">
-							<button className="bar-send stop" onClick={() => onAbort?.()}>
+							<button
+								className="bar-send stop"
+								onClick={() => {
+									console.log(
+										"[frida-abort] clic botón Detener (Composer) — busy=" +
+											busy,
+									);
+									onAbort?.();
+								}}
+							>
 								<Square size={15} />
 							</button>
 						</Tooltip>

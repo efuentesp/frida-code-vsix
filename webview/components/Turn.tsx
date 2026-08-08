@@ -52,6 +52,7 @@ export function TurnView({
 							block={skill}
 							live={live}
 							input={skill.userMessage?.replace(/^Skill input:\s*/, "")}
+							onCopy={onCopy}
 						/>
 					) : (
 						<div className="bubble">{turn.user}</div>

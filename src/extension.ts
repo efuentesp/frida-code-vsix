@@ -469,6 +469,22 @@ export async function activate(
 		view?.webview.postMessage(msg);
 	};
 
+	// Canal de diagnóstico del flujo de Detener (botón / doble-Esc). Persistente
+	// y filtrable: Command Palette → "Output: Show Output Channels" → "Frida Abort".
+	// Registra ambos extremos: el webview reenvía vía {type:"abort_diag"} y el host
+	// loguea abortRun() + el ciclo de vida del agente, todo en una sola línea de
+	// tiempo para localizar dónde se rompe la cadena.
+	const abortChannel = vscode.window.createOutputChannel("Frida Abort");
+	function abortDiag(msg: string): void {
+		const line = `[${new Date().toISOString()}] ${msg}`;
+		try {
+			abortChannel.appendLine(line);
+		} catch {
+			/* noop */
+		}
+		console.log("[frida-abort]", msg);
+	}
+
 	function workspaceCwd(): string {
 		return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 	}
@@ -1400,6 +1416,9 @@ export async function activate(
 		session.subscribe((event: any) => {
 			switch (event?.type) {
 				case "agent_start":
+					abortDiag(
+						`agent_start — isStreaming=${!!session.isStreaming} isBashRunning=${!!session.isBashRunning} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+					);
 					turnsInRun = 0;
 					// Snapshot del usage aggregate para repartir el delta del turno entre
 					// las tarjetas como ~llm (atribución burda ÷ N).
@@ -1411,6 +1430,9 @@ export async function activate(
 					post({ type: "turn_active" });
 					break;
 				case "agent_end":
+					abortDiag(
+						`agent_end — errorMessage=${event.errorMessage ?? "(none)"} willRetry=${!!event.willRetry} hadText=${hadText} hadToolCall=${hadToolCall} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"}`,
+					);
 					postUsage(session);
 					post({ type: "agent_busy", busy: false });
 					// Vigilancia: ¿el proveedor/modelo cambió durante el turno SIN pasar por
@@ -1538,6 +1560,9 @@ export async function activate(
 					break;
 				}
 				case "message_end":
+					abortDiag(
+						`message_end — role=${event.message?.role ?? "?"} stopReason=${event.message?.stopReason ?? "?"}`,
+					);
 					if (
 						event.message?.role === "assistant" &&
 						event.message?.stopReason === "aborted"
@@ -1788,7 +1813,13 @@ export async function activate(
 				await cancelCompaction();
 				break;
 			case "abort":
+				abortDiag(`host ← webview {type:"abort"} recibido`);
 				await abortRun();
+				break;
+			case "abort_diag":
+				// Trazado reenviado desde el webview (Esc / botón) para unificar el timeline
+				// en el canal "Frida Abort". text ya incluye el prefijo del origen.
+				abortDiag(String(msg.text ?? "(abort_diag sin texto)"));
 				break;
 			case "reload":
 				await reloadResources();
@@ -3079,8 +3110,16 @@ export async function activate(
 	}
 
 	async function abortRun(): Promise<void> {
+		abortDiag(
+			`abortRun START — pendingLocal=${pendingQueue.length} inRetry=${inRetry}`,
+		);
+		const t0 = Date.now();
 		try {
 			const { session } = await ensureSession();
+			const s = session.session;
+			abortDiag(
+				`pre-abort — isStreaming=${!!s?.isStreaming} isBashRunning=${!!s?.isBashRunning} isIdle=${s?.isIdle ?? "?"} queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+			);
 			// VACIAR LA COLA DE ENCOLADOS ANTES DE ABORTAR. El abort() del SDK NO vacía
 			// la cola interna de steer/followUp: si hay mensajes encolados, sobreviven
 			// al abort y el agente los procesa al cancelar el turno actual → parece que
@@ -3091,11 +3130,14 @@ export async function activate(
 			// composer (vía composer_insert) para no perder lo encolado.
 			const restoreTexts = pendingQueue.map((q) => q.text);
 			try {
-				session.session?.clearQueue?.();
+				s?.clearQueue?.();
 			} catch {
 				/* noop */
 			}
 			resetQueue();
+			abortDiag(
+				`post-clearQueue — queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+			);
 			if (restoreTexts.length > 0) {
 				post({ type: "composer_insert", text: restoreTexts.join("\n\n") });
 			}
@@ -3104,16 +3146,18 @@ export async function activate(
 			// retry en curso de inmediato — PERO sin return: después abortamos el
 			// agente entero. Antes los early-returns dejaban la corrida autónoma
 			// corriendo (solo mataban un bash/retry a la vez y el run seguía).
-			if (session.session?.isBashRunning) {
+			if (s?.isBashRunning) {
+				abortDiag("isBashRunning → abortBash()");
 				try {
-					await session.session.abortBash?.();
+					await s.abortBash?.();
 				} catch {
 					/* noop */
 				}
 			}
 			if (inRetry) {
+				abortDiag("inRetry → abortRetry()");
 				try {
-					await session.session.abortRetry?.();
+					await s.abortRetry?.();
 				} catch {
 					/* noop */
 				}
@@ -3124,12 +3168,29 @@ export async function activate(
 			// waitForIdle() podría tardar: carreramos con un timeout de 8s para no
 			// colgar el botón. El evento agent_end (al que ya nos suscribimos) bajará
 			// busy cuando el agente realmente pare, aun si esta promesa resuelve antes.
+			abortDiag("abort() race(8s) START");
+			let timedOut = false;
 			await Promise.race([
-				session.session.abort(),
-				new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+				Promise.resolve(s?.abort?.()).then(() => {
+					abortDiag(
+						`abort() RESOLVED tras ${Date.now() - t0}ms — isIdle=${s?.isIdle ?? "?"} isStreaming=${!!s?.isStreaming}`,
+					);
+				}),
+				new Promise<void>((resolve) =>
+					setTimeout(() => {
+						timedOut = true;
+						resolve();
+					}, 8000),
+				),
 			]);
-		} catch {
-			/* noop */
+			if (timedOut) {
+				abortDiag(
+					`abort() TIMEOUT 8000ms — SIGUE isStreaming=${!!s?.isStreaming} isIdle=${s?.isIdle ?? "?"} (probable tool/MCP/subagente que ignora la señal de abort)`,
+				);
+			}
+			abortDiag(`abortRun END tras ${Date.now() - t0}ms`);
+		} catch (e: any) {
+			abortDiag(`abortRun THROW: ${String(e?.message ?? e)}`);
 		}
 	}
 
