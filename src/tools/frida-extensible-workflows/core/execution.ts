@@ -1,21 +1,62 @@
 import { fork, spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+	lstatSync,
+	mkdtempSync,
+	readlinkSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { RunStore, structuralPath as operationPath } from "./persistence";
+import { type RunStore, structuralPath as operationPath } from "./persistence";
 import type { AgentAttempt } from "./agent-execution";
-import type { AgentIdentity, AgentAttemptSummary, JsonValue, ShellIdentity, ShellOptions, ShellResult, WorkflowAgentSessionReference, WorkflowBridge, WorkflowErrorCode, WorkflowExecution } from "./types";
+import type {
+	AgentIdentity,
+	AgentAttemptSummary,
+	JsonValue,
+	ShellIdentity,
+	ShellOptions,
+	ShellResult,
+	WorkflowAgentSessionReference,
+	WorkflowBridge,
+	WorkflowErrorCode,
+	WorkflowExecution,
+} from "./types";
 import { WorkflowError, roleNameOf } from "./types";
-import { asWorkflowError, errorText, fail, isWorkflowAuthored, jsonValue, markWorkflowAuthored, object, positiveInteger } from "./utils";
-import { instrumentWorkflow, validateAgentOptions, validateShellCommand, validateShellOptions } from "./validation";
+import {
+	asWorkflowError,
+	errorText,
+	fail,
+	isWorkflowAuthored,
+	jsonValue,
+	markWorkflowAuthored,
+	object,
+	positiveInteger,
+} from "./utils";
+import {
+	instrumentWorkflow,
+	validateAgentOptions,
+	validateShellCommand,
+	validateShellOptions,
+} from "./validation";
 
 export const RPC_LIMIT_BYTES = 10 * 1024 * 1024;
-type WorkerErrorShape = { code?: string; message: string; authored?: boolean; failedAt?: string };
+type WorkerErrorShape = {
+	code?: string;
+	message: string;
+	authored?: boolean;
+	failedAt?: string;
+};
 export const HEARTBEAT_TIMEOUT_MS = 5000;
 const HEARTBEAT_INTERVAL_MS = 1000;
 
-const OUTCOME_ERRORS = new Set<string>(["AGENT_TIMEOUT", "AGENT_FAILED", "RESULT_INVALID"]);
+const OUTCOME_ERRORS = new Set<string>([
+	"AGENT_TIMEOUT",
+	"AGENT_FAILED",
+	"RESULT_INVALID",
+]);
 const WORK_RESULT_BRAND = "__workResult";
 
 const childSource = String.raw`
@@ -280,280 +321,767 @@ Promise.resolve().then(() => new vm.Script("(async(__pi_extensible_workflows_age
 `;
 
 export function encoded(value: unknown): string {
-  if (!jsonValue(value)) fail("RPC_LIMIT_EXCEEDED", "RPC values must be JSON-compatible");
-  const json = JSON.stringify(value);
-  if (Buffer.byteLength(json) > RPC_LIMIT_BYTES) fail("RPC_LIMIT_EXCEEDED", "RPC value exceeds the 10 MB JSON boundary");
-  return json;
+	if (!jsonValue(value))
+		fail("RPC_LIMIT_EXCEEDED", "RPC values must be JSON-compatible");
+	const json = JSON.stringify(value);
+	if (Buffer.byteLength(json) > RPC_LIMIT_BYTES)
+		fail("RPC_LIMIT_EXCEEDED", "RPC value exceeds the 10 MB JSON boundary");
+	return json;
 }
 
 function encodedRpcResult(id: number, value: JsonValue): string {
-  return encoded({ type: "rpcResult", id, ok: true, value });
+	return encoded({ type: "rpcResult", id, ok: true, value });
 }
 
 function readAgentIdentity(value: unknown): AgentIdentity {
-  if (!object(value)) fail("INTERNAL_ERROR", "Invalid workflow agent identity");
-  const structuralPath = value.structuralPath;
-  const callSite = value.callSite;
-  const occurrence = value.occurrence;
-  const worktreeOwner = value.worktreeOwner;
-  const parentBreadcrumb = value.parentBreadcrumb;
-  if (!Array.isArray(structuralPath) || !structuralPath.every((part): part is string => typeof part === "string" && Boolean(part.trim())) || typeof callSite !== "string" || !callSite || !positiveInteger(occurrence) || parentBreadcrumb !== undefined && (typeof parentBreadcrumb !== "string" || !parentBreadcrumb.trim()) || worktreeOwner !== undefined && (typeof worktreeOwner !== "string" || !worktreeOwner)) fail("INTERNAL_ERROR", "Invalid workflow agent identity");
-  return { structuralPath: [...structuralPath], callSite, occurrence, ...(typeof parentBreadcrumb === "string" ? { parentBreadcrumb } : {}), ...(typeof worktreeOwner === "string" ? { worktreeOwner } : {}) };
+	if (!object(value)) fail("INTERNAL_ERROR", "Invalid workflow agent identity");
+	const structuralPath = value.structuralPath;
+	const callSite = value.callSite;
+	const occurrence = value.occurrence;
+	const worktreeOwner = value.worktreeOwner;
+	const parentBreadcrumb = value.parentBreadcrumb;
+	if (
+		!Array.isArray(structuralPath) ||
+		!structuralPath.every(
+			(part): part is string =>
+				typeof part === "string" && Boolean(part.trim()),
+		) ||
+		typeof callSite !== "string" ||
+		!callSite ||
+		!positiveInteger(occurrence) ||
+		(parentBreadcrumb !== undefined &&
+			(typeof parentBreadcrumb !== "string" || !parentBreadcrumb.trim())) ||
+		(worktreeOwner !== undefined &&
+			(typeof worktreeOwner !== "string" || !worktreeOwner))
+	)
+		fail("INTERNAL_ERROR", "Invalid workflow agent identity");
+	return {
+		structuralPath: [...structuralPath],
+		callSite,
+		occurrence,
+		...(typeof parentBreadcrumb === "string" ? { parentBreadcrumb } : {}),
+		...(typeof worktreeOwner === "string" ? { worktreeOwner } : {}),
+	};
 }
 function readShellIdentity(value: unknown): ShellIdentity {
-  const identity = readAgentIdentity(value);
-  return { structuralPath: identity.structuralPath, callSite: identity.callSite, occurrence: identity.occurrence, ...(identity.worktreeOwner ? { worktreeOwner: identity.worktreeOwner } : {}) };
+	const identity = readAgentIdentity(value);
+	return {
+		structuralPath: identity.structuralPath,
+		callSite: identity.callSite,
+		occurrence: identity.occurrence,
+		...(identity.worktreeOwner
+			? { worktreeOwner: identity.worktreeOwner }
+			: {}),
+	};
 }
 export function agentIdentityPath(identity: AgentIdentity): string {
-  return operationPath("agent", ...identity.structuralPath, `callsite:${identity.callSite}`, `occurrence:${String(identity.occurrence)}`);
+	return operationPath(
+		"agent",
+		...identity.structuralPath,
+		`callsite:${identity.callSite}`,
+		`occurrence:${String(identity.occurrence)}`,
+	);
 }
 export function shellIdentityPath(identity: ShellIdentity): string {
-  return operationPath("shell", ...(identity.worktreeOwner ? ["worktree", identity.worktreeOwner] : []), ...identity.structuralPath, `callsite:${identity.callSite}`, `occurrence:${String(identity.occurrence)}`);
+	return operationPath(
+		"shell",
+		...(identity.worktreeOwner ? ["worktree", identity.worktreeOwner] : []),
+		...identity.structuralPath,
+		`callsite:${identity.callSite}`,
+		`occurrence:${String(identity.occurrence)}`,
+	);
 }
 export function readShellResult(value: unknown): ShellResult {
-  if (!object(value) || (value.exitCode !== null && !Number.isInteger(value.exitCode)) || typeof value.stdout !== "string" || typeof value.stderr !== "string") fail("SHELL_FAILED", "Shell bridge returned an invalid result");
-  return { exitCode: value.exitCode as number | null, stdout: value.stdout, stderr: value.stderr };
+	if (
+		!object(value) ||
+		(value.exitCode !== null && !Number.isInteger(value.exitCode)) ||
+		typeof value.stdout !== "string" ||
+		typeof value.stderr !== "string"
+	)
+		fail("SHELL_FAILED", "Shell bridge returned an invalid result");
+	return {
+		exitCode: value.exitCode as number | null,
+		stdout: value.stdout,
+		stderr: value.stderr,
+	};
 }
-export function agentWorktree(identity: AgentIdentity): { worktreeOwner?: string } {
-  return identity.worktreeOwner ? { worktreeOwner: identity.worktreeOwner } : {};
+export function agentWorktree(identity: AgentIdentity): {
+	worktreeOwner?: string;
+} {
+	return identity.worktreeOwner
+		? { worktreeOwner: identity.worktreeOwner }
+		: {};
 }
 function shellProcessKill(child: ChildProcess): void {
-  let forceKill: ReturnType<typeof setTimeout> | undefined;
-  const killProcessTree = (signal: "SIGTERM" | "SIGKILL") => {
-    try {
-      if (child.pid && process.platform !== "win32") process.kill(-child.pid, signal);
-      else if (child.pid && process.platform === "win32") {
-        const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
-        killer.unref();
-      } else child.kill(signal);
-    } catch {
-      try { child.kill(signal); } catch { /* The process may already have exited. */ }
-    }
-  };
-  child.once("close", () => { if (forceKill) clearTimeout(forceKill); });
-  killProcessTree("SIGTERM");
-  forceKill = setTimeout(() => { forceKill = undefined; killProcessTree("SIGKILL"); }, 1000);
-  forceKill.unref();
+	let forceKill: ReturnType<typeof setTimeout> | undefined;
+	const killProcessTree = (signal: "SIGTERM" | "SIGKILL") => {
+		try {
+			if (child.pid && process.platform !== "win32")
+				process.kill(-child.pid, signal);
+			else if (child.pid && process.platform === "win32") {
+				const killer = spawn(
+					"taskkill",
+					["/pid", String(child.pid), "/t", "/f"],
+					{ stdio: "ignore", windowsHide: true },
+				);
+				killer.unref();
+			} else child.kill(signal);
+		} catch {
+			try {
+				child.kill(signal);
+			} catch {
+				/* The process may already have exited. */
+			}
+		}
+	};
+	child.once("close", () => {
+		if (forceKill) clearTimeout(forceKill);
+	});
+	killProcessTree("SIGTERM");
+	forceKill = setTimeout(() => {
+		forceKill = undefined;
+		killProcessTree("SIGKILL");
+	}, 1000);
+	forceKill.unref();
 }
-export function executeShellCommand(command: string, options: ShellOptions, signal: AbortSignal, cwd = process.cwd()): Promise<ShellResult> {
-  return new Promise((resolve, reject) => {
-    let child: ChildProcess;
-    try { child = spawn(command, { shell: true, cwd, env: { ...process.env, ...(options.env ?? {}) }, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"] }); }
-    catch (error) { reject(new WorkflowError("SHELL_FAILED", errorText(error))); return; }
-    let settled = false;
-    let timedOut = false;
-    let outputBytes = 0;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const stdoutDecoder = new StringDecoder("utf8");
-    const stderrDecoder = new StringDecoder("utf8");
-    let stdout = "";
-    let stderr = "";
-    const cleanup = () => {
-      if (timeout) clearTimeout(timeout);
-      signal.removeEventListener("abort", onAbort);
-    };
-    const failShell = (error: WorkflowError) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      shellProcessKill(child);
-      reject(error);
-    };
-    const onAbort = () => { failShell(new WorkflowError("CANCELLED", "Workflow cancelled")); };
-    const capture = (target: "stdout" | "stderr", chunk: Buffer) => {
-      if (settled) return;
-      outputBytes += chunk.byteLength;
-      if (outputBytes > RPC_LIMIT_BYTES) { failShell(new WorkflowError("RPC_LIMIT_EXCEEDED", "Shell result exceeds the 10 MB JSON boundary")); return; }
-      if (target === "stdout") stdout += stdoutDecoder.write(chunk); else stderr += stderrDecoder.write(chunk);
-    };
-    child.stdout?.on("data", (chunk: Buffer) => { capture("stdout", chunk); });
-    child.stderr?.on("data", (chunk: Buffer) => { capture("stderr", chunk); });
-    child.once("error", (error) => { failShell(new WorkflowError("SHELL_FAILED", errorText(error))); });
-    child.once("close", (exitCode) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      stdout += stdoutDecoder.end();
-      stderr += stderrDecoder.end();
-      if (signal.aborted) { reject(new WorkflowError("CANCELLED", "Workflow cancelled")); return; }
-      if (timedOut) { reject(new WorkflowError("SHELL_FAILED", `Shell command timed out after ${String(options.timeoutMs)}ms`)); return; }
-      const result = { exitCode: exitCode === null ? null : exitCode, stdout, stderr };
-      try { encodedRpcResult(Number.MAX_SAFE_INTEGER, result); } catch (error) { reject(error instanceof WorkflowError ? error : new WorkflowError("RPC_LIMIT_EXCEEDED", errorText(error))); return; }
-      resolve(result);
-    });
-    if (signal.aborted) { onAbort(); return; }
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (options.timeoutMs !== undefined) timeout = setTimeout(() => { timedOut = true; shellProcessKill(child); }, options.timeoutMs);
-  });
+export function executeShellCommand(
+	command: string,
+	options: ShellOptions,
+	signal: AbortSignal,
+	cwd = process.cwd(),
+): Promise<ShellResult> {
+	return new Promise((resolve, reject) => {
+		let child: ChildProcess;
+		try {
+			child = spawn(command, {
+				shell: true,
+				cwd,
+				env: { ...process.env, ...(options.env ?? {}) },
+				detached: process.platform !== "win32",
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+		} catch (error) {
+			reject(new WorkflowError("SHELL_FAILED", errorText(error)));
+			return;
+		}
+		let settled = false;
+		let timedOut = false;
+		let outputBytes = 0;
+		let timeout: ReturnType<typeof setTimeout> | undefined;
+		const stdoutDecoder = new StringDecoder("utf8");
+		const stderrDecoder = new StringDecoder("utf8");
+		let stdout = "";
+		let stderr = "";
+		const cleanup = () => {
+			if (timeout) clearTimeout(timeout);
+			signal.removeEventListener("abort", onAbort);
+		};
+		const failShell = (error: WorkflowError) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			shellProcessKill(child);
+			reject(error);
+		};
+		const onAbort = () => {
+			failShell(new WorkflowError("CANCELLED", "Workflow cancelled"));
+		};
+		const capture = (target: "stdout" | "stderr", chunk: Buffer) => {
+			if (settled) return;
+			outputBytes += chunk.byteLength;
+			if (outputBytes > RPC_LIMIT_BYTES) {
+				failShell(
+					new WorkflowError(
+						"RPC_LIMIT_EXCEEDED",
+						"Shell result exceeds the 10 MB JSON boundary",
+					),
+				);
+				return;
+			}
+			if (target === "stdout") stdout += stdoutDecoder.write(chunk);
+			else stderr += stderrDecoder.write(chunk);
+		};
+		child.stdout?.on("data", (chunk: Buffer) => {
+			capture("stdout", chunk);
+		});
+		child.stderr?.on("data", (chunk: Buffer) => {
+			capture("stderr", chunk);
+		});
+		child.once("error", (error) => {
+			failShell(new WorkflowError("SHELL_FAILED", errorText(error)));
+		});
+		child.once("close", (exitCode) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			stdout += stdoutDecoder.end();
+			stderr += stderrDecoder.end();
+			if (signal.aborted) {
+				reject(new WorkflowError("CANCELLED", "Workflow cancelled"));
+				return;
+			}
+			if (timedOut) {
+				reject(
+					new WorkflowError(
+						"SHELL_FAILED",
+						`Shell command timed out after ${String(options.timeoutMs)}ms`,
+					),
+				);
+				return;
+			}
+			const result = {
+				exitCode: exitCode === null ? null : exitCode,
+				stdout,
+				stderr,
+			};
+			try {
+				encodedRpcResult(Number.MAX_SAFE_INTEGER, result);
+			} catch (error) {
+				reject(
+					error instanceof WorkflowError
+						? error
+						: new WorkflowError("RPC_LIMIT_EXCEEDED", errorText(error)),
+				);
+				return;
+			}
+			resolve(result);
+		});
+		if (signal.aborted) {
+			onAbort();
+			return;
+		}
+		signal.addEventListener("abort", onAbort, { once: true });
+		if (options.timeoutMs !== undefined)
+			timeout = setTimeout(() => {
+				timedOut = true;
+				shellProcessKill(child);
+			}, options.timeoutMs);
+	});
 }
 function workflowErrorFromWorker(error: WorkerErrorShape): WorkflowError {
-  const code = typeof error.code === "string" ? error.code as WorkflowErrorCode : "INTERNAL_ERROR";
-  const typed = markWorkflowAuthored(new WorkflowError(code, error.message), Boolean(error.authored) || error.code === undefined);
-  return error.failedAt === undefined ? typed : Object.assign(typed, { failedAt: error.failedAt });
+	const code =
+		typeof error.code === "string"
+			? (error.code as WorkflowErrorCode)
+			: "INTERNAL_ERROR";
+	const typed = markWorkflowAuthored(
+		new WorkflowError(code, error.message),
+		Boolean(error.authored) || error.code === undefined,
+	);
+	return error.failedAt === undefined
+		? typed
+		: Object.assign(typed, { failedAt: error.failedAt });
 }
-export function runWorkflow(script: string, args: JsonValue = null, bridge: WorkflowBridge = {}, signal?: AbortSignal): WorkflowExecution {
-  encoded(args);
-  const config = JSON.stringify({ script: instrumentWorkflow(script), args: structuredClone(args), functions: bridge.functions ?? {} });
-  const childDir = realpathSync(mkdtempSync(join(tmpdir(), "pi-wf-")));
-  const childFile = join(childDir, "child.cjs");
-  writeFileSync(childFile, childSource);
-  const child: ChildProcess = fork(childFile, [String(RPC_LIMIT_BYTES), config], {
-    execArgv: (() => {
-      const filtered: string[] = [];
-      const skip = new Set(["--input-type", "-e", "--eval", "-p", "--print"]);
-      let skipNext = false;
-      for (const arg of process.execArgv) {
-        if (skipNext) { skipNext = false; continue; }
-        if (skip.has(arg) || skip.has(arg.split("=")[0] ?? "")) { if (!arg.includes("=")) skipNext = true; continue; }
-        filtered.push(arg);
-      }
-      return [...filtered, "--max-old-space-size=128", "--permission", `--allow-fs-read=${childDir}`];
-    })(),
-    stdio: ["ignore", "ignore", "ignore", "ipc"],
-    serialization: "advanced",
-  });
-  const controller = new AbortController();
-  let settled = false;
-  let rejectResult: (error: WorkflowError) => void = () => undefined;
-  let lastHeartbeatAt = performance.now();
-  let lastWatchdogCheckAt = lastHeartbeatAt;
-  const watchdog = setInterval(() => {
-    const now = performance.now();
-    // A check delayed enough to bridge the normal heartbeat margin makes elapsed time unreliable.
-    const watchdogCheckWasDelayed = now - lastWatchdogCheckAt >= HEARTBEAT_TIMEOUT_MS - HEARTBEAT_INTERVAL_MS;
-    lastWatchdogCheckAt = now;
-    if (watchdogCheckWasDelayed) { lastHeartbeatAt = now; return; }
-    if (now - lastHeartbeatAt >= HEARTBEAT_TIMEOUT_MS) stop("WORKER_UNRESPONSIVE", "Workflow worker missed its five-second heartbeat");
-  }, HEARTBEAT_INTERVAL_MS);
-  const result = new Promise<JsonValue>((resolve, reject) => {
-    rejectResult = reject;
-    child.on("message", (raw: unknown) => {
-      try {
-        if (typeof raw !== "string" || Buffer.byteLength(raw) > RPC_LIMIT_BYTES) fail("RPC_LIMIT_EXCEEDED", "RPC value exceeds the 10 MB JSON boundary");
-        const message = JSON.parse(raw) as { type?: string; id?: number; method?: string; args?: JsonValue[]; ok?: boolean; value?: JsonValue; error?: WorkerErrorShape };
-        if (!jsonValue(message)) fail("RPC_LIMIT_EXCEEDED", "Worker RPC must contain JSON-compatible values");
-        if (message.type === "heartbeat") { lastHeartbeatAt = performance.now(); return; }
-        if (message.type === "result") { encoded(message.value); finish(); resolve(message.value ?? null); return; }
-        if (message.type === "error") { finish(); reject(workflowErrorFromWorker(message.error ?? { code: "INTERNAL_ERROR", message: "Worker failed" })); return; }
-        if (message.type === "rpc" && message.id !== undefined) void handleRpc(message.id, message.method ?? "", message.args ?? []);
-      } catch (error) { stop(error instanceof WorkflowError ? error.code : "INTERNAL_ERROR", error instanceof Error ? error.message : String(error)); }
-    });
-    child.on("error", (error: Error) => { stop("INTERNAL_ERROR", error.message); });
-    child.on("exit", (code) => { if (!settled && code !== 0) stop("INTERNAL_ERROR", `Workflow child exited with code ${String(code)}`); });
-  });
-  function killChild() {
-    if (!child.killed) {
-      child.kill("SIGTERM");
-      setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 1000).unref();
-    }
-  }
-  function finish() { settled = true; clearInterval(watchdog); signal?.removeEventListener("abort", cancel); killChild(); rmSync(childDir, { recursive: true, force: true }); }
-  function stop(code: WorkflowErrorCode, message: string) { if (settled) return; controller.abort(); finish(); rejectResult(new WorkflowError(code, message)); }
-  function branded(result: Record<string, JsonValue>): JsonValue { return { ...result, [WORK_RESULT_BRAND]: true }; }
-  async function handleRpc(id: number, method: string, values: JsonValue[]) {
-    try {
-      encoded(values);
-      let value: JsonValue = null;
-      if (method === "agent") {
-        if (!bridge.agent) fail("AGENT_FAILED", "No agent bridge is available");
-        if (typeof values[0] !== "string") fail("INTERNAL_ERROR", "agent prompt must be a string");
-        const opts = validateAgentOptions(values[1]);
-        const identity = readAgentIdentity(values[2]);
-        const path = agentIdentityPath(identity);
-        const label = typeof opts.label === "string" ? opts.label : roleNameOf(opts.role) ?? "agent";
-        try {
-          const result = await bridge.agent(values[0], opts, controller.signal, identity);
-          value = branded({ name: label, ok: true, value: result ?? null });
-        } catch (error) {
-          const typed = asWorkflowError(error);
-          if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
-          value = branded({ name: label, ok: false, failedAt: path, error: { code: typed.code, message: typed.message, ...(isWorkflowAuthored(typed) ? { authored: true } : {}) } });
-        }
-      } else if (method === "shell") {
-        if (!bridge.shell) fail("SHELL_FAILED", "No shell bridge is available");
-        const command = validateShellCommand(values[0]);
-        const options = validateShellOptions(values[1]);
-        const identity = readShellIdentity(values[2]);
-        value = readShellResult(await bridge.shell(command, options, controller.signal, identity)) as unknown as JsonValue;
-      } else if (method === "checkpoint") {
-        if (!bridge.checkpoint || !object(values[0])) fail("INTERNAL_ERROR", "checkpoint requires an available bridge and object input");
-        const name = typeof values[0].name === "string" ? values[0].name : "checkpoint";
-        try {
-          const result = await bridge.checkpoint(values[0], controller.signal);
-          if (typeof result !== "boolean") fail("INTERNAL_ERROR", "checkpoint must return a boolean");
-          value = branded({ name, ok: true, value: result ? "approved" : "rejected" });
-        } catch (error) {
-          const typed = asWorkflowError(error);
-          if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
-          value = branded({ name, ok: false, failedAt: name, error: { code: typed.code, message: typed.message, ...(isWorkflowAuthored(typed) ? { authored: true } : {}) } });
-        }
-      } else if (method === "function") {
-        const worktreeOwner = values[3] === undefined || values[3] === null ? undefined : typeof values[3] === "string" && values[3] ? values[3] : fail("INTERNAL_ERROR", "function worktree scope is invalid");
-        const structuralPath = values[4] === undefined ? [] : values[4];
-        if (!Array.isArray(structuralPath) || !structuralPath.every((part): part is string => typeof part === "string" && Boolean(part.trim()))) fail("INTERNAL_ERROR", "function structural scope is invalid");
-        if (!bridge.function || typeof values[0] !== "string" || !object(values[1]) || typeof values[2] !== "string") fail("INTERNAL_ERROR", "function requires an available bridge, name, object input, and path");
-        const name = values[0];
-        try {
-          const result = await bridge.function(values[0], values[1], values[2], controller.signal, worktreeOwner, structuralPath);
-          value = branded({ name, ok: true, value: result ?? null });
-        } catch (error) {
-          const typed = asWorkflowError(error);
-          if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
-          value = branded({ name, ok: false, failedAt: name, error: { code: typed.code, message: typed.message, ...(isWorkflowAuthored(typed) ? { authored: true } : {}) } });
-        }
-      } else if (method === "worktree") {
-        if (!bridge.worktree || typeof values[0] !== "string" || !values[0]) fail("INTERNAL_ERROR", "worktree requires an active host bridge and scope");
-        value = await bridge.worktree(values[0], controller.signal);
-      } else if (method === "phase") {
-        if (typeof values[0] !== "string") fail("INTERNAL_ERROR", "phase name must be a string");
-        await bridge.phase?.(values[0]);
-      } else if (method === "log") {
-        if (typeof values[0] !== "string") fail("INTERNAL_ERROR", "log message must be a string");
-        await bridge.log?.(values[0]);
-      }
-      else fail("INTERNAL_ERROR", `Unknown worker RPC method: ${method}`);
-      encoded(value);
-      child.send(encodedRpcResult(id, value));
-    } catch (error) {
-      const typed = asWorkflowError(error);
-      child.send(encoded({ type: "rpcResult", id, ok: false, error: { code: typed.code, message: typed.message, ...(isWorkflowAuthored(typed) ? { authored: true } : {}) } }));
-    }
-  }
-  function cancel() {
-    if (settled) return;
-    controller.abort();
-    child.send(encoded({ type: "cancel" }));
-    stop("CANCELLED", "Workflow cancelled");
-  }
-  if (signal?.aborted) cancel(); else signal?.addEventListener("abort", cancel, { once: true });
-  return { result, cancel };
+/** [frida-wf-diag] Contexto de boot del child capturado en el instante del crash
+ *  (no se puede recoger fiablemente después: tmpdir()/execArgv pertenecen al
+ *  proceso host y reflejan el entorno exacto del fallo). Se incrusta en el error
+ *  para que viaje hasta el summary.json del run y pueda diagnosticarse de forma
+ *  autónoma. */
+function captureChildBootContext(opts: {
+	childDir: string;
+	execArgv: readonly string[];
+	exitCode: number | null;
+	stderr: string;
+}): string {
+	const lines: string[] = [];
+	lines.push(
+		`node ${process.versions.node} (${process.platform}/${process.arch})`,
+	);
+	try {
+		lines.push(`tmpdir() = ${tmpdir()}`);
+	} catch (e) {
+		lines.push(`tmpdir() = ERR ${(e as Error).message}`);
+	}
+	try {
+		lines.push(`realpath(tmpdir()) = ${realpathSync(tmpdir())}`);
+	} catch (e) {
+		lines.push(`realpath(tmpdir()) = ERR ${(e as Error).message}`);
+	}
+	try {
+		const syms: string[] = [];
+		let d = realpathSync(opts.childDir);
+		let guard = 32;
+		while (d && d !== "/" && guard-- > 0) {
+			try {
+				if (lstatSync(d).isSymbolicLink())
+					syms.push(`${d} -> ${readlinkSync(d)}`);
+			} catch {
+				/* componente inaccesible */
+			}
+			d = dirname(d);
+		}
+		lines.push(
+			`symlinks en ruta a childDir = ${syms.length ? syms.join(", ") : "(ninguno)"}`,
+		);
+	} catch (e) {
+		lines.push(`symlinks en ruta a childDir = ERR ${(e as Error).message}`);
+	}
+	lines.push(`child execArgv = ${JSON.stringify(opts.execArgv)}`);
+	lines.push(`child exit code = ${String(opts.exitCode)}`);
+	const tail = opts.stderr.trim();
+	if (tail) lines.push(`--- child stderr (últimos 8 KB) ---\n${tail}`);
+	return lines.join("\n");
 }
-function attemptSummary(attempt: AgentAttempt, accounting = attempt.accounting): AgentAttemptSummary {
-  return { attempt: attempt.attempt, transport: attempt.transport, ...(attempt.session ? { session: attempt.session } : {}), ...(attempt.error ? { error: attempt.error } : {}), accounting, setup: attempt.setup };
+export function runWorkflow(
+	script: string,
+	args: JsonValue = null,
+	bridge: WorkflowBridge = {},
+	signal?: AbortSignal,
+): WorkflowExecution {
+	encoded(args);
+	const config = JSON.stringify({
+		script: instrumentWorkflow(script),
+		args: structuredClone(args),
+		functions: bridge.functions ?? {},
+	});
+	const childDir = realpathSync(mkdtempSync(join(tmpdir(), "pi-wf-")));
+	const childFile = join(childDir, "child.cjs");
+	writeFileSync(childFile, childSource);
+	const childExecArgv = (() => {
+		const filtered: string[] = [];
+		const skip = new Set(["--input-type", "-e", "--eval", "-p", "--print"]);
+		let skipNext = false;
+		for (const arg of process.execArgv) {
+			if (skipNext) {
+				skipNext = false;
+				continue;
+			}
+			if (skip.has(arg) || skip.has(arg.split("=")[0] ?? "")) {
+				if (!arg.includes("=")) skipNext = true;
+				continue;
+			}
+			filtered.push(arg);
+		}
+		return [
+			...filtered,
+			"--max-old-space-size=128",
+			"--permission",
+			`--allow-fs-read=${childDir}`,
+		];
+	})();
+	const child: ChildProcess = fork(
+		childFile,
+		[String(RPC_LIMIT_BYTES), config],
+		{
+			execArgv: childExecArgv,
+			stdio: ["ignore", "ignore", "pipe", "ipc"],
+			serialization: "advanced",
+		},
+	);
+	// [frida-wf-diag] Captura del stderr del child para diagnóstico de boot/crash.
+	// Fallos fatales de node (p.ej. ERR_ACCESS_DENIED del Permission Model) se
+	// imprimen a stderr ANTES de que el child cargue su script; al capturarlo aquí
+	// se hace visible en el error del run en lugar de perderse (antes stdio:ignore).
+	let childStderr = "";
+	if (child.stderr) {
+		child.stderr.setEncoding("utf8");
+		child.stderr.on("data", (chunk: string) => {
+			childStderr += chunk;
+			if (childStderr.length > 8192) childStderr = childStderr.slice(-8192);
+		});
+	}
+	const controller = new AbortController();
+	let settled = false;
+	let rejectResult: (error: WorkflowError) => void = () => undefined;
+	let lastHeartbeatAt = performance.now();
+	let lastWatchdogCheckAt = lastHeartbeatAt;
+	const watchdog = setInterval(() => {
+		const now = performance.now();
+		// A check delayed enough to bridge the normal heartbeat margin makes elapsed time unreliable.
+		const watchdogCheckWasDelayed =
+			now - lastWatchdogCheckAt >= HEARTBEAT_TIMEOUT_MS - HEARTBEAT_INTERVAL_MS;
+		lastWatchdogCheckAt = now;
+		if (watchdogCheckWasDelayed) {
+			lastHeartbeatAt = now;
+			return;
+		}
+		if (now - lastHeartbeatAt >= HEARTBEAT_TIMEOUT_MS)
+			stop(
+				"WORKER_UNRESPONSIVE",
+				"Workflow worker missed its five-second heartbeat",
+			);
+	}, HEARTBEAT_INTERVAL_MS);
+	const result = new Promise<JsonValue>((resolve, reject) => {
+		rejectResult = reject;
+		child.on("message", (raw: unknown) => {
+			try {
+				if (typeof raw !== "string" || Buffer.byteLength(raw) > RPC_LIMIT_BYTES)
+					fail(
+						"RPC_LIMIT_EXCEEDED",
+						"RPC value exceeds the 10 MB JSON boundary",
+					);
+				const message = JSON.parse(raw) as {
+					type?: string;
+					id?: number;
+					method?: string;
+					args?: JsonValue[];
+					ok?: boolean;
+					value?: JsonValue;
+					error?: WorkerErrorShape;
+				};
+				if (!jsonValue(message))
+					fail(
+						"RPC_LIMIT_EXCEEDED",
+						"Worker RPC must contain JSON-compatible values",
+					);
+				if (message.type === "heartbeat") {
+					lastHeartbeatAt = performance.now();
+					return;
+				}
+				if (message.type === "result") {
+					encoded(message.value);
+					finish();
+					resolve(message.value ?? null);
+					return;
+				}
+				if (message.type === "error") {
+					finish();
+					reject(
+						workflowErrorFromWorker(
+							message.error ?? {
+								code: "INTERNAL_ERROR",
+								message: "Worker failed",
+							},
+						),
+					);
+					return;
+				}
+				if (message.type === "rpc" && message.id !== undefined)
+					void handleRpc(message.id, message.method ?? "", message.args ?? []);
+			} catch (error) {
+				stop(
+					error instanceof WorkflowError ? error.code : "INTERNAL_ERROR",
+					error instanceof Error ? error.message : String(error),
+				);
+			}
+		});
+		child.on("error", (error: Error) => {
+			stop("INTERNAL_ERROR", error.message);
+		});
+		child.on("exit", (code) => {
+			if (!settled && code !== 0)
+				stop(
+					"INTERNAL_ERROR",
+					`Workflow child exited with code ${String(code)}\n--- boot diagnostic ---\n${captureChildBootContext({ childDir, execArgv: childExecArgv, exitCode: code, stderr: childStderr })}`,
+				);
+		});
+	});
+	function killChild() {
+		if (!child.killed) {
+			child.kill("SIGTERM");
+			setTimeout(() => {
+				if (!child.killed) child.kill("SIGKILL");
+			}, 1000).unref();
+		}
+	}
+	function finish() {
+		settled = true;
+		clearInterval(watchdog);
+		signal?.removeEventListener("abort", cancel);
+		killChild();
+		rmSync(childDir, { recursive: true, force: true });
+	}
+	function stop(code: WorkflowErrorCode, message: string) {
+		if (settled) return;
+		controller.abort();
+		finish();
+		rejectResult(new WorkflowError(code, message));
+	}
+	function branded(result: Record<string, JsonValue>): JsonValue {
+		return { ...result, [WORK_RESULT_BRAND]: true };
+	}
+	async function handleRpc(id: number, method: string, values: JsonValue[]) {
+		try {
+			encoded(values);
+			let value: JsonValue = null;
+			if (method === "agent") {
+				if (!bridge.agent) fail("AGENT_FAILED", "No agent bridge is available");
+				if (typeof values[0] !== "string")
+					fail("INTERNAL_ERROR", "agent prompt must be a string");
+				const opts = validateAgentOptions(values[1]);
+				const identity = readAgentIdentity(values[2]);
+				const path = agentIdentityPath(identity);
+				const label =
+					typeof opts.label === "string"
+						? opts.label
+						: (roleNameOf(opts.role) ?? "agent");
+				try {
+					const result = await bridge.agent(
+						values[0],
+						opts,
+						controller.signal,
+						identity,
+					);
+					value = branded({ name: label, ok: true, value: result ?? null });
+				} catch (error) {
+					const typed = asWorkflowError(error);
+					if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
+					value = branded({
+						name: label,
+						ok: false,
+						failedAt: path,
+						error: {
+							code: typed.code,
+							message: typed.message,
+							...(isWorkflowAuthored(typed) ? { authored: true } : {}),
+						},
+					});
+				}
+			} else if (method === "shell") {
+				if (!bridge.shell) fail("SHELL_FAILED", "No shell bridge is available");
+				const command = validateShellCommand(values[0]);
+				const options = validateShellOptions(values[1]);
+				const identity = readShellIdentity(values[2]);
+				value = readShellResult(
+					await bridge.shell(command, options, controller.signal, identity),
+				) as unknown as JsonValue;
+			} else if (method === "checkpoint") {
+				if (!bridge.checkpoint || !object(values[0]))
+					fail(
+						"INTERNAL_ERROR",
+						"checkpoint requires an available bridge and object input",
+					);
+				const name =
+					typeof values[0].name === "string" ? values[0].name : "checkpoint";
+				try {
+					const result = await bridge.checkpoint(values[0], controller.signal);
+					if (typeof result !== "boolean")
+						fail("INTERNAL_ERROR", "checkpoint must return a boolean");
+					value = branded({
+						name,
+						ok: true,
+						value: result ? "approved" : "rejected",
+					});
+				} catch (error) {
+					const typed = asWorkflowError(error);
+					if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
+					value = branded({
+						name,
+						ok: false,
+						failedAt: name,
+						error: {
+							code: typed.code,
+							message: typed.message,
+							...(isWorkflowAuthored(typed) ? { authored: true } : {}),
+						},
+					});
+				}
+			} else if (method === "function") {
+				const worktreeOwner =
+					values[3] === undefined || values[3] === null
+						? undefined
+						: typeof values[3] === "string" && values[3]
+							? values[3]
+							: fail("INTERNAL_ERROR", "function worktree scope is invalid");
+				const structuralPath = values[4] === undefined ? [] : values[4];
+				if (
+					!Array.isArray(structuralPath) ||
+					!structuralPath.every(
+						(part): part is string =>
+							typeof part === "string" && Boolean(part.trim()),
+					)
+				)
+					fail("INTERNAL_ERROR", "function structural scope is invalid");
+				if (
+					!bridge.function ||
+					typeof values[0] !== "string" ||
+					!object(values[1]) ||
+					typeof values[2] !== "string"
+				)
+					fail(
+						"INTERNAL_ERROR",
+						"function requires an available bridge, name, object input, and path",
+					);
+				const name = values[0];
+				try {
+					const result = await bridge.function(
+						values[0],
+						values[1],
+						values[2],
+						controller.signal,
+						worktreeOwner,
+						structuralPath,
+					);
+					value = branded({ name, ok: true, value: result ?? null });
+				} catch (error) {
+					const typed = asWorkflowError(error);
+					if (!OUTCOME_ERRORS.has(typed.code)) throw typed;
+					value = branded({
+						name,
+						ok: false,
+						failedAt: name,
+						error: {
+							code: typed.code,
+							message: typed.message,
+							...(isWorkflowAuthored(typed) ? { authored: true } : {}),
+						},
+					});
+				}
+			} else if (method === "worktree") {
+				if (!bridge.worktree || typeof values[0] !== "string" || !values[0])
+					fail(
+						"INTERNAL_ERROR",
+						"worktree requires an active host bridge and scope",
+					);
+				value = await bridge.worktree(values[0], controller.signal);
+			} else if (method === "phase") {
+				if (typeof values[0] !== "string")
+					fail("INTERNAL_ERROR", "phase name must be a string");
+				await bridge.phase?.(values[0]);
+			} else if (method === "log") {
+				if (typeof values[0] !== "string")
+					fail("INTERNAL_ERROR", "log message must be a string");
+				await bridge.log?.(values[0]);
+			} else fail("INTERNAL_ERROR", `Unknown worker RPC method: ${method}`);
+			encoded(value);
+			child.send(encodedRpcResult(id, value));
+		} catch (error) {
+			const typed = asWorkflowError(error);
+			child.send(
+				encoded({
+					type: "rpcResult",
+					id,
+					ok: false,
+					error: {
+						code: typed.code,
+						message: typed.message,
+						...(isWorkflowAuthored(typed) ? { authored: true } : {}),
+					},
+				}),
+			);
+		}
+	}
+	function cancel() {
+		if (settled) return;
+		controller.abort();
+		child.send(encoded({ type: "cancel" }));
+		stop("CANCELLED", "Workflow cancelled");
+	}
+	if (signal?.aborted) cancel();
+	else signal?.addEventListener("abort", cancel, { once: true });
+	return { result, cancel };
 }
-export async function persistActiveAgentAttempt(store: RunStore, id: string, active: AgentAttempt): Promise<void> {
-  await store.updateState((run) => {
-    const agent = run.agents.find((candidate) => candidate.id === id);
-    if (!agent) throw new WorkflowError("INTERNAL_ERROR", `Missing production ownership record: ${id}`);
-    const accounting = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
-    const detail = attemptSummary(active, accounting);
-    const details = [...(agent.attemptDetails ?? []).filter((candidate) => candidate.attempt !== active.attempt), detail];
-    const session = active.session;
-    const agentSessions = session && !run.agentSessions.some(({ transport, sessionId }) => transport === session.transport && sessionId === session.sessionId) ? [...run.agentSessions, session] : run.agentSessions;
-    return { ...run, agents: run.agents.map((candidate) => candidate.id === id ? { ...candidate, attempts: Math.max(candidate.attempts, active.attempt), attemptDetails: details } : candidate), agentSessions };
-  });
+function attemptSummary(
+	attempt: AgentAttempt,
+	accounting = attempt.accounting,
+): AgentAttemptSummary {
+	return {
+		attempt: attempt.attempt,
+		transport: attempt.transport,
+		...(attempt.session ? { session: attempt.session } : {}),
+		...(attempt.error ? { error: attempt.error } : {}),
+		accounting,
+		setup: attempt.setup,
+	};
+}
+export async function persistActiveAgentAttempt(
+	store: RunStore,
+	id: string,
+	active: AgentAttempt,
+): Promise<void> {
+	await store.updateState((run) => {
+		const agent = run.agents.find((candidate) => candidate.id === id);
+		if (!agent)
+			throw new WorkflowError(
+				"INTERNAL_ERROR",
+				`Missing production ownership record: ${id}`,
+			);
+		const accounting = {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			cost: 0,
+		};
+		const detail = attemptSummary(active, accounting);
+		const details = [
+			...(agent.attemptDetails ?? []).filter(
+				(candidate) => candidate.attempt !== active.attempt,
+			),
+			detail,
+		];
+		const session = active.session;
+		const agentSessions =
+			session &&
+			!run.agentSessions.some(
+				({ transport, sessionId }) =>
+					transport === session.transport && sessionId === session.sessionId,
+			)
+				? [...run.agentSessions, session]
+				: run.agentSessions;
+		return {
+			...run,
+			agents: run.agents.map((candidate) =>
+				candidate.id === id
+					? {
+							...candidate,
+							attempts: Math.max(candidate.attempts, active.attempt),
+							attemptDetails: details,
+						}
+					: candidate,
+			),
+			agentSessions,
+		};
+	});
 }
 
-export async function persistAgentAttempts(store: RunStore, id: string, attempts: readonly AgentAttempt[]): Promise<void> {
-  await store.updateState((run) => {
-    const agent = run.agents.find((candidate) => candidate.id === id);
-    if (!agent) throw new WorkflowError("INTERNAL_ERROR", `Missing production ownership record: ${id}`);
-    const total = attempts.reduce((sum, attempt) => ({ input: sum.input + attempt.accounting.input, output: sum.output + attempt.accounting.output, cacheRead: sum.cacheRead + attempt.accounting.cacheRead, cacheWrite: sum.cacheWrite + attempt.accounting.cacheWrite, cost: sum.cost + attempt.accounting.cost }), { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 });
-    const attemptDetails = attempts.map((attempt) => attemptSummary(attempt));
-    const sessions = attempts.map((attempt) => attempt.session).filter((session): session is WorkflowAgentSessionReference => session !== undefined);
-    const sessionKeys = new Set(sessions.map(({ transport, sessionId }) => `${transport}:${sessionId}`));
-    return { ...run, agents: run.agents.map((candidate) => candidate.id === id ? { ...candidate, attempts: attempts.length, attemptDetails, accounting: total } : candidate), agentSessions: [...run.agentSessions.filter(({ transport, sessionId }) => !sessionKeys.has(`${transport}:${sessionId}`)), ...sessions] };
-  });
+export async function persistAgentAttempts(
+	store: RunStore,
+	id: string,
+	attempts: readonly AgentAttempt[],
+): Promise<void> {
+	await store.updateState((run) => {
+		const agent = run.agents.find((candidate) => candidate.id === id);
+		if (!agent)
+			throw new WorkflowError(
+				"INTERNAL_ERROR",
+				`Missing production ownership record: ${id}`,
+			);
+		const total = attempts.reduce(
+			(sum, attempt) => ({
+				input: sum.input + attempt.accounting.input,
+				output: sum.output + attempt.accounting.output,
+				cacheRead: sum.cacheRead + attempt.accounting.cacheRead,
+				cacheWrite: sum.cacheWrite + attempt.accounting.cacheWrite,
+				cost: sum.cost + attempt.accounting.cost,
+			}),
+			{ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 },
+		);
+		const attemptDetails = attempts.map((attempt) => attemptSummary(attempt));
+		const sessions = attempts
+			.map((attempt) => attempt.session)
+			.filter(
+				(session): session is WorkflowAgentSessionReference =>
+					session !== undefined,
+			);
+		const sessionKeys = new Set(
+			sessions.map(({ transport, sessionId }) => `${transport}:${sessionId}`),
+		);
+		return {
+			...run,
+			agents: run.agents.map((candidate) =>
+				candidate.id === id
+					? {
+							...candidate,
+							attempts: attempts.length,
+							attemptDetails,
+							accounting: total,
+						}
+					: candidate,
+			),
+			agentSessions: [
+				...run.agentSessions.filter(
+					({ transport, sessionId }) =>
+						!sessionKeys.has(`${transport}:${sessionId}`),
+				),
+				...sessions,
+			],
+		};
+	});
 }
 
-export type { AgentIdentity, ShellIdentity, WorkflowBridge, WorkflowExecution } from "./types";
+export type {
+	AgentIdentity,
+	ShellIdentity,
+	WorkflowBridge,
+	WorkflowExecution,
+} from "./types";
