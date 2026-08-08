@@ -1,6 +1,13 @@
 import path from "node:path";
 import * as fs from "node:fs/promises";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import {
+	appendFileSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -490,11 +497,23 @@ export async function activate(
 				abortLogReady = true;
 			}
 			if (abortLogBytes < 0) {
-				try { abortLogBytes = statSync(abortLogPath).size; } catch { abortLogBytes = 0; }
+				try {
+					abortLogBytes = statSync(abortLogPath).size;
+				} catch {
+					abortLogBytes = 0;
+				}
 			}
 			if (abortLogBytes >= abortLogMax) {
-				try { copyFileSync(abortLogPath, `${abortLogPath}.1`); } catch { /* noop */ }
-				try { writeFileSync(abortLogPath, ""); } catch { /* noop */ }
+				try {
+					copyFileSync(abortLogPath, `${abortLogPath}.1`);
+				} catch {
+					/* noop */
+				}
+				try {
+					writeFileSync(abortLogPath, "");
+				} catch {
+					/* noop */
+				}
 				abortLogBytes = 0;
 			}
 			appendFileSync(abortLogPath, line + "\n");
