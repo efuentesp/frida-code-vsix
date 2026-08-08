@@ -418,14 +418,198 @@ function renderResult(entry: ToolEntry) {
  *  - corriendo sin parcial → placeholder "Ejecutando…" (sólo visible tras el
  *    umbral, porque CollapsibleCard abre entonces).
  *  - terminado con resultado/diff → render rico del resultado. */
-function renderBody(entry: ToolEntry, running: boolean): ReactNode {
-	if (running) {
-		if (entry.partialDetails) return renderSubagentLive(entry.partialDetails);
-		if (entry.partial && entry.partial.trim())
-			return <pre className="tool-result partial">{entry.partial}</pre>;
-		return <div className="tool-running-placeholder">Ejecutando…</div>;
+// ---- Secciones Entrada / Salida ------------------------------------------
+// Cada tarjeta se divide en dos secciones claras: qué se solicitó (args) y
+// qué se devolvió (result/diff). Reutilizamos renderResult para la Salida.
+
+function ToolSection({
+	label,
+	children,
+}: {
+	label: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="tc-section">
+			<div className="tc-section-label">{label}</div>
+			<div className="tc-section-body">{children}</div>
+		</div>
+	);
+}
+
+/** Filas [etiqueta, valor] para la Entrada de tools con args simples. */
+function InputRows({ rows }: { rows: [string, string][] }) {
+	if (!rows.length) return null;
+	return (
+		<dl className="tc-rows">
+			{rows.map(([k, v], i) => (
+				<div key={i} className="tc-row">
+					<dt>{k}</dt>
+					<dd>{v}</dd>
+				</div>
+			))}
+		</dl>
+	);
+}
+
+/** Filas significativas por tool (clave → valor legible). null se descarta. */
+function inputRowsFor(tool: string, a: ToolArgs): [string, string][] {
+	const rows: ([string, string] | null)[] = [];
+	const push = (k: string, v: unknown) =>
+		rows.push(
+			v === undefined || v === null || v === "" ? null : [k, String(v)],
+		);
+	switch (tool) {
+		case "read":
+			push("ruta", a.path);
+			push("offset", a.offset);
+			push("limit", a.limit);
+			break;
+		case "ls":
+			push("ruta", a.path);
+			break;
+		case "edit":
+			push("ruta", a.path);
+			push("replace_all", a.replace_all === true ? "sí" : undefined);
+			break;
+		case "write":
+			push("ruta", a.path);
+			break;
+		case "grep":
+			push("patrón", a.pattern ? `"${a.pattern}"` : undefined);
+			push("ruta", a.path);
+			push("glob", a.glob);
+			push("output_mode", a.output_mode);
+			break;
+		case "find":
+			push("patrón", a.pattern);
+			push("ruta", a.path);
+			break;
+		case "get_subagent_result":
+			push("agent_id", a.agent_id);
+			push("verbose", a.verbose === true ? "sí" : undefined);
+			break;
+		case "web_fetch_md":
+			push("url", a.url);
+			break;
+		case "web_docs_search":
+			push("library", a.library_name);
+			push("query", a.query);
+			break;
+		case "web_docs_fetch":
+			push("library_id", a.library_id);
+			push("query", a.query);
+			break;
 	}
-	return renderResult(entry);
+	return rows.filter((r): r is [string, string] => r !== null);
+}
+
+/** Fallback: todas las claves primitivas de args como filas. */
+function genericRows(a: ToolArgs): [string, string][] {
+	return Object.entries(a)
+		.filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+		.map(([k, v]) => [k, String(v)]);
+}
+
+/** Cuerpo de la Salida mientras corre (parcial / placeholder / sub-agente). */
+function renderRunning(entry: ToolEntry): ReactNode {
+	if (entry.partialDetails) return renderSubagentLive(entry.partialDetails);
+	if (entry.partial && entry.partial.trim())
+		return <pre className="tool-result partial">{entry.partial}</pre>;
+	return <div className="tool-running-placeholder">Ejecutando…</div>;
+}
+
+/** Sección "Entrada": formatea los args del tool de forma legible (no JSON
+ *  crudo). Espejo de renderResult para el lado del request. */
+function renderInput(entry: ToolEntry): ReactNode {
+	const a = (entry.args ?? {}) as ToolArgs;
+	const tool = entry.tool;
+	switch (tool) {
+		case "bash":
+			return <pre className="tool-result tc-input-cmd">$ {str(a.command)}</pre>;
+		case "agent":
+			return (
+				<div className="tc-input-block">
+					{a.subagent_type ? (
+						<div className="tc-row">
+							<dt>tipo</dt>
+							<dd>
+								<code>{str(a.subagent_type)}</code>
+							</dd>
+						</div>
+					) : null}
+					{a.description ? (
+						<div className="tc-row">
+							<dt>descripción</dt>
+							<dd>{str(a.description)}</dd>
+						</div>
+					) : null}
+					{a.prompt ? (
+						<pre className="tc-input-prompt">{str(a.prompt)}</pre>
+					) : null}
+				</div>
+			);
+		case "ask_user_question": {
+			const qs = Array.isArray(a.questions) ? a.questions : [];
+			if (!qs.length) return null;
+			return (
+				<div className="tc-input-block">
+					{qs.map((q, i) => {
+						const qq = (q ?? {}) as ToolArgs;
+						const opts = Array.isArray(qq.options) ? qq.options : [];
+						return (
+							<div key={i} className="tc-ask-q">
+								<div className="tc-ask-head">
+									<span className="tc-ask-n">P{i + 1}</span>
+									{qq.header ? (
+										<span className="tc-ask-h">[{str(qq.header)}]</span>
+									) : null}{" "}
+									{str(qq.question)}
+								</div>
+								{opts.length ? (
+									<ul className="tc-ask-opts">
+										{opts.map((o, j) => {
+											const oo = (o ?? {}) as ToolArgs;
+											return <li key={j}>· {str(oo.label)}</li>;
+										})}
+									</ul>
+								) : null}
+							</div>
+						);
+					})}
+				</div>
+			);
+		}
+		case "edit":
+		case "write":
+		case "read":
+		case "ls":
+		case "grep":
+		case "find":
+		case "get_subagent_result":
+		case "web_fetch_md":
+		case "web_docs_search":
+		case "web_docs_fetch":
+			return <InputRows rows={inputRowsFor(tool, a)} />;
+		default:
+			return <InputRows rows={genericRows(a)} />;
+	}
+}
+
+function renderBody(entry: ToolEntry, running: boolean): ReactNode {
+	const inputNode = renderInput(entry);
+	const outputNode = running ? renderRunning(entry) : renderResult(entry);
+	if (!inputNode && !outputNode) return null;
+	return (
+		<div className="tc-sections">
+			{inputNode ? (
+				<ToolSection label="Entrada">{inputNode}</ToolSection>
+			) : null}
+			{outputNode ? (
+				<ToolSection label="Salida">{outputNode}</ToolSection>
+			) : null}
+		</div>
+	);
 }
 
 /** Contenido del header entre el icono y el estado (título, etiqueta, badges).
@@ -513,6 +697,12 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 	const { icon, name, label, path } = toolCallInfo(entry.tool, entry.args);
 	const hasResult =
 		!running && (!!(entry.result && entry.result.trim()) || !!entry.diff);
+	// Con la sección Entrada, la tarjeta siempre tiene algo que mostrar (los args),
+	// así que es expandible aunque el resultado esté vacío.
+	const hasInput =
+		!!entry.args &&
+		typeof entry.args === "object" &&
+		Object.keys(entry.args as Record<string, unknown>).length > 0;
 	// Progreso parcial en vivo (tool_execution_update) de un tool largo. Fuerza la
 	// auto-apertura inmediata mientras corre.
 	const hasPartial =
@@ -536,7 +726,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			running={running}
 			startedAt={entry.startedAt}
 			hasPartial={hasPartial}
-			hasContent={hasResult}
+			hasContent={hasResult || hasInput}
 			variant="tool"
 			icon={icon}
 			iconLive={running}
@@ -551,7 +741,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 			status={buildStatus(entry.state, elapsed, ctxTokens, entry.tokensLLM)}
 			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
-			{running || hasResult ? renderBody(entry, running) : null}
+			{renderBody(entry, running)}
 		</CollapsibleCard>
 	);
 }
