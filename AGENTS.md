@@ -7,6 +7,23 @@ Antes de cambiar el número de versión o hacer un deploy, lee
 Commits. El bump de versión es automático: `npm run release` (determina el tipo
 de cambio según los commits y actualiza `package.json` + `CHANGELOG.md`).
 
+## Gestión de issues
+
+Toda **funcionalidad nueva**, **cambio** o **defecto** reportado se captura
+en un issue de GitHub, clasificado con la etiqueta correcta:
+
+| Tipo de trabajo | Etiqueta |
+| --- | --- |
+| Funcionalidad nueva o mejora | `enhancement` |
+| Defecto / algo no funciona | `bug` |
+| Mejora de documentación | `documentation` |
+| Trivial / buen primer issue | `good first issue` |
+
+El agente **no crea, modifica, cierra ni reabre** un issue por iniciativa propia:
+confirma con el usuario antes de cualquier acción del ciclo de vida (salvo que
+éste la haya pedido explícitamente en el turno). Operar con
+`gh issue create | view | edit | close | reopen`.
+
 ## Cierre de issues
 
 Un issue **no se cierra** cuando el código está implementado y pasó las
