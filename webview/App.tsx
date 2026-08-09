@@ -775,7 +775,17 @@ export function App() {
 						}
 					/>
 				)}
-				<WorkspaceBar ws={state.workspace} />
+				<WorkspaceBar
+					ws={state.workspace}
+					onRename={(name) =>
+						state.workspace?.sessionPath &&
+						post({
+							type: "rename_session",
+							path: state.workspace.sessionPath,
+							name,
+						})
+					}
+				/>
 				<ContextBar usage={state.usage} />
 			</div>
 			{sessionsOpen && state.sessions && (

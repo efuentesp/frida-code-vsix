@@ -356,6 +356,8 @@ export interface WorkspaceInfo {
 	branch?: string;
 	dirty?: boolean;
 	sessionName?: string;
+	/** Path del archivo de la sesión activa (para renombrar in-place, issue #4). */
+	sessionPath?: string;
 	/** Conteo de archivos added/modified/deleted. */
 	diff?: WorkspaceDiff;
 	/** Commits adelantados / atrasados vs upstream (origin). */
@@ -589,6 +591,7 @@ export type InMessage =
 			branch?: string;
 			dirty?: boolean;
 			sessionName?: string;
+			sessionPath?: string;
 			diff?: WorkspaceDiff;
 			ahead?: number;
 			behind?: number;

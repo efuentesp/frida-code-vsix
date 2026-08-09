@@ -14,6 +14,8 @@ import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import {
+	createAgentSession,
+	DefaultResourceLoader,
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -1399,6 +1401,7 @@ export async function activate(
 		diff?: { added: number; modified: number; deleted: number };
 		ahead?: number;
 		behind?: number;
+		sessionPath?: string;
 	}> {
 		const cwd = workspaceCwd();
 		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
@@ -1419,12 +1422,13 @@ export async function activate(
 				branch: head.branch,
 				dirty,
 				sessionName,
+				sessionPath: frida?.session?.sessionFile,
 				diff,
 				ahead: head.ahead,
 				behind: head.behind,
 			};
 		} catch {
-			return { cwd, sessionName }; // no es repo o git no disponible
+			return { cwd, sessionName, sessionPath: frida?.session?.sessionFile }; // no es repo o git no disponible
 		}
 	}
 
@@ -1574,12 +1578,15 @@ export async function activate(
 						post({ type: "user", text: pendingQueue.shift()!.text });
 						postQueued();
 					}
+					const isFirstTurn = turnsInRun === 0;
 					turnsInRun++;
 					// Nuevo turno: reinicia el acumulador para reflejar solo lo que pi-lens
 					// encuentre en ESTE turno.
 					lensAccum.clear();
 					lensAnyTruncated = false;
 					post({ type: "turn_active" });
+					// issue #4 Parte 2: auto-título al primer mensaje de una sesión sin nombre.
+					if (isFirstTurn) void maybeAutoTitle();
 					break;
 				}
 				case "turn_end":
@@ -2295,6 +2302,119 @@ export async function activate(
 			return;
 		}
 		await renameSession(pathStr, name);
+	}
+
+	// === Auto-título de sesión (issue #4 Parte 2) ===
+	// Al primer mensaje de una sesión nueva (sin nombre), se genera un título
+	// conciso con el modelo activo vía una sesión efímera sin tools y se aplica
+	// con renameCurrentSession. Best-effort: nunca rompe el turno del usuario.
+
+	/** Extrae el texto (unido) del último mensaje con `role` en `messages`. */
+	function lastMessageText(
+		messages:
+			| Array<{ role?: string; content?: unknown }>
+			| undefined,
+		role: string,
+	): string | undefined {
+		if (!messages) return undefined;
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const msg = messages[i];
+			if (msg?.role !== role) continue;
+			const c = msg.content;
+			if (typeof c === "string") return c;
+			if (Array.isArray(c)) {
+				const texts = c
+					.filter(
+						(x): x is { type: "text"; text: string } =>
+							typeof x === "object" &&
+							x !== null &&
+							(x as { type?: string }).type === "text" &&
+							typeof (x as { text?: unknown }).text === "string",
+					)
+					.map((x) => x.text);
+				if (texts.length) return texts.join("\n");
+			}
+		}
+		return undefined;
+	}
+
+	/** Limpia la respuesta a un título: quita comillas/prefijos, recorta a ~6 palabras. */
+	function cleanTitle(raw: string | undefined): string | undefined {
+		if (!raw) return undefined;
+		const stripped = raw
+			.replace(/^(t[ií]tulo|title)\s*[:：]\s*/i, "")
+			.replace(/^["'`«»“”]+|["'`«»“”]+$/g, "")
+			.replace(/[.!:;…]+$/g, "")
+			.trim();
+		if (!stripped) return undefined;
+		const words = stripped.split(/\s+/).slice(0, 6).join(" ");
+		return words.length > 60 ? `${words.slice(0, 57).trim()}…` : words;
+	}
+
+	/** Crea una sesión efímera sin tools y pide un título para el mensaje. */
+	async function generateSessionTitle(
+		firstMessage: string,
+	): Promise<string | undefined> {
+		const runtime = frida?.modelRuntime;
+		const model = frida?.session?.model;
+		if (!runtime) return undefined;
+		const cwd = workspaceCwd();
+		const agentDir = defaultAgentDir();
+		const settingsManager = SettingsManager.create(cwd, agentDir);
+		const resourceLoader = new DefaultResourceLoader({
+			cwd,
+			agentDir,
+			settingsManager,
+			systemPrompt:
+				"Eres un generador de títulos de sesión. Responde SOLO con un título conciso de máximo 5 palabras que capture la intención del mensaje del usuario. Sin comillas, sin puntuación final, sin explicación, sin prefijos como «Título:».",
+		});
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			settingsManager,
+			resourceLoader,
+			modelRuntime: runtime,
+			...(model ? { model } : {}),
+			noTools: "all",
+		});
+		try {
+			const snippet = firstMessage.slice(0, 1000);
+			await session.prompt(
+				`Genera un título de máximo 5 palabras para una sesión que empieza con este mensaje del usuario:\n\n${snippet}`,
+			);
+			const messages = (
+				session as unknown as {
+					state?: {
+						messages?: Array<{ role?: string; content?: unknown }>;
+					};
+				}
+			).state?.messages;
+			return cleanTitle(lastMessageText(messages, "assistant"));
+		} finally {
+			await (
+				session as unknown as { dispose?: () => Promise<void> | void }
+			).dispose?.();
+		}
+	}
+
+	/** Orquesta el auto-título: sólo si la sesión no tiene nombre y hay primer mensaje. */
+	async function maybeAutoTitle(): Promise<void> {
+		try {
+			if (frida?.sessionManager?.getSessionName?.()) return; // ya tiene nombre
+			const messages = (
+				frida?.session as unknown as {
+					state?: {
+						messages?: Array<{ role?: string; content?: unknown }>;
+					};
+				}
+			)?.state?.messages;
+			const firstMessage = lastMessageText(messages, "user");
+			if (!firstMessage || firstMessage.trim().length < 3) return;
+			const title = await generateSessionTitle(firstMessage);
+			if (title) await renameCurrentSession(title); // refresca el footer
+		} catch {
+			// Best-effort: el auto-título nunca debe romper el turno del usuario.
+		}
 	}
 
 	async function copyLastMessage(): Promise<void> {

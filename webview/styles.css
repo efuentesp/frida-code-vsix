@@ -1828,6 +1828,28 @@ button.sec:hover {
 	flex: 0 1 auto;
 	min-width: 0;
 }
+/* issue #4: nombre de sesión editable en el footer. */
+.ws-session.editable {
+	cursor: text;
+	border-radius: 3px;
+}
+.ws-session.editable:hover {
+	opacity: 1;
+	background: var(--vscode-editor-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+.ws-session-input {
+	flex: 0 1 auto;
+	min-width: 80px;
+	max-width: 220px;
+	font: inherit;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder, #007fd4));
+	border-radius: 3px;
+	padding: 0 4px;
+	outline: none;
+}
 .ws-bar .ws-branch {
 	display: inline-flex;
 	align-items: center;
@@ -2389,7 +2411,8 @@ button.danger:hover {
 }
 .q-review-row + .q-review-row {
 	padding-top: 10px;
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .q-review-head {
 	display: flex;

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { WorkspaceInfo } from "../types";
 import { Tooltip } from "./Tooltip";
 import { CircleDot, Folder, GitBranch } from "lucide-react";
@@ -37,7 +38,27 @@ function branchTooltip(ws: WorkspaceInfo): string {
 	return [ws.branch, ...syncBits, ...diffBits].join(" · ");
 }
 
-export function WorkspaceBar({ ws }: { ws?: WorkspaceInfo }) {
+export function WorkspaceBar({
+	ws,
+	onRename,
+}: {
+	ws?: WorkspaceInfo;
+	onRename?: (name: string) => void;
+}) {
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState("");
+
+	function startEdit() {
+		setDraft(ws?.sessionName ?? "");
+		setEditing(true);
+	}
+	function commit() {
+		const name = draft.trim();
+		setEditing(false);
+		if (name && name !== ws?.sessionName && onRename && ws?.sessionPath) {
+			onRename(name);
+		}
+	}
 	return (
 		<div className="ws-bar">
 			<Tooltip label={ws?.cwd ?? "Carpeta de trabajo"} side="top">
@@ -46,11 +67,38 @@ export function WorkspaceBar({ ws }: { ws?: WorkspaceInfo }) {
 					<code>{ws ? shortCwd(ws.cwd) : "…"}</code>
 				</span>
 			</Tooltip>
-			{ws?.sessionName && (
-				<span className="ws-session" title={ws.sessionName}>
-					• {ws.sessionName}
+		{ws?.sessionPath &&
+			(editing ? (
+				<input
+					className="ws-session-input"
+					value={draft}
+					placeholder="Nombre de la sesión…"
+					autoFocus
+					onChange={(e) => setDraft(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							e.preventDefault();
+							commit();
+						} else if (e.key === "Escape") {
+							e.preventDefault();
+							setEditing(false);
+						}
+					}}
+					onBlur={commit}
+				/>
+			) : (
+				<span
+					className={"ws-session" + (onRename ? " editable" : "")}
+					title={
+						onRename
+							? "Click para renombrar la sesión"
+							: ws?.sessionName
+					}
+					onClick={onRename ? startEdit : undefined}
+				>
+					• {ws?.sessionName ?? "(sin nombre)"}
 				</span>
-			)}
+			))}
 			{ws?.branch && (
 				<Tooltip label={branchTooltip(ws)} side="top">
 					<span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>
