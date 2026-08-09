@@ -63,9 +63,7 @@ export function getGitAPI(): GitAPI | undefined {
  * workspace; si no hay match exacto, usa el primero disponible. undefined si no
  * hay repos abiertos o el API aún no inicializó.
  */
-export function getActiveRepository(
-	cwd?: string,
-): GitRepository | undefined {
+export function getActiveRepository(cwd?: string): GitRepository | undefined {
 	const api = getGitAPI();
 	if (!api) return undefined;
 	if (api.state === "uninitialized") return undefined;
