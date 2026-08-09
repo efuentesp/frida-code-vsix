@@ -340,10 +340,7 @@ export function App() {
 					Frida Code
 				</span>
 				{state.workspace?.isWorktree && state.workspace?.branch && (
-					<Tooltip
-						label={`Worktree · ${state.workspace.cwd}`}
-						side="bottom"
-					>
+					<Tooltip label={`Worktree · ${state.workspace.cwd}`} side="bottom">
 						<span className="worktree-badge">
 							<GitBranch size={12} /> {state.workspace.branch}
 						</span>

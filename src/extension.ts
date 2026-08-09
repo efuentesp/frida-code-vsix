@@ -1467,7 +1467,12 @@ export async function activate(
 				isWorktree: await detectWorktree(cwd),
 			};
 		} catch {
-			return { cwd, sessionName, sessionPath: frida?.session?.sessionFile, isWorktree: false }; // no es repo o git no disponible
+			return {
+				cwd,
+				sessionName,
+				sessionPath: frida?.session?.sessionFile,
+				isWorktree: false,
+			}; // no es repo o git no disponible
 		}
 	}
 
