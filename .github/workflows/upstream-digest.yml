@@ -1,0 +1,66 @@
+name: upstream-pi-digest
+
+# Digest semanal de drift Frida↔pi (issue #11).
+# Corre upstream:drift --json y abre un issue con el resultado:
+#   - con drift  → issue ABIERTO etiquetado `upstream` (acción requerida)
+#   - sin drift  → issue abierto y cerrado al instante (registro/heartbeat)
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Lunes 09:00 UTC
+  workflow_dispatch: {} # disparo manual
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar deps
+        run: npm ci
+
+      - name: Computar drift
+        run: node scripts/upstream-drift.mjs --json > drift.json
+
+      - name: Contar drift
+        id: cnt
+        run: |
+          n=$(jq '[.rows[]|select(.drifted)]|length' drift.json)
+          echo "drift=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Construir cuerpo del issue
+        run: node scripts/upstream-digest.mjs drift.json > issue-body.md
+
+      - name: Asegurar label 'upstream'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create upstream --repo ${{ github.repository }} \
+            --color F1C40F --description "Drift/cambios del upstream pi" || true
+
+      - name: Abrir issue semanal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          N=${{ steps.cnt.outputs.drift }}
+          if [ "$N" -gt 0 ]; then
+            gh issue create --repo ${{ github.repository }} \
+              --title "pi upstream digest — $DATE · ⚠ $N con drift" \
+              --body-file issue-body.md --label upstream
+          else
+            URL=$(gh issue create --repo ${{ github.repository }} \
+              --title "pi upstream digest — $DATE · ✓ todo synced" \
+              --body-file issue-body.md)
+            gh issue close "$URL" --repo ${{ github.repository }} \
+              --comment "Sin drift — cerrado automático (registro)."
+          fi
