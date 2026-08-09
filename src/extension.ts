@@ -41,6 +41,10 @@ import {
 	getApiKeyProvider,
 } from "./providers/api-key-providers";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
+import {
+	MOONSHOT_PROVIDER,
+	MOONSHOT_PROVIDER_DISPLAY,
+} from "./providers/moonshot-provider";
 import { getWebviewHtml } from "./webview-html";
 import { analyzeContext } from "./tools/frida-context/analysis";
 import { readSessionStats } from "./session-stats";
@@ -991,6 +995,7 @@ export async function activate(
 	function providerDisplayName(id: string): string {
 		if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
 		if (id === ZAI_PROVIDER) return ZAI_PROVIDER_DISPLAY;
+		if (id === MOONSHOT_PROVIDER) return MOONSHOT_PROVIDER_DISPLAY;
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
 	}
@@ -1160,6 +1165,17 @@ export async function activate(
 		const models: any[] =
 			frida?.modelRuntime?.getModels?.("github-copilot") ?? [];
 		return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
+	}
+
+	// Moonshot AI (Kimi): modelo default del provider. El catálogo built-in trae
+	// kimi-k3, kimi-k2.6, kimi-k2-thinking…; fijamos kimi-k3 como pre-selección al
+	// configurar por primera vez (mismo patrón que copilotDefaultModelId).
+	function moonshotDefaultModelId(): string | undefined {
+		const models: any[] =
+			frida?.modelRuntime?.getModels?.(MOONSHOT_PROVIDER) ?? [];
+		return (
+			models.find((m: any) => m.id === "kimi-k3")?.id ?? models[0]?.id
+		);
 	}
 
 	// Serializa un error de login a texto útil — NUNCA vacío. El catch anterior
@@ -3718,6 +3734,12 @@ export async function activate(
 			// los defaults (best-effort). Refresca el selector del webview.
 			if (providerId === ZAI_PROVIDER) {
 				void frida.discoverModels(providerId).finally(postModels);
+			}
+			// Moonshot: al configurar por primera vez (sin modelo activo aún),
+			// pre-seleccionar kimi-k3 como default del provider.
+			if (providerId === MOONSHOT_PROVIDER && !activeModel) {
+				const defaultId = moonshotDefaultModelId();
+				if (defaultId) await selectModel(providerId, defaultId);
 			}
 			postResources();
 		} else {

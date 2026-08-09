@@ -17,6 +17,10 @@
 // Este módulo da el mapeo id → {secretKey, displayName, authMode} para que el host
 // itere al cargar/guardar keys y poblar el onboarding/selector.
 
+import {
+	MOONSHOT_PROVIDER,
+	MOONSHOT_PROVIDER_DISPLAY,
+} from "./moonshot-provider";
 import { SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_DISPLAY } from "./softtek-provider";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./z-ai-provider";
 
@@ -41,6 +45,12 @@ export const API_KEY_PROVIDERS: readonly ApiKeyProviderDef[] = [
 		id: ZAI_PROVIDER,
 		displayName: ZAI_PROVIDER_DISPLAY,
 		secretKey: "frida.zaiKey",
+		authMode: "bearer",
+	},
+	{
+		id: MOONSHOT_PROVIDER,
+		displayName: MOONSHOT_PROVIDER_DISPLAY,
+		secretKey: "frida.moonshotKey",
 		authMode: "bearer",
 	},
 ];
