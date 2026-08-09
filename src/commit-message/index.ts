@@ -1,6 +1,6 @@
 // Command handler de `frida.generateCommitMessage` (issue #9).
 //
-// Orquesta el flujo completo: repo git activo → diff staged → config → LLM →
+// Orquesta el flujo completo: repo git activo → diff (staged si hay; si no working tree) → config → LLM →
 // inputBox.value. NUNCA commitea: sólo llena el textbox de commit para que el
 // usuario revise y dé Commit manualmente (Ctrl+Enter), como GitHub Copilot.
 //
@@ -25,9 +25,10 @@ export interface CommandContext {
 }
 
 /**
- * Ejecuta el comando: genera el mensaje de commit del diff staged y lo escribe
- * en el textbox del SCM. Maneja los casos borde (sin modelo, sin repo, sin
- * staged, fallo del LLM) con mensajes claros al usuario. No commitea.
+ * Ejecuta el comando: genera el mensaje de commit del diff (staged si hay; si
+ * no, working tree) y lo escribe en el textbox del SCM. Maneja los casos borde
+ * (sin modelo, sin repo, sin cambios, fallo del LLM) con mensajes claros al
+ * usuario. No commitea ni hace git add: sólo llena el textbox.
  */
 export async function runGenerateCommitMessage(
 	ctx: CommandContext,
@@ -51,19 +52,28 @@ export async function runGenerateCommitMessage(
 		return;
 	}
 
-	// 3. Diff staged. diff(true) = cambios en el index (no el working tree).
+	// 3. Diff: staged si hay; si no, working tree (mirror de GitHub Copilot).
+	//    Así el botón sirve aunque el usuario aún no haya hecho `git add`.
 	let diff: string;
+	let diffSource: "staged" | "working tree";
 	try {
-		diff = await repo.diff(true);
+		const staged = await repo.diff(true);
+		if (staged.trim()) {
+			diff = staged;
+			diffSource = "staged";
+		} else {
+			diff = await repo.diff(false);
+			diffSource = "working tree";
+		}
 	} catch (e) {
 		await vscode.window.showErrorMessage(
-			`Frida no pudo leer el diff staged: ${e instanceof Error ? e.message : String(e)}`,
+			`Frida no pudo leer el diff: ${e instanceof Error ? e.message : String(e)}`,
 		);
 		return;
 	}
 	if (!diff.trim()) {
 		await vscode.window.showWarningMessage(
-			"No hay cambios staged. Ejecuta `git add` sobre los archivos a commitear y vuelve a intentarlo.",
+			"No hay cambios para generar un mensaje. Modifica archivos y vuelve a intentarlo.",
 		);
 		return;
 	}
@@ -93,6 +103,6 @@ export async function runGenerateCommitMessage(
 	// 5. Escribir en el textbox. El commit SIEMPRE es manual (Ctrl+Enter).
 	repo.inputBox.value = message;
 	void vscode.window.showInformationMessage(
-		"Frida: mensaje generado. Revísalo y dale Commit (Ctrl+Enter).",
+		`Frida: mensaje generado (basado en cambios ${diffSource}). Revísalo y dale Commit (Ctrl+Enter).`,
 	);
 }

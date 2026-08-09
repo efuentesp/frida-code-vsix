@@ -141,12 +141,12 @@ function readTemplate(config: CommitMessageConfig): string | undefined {
 		.replaceAll("{types}", CONVENTIONAL_TYPES);
 }
 
-/** Construye el prompt de usuario con el diff staged. */
+/** Construye el prompt de usuario con el diff (staged o working tree). */
 function buildUserPrompt(diff: string, config: CommitMessageConfig): string {
 	const header =
 		config.language === "es"
-			? "Genera el mensaje de commit para el siguiente diff staged:"
-			: "Generate the commit message for the following staged diff:";
+			? "Genera el mensaje de commit para el siguiente diff:"
+			: "Generate the commit message for the following diff:";
 	return `${header}\n\n\`\`\`diff\n${diff}\n\`\`\``;
 }
 
