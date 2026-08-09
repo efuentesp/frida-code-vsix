@@ -24,6 +24,10 @@ confirma con el usuario antes de cualquier acción del ciclo de vida (salvo que
 éste la haya pedido explícitamente en el turno). Operar con
 `gh issue create | view | edit | close | reopen`.
 
+Todo commit que aborde un issue debe **referenciarlo** en el cuerpo (footer
+`Refs #N`) para que queden vinculados en GitHub. No usar `Closes #N` (ver
+*Cierre de issues*).
+
 ## Cierre de issues
 
 Un issue **no se cierra** cuando el código está implementado y pasó las
