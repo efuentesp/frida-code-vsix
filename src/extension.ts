@@ -1412,6 +1412,22 @@ export async function activate(
 	// Info del workspace: carpeta de trabajo + branch git, conteo de cambios
 	// (added/modified/deleted) y commits ahead/behind vs origin. Una sola llamada
 	// `git status --porcelain -b` da los tres. La ejecuta el HOST directamente
+	// Detecta si cwd es un worktree vinculado (no el checkout principal). El
+	// git-dir de un worktree vinculado vive bajo <common>/.git/worktrees/<name>;
+	// el del principal es <repo>/.git. Issue #13.
+	async function detectWorktree(cwd: string): Promise<boolean> {
+		try {
+			const { stdout } = await execFileP(
+				"git",
+				["rev-parse", "--absolute-git-dir"],
+				{ cwd, timeout: 3000 },
+			);
+			return /[/\\]\.git[/\\]worktrees[/\\]/.test(stdout.trim());
+		} catch {
+			return false;
+		}
+	}
+
 	// (no el modelo), así que no pasa por el gate de bash de D7. No depende de la
 	// extensión Git de VS Code.
 	async function collectWorkspace(): Promise<{
@@ -1423,6 +1439,7 @@ export async function activate(
 		ahead?: number;
 		behind?: number;
 		sessionPath?: string;
+		isWorktree?: boolean;
 	}> {
 		const cwd = workspaceCwd();
 		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
@@ -1447,9 +1464,10 @@ export async function activate(
 				diff,
 				ahead: head.ahead,
 				behind: head.behind,
+				isWorktree: await detectWorktree(cwd),
 			};
 		} catch {
-			return { cwd, sessionName, sessionPath: frida?.session?.sessionFile }; // no es repo o git no disponible
+			return { cwd, sessionName, sessionPath: frida?.session?.sessionFile, isWorktree: false }; // no es repo o git no disponible
 		}
 	}
 
