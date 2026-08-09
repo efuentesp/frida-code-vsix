@@ -576,6 +576,11 @@ export async function activate(
 	// Sin esto, el usuario ve "silencio" en vez de "API key inválida".
 	let hadText = false;
 	let hadToolCall = false;
+	// issue #6: error que pi-ai deja en el mensaje (stopReason="error" →
+	// message.errorMessage) y NO propaga al evento agent_end. Se captura en
+	// message_end y se surfacea en agent_end; sin esto el error real del provider
+	// (p. ej. "Invalid API key" de Moonshot) se traga.
+	let lastMessageError: string | undefined;
 
 	function lensRelative(p: string, cwd: string): string {
 		try {
@@ -1507,6 +1512,7 @@ export async function activate(
 					turnUsageBaseline = sumUsage(session);
 					hadText = false;
 					hadToolCall = false;
+					lastMessageError = undefined;
 					lensBusy = true;
 					post({ type: "agent_busy", busy: true });
 					post({ type: "turn_active" });
@@ -1568,18 +1574,26 @@ export async function activate(
 					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
 					if (event.errorMessage && !event.willRetry) {
 						post({ type: "provider_error", text: String(event.errorMessage) });
+					} else if (lastMessageError && !event.willRetry) {
+						// issue #6: el provider falló y pi-ai dejó el error en el mensaje
+						// (stopReason="error" → message.errorMessage) pero NO en el evento
+						// agent_end. Sin esto el error real (p. ej. "Invalid API key" de
+						// Moonshot, o "model not found") se traga y el usuario ve el
+						// fallback genérico hardcodeado a DevEngine.
+						post({ type: "provider_error", text: lastMessageError });
 					} else if (!hadText && !hadToolCall) {
-						// Fix UX #1: el agente terminó sin generar texto ni llamar tools, y sin
-						// errorMessage explícito. El caso más común es un 401 del gateway
-						// (API key vencida/inválida) que el SDK openai lanza antes de
-						// onResponse, así que after_provider_response no lo atrapa y queda
-						// invisible. Avisamos al usuario en vez de dejarlo en silencio.
-						post({
-							type: "provider_error",
-							text:
-								"El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el gateway DevEngine no respondió. " +
-								"Renueva tu API key o ejecuta “Frida: Diagnosticar gateway DevEngine”.",
-						});
+						// Fix UX #1 + issue #6: el agente terminó sin texto/tools ni error
+						// capturable. Mensaje consciente del proveedor activo (antes estaba
+						// hardcodeado a DevEngine incluso para Moonshot/z.ai).
+						const isDevEngine = activeModel?.provider === SOFTTEK_PROVIDER;
+						const provName =
+							getApiKeyProvider(activeModel?.provider ?? "")?.displayName ??
+							activeModel?.provider ??
+							"este proveedor";
+						const fallbackText = isDevEngine
+							? `El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el gateway DevEngine no respondió. Renueva tu API key o ejecuta "Frida: Diagnosticar gateway DevEngine".`
+							: `El modelo no generó respuesta (${provName}). Causa probable: API key inválida o vencida (401), o el modelo/ID es incorrecto. Verifica tu API key en el panel de Proveedores.`;
+						post({ type: "provider_error", text: fallbackText });
 					}
 					// El agente terminó: a partir de aquí los diagnósticos tardíos (cascade)
 					// se publican solos (mergeLens comprueba lensBusy).
@@ -1656,6 +1670,19 @@ export async function activate(
 						event.message?.stopReason === "aborted"
 					) {
 						post({ type: "info", text: "Operación cancelada" });
+					}
+					// issue #6: pi-ai termina el mensaje assistant con stopReason="error" y
+					// deja el detalle humano en message.errorMessage (lo confirman
+					// print-mode.js:106 e interactive-mode.js:2380 del SDK). Lo capturamos
+					// para surfacerlo en agent_end; el SDK NO lo copia a event.errorMessage.
+					if (
+						event.message?.role === "assistant" &&
+						event.message?.stopReason === "error"
+					) {
+						lastMessageError = event.message?.errorMessage || undefined;
+						abortDiag(
+							`message_end stopReason=error — ${lastMessageError ?? "(sin texto en message.errorMessage)"}`,
+						);
 					}
 					// Cada respuesta del modelo actualiza los tokens reales del contexto
 					// (usageTokens del último assistant). Sin esto la barra se congela en
