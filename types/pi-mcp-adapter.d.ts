@@ -24,7 +24,9 @@ export interface McpAdapterOptions {
 }
 
 /** Factory del adapter MCP. Sin options usa config file-based (.mcp.json). */
-export declare function createMcpAdapter(options?: McpAdapterOptions): (pi: ExtensionAPI) => void;
+export declare function createMcpAdapter(
+	options?: McpAdapterOptions,
+): (pi: ExtensionAPI) => void;
 
 /** Instancia por defecto (adapter ya creado con config por defecto). */
 declare const mcpAdapter: (pi: ExtensionAPI) => void;

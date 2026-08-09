@@ -32,7 +32,9 @@ function arg(name) {
 }
 const pkg = arg("pkg");
 if (!pkg) {
-	process.stderr.write("Uso: npm run upstream:feasible -- --pkg <paquete> [--from A --to B] [--json]\n");
+	process.stderr.write(
+		"Uso: npm run upstream:feasible -- --pkg <paquete> [--from A --to B] [--json]\n",
+	);
 	process.exit(1);
 }
 
@@ -45,10 +47,13 @@ try {
 	process.exit(1);
 }
 let source;
-if (ledger.platform.package === pkg) source = { label: ledger.platform.package, ...ledger.platform };
+if (ledger.platform.package === pkg)
+	source = { label: ledger.platform.package, ...ledger.platform };
 else source = ledger.sources.find((s) => s.upstream === pkg);
 if (!source) {
-	process.stderr.write(`✗ '${pkg}' no está en upstream-pi.json. Corre 'npm run upstream:drift' para ver las fuentes.\n`);
+	process.stderr.write(
+		`✗ '${pkg}' no está en upstream-pi.json. Corre 'npm run upstream:drift' para ver las fuentes.\n`,
+	);
 	process.exit(1);
 }
 
@@ -73,7 +78,13 @@ function lockfileVersion(p) {
 }
 function registryLatest(p) {
 	try {
-		return execSync(`npm view "${p}" version`, { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"], timeout: 15000 }).trim() || null;
+		return (
+			execSync(`npm view "${p}" version`, {
+				encoding: "utf8",
+				stdio: ["pipe", "pipe", "ignore"],
+				timeout: 15000,
+			}).trim() || null
+		);
 	} catch {
 		return null;
 	}
@@ -101,9 +112,15 @@ function sliceChangelog(p, fromVer, toVer) {
 
 // ─── from/to ─────────────────────────────────────────────────────────────────
 const fromV = arg("from") || (source.basedOn !== "n/a" ? source.basedOn : null);
-const toV = arg("to") || (source.kind === "runtime" || source.kind === "platform" ? lockfileVersion(pkg) : registryLatest(pkg));
+const toV =
+	arg("to") ||
+	(source.kind === "runtime" || source.kind === "platform"
+		? lockfileVersion(pkg)
+		: registryLatest(pkg));
 if (!fromV || !toV) {
-	process.stderr.write(`✗ No pude resolver from/to (from=${fromV}, to=${toV}). Pásalos con --from/--to.\n`);
+	process.stderr.write(
+		`✗ No pude resolver from/to (from=${fromV}, to=${toV}). Pásalos con --from/--to.\n`,
+	);
 	process.exit(1);
 }
 
@@ -125,7 +142,8 @@ function parseSections(block) {
 			sections.push(cur);
 			continue;
 		}
-		if (cur && /^\s*[-*]/.test(line)) cur.bullets.push(line.replace(/^\s*[-*]\s*/, "").trim());
+		if (cur && /^\s*[-*]/.test(line))
+			cur.bullets.push(line.replace(/^\s*[-*]\s*/, "").trim());
 	}
 	return sections;
 }
@@ -134,13 +152,17 @@ function sectionTriage(name) {
 	const n = name.toLowerCase();
 	if (source.kind === "reference") return "n/a (reference)";
 	if (source.mode === "delegate") {
-		if (n.includes("remov") || n.includes("break")) return "⚠ posible break (delegate) — verificar API";
+		if (n.includes("remov") || n.includes("break"))
+			return "⚠ posible break (delegate) — verificar API";
 		return "bump (heredado; re-test)";
 	}
-	if (n.includes("remov") || n.includes("break")) return "port ⚠ (posible break en lógica duplicada)";
+	if (n.includes("remov") || n.includes("break"))
+		return "port ⚠ (posible break en lógica duplicada)";
 	if (n.includes("added")) return "port? (¿feature nueva a portar?)";
-	if (n.includes("fix")) return "skip/defer (fix del upstream; ¿Frida tiene el mismo bug?)";
-	if (n.includes("chang") || n.includes("deprecat")) return "port? (¿cambio de comportamiento relevante?)";
+	if (n.includes("fix"))
+		return "skip/defer (fix del upstream; ¿Frida tiene el mismo bug?)";
+	if (n.includes("chang") || n.includes("deprecat"))
+		return "port? (¿cambio de comportamiento relevante?)";
 	return "port? (evaluar)";
 }
 function effort(n) {
@@ -157,7 +179,23 @@ const sections = block ? parseSections(block) : [];
 if (asJson) {
 	process.stdout.write(
 		`${JSON.stringify(
-			{ pkg, wrapper: source.label || source.wrapper, kind: source.kind, mode: source.mode, from: fromV, to: toV, sameRange, changelogAvailable: Boolean(block), sections: sections.map((s) => ({ version: s.version, name: s.name, bullets: s.bullets.length, triage: sectionTriage(s.name), effort: effort(s.bullets.length) })) },
+			{
+				pkg,
+				wrapper: source.label || source.wrapper,
+				kind: source.kind,
+				mode: source.mode,
+				from: fromV,
+				to: toV,
+				sameRange,
+				changelogAvailable: Boolean(block),
+				sections: sections.map((s) => ({
+					version: s.version,
+					name: s.name,
+					bullets: s.bullets.length,
+					triage: sectionTriage(s.name),
+					effort: effort(s.bullets.length),
+				})),
+			},
 			null,
 			2,
 		)}\n`,
@@ -167,26 +205,40 @@ if (asJson) {
 
 const out = [];
 out.push(`\n ▌ Factibilidad de bump: ${pkg}`);
-out.push(`   wrapper: ${source.label || source.wrapper}   [${source.kind} · ${source.mode}]`);
+out.push(
+	`   wrapper: ${source.label || source.wrapper}   [${source.kind} · ${source.mode}]`,
+);
 out.push(`   rango:   ${fromV} → ${toV}`);
 out.push("");
 if (sameRange) {
 	out.push(` from === to (${fromV}): mismo rango, sin cambios que evaluar.`);
 } else if (!block) {
-	out.push(` ⚠ CHANGELOG no disponible localmente (port no instalado o sin ${fromV}→${toV} en node_modules).`);
+	out.push(
+		` ⚠ CHANGELOG no disponible localmente (port no instalado o sin ${fromV}→${toV} en node_modules).`,
+	);
 	if (source.repo) out.push(`   Revisar manualmente: ${source.repo}`);
-	out.push(`   Triage genérico por mode=${source.mode}: ${source.mode === "delegate" ? "bump (heredado; re-test)" : "port? (evaluar repo upstream)"}`);
+	out.push(
+		`   Triage genérico por mode=${source.mode}: ${source.mode === "delegate" ? "bump (heredado; re-test)" : "port? (evaluar repo upstream)"}`,
+	);
 } else if (sections.length === 0) {
-	out.push(` (sin secciones ### detectadas entre ${fromV} y ${toV}; posiblemente mismo rango o formato distinto)`);
+	out.push(
+		` (sin secciones ### detectadas entre ${fromV} y ${toV}; posiblemente mismo rango o formato distinto)`,
+	);
 } else {
-	out.push(` ${sections.length} sección(es) — triage + esfuerzo (S/M/L por nº de bullets):`);
+	out.push(
+		` ${sections.length} sección(es) — triage + esfuerzo (S/M/L por nº de bullets):`,
+	);
 	out.push("");
 	for (const s of sections) {
-		out.push(` • [${s.version}] ${s.name} — ${s.bullets.length} cambio(s) · esfuerzo ${effort(s.bullets.length)}`);
+		out.push(
+			` • [${s.version}] ${s.name} — ${s.bullets.length} cambio(s) · esfuerzo ${effort(s.bullets.length)}`,
+		);
 		out.push(`     triage: ${sectionTriage(s.name)}`);
 	}
 }
 out.push("");
-out.push(` Leyenda: port=implementar en Frida · bump=heredado(sólo re-test) · defer/skip=no ahora.`);
+out.push(
+	` Leyenda: port=implementar en Frida · bump=heredado(sólo re-test) · defer/skip=no ahora.`,
+);
 out.push("");
 process.stdout.write(`${out.join("\n")}\n`);

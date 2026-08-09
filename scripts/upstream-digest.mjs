@@ -11,7 +11,9 @@
 
 import { readFileSync } from "node:fs";
 
-const input = process.argv[2] ? readFileSync(process.argv[2], "utf8") : readFileSync(0, "utf8");
+const input = process.argv[2]
+	? readFileSync(process.argv[2], "utf8")
+	: readFileSync(0, "utf8");
 let data;
 try {
 	data = JSON.parse(input);
@@ -39,7 +41,9 @@ out.push("");
 if (drifted.length === 0) {
 	out.push("## ✅ Todo sincronizado");
 	out.push("");
-	out.push("Ningún upstream publicó cambios desde el último sync. Nada que portar esta semana.");
+	out.push(
+		"Ningún upstream publicó cambios desde el último sync. Nada que portar esta semana.",
+	);
 	out.push("");
 } else {
 	out.push(`## ⚠ ${drifted.length} con drift — revisar para port/bump`);

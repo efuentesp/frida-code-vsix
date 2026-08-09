@@ -48,10 +48,16 @@ function lockfileVersion(pkg) {
 			const lock = JSON.parse(readFileSync(lockPath, "utf8"));
 			const key = `node_modules/${pkg}`;
 			if (lock.packages?.[key]?.version) return lock.packages[key].version;
-			if (lock.dependencies?.[pkg]?.version) return lock.dependencies[pkg].version;
+			if (lock.dependencies?.[pkg]?.version)
+				return lock.dependencies[pkg].version;
 		} catch {}
 	}
-	const pjPath = resolve(root, "node_modules", ...pkg.split("/"), "package.json");
+	const pjPath = resolve(
+		root,
+		"node_modules",
+		...pkg.split("/"),
+		"package.json",
+	);
 	if (existsSync(pjPath)) {
 		try {
 			return JSON.parse(readFileSync(pjPath, "utf8")).version;
@@ -119,8 +125,14 @@ function semvercmp(a, b) {
 	if (a === b) return 0;
 	if (!a) return -1;
 	if (!b) return 1;
-	const pa = a.replace(/^[^0-9]*/, "").split(/[.\-+]/).map((n) => Number.parseInt(n, 10) || 0);
-	const pb = b.replace(/^[^0-9]*/, "").split(/[.\-+]/).map((n) => Number.parseInt(n, 10) || 0);
+	const pa = a
+		.replace(/^[^0-9]*/, "")
+		.split(/[.\-+]/)
+		.map((n) => Number.parseInt(n, 10) || 0);
+	const pb = b
+		.replace(/^[^0-9]*/, "")
+		.split(/[.\-+]/)
+		.map((n) => Number.parseInt(n, 10) || 0);
 	for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
 		if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
 	}
@@ -140,15 +152,42 @@ function triage({ mode, kind, drifted }) {
 
 function evaluate({ label, upstream, kind, mode, basedOn }) {
 	if (kind === "reference") {
-		return { label, upstream, kind, mode, basedOn, current: null, drifted: false, triage: "n/a (reference)", changelog: null };
+		return {
+			label,
+			upstream,
+			kind,
+			mode,
+			basedOn,
+			current: null,
+			drifted: false,
+			triage: "n/a (reference)",
+			changelog: null,
+		};
 	}
-	const current = kind === "runtime" || kind === "platform" ? lockfileVersion(upstream) : registryLatest(upstream);
-	const drifted = !!current && basedOn !== "n/a" && basedOn !== current && semvercmp(current, basedOn) !== 0;
+	const current =
+		kind === "runtime" || kind === "platform"
+			? lockfileVersion(upstream)
+			: registryLatest(upstream);
+	const drifted =
+		!!current &&
+		basedOn !== "n/a" &&
+		basedOn !== current &&
+		semvercmp(current, basedOn) !== 0;
 	let changelog = null;
 	if (drifted && (kind === "runtime" || kind === "platform")) {
 		changelog = sliceChangelog(upstream, basedOn, current);
 	}
-	return { label, upstream, kind, mode, basedOn, current, drifted, triage: triage({ mode, kind, drifted }), changelog };
+	return {
+		label,
+		upstream,
+		kind,
+		mode,
+		basedOn,
+		current,
+		drifted,
+		triage: triage({ mode, kind, drifted }),
+		changelog,
+	};
 }
 
 const rows = [];
@@ -178,7 +217,9 @@ for (const s of ledger.sources) {
 // ─── salida ──────────────────────────────────────────────────────────────────
 
 if (asJson) {
-	process.stdout.write(`${JSON.stringify({ generatedAt: new Date().toISOString(), ledger: ledgerPath, rows }, null, 2)}\n`);
+	process.stdout.write(
+		`${JSON.stringify({ generatedAt: new Date().toISOString(), ledger: ledgerPath, rows }, null, 2)}\n`,
+	);
 	process.exit(0);
 }
 
@@ -210,13 +251,20 @@ for (const r of rows) {
 }
 
 if (refs.length) {
-	out.push(` ▌ No rastreados (${refs.length}, reference = original de Frida, sin upstream directo):`);
-	out.push(`   ${refs.map((r) => r.label.replace("src/tools/", "")).join(", ")}`);
+	out.push(
+		` ▌ No rastreados (${refs.length}, reference = original de Frida, sin upstream directo):`,
+	);
+	out.push(
+		`   ${refs.map((r) => r.label.replace("src/tools/", "")).join(", ")}`,
+	);
 	out.push("");
 }
 
-out.push(` Resumen: ${tracked.length} rastreados · ${synced.length} synced · ${drifted.length} con drift`);
-if (noRegistry) out.push("   (modo --no-registry: ports sin verificación de registry)");
+out.push(
+	` Resumen: ${tracked.length} rastreados · ${synced.length} synced · ${drifted.length} con drift`,
+);
+if (noRegistry)
+	out.push("   (modo --no-registry: ports sin verificación de registry)");
 out.push("");
 
 process.stdout.write(`${out.join("\n")}\n`);
