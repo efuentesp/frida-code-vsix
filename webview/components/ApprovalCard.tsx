@@ -44,6 +44,11 @@ const FRIDA_INTERNAL_TOOLS = new Set([
 	"workflow_respond",
 	"workflow_retry",
 	"workflow_resume",
+	// MCP / skills: tools nativas de Pi con efectos (llaman a servers MCP o
+	// copian scripts/assets al workspace). Conocidas, no "no reconocidas" (#12).
+	"mcp",
+	"mcpScript",
+	"read_skills",
 ]);
 
 type ItemKey = "yes" | "pattern" | "no" | "reason";
