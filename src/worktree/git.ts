@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import {
+	existsSync,
+	lstatSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+} from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import type { ExecResult, GitClient } from "./exec";
 
@@ -67,7 +73,10 @@ export function parseWorktreePorcelain(output: string): WorktreeRecord[] {
 
 		if (key === "worktree") {
 			finish();
-			if (!value) throw new GitWorktreeError("Worktree porcelain record is missing path.");
+			if (!value)
+				throw new GitWorktreeError(
+					"Worktree porcelain record is missing path.",
+				);
 			current = { path: value, bare: false, detached: false };
 			continue;
 		}
@@ -118,7 +127,11 @@ export function defaultWorktreePath(
 	branch: string,
 	worktreeRoot: string,
 ): string {
-	return resolve(worktreeRoot, basename(mainWorktreePath), branch.replaceAll("/", "-"));
+	return resolve(
+		worktreeRoot,
+		basename(mainWorktreePath),
+		branch.replaceAll("/", "-"),
+	);
 }
 
 export function buildAddArguments(input: AddArguments): string[] {
@@ -143,7 +156,9 @@ export function pathEntryExists(path: string): boolean {
 		return true;
 	} catch (error) {
 		if (isNodeError(error) && error.code === "ENOENT") return false;
-		throw new GitWorktreeError(`Cannot inspect filesystem path ${path}: ${formatError(error)}`);
+		throw new GitWorktreeError(
+			`Cannot inspect filesystem path ${path}: ${formatError(error)}`,
+		);
 	}
 }
 
@@ -157,7 +172,10 @@ export function unresolvableSymlinkAncestor(path: string): string | undefined {
 				realpathSync.native(current);
 				return undefined;
 			} catch (error) {
-				if (isNodeError(error) && (error.code === "ENOENT" || error.code === "ELOOP")) {
+				if (
+					isNodeError(error) &&
+					(error.code === "ENOENT" || error.code === "ELOOP")
+				) {
 					return current;
 				}
 				throw new GitWorktreeError(
@@ -182,7 +200,10 @@ export function pathsEqual(left: string, right: string): boolean {
 	return pathIdentity(left) === pathIdentity(right);
 }
 
-export function sameWorktreeIdentity(left: WorktreeRecord, right: WorktreeRecord): boolean {
+export function sameWorktreeIdentity(
+	left: WorktreeRecord,
+	right: WorktreeRecord,
+): boolean {
 	return (
 		pathsEqual(left.path, right.path) &&
 		left.head === right.head &&
@@ -198,7 +219,12 @@ export async function listWorktrees(
 	cwd: string,
 	signal?: AbortSignal,
 ): Promise<WorktreeRecord[]> {
-	const result = await runGit(pi, ["worktree", "list", "--porcelain", "-z"], cwd, signal);
+	const result = await runGit(
+		pi,
+		["worktree", "list", "--porcelain", "-z"],
+		cwd,
+		signal,
+	);
 	return parseWorktreePorcelain(result.stdout);
 }
 
@@ -207,9 +233,15 @@ export async function currentWorktreePath(
 	cwd: string,
 	signal?: AbortSignal,
 ): Promise<string> {
-	const result = await runGit(pi, ["rev-parse", "--show-toplevel"], cwd, signal);
+	const result = await runGit(
+		pi,
+		["rev-parse", "--show-toplevel"],
+		cwd,
+		signal,
+	);
 	const path = removeLineEnding(result.stdout);
-	if (!path) throw new GitWorktreeError("Git did not return the current worktree path.");
+	if (!path)
+		throw new GitWorktreeError("Git did not return the current worktree path.");
 	return pathIdentity(path);
 }
 
@@ -224,7 +256,8 @@ export async function symbolicBranch(
 		cwd,
 		signal,
 	);
-	if (result.killed) throw killedError(["symbolic-ref", "--quiet", "--short", "HEAD"]);
+	if (result.killed)
+		throw killedError(["symbolic-ref", "--quiet", "--short", "HEAD"]);
 	if (result.code !== 0) return undefined;
 	return result.stdout.trim() || undefined;
 }
@@ -235,9 +268,15 @@ export async function validateBranch(
 	branch: string,
 	signal?: AbortSignal,
 ): Promise<string> {
-	const result = await runGit(pi, ["check-ref-format", "--branch", branch], cwd, signal);
+	const result = await runGit(
+		pi,
+		["check-ref-format", "--branch", branch],
+		cwd,
+		signal,
+	);
 	const normalized = result.stdout.trim();
-	if (!normalized) throw new GitWorktreeError("Git returned an empty branch name.");
+	if (!normalized)
+		throw new GitWorktreeError("Git returned an empty branch name.");
 	return normalized;
 }
 
@@ -273,7 +312,9 @@ export async function resolveCommit(
 	);
 	const oid = result.stdout.trim();
 	if (!/^[0-9a-fA-F]{40,64}$/u.test(oid)) {
-		throw new GitWorktreeError(`Git returned an invalid commit object for ${startPoint}.`);
+		throw new GitWorktreeError(
+			`Git returned an invalid commit object for ${startPoint}.`,
+		);
 	}
 	return oid;
 }
@@ -284,7 +325,13 @@ export async function addWorktree(
 	input: AddArguments,
 	signal?: AbortSignal,
 ): Promise<void> {
-	await runGit(pi, buildAddArguments(input), cwd, signal, GIT_MUTATION_TIMEOUT_MS);
+	await runGit(
+		pi,
+		buildAddArguments(input),
+		cwd,
+		signal,
+		GIT_MUTATION_TIMEOUT_MS,
+	);
 }
 
 export async function removeWorktree(
@@ -293,7 +340,13 @@ export async function removeWorktree(
 	path: string,
 	signal?: AbortSignal,
 ): Promise<void> {
-	await runGit(pi, ["worktree", "remove", path], cwd, signal, GIT_MUTATION_TIMEOUT_MS);
+	await runGit(
+		pi,
+		["worktree", "remove", path],
+		cwd,
+		signal,
+		GIT_MUTATION_TIMEOUT_MS,
+	);
 }
 
 export async function worktreeInventory(
@@ -310,8 +363,18 @@ export async function worktreeInventory(
 	];
 	const status = await runGit(pi, statusArgs, path, signal);
 	const indexFlags = await runGit(pi, ["ls-files", "-v", "-z"], path, signal);
-	const indexInventory = await indexFlagInventory(pi, indexFlags.stdout, path, signal);
-	const submoduleStatus = await runGit(pi, ["submodule", "status", "--recursive"], path, signal);
+	const indexInventory = await indexFlagInventory(
+		pi,
+		indexFlags.stdout,
+		path,
+		signal,
+	);
+	const submoduleStatus = await runGit(
+		pi,
+		["submodule", "status", "--recursive"],
+		path,
+		signal,
+	);
 	const initializedSubmodules = nonEmptyLines(submoduleStatus.stdout)
 		.filter((line) => !line.startsWith("-"))
 		.map((line) => `initialized submodule: ${line.slice(1).trimStart()}`);
@@ -347,7 +410,10 @@ export async function worktreeAdministrativeDirectory(
 		signal,
 	);
 	const value = removeLineEnding(result.stdout);
-	if (!value) throw new GitWorktreeError("Git did not return its worktree administrative path.");
+	if (!value)
+		throw new GitWorktreeError(
+			"Git did not return its worktree administrative path.",
+		);
 	return resolve(cwd, value);
 }
 
@@ -358,11 +424,19 @@ export async function administrativeHistoryOids(
 	signal?: AbortSignal,
 ): Promise<string[]> {
 	const gitDirArgument = `--git-dir=${administrativePath}`;
-	const values = readAdministrativeReflogOids(resolve(administrativePath, "logs"));
+	const values = readAdministrativeReflogOids(
+		resolve(administrativePath, "logs"),
+	);
 
 	const refs = await runGit(
 		pi,
-		[gitDirArgument, "for-each-ref", "--format=%(objectname)", "refs/worktree", "refs/bisect"],
+		[
+			gitDirArgument,
+			"for-each-ref",
+			"--format=%(objectname)",
+			"refs/worktree",
+			"refs/bisect",
+		],
 		cwd,
 		signal,
 	);
@@ -399,13 +473,16 @@ export async function administrativePruneCandidates(
 		signal,
 	);
 	const commonValue = removeLineEnding(commonResult.stdout);
-	if (!commonValue) throw new GitWorktreeError("Git did not return its common directory.");
+	if (!commonValue)
+		throw new GitWorktreeError("Git did not return its common directory.");
 	const commonDirectory = resolve(cwd, commonValue);
 	const administrativeRoot = resolve(commonDirectory, "worktrees");
 	if (!existsSync(administrativeRoot)) return [];
 
 	const candidates: AdministrativePruneCandidate[] = [];
-	for (const entry of readdirSync(administrativeRoot, { withFileTypes: true })) {
+	for (const entry of readdirSync(administrativeRoot, {
+		withFileTypes: true,
+	})) {
 		const administrativePath = resolve(administrativeRoot, entry.name);
 		if (!entry.isDirectory() || entry.isSymbolicLink()) {
 			throw new GitWorktreeError(
@@ -430,7 +507,9 @@ export async function administrativePruneCandidates(
 		let headValue: string;
 		try {
 			if (!lstatSync(headPath).isFile()) {
-				throw new GitWorktreeError(`Git worktree administrative HEAD is not a file: ${headPath}.`);
+				throw new GitWorktreeError(
+					`Git worktree administrative HEAD is not a file: ${headPath}.`,
+				);
 			}
 			headValue = removeLineEnding(readFileSync(headPath, "utf8"));
 		} catch (error) {
@@ -439,7 +518,12 @@ export async function administrativePruneCandidates(
 				`Cannot inspect Git worktree administrative HEAD ${headPath}: ${formatError(error)}`,
 			);
 		}
-		const indexDirty = await administrativeIndexIsDirty(pi, cwd, administrativePath, signal);
+		const indexDirty = await administrativeIndexIsDirty(
+			pi,
+			cwd,
+			administrativePath,
+			signal,
+		);
 		if (headValue.startsWith("ref: ")) {
 			const branchRef = headValue.slice("ref: ".length);
 			if (!branchRef) {
@@ -456,7 +540,9 @@ export async function administrativePruneCandidates(
 			continue;
 		}
 		if (!/^[0-9a-fA-F]{40,64}$/u.test(headValue)) {
-			throw new GitWorktreeError(`Git worktree administrative HEAD is malformed: ${headPath}.`);
+			throw new GitWorktreeError(
+				`Git worktree administrative HEAD is malformed: ${headPath}.`,
+			);
 		}
 		candidates.push({
 			id: entry.name,
@@ -498,7 +584,9 @@ export async function durableRefExists(
 	signal?: AbortSignal,
 ): Promise<boolean> {
 	if (!ref.startsWith("refs/") || ref.includes("\0")) {
-		throw new GitWorktreeError("Git worktree administrative HEAD contains an invalid ref.");
+		throw new GitWorktreeError(
+			"Git worktree administrative HEAD contains an invalid ref.",
+		);
 	}
 	const result = await runGitAllowFailure(
 		pi,
@@ -542,7 +630,12 @@ export async function prunePreview(
 	cwd: string,
 	signal?: AbortSignal,
 ): Promise<string> {
-	const result = await runGit(pi, ["worktree", "prune", "--dry-run", "--verbose"], cwd, signal);
+	const result = await runGit(
+		pi,
+		["worktree", "prune", "--dry-run", "--verbose"],
+		cwd,
+		signal,
+	);
 	return combineOutput(result);
 }
 
@@ -561,7 +654,10 @@ export async function pruneWorktrees(
 	return combineOutput(result);
 }
 
-export function formatWorktree(record: WorktreeRecord, currentPath?: string): string {
+export function formatWorktree(
+	record: WorktreeRecord,
+	currentPath?: string,
+): string {
 	const labels = [
 		currentPath && pathsEqual(record.path, currentPath) ? "current" : undefined,
 		record.isMain ? "main" : undefined,
@@ -575,7 +671,9 @@ export function formatWorktree(record: WorktreeRecord, currentPath?: string): st
 			: undefined,
 	].filter((label): label is string => Boolean(label));
 	const head = record.head ? record.head.slice(0, 8) : "no HEAD";
-	return stripTerminalControls(`${record.path}  [${labels.join(", ") || "unknown"}]  ${head}`);
+	return stripTerminalControls(
+		`${record.path}  [${labels.join(", ") || "unknown"}]  ${head}`,
+	);
 }
 
 export function stripTerminalControls(value: string): string {
@@ -612,7 +710,10 @@ async function runGitAllowFailure(
 	} catch (error) {
 		const message = formatError(error);
 		if (/\bENOENT\b|not found/i.test(message)) {
-			throw new GitWorktreeError("Git executable was not found. Install Git and retry.", args);
+			throw new GitWorktreeError(
+				"Git executable was not found. Install Git and retry.",
+				args,
+			);
 		}
 		throw new GitWorktreeError(
 			`Could not start git ${args.slice(0, 2).join(" ")}: ${message}`,
@@ -628,7 +729,10 @@ function gitFailure(args: string[], result: ExecResult): GitWorktreeError {
 	const hint = /not a git repository/i.test(detail)
 		? "The current Pi workspace is not inside a Git repository."
 		: detail || `Git exited with code ${result.code}.`;
-	return new GitWorktreeError(`git ${args.slice(0, 2).join(" ")} failed: ${hint}`, args);
+	return new GitWorktreeError(
+		`git ${args.slice(0, 2).join(" ")} failed: ${hint}`,
+		args,
+	);
 }
 
 function killedError(args: string[]): GitWorktreeError {
@@ -664,10 +768,13 @@ async function indexFlagInventory(
 	const inventory: string[] = [];
 	for (const entry of entries) {
 		const flags = [
-			entry.skipWorktree && !sparseManagedPaths.has(entry.path) ? "skip-worktree" : undefined,
+			entry.skipWorktree && !sparseManagedPaths.has(entry.path)
+				? "skip-worktree"
+				: undefined,
 			entry.assumeUnchanged ? "assume-unchanged" : undefined,
 		].filter((flag): flag is string => flag !== undefined);
-		if (flags.length > 0) inventory.push(`index flag ${flags.join("+")}: ${entry.path}`);
+		if (flags.length > 0)
+			inventory.push(`index flag ${flags.join("+")}: ${entry.path}`);
 	}
 	return inventory;
 }
@@ -677,7 +784,9 @@ function parseIndexFlagEntries(value: string): IndexFlagEntry[] {
 	for (const entry of value.split("\0")) {
 		if (!entry) continue;
 		if (entry.length < 3 || entry[1] !== " ") {
-			throw new GitWorktreeError("Git returned malformed ls-files index-flag output.");
+			throw new GitWorktreeError(
+				"Git returned malformed ls-files index-flag output.",
+			);
 		}
 		const tag = entry[0] ?? "";
 		const skipWorktree = tag.toUpperCase() === "S";
@@ -713,9 +822,13 @@ async function sparseManagedSkipWorktreePaths(
 	// Older Git versions lack check-rules; retain every flag rather than guessing.
 	if (checked.code !== 0) return new Set();
 
-	const included = new Set(nulSeparatedPaths(checked.stdout, "sparse-checkout rules"));
+	const included = new Set(
+		nulSeparatedPaths(checked.stdout, "sparse-checkout rules"),
+	);
 	if ([...included].some((path) => !candidates.has(path))) {
-		throw new GitWorktreeError("Git returned an unexpected sparse-checkout path.");
+		throw new GitWorktreeError(
+			"Git returned an unexpected sparse-checkout path.",
+		);
 	}
 	return new Set([...candidates].filter((path) => !included.has(path)));
 }
@@ -732,7 +845,11 @@ function runGitWithInputAllowFailure(
 	}
 	return new Promise((resolveResult, reject) => {
 		// ExtensionAPI.exec has no stdin channel, so this read-only check uses an argv-only child.
-		const child = spawn("git", args, { cwd, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+		const child = spawn("git", args, {
+			cwd,
+			stdio: ["pipe", "pipe", "pipe"],
+			windowsHide: true,
+		});
 		let stdout = "";
 		let stderr = "";
 		let killed = false;
@@ -753,7 +870,10 @@ function runGitWithInputAllowFailure(
 			const message = formatError(error);
 			reject(
 				/\bENOENT\b|not found/i.test(message)
-					? new GitWorktreeError("Git executable was not found. Install Git and retry.", args)
+					? new GitWorktreeError(
+							"Git executable was not found. Install Git and retry.",
+							args,
+						)
 					: new GitWorktreeError(
 							`Could not start git ${args.slice(0, 2).join(" ")}: ${message}`,
 							args,
@@ -778,7 +898,12 @@ function runGitWithInputAllowFailure(
 		});
 		child.once("error", fail);
 		child.once("close", (code, closeSignal) => {
-			finish({ stdout, stderr, code: code ?? 1, killed: killed || closeSignal !== null });
+			finish({
+				stdout,
+				stderr,
+				code: code ?? 1,
+				killed: killed || closeSignal !== null,
+			});
 		});
 		signal?.addEventListener("abort", stop, { once: true });
 		if (signal?.aborted) stop();
@@ -794,7 +919,9 @@ function nulSeparatedPaths(value: string, source: string): string[] {
 }
 
 function combineOutput(result: ExecResult): string {
-	return [result.stdout.trimEnd(), result.stderr.trimEnd()].filter(Boolean).join("\n");
+	return [result.stdout.trimEnd(), result.stderr.trimEnd()]
+		.filter(Boolean)
+		.join("\n");
 }
 
 function removeLineEnding(value: string): string {
@@ -810,7 +937,9 @@ function splitAdministrativeOids(value: string, source: string): string[] {
 		.split("\n")
 		.map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
 	if (values.some((oid) => !/^[0-9a-fA-F]{40,64}$/u.test(oid))) {
-		throw new GitWorktreeError(`Git returned malformed object IDs for ${source}.`);
+		throw new GitWorktreeError(
+			`Git returned malformed object IDs for ${source}.`,
+		);
 	}
 	return values;
 }
@@ -821,13 +950,18 @@ function splitFetchHeadOids(value: string): string[] {
 	return normalized.split("\n").map((line) => {
 		const match = /^([0-9a-fA-F]{40,64})\t/u.exec(line);
 		if (!match?.[1]) {
-			throw new GitWorktreeError("Git worktree administrative FETCH_HEAD is malformed.");
+			throw new GitWorktreeError(
+				"Git worktree administrative FETCH_HEAD is malformed.",
+			);
 		}
 		return match[1];
 	});
 }
 
-function readAdministrativeFile(administrativePath: string, name: string): string | undefined {
+function readAdministrativeFile(
+	administrativePath: string,
+	name: string,
+): string | undefined {
 	const path = resolve(administrativePath, name);
 	let stat: ReturnType<typeof lstatSync>;
 	try {
@@ -858,15 +992,21 @@ function readAdministrativeReflogOids(logPath: string): string[] {
 	try {
 		stat = lstatSync(logPath);
 	} catch (error) {
-		throw new GitWorktreeError(`Cannot inspect Git reflog path ${logPath}: ${formatError(error)}`);
+		throw new GitWorktreeError(
+			`Cannot inspect Git reflog path ${logPath}: ${formatError(error)}`,
+		);
 	}
 	if (stat.isSymbolicLink()) {
-		throw new GitWorktreeError(`Git reflog path must not be a symbolic link: ${logPath}.`);
+		throw new GitWorktreeError(
+			`Git reflog path must not be a symbolic link: ${logPath}.`,
+		);
 	}
 	if (stat.isDirectory()) {
 		const values: string[] = [];
 		for (const entry of readdirSync(logPath, { withFileTypes: true })) {
-			values.push(...readAdministrativeReflogOids(resolve(logPath, entry.name)));
+			values.push(
+				...readAdministrativeReflogOids(resolve(logPath, entry.name)),
+			);
 		}
 		return values;
 	}
@@ -878,7 +1018,9 @@ function readAdministrativeReflogOids(logPath: string): string[] {
 	try {
 		contents = readFileSync(logPath, "utf8");
 	} catch (error) {
-		throw new GitWorktreeError(`Cannot read Git reflog ${logPath}: ${formatError(error)}`);
+		throw new GitWorktreeError(
+			`Cannot read Git reflog ${logPath}: ${formatError(error)}`,
+		);
 	}
 	const normalized = contents.endsWith("\n") ? contents.slice(0, -1) : contents;
 	if (!normalized) return [];
@@ -886,7 +1028,9 @@ function readAdministrativeReflogOids(logPath: string): string[] {
 	for (const line of normalized.split("\n")) {
 		const match = /^([0-9a-fA-F]{40,64}) ([0-9a-fA-F]{40,64}) /u.exec(line);
 		if (!match?.[1] || !match[2] || match[1].length !== match[2].length) {
-			throw new GitWorktreeError(`Git worktree reflog is malformed: ${logPath}.`);
+			throw new GitWorktreeError(
+				`Git worktree reflog is malformed: ${logPath}.`,
+			);
 		}
 		for (const oid of [match[1], match[2]]) {
 			if (!/^0+$/u.test(oid)) values.push(oid);

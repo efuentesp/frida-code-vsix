@@ -33,7 +33,11 @@ export interface GitExecOptions {
  * `Pick<ExtensionAPI, "exec">` del candidato original.
  */
 export interface GitClient {
-	exec(command: string, args: string[], options?: GitExecOptions): Promise<ExecResult>;
+	exec(
+		command: string,
+		args: string[],
+		options?: GitExecOptions,
+	): Promise<ExecResult>;
 }
 
 /** Factory del cliente git (argv spawn, sin shell). */
@@ -97,7 +101,12 @@ function execGit(
 			reject(error);
 		});
 		child.once("close", (code, sig) => {
-			finish({ stdout, stderr, code: code ?? 1, killed: killed || sig !== null });
+			finish({
+				stdout,
+				stderr,
+				code: code ?? 1,
+				killed: killed || sig !== null,
+			});
 		});
 		signal?.addEventListener("abort", stop, { once: true });
 	});

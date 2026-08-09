@@ -26,7 +26,9 @@ export interface WorktreeCommandContext {
  * Ejecuta el comando: abre el menú de worktrees (add/abrir/remove/prune/configure).
  * Maneja errores fatales (no es repo git, git no instalado) con mensajes claros.
  */
-export async function runWorktreeCommand(ctx: WorktreeCommandContext): Promise<void> {
+export async function runWorktreeCommand(
+	ctx: WorktreeCommandContext,
+): Promise<void> {
 	const git = createGitClient();
 	const settings = createWorktreeSettingsRuntime({ path: settingsFilePath });
 	// Carga el estado desde disco (best-effort: archivo roto → default + warning).

@@ -1,9 +1,16 @@
-import { lstat, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import {
+	lstat,
+	mkdir,
+	readFile,
+	rename,
+	unlink,
+	writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, posix, win32 } from "node:path";
 import { defaultAgentDir } from "../pi-session";
 
-export const SETTINGS_FILE = "worktree.json";
+const SETTINGS_FILE = "worktree.json";
 
 export type WorktreeSettingsSource = "default" | "user";
 
@@ -34,7 +41,9 @@ export interface WorktreeSettingsRuntime {
 	get(): Readonly<WorktreeSettingsState>;
 	getPath(): string;
 	reload(): Promise<Readonly<WorktreeSettingsState>>;
-	save(configuredRoot: string | undefined): Promise<Readonly<WorktreeSettingsState>>;
+	save(
+		configuredRoot: string | undefined,
+	): Promise<Readonly<WorktreeSettingsState>>;
 	flush?(): Promise<void>;
 }
 
@@ -47,7 +56,9 @@ interface RuntimeOptions {
 
 const DEFAULT_FILE_OPERATIONS: SettingsFileOperations = {
 	write: (path, data) =>
-		writeFile(path, data, { encoding: "utf8", flag: "wx", mode: 0o600 }).then(() => undefined),
+		writeFile(path, data, { encoding: "utf8", flag: "wx", mode: 0o600 }).then(
+			() => undefined,
+		),
 	rename,
 };
 
@@ -55,20 +66,22 @@ export function settingsFilePath(): string {
 	return join(defaultAgentDir(), SETTINGS_FILE);
 }
 
-export function defaultWorktreeRoot(
+function defaultWorktreeRoot(
 	home = homedir(),
 	platform: NodeJS.Platform = process.platform,
 ): string {
 	return platformPath(platform).join(home, ".worktrees");
 }
 
-export function resolveWorktreeRoot(
+function resolveWorktreeRoot(
 	value: string,
 	home = homedir(),
 	platform: NodeJS.Platform = process.platform,
 ): string {
 	if (!value || value.includes("\0")) {
-		throw new Error("worktreeRoot must be a non-empty path without NUL characters.");
+		throw new Error(
+			"worktreeRoot must be a non-empty path without NUL characters.",
+		);
 	}
 	if (hasShellVariableSyntax(value)) {
 		throw new Error("worktreeRoot must not contain shell variable syntax.");
@@ -78,10 +91,15 @@ export function resolveWorktreeRoot(
 	let candidate = value;
 	if (value === "~") {
 		candidate = home;
-	} else if (value.startsWith("~/") || (platform === "win32" && value.startsWith("~\\"))) {
+	} else if (
+		value.startsWith("~/") ||
+		(platform === "win32" && value.startsWith("~\\"))
+	) {
 		candidate = path.resolve(home, value.slice(2));
 	} else if (value.startsWith("~")) {
-		throw new Error("worktreeRoot supports only ~ itself or a path beginning with ~/.");
+		throw new Error(
+			"worktreeRoot supports only ~ itself or a path beginning with ~/.",
+		);
 	}
 	if (!path.isAbsolute(candidate)) {
 		throw new Error("worktreeRoot must be an absolute path or begin with ~/.");
@@ -94,11 +112,13 @@ export function resolveWorktreeRoot(
 		}
 		return normalized;
 	} catch (error) {
-		throw new Error(`worktreeRoot could not be normalized: ${formatError(error)}`);
+		throw new Error(
+			`worktreeRoot could not be normalized: ${formatError(error)}`,
+		);
 	}
 }
 
-export async function loadWorktreeSettings(
+async function loadWorktreeSettings(
 	path = settingsFilePath(),
 	home = homedir(),
 	platform: NodeJS.Platform = process.platform,
@@ -107,8 +127,10 @@ export async function loadWorktreeSettings(
 	let text: string;
 	try {
 		const stats = await lstat(path);
-		if (stats.isSymbolicLink()) return invalid(path, fallback, "symbolic links are not accepted");
-		if (!stats.isFile()) return invalid(path, fallback, "settings path is not a regular file");
+		if (stats.isSymbolicLink())
+			return invalid(path, fallback, "symbolic links are not accepted");
+		if (!stats.isFile())
+			return invalid(path, fallback, "settings path is not a regular file");
 		text = await readFile(path, "utf8");
 	} catch (error) {
 		if (isNodeError(error) && error.code === "ENOENT") {
@@ -125,7 +147,8 @@ export async function loadWorktreeSettings(
 
 	try {
 		const document = JSON.parse(text) as unknown;
-		if (!isRecord(document)) return invalid(path, fallback, "the top level must be a JSON object");
+		if (!isRecord(document))
+			return invalid(path, fallback, "the top level must be a JSON object");
 		if (!Object.hasOwn(document, "worktreeRoot")) {
 			return {
 				kind: "loaded",
@@ -138,7 +161,11 @@ export async function loadWorktreeSettings(
 		if (typeof document.worktreeRoot !== "string") {
 			return invalid(path, fallback, "worktreeRoot must be a string");
 		}
-		const effectiveRoot = resolveWorktreeRoot(document.worktreeRoot, home, platform);
+		const effectiveRoot = resolveWorktreeRoot(
+			document.worktreeRoot,
+			home,
+			platform,
+		);
 		return {
 			kind: "loaded",
 			path,
@@ -152,7 +179,7 @@ export async function loadWorktreeSettings(
 	}
 }
 
-export async function saveWorktreeSettings(
+async function saveWorktreeSettings(
 	document: Record<string, unknown>,
 	configuredRoot: string | undefined,
 	path = settingsFilePath(),
@@ -169,7 +196,10 @@ export async function saveWorktreeSettings(
 			temporaryPath,
 			`${JSON.stringify(nextDocument, null, 2)}\n`,
 		);
-		await (operations.rename ?? DEFAULT_FILE_OPERATIONS.rename)(temporaryPath, path);
+		await (operations.rename ?? DEFAULT_FILE_OPERATIONS.rename)(
+			temporaryPath,
+			path,
+		);
 		return nextDocument;
 	} catch (error) {
 		await unlink(temporaryPath).catch(() => undefined);
@@ -185,7 +215,9 @@ export function createWorktreeSettingsRuntime(
 	let resolvedPath: string | undefined;
 	const getPath = () => {
 		resolvedPath ??=
-			typeof options.path === "function" ? options.path() : (options.path ?? settingsFilePath());
+			typeof options.path === "function"
+				? options.path()
+				: (options.path ?? settingsFilePath());
 		return resolvedPath;
 	};
 	let operationQueue = Promise.resolve();
@@ -223,7 +255,9 @@ export function createWorktreeSettingsRuntime(
 		save(configuredRoot) {
 			return enqueue(async () => {
 				if (!state.canSave) {
-					throw new Error(`Fix the pi-worktree settings file at ${getPath()} before changing it.`);
+					throw new Error(
+						`Fix the pi-worktree settings file at ${getPath()} before changing it.`,
+					);
 				}
 				const effectiveRoot =
 					configuredRoot === undefined
@@ -232,7 +266,9 @@ export function createWorktreeSettingsRuntime(
 				const latest = await loadWorktreeSettings(getPath(), home, platform);
 				if (latest.kind === "invalid") {
 					state = { ...state, warning: latest.warning, canSave: false };
-					throw new Error(`Fix the pi-worktree settings file at ${getPath()} before changing it.`);
+					throw new Error(
+						`Fix the pi-worktree settings file at ${getPath()} before changing it.`,
+					);
 				}
 				await saveWorktreeSettings(
 					latest.document ?? {},
@@ -252,17 +288,25 @@ export function createWorktreeSettingsRuntime(
 	};
 }
 
-function stateFromLoaded(loaded: LoadedWorktreeSettings): WorktreeSettingsState {
+function stateFromLoaded(
+	loaded: LoadedWorktreeSettings,
+): WorktreeSettingsState {
 	return {
 		effectiveRoot: loaded.effectiveRoot,
 		source: loaded.source,
-		...(loaded.configuredRoot === undefined ? {} : { configuredRoot: loaded.configuredRoot }),
+		...(loaded.configuredRoot === undefined
+			? {}
+			: { configuredRoot: loaded.configuredRoot }),
 		...(loaded.warning === undefined ? {} : { warning: loaded.warning }),
 		canSave: true,
 	};
 }
 
-function invalid(path: string, fallback: string, reason: string): LoadedWorktreeSettings {
+function invalid(
+	path: string,
+	fallback: string,
+	reason: string,
+): LoadedWorktreeSettings {
 	return {
 		kind: "invalid",
 		path,

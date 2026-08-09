@@ -4098,10 +4098,7 @@ export async function activate(
 			"frida.generateCommitMessage",
 			() => void generateCommitMessageCmd(),
 		),
-		vscode.commands.registerCommand(
-			"frida.worktree",
-			() => void worktreeCmd(),
-		),
+		vscode.commands.registerCommand("frida.worktree", () => void worktreeCmd()),
 		vscode.window.onDidChangeWindowState((s) => {
 			vscodeWindowFocused = s.focused;
 		}),
