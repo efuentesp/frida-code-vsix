@@ -73,9 +73,7 @@ function emit(): void {
 }
 
 /** Clave estable para comparar/arglomerar structuralPath. */
-export function pathKey(
-	structuralPath: readonly string[] | undefined,
-): string {
+export function pathKey(structuralPath: readonly string[] | undefined): string {
 	return (structuralPath ?? []).join("/");
 }
 

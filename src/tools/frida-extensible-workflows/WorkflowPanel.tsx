@@ -178,9 +178,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 						[{run.phase}]
 					</ftext>
 				) : null}
-				{(counts.completed > 0 ||
-					counts.failed > 0 ||
-					counts.running > 0) && (
+				{(counts.completed > 0 || counts.failed > 0 || counts.running > 0) && (
 					<fbox flexDirection="row" gap={4} alignItems="center">
 						{counts.completed > 0 ? (
 							<ftext size={11} color={STATE_COLOR.completed}>

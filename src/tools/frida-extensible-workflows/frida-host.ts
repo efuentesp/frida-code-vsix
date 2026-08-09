@@ -243,7 +243,13 @@ async function runWithStore(
 			? { createSpawnerForCwd: opts.createSpawnerForCwd }
 			: {}),
 	});
-	const exec = runWorkflow(opts.script, opts.args, bridge, opts.signal, opts.onProgress);
+	const exec = runWorkflow(
+		opts.script,
+		opts.args,
+		bridge,
+		opts.signal,
+		opts.onProgress,
+	);
 	try {
 		const result = await exec.result;
 		await store.saveState({ ...run, state: "completed", usage });

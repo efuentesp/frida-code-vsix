@@ -324,24 +324,24 @@ export function createFridaExtensibleWorkflows() {
 						runId,
 						workflowName: name,
 					} as JsonValue);
-						upsertWorkflowRun({ runId, workflowName: name, state: "running" });
+					upsertWorkflowRun({ runId, workflowName: name, state: "running" });
 
-						void runWorkflowInStore({
-							name,
-							script,
-							args,
-							cwd: ctx.cwd,
-							sessionId,
-							runId,
-							spawnAgent,
-							signal: controller.signal,
-							foreground: false,
-							createSpawnerForCwd,
-							...(budget ? { budget } : {}),
-							onCheckpoint,
-							onProgress: (event) =>
-								applyWorkflowProgress({ runId, progress: event }),
-						})
+					void runWorkflowInStore({
+						name,
+						script,
+						args,
+						cwd: ctx.cwd,
+						sessionId,
+						runId,
+						spawnAgent,
+						signal: controller.signal,
+						foreground: false,
+						createSpawnerForCwd,
+						...(budget ? { budget } : {}),
+						onCheckpoint,
+						onProgress: (event) =>
+							applyWorkflowProgress({ runId, progress: event }),
+					})
 						.then(({ result }) => {
 							emitWorkflowEvent(pi, "workflow:run-completed", {
 								runId,
