@@ -13,6 +13,7 @@ export function SkillBlockCard({
 	block,
 	live,
 	input,
+	onCopy,
 }: {
 	block: SkillBlock;
 	/** true mientras Frida trabaja en este skill (el turno es el activo + busy).

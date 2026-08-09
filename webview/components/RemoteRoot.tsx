@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode, CSSProperties } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import type { WebNode } from "../types";
 import { Markdown } from "./Markdown";
 import {
@@ -13,16 +13,10 @@ import {
 	X,
 } from "lucide-react";
 
+import type { LucideIcon } from "lucide-react";
+
 /** Registro nombre-lucide (kebab) → componente. `ficon` lo consulta por `name`. */
-const F_ICONS: Record<
-	string,
-	ComponentType<{
-		size?: number;
-		color?: string;
-		strokeWidth?: number;
-		className?: string;
-	}>
-> = {
+const F_ICONS: Record<string, LucideIcon> = {
 	circle: Circle,
 	"loader-circle": LoaderCircle,
 	check: Check,
