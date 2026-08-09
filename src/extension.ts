@@ -24,6 +24,7 @@ import {
 	defaultAgentDir,
 	type FridaSession,
 } from "./pi-session";
+import { runGenerateCommitMessage } from "./commit-message";
 import type { ApprovalRequest } from "./approval-bridge";
 import { ModelChangeBridge } from "./model-change-bridge";
 import type { PermissionMode } from "./tools/frida-permission-system";
@@ -1173,9 +1174,7 @@ export async function activate(
 	function moonshotDefaultModelId(): string | undefined {
 		const models: any[] =
 			frida?.modelRuntime?.getModels?.(MOONSHOT_PROVIDER) ?? [];
-		return (
-			models.find((m: any) => m.id === "kimi-k3")?.id ?? models[0]?.id
-		);
+		return models.find((m: any) => m.id === "kimi-k3")?.id ?? models[0]?.id;
 	}
 
 	// Serializa un error de login a texto útil — NUNCA vacío. El catch anterior
@@ -3972,6 +3971,18 @@ export async function activate(
 		diagChannel.appendLine("Ver fix-frida-gateway.md.");
 	}
 
+	// Genera el mensaje de commit del diff staged con el LLM activo y lo deja en el
+	// textbox del SCM para commit manual (issue #9). Reutiliza el patrón de
+	// generateSessionTitle: sesión efímera sin tools, mismo modelRuntime/model.
+	async function generateCommitMessageCmd(): Promise<void> {
+		await runGenerateCommitMessage({
+			modelRuntime: frida?.modelRuntime,
+			model: frida?.session?.model,
+			cwd: workspaceCwd(),
+			agentDir: defaultAgentDir(),
+		});
+	}
+
 	// Exporta el reporte de uso (frida-usage-report/v1) para el concentrador externo.
 	// Opt-in inline: sólo incluye email/org si el usuario lo permite (exporta anónimo si no).
 	async function exportUsage(): Promise<void> {
@@ -4047,6 +4058,10 @@ export async function activate(
 		vscode.commands.registerCommand(
 			"frida.exportUsage",
 			() => void exportUsage(),
+		),
+		vscode.commands.registerCommand(
+			"frida.generateCommitMessage",
+			() => void generateCommitMessageCmd(),
 		),
 		vscode.window.onDidChangeWindowState((s) => {
 			vscodeWindowFocused = s.focused;

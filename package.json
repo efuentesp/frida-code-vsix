@@ -75,6 +75,34 @@
       {
         "command": "frida.diagnoseThinking",
         "title": "Frida: Diagnosticar thinking del proveedor"
+      },
+      {
+        "command": "frida.generateCommitMessage",
+        "title": "Frida: Generar mensaje de commit",
+        "icon": "$(sparkle)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "frida.generateCommitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "frida.generateCommitMessage",
+          "when": "scmProvider == git"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "frida.generateCommitMessage",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c",
+        "when": "scmRepositoryState"
       }
     ],
     "viewsContainers": {
@@ -208,6 +236,39 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Emite un sonido del sistema y muestra una notificación cuando Frida termina una petición o necesita tu atención (un permiso o una pregunta) y la ventana de VS Code no tiene el foco (estás en otra aplicación). Sonido distinto para cada caso: listo (Glass) al terminar, atención (Ping) al pedir permiso o pregunta. Útil para regresar a Frida tras cambiar de ventana."
+        },
+        "frida.commitMessage.format": {
+          "type": "string",
+          "enum": [
+            "conventional",
+            "free"
+          ],
+          "default": "conventional",
+          "markdownDescription": "Formato del mensaje que genera **Frida: Generar mensaje de commit**. `conventional` = Conventional Commits con scope inferido del módulo tocado (`feat(scope): …`); `free` = descripción libre. Coherente con [docs/versioning.md](docs/versioning.md)."
+        },
+        "frida.commitMessage.language": {
+          "type": "string",
+          "enum": [
+            "es",
+            "en"
+          ],
+          "default": "es",
+          "markdownDescription": "Idioma del mensaje generado por **Frida: Generar mensaje de commit**."
+        },
+        "frida.commitMessage.includeBody": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Incluir un cuerpo con viñetas cuando el diff lo justifica (cambio complejo). Si el cambio es simple, se omite el cuerpo."
+        },
+        "frida.commitMessage.maxSubjectLength": {
+          "type": "number",
+          "default": 50,
+          "markdownDescription": "Longitud máxima de la primera línea (asunto) del mensaje de commit."
+        },
+        "frida.commitMessage.templatePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Ruta (absoluta o relativa al workspace) a un archivo markdown que **reemplaza** el system prompt default del generador. Útil para reglas de equipo (ticket JIRA obligatorio, scope fijo, sin emoji, etc.). Soporta los placeholders `{language}`, `{maxSubjectLength}` y `{types}`. Vacío = prompt default de Conventional Commits; si existe `~/.frida/commit-message-prompt.md`, se usa ese."
         }
       }
     }
