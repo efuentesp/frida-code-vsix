@@ -168,10 +168,10 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 			...drafts,
 			[tab]: { questionIndex: tab, kind: "option", answer: label },
 		});
-		// Parity pi: al elegir (single-select) saltar a la siguiente pestaña.
-		// Con 2+ preguntas avanza (a la siguiente pregunta o a "Enviar"); con 1
-		// sola no hay tab bar → el usuario envía con Shift+Enter / Enviar.
-		if (isMulti) goToTab(Math.min(tab + 1, questions.length));
+		// No auto-advance (issue #5): al elegir, el usuario se queda en la
+		// pregunta para releer/corregir y avanza manualmente (Siguiente →,
+		// flechas ←→, o Revisar y enviar). Con 1 sola pregunta no hay tab bar y
+		// se envía con Shift+Enter / Enviar.
 	}
 	function toggleMulti(label: string) {
 		const selected = new Set(draft?.selected ?? []);
@@ -319,20 +319,14 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	function renderOption(opt: WebQuestionOption, i: number) {
 		const selected = isOptionSelected(opt.label);
 		const focused = zone === "options" && i === focusOpt;
-		const indicator = q!.multiSelect
-			? selected
-				? "☑"
-				: "☐"
-			: selected
-				? "◉"
-				: "○";
+		let indicator: string;
+		if (q!.multiSelect) indicator = selected ? "☑" : "☐";
+		else indicator = selected ? "◉" : "○";
 		return (
 			<div
 				key={`${opt.label}-${i}`}
 				tabIndex={-1}
-				className={
-					"q-opt" + (selected ? " selected" : "") + (focused ? " focused" : "")
-				}
+				className={`q-opt${selected ? " selected" : ""}${focused ? " focused" : ""}`}
 				onMouseEnter={() => setHoverLabel(opt.label)}
 				onClick={() => {
 					setZone("options");
@@ -396,23 +390,33 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					<div className="q-review-list">
 						{questions.map((qq, i) => {
 							const d = drafts[i];
+							const answered = isAnswered(i);
 							let value: string;
-							if (!d || !isAnswered(i)) value = "(sin responder)";
+							if (!d || !answered) value = "(sin responder)";
 							else if (d.kind === "multi")
 								value = (d.selected ?? []).join(", ");
 							else if (d.kind === "custom") value = `(escrito) ${d.answer}`;
 							else value = d.answer ?? "";
 							return (
-								<div key={i} className="q-review-row">
-									<span className="q-review-label">
-										{qq.header || `Q${i + 1}`}:
-									</span>{" "}
-									<span className="q-review-value">{value}</span>
+								<div
+									key={i}
+									className={`q-review-row${answered ? " ok" : " missing"}`}
+								>
+									<div className="q-review-head">
+										<span className="q-review-idx">{`Q${i + 1}`}</span>
+										<span className="q-review-state">
+											{answered ? "✓" : "○"}
+										</span>
+										<span className="q-review-label">
+											{qq.header || `Q${i + 1}`}
+										</span>
+									</div>
+									<div className="q-review-value">{value}</div>
 								</div>
 							);
 						})}
 					</div>
-					<div className={"q-review-status " + (allAnswered ? "ok" : "warn")}>
+					<div className={`q-review-status ${allAnswered ? "ok" : "warn"}`}>
 						{allAnswered
 							? "✓ Enter para enviar"
 							: `Faltan: ${missing.join(", ")}`}
