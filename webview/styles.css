@@ -2403,6 +2403,22 @@ button.danger:hover {
 .q-question {
 	font-size: 13px;
 }
+/* Markdown en QuestionsPanel (issue #15): el label/header compactos y el valor
+   de respuesta son de una línea → sin margen de <p>; la pregunta y la
+   descripción son bloques → quitar sólo el margen externo (preserva el interno). */
+.q-opt-label .md p,
+.q-header .md p,
+.q-review-value .md p {
+	margin: 0;
+}
+.q-question .md > p:first-child,
+.q-opt-desc .md > p:first-child {
+	margin-top: 0;
+}
+.q-question .md > p:last-child,
+.q-opt-desc .md > p:last-child {
+	margin-bottom: 0;
+}
 /* Pestaña "Enviar" (review): resumen de respuestas + estado (parity pi). */
 .q-review {
 	display: flex;

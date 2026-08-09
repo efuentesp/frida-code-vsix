@@ -337,8 +337,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 			>
 				<span className="q-opt-marker">{indicator}</span>
 				<div className="q-opt-body">
-					<div className="q-opt-label">{opt.label}</div>
-					<div className="q-opt-desc">{opt.description}</div>
+					<div className="q-opt-label">
+						<Markdown>{opt.label}</Markdown>
+					</div>
+					<div className="q-opt-desc">
+						<Markdown>{opt.description}</Markdown>
+					</div>
 				</div>
 			</div>
 		);
@@ -411,7 +415,9 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 											{qq.header || `Q${i + 1}`}
 										</span>
 									</div>
-									<div className="q-review-value">{value}</div>
+									<div className="q-review-value">
+								<Markdown>{value}</Markdown>
+							</div>
 								</div>
 							);
 						})}
@@ -424,10 +430,14 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				</div>
 			) : (
 				<>
-					{!isMulti && q!.header ? (
-						<div className="q-header">{q!.header}</div>
-					) : null}
-					<div className="q-question">{q!.question}</div>
+				{!isMulti && q!.header ? (
+					<div className="q-header">
+						<Markdown>{q!.header}</Markdown>
+					</div>
+				) : null}
+				<div className="q-question">
+					<Markdown>{q!.question}</Markdown>
+				</div>
 
 					{hasPreviews && !inputMode ? (
 						<div className="q-with-preview">
