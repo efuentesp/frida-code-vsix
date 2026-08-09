@@ -638,8 +638,7 @@ export function createFridaExtensibleWorkflows() {
 							runId,
 							workflowName,
 							state: "failed",
-							error:
-								err instanceof Error ? err.message : String(err),
+							error: err instanceof Error ? err.message : String(err),
 						});
 						throw err;
 					}
