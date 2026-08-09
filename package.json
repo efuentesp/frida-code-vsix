@@ -80,6 +80,11 @@
         "command": "frida.generateCommitMessage",
         "title": "Frida: Generar mensaje de commit",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "frida.worktree",
+        "title": "Frida: Worktrees",
+        "icon": "$(git-branch)"
       }
     ],
     "menus": {
@@ -88,11 +93,20 @@
           "command": "frida.generateCommitMessage",
           "group": "navigation",
           "when": "scmProvider == git"
+        },
+        {
+          "command": "frida.worktree",
+          "group": "navigation",
+          "when": "scmProvider == git"
         }
       ],
       "commandPalette": [
         {
           "command": "frida.generateCommitMessage",
+          "when": "scmProvider == git"
+        },
+        {
+          "command": "frida.worktree",
           "when": "scmProvider == git"
         }
       ]

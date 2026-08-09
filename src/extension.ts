@@ -25,6 +25,7 @@ import {
 	type FridaSession,
 } from "./pi-session";
 import { runGenerateCommitMessage } from "./commit-message";
+import { runWorktreeCommand } from "./worktree";
 import type { ApprovalRequest } from "./approval-bridge";
 import { ModelChangeBridge } from "./model-change-bridge";
 import type { PermissionMode } from "./tools/frida-permission-system";
@@ -4010,6 +4011,13 @@ export async function activate(
 		});
 	}
 
+	// Gestiona git worktrees (add / abrir / remove / prune / configure) y abre cada
+	// worktree en una ventana VS Code nueva: una por requisito, sin choques. Porte
+	// nativo de @narumitw/pi-worktree (issue #13).
+	async function worktreeCmd(): Promise<void> {
+		await runWorktreeCommand({ cwd: workspaceCwd() });
+	}
+
 	// Exporta el reporte de uso (frida-usage-report/v1) para el concentrador externo.
 	// Opt-in inline: sólo incluye email/org si el usuario lo permite (exporta anónimo si no).
 	async function exportUsage(): Promise<void> {
@@ -4089,6 +4097,10 @@ export async function activate(
 		vscode.commands.registerCommand(
 			"frida.generateCommitMessage",
 			() => void generateCommitMessageCmd(),
+		),
+		vscode.commands.registerCommand(
+			"frida.worktree",
+			() => void worktreeCmd(),
 		),
 		vscode.window.onDidChangeWindowState((s) => {
 			vscodeWindowFocused = s.focused;
