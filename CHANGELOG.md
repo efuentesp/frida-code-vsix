@@ -17,6 +17,36 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.17.0] - 2026-08-09
+### Añadido
+
+- **scm** — botón "Generar commit message" en Source Control (issue #9)
+- **providers** — Moonshot AI (Kimi) como proveedor + kimi-k3 default
+- **workflows** — progreso en vivo de workflows en background (issue #7)
+- **webview,host** — renombrar sesión in-place + auto-título del primer mensaje (issue #4)
+- **webview** — ask_user_question sin auto-advance + revisión jerárquica (issue #5)
+- **abort** — persistir traza de diagnóstico a ~/.frida/logs/abort.log
+- **webview** — secciones Entrada/Salida en tarjetas de tool y skill
+- **abort** — canal "Frida Abort" con trazado bidireccional webview↔host
+- **frida-workflows** — capturar stderr y contexto de boot del child al morrir
+- **todo** — mostrar la tarea en progreso en el header al colapsar
+- **webview** — borde rojo del textbox en modo YOLO
+- **webview** — basename del archivo + ruta completa en tooltip
+- **webview** — conteo de cambios y sync vs origin en el WorkspaceBar
+
+### Corregido
+
+- **webview** — reconocer las tools de frida-extensible-workflows en el ApprovalCard (issue #8)
+- **workspace** — refrescar el footer de git al editar/escribir (issue #3)
+- **frida-workflows** — filtrar flags de inspector del execArgv heredado del child
+- **subagents** — evitar agentes duplicados en el panel al registrar una sola vez
+
+### Interno
+
+- **workflows** — reformateo post-issue #7
+- **webview,host** — reformateo post-issue #4
+- **abort** — reformato Biome de la persistencia del log de abort
+
 ## [0.16.0] - 2026-08-07
 ### Añadido
 
