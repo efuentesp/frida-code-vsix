@@ -51,6 +51,7 @@ import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaExtensibleWorkflows } from "./tools/frida-extensible-workflows";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
+import { createFridaWorktree } from "./worktree";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
 import {
@@ -510,6 +511,13 @@ export async function createFridaSession(
 			{
 				name: "frida-git-sync",
 				factory: createFridaGitSync(),
+			},
+			// frida-worktree (issue #13): porte nativo de @narumitw/pi-worktree.
+			// Registra /worktree (slash command del chat, UI vía ctx.ui). El comando
+			// VS Code frida.worktree (botón SCM) se cablea aparte en extension.ts.
+			{
+				name: "frida-worktree",
+				factory: createFridaWorktree(),
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens
