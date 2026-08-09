@@ -69,6 +69,7 @@ for (const key of ["getBuiltinModule","binding","_linkedBinding","dlopen","kill"
   if (key in process) process[key] = undefined;
 }
 let nextId = 0;
+let agentSeq = 0;
 let cancelled = false;
 const pending = new Map();
 const inflight = new Set();
@@ -149,9 +150,12 @@ const internalAgent = (...values) => {
   const options = values.length < 2 || values[1] === undefined ? {} : values[1];
   const worktreeOwner = worktreeOwners.getStore();
   const identity = { structuralPath: [...inherited], callSite, occurrence, ...(worktreeOwner ? { worktreeOwner } : {}) };
+  const wfRole = typeof options.role === "string" ? options.role : (options.role && typeof options.role === "object" && typeof options.role.role === "string" ? options.role.role : undefined);
+  const agentId = "a" + (++agentSeq);
+  send({ type: "progress", kind: "agent_start", agentId: agentId, structuralPath: identity.structuralPath, occurrence: occurrence, ...(wfRole ? { role: wfRole } : {}) });
   let result;
   try {
-    result = rpc("agent", [values[0], options, identity]).then(unwrap);
+    result = rpc("agent", [values[0], options, identity]).then((v) => { const value = unwrap(v); send({ type: "progress", kind: "agent_end", agentId: agentId, ok: true }); return value; }, (e) => { send({ type: "progress", kind: "agent_end", agentId: agentId, ok: false, ...(errorCode(e) ? { code: errorCode(e) } : {}) }); throw e; });
   } catch (error) {
     agentInflight.delete(occurrenceKey);
     throw error;
@@ -236,7 +240,7 @@ const prompt = (template, values) => {
   return template.replace(/{{|}}|{([A-Za-z_$][\w$]*)}/g, (match, key) => match === "{{" ? "{" : match === "}}" ? "}" : typeof values[key] === "string" ? values[key] : JSON.stringify(values[key], null, 2));
 };
 const checkpoint = input => rpc("checkpoint", [input]).then(unwrap);
-const phase = name => rpc("phase", [name]);
+const phase = name => { send({ type: "progress", kind: "phase", name: name }); return rpc("phase", [name]); };
 const log = message => rpc("log", [message]);
 const functionOccurrences = new Map();
 const functionPath = name => {
@@ -264,6 +268,9 @@ const parallel = async (operationName, tasks) => {
     named(name, "parallel task");
     if (typeof run !== "function") throw workError("INVALID_METADATA", "parallel task values must be run functions");
   }
+  const groupParent = inheritedAgentPath.getStore() || [];
+  const groupPath = [...groupParent, operationName];
+  send({ type: "progress", kind: "group_start", structuralPath: groupPath, name: operationName, taskNames: entries.map(e => e[0]) });
   const results = await Promise.all(entries.map(async ([name, run]) => {
     try {
       const parent = inheritedAgentPath.getStore() || [];
@@ -275,6 +282,7 @@ const parallel = async (operationName, tasks) => {
     }
   }));
   const failure = results.find(result => !result.ok);
+  send({ type: "progress", kind: "group_end", structuralPath: groupPath, ok: !failure });
   if (failure) throw Object.assign(workflowError(failure.error), { failedAt: failure.failedAt });
   return Object.fromEntries(results.map(result => [result.name, result.value]));
 };
@@ -621,11 +629,25 @@ function captureChildBootContext(opts: {
 	if (tail) lines.push(`--- child stderr (últimos 8 KB) ---\n${tail}`);
 	return lines.join("\n");
 }
+export interface WorkflowProgressEvent {
+	type: "progress";
+	kind: "agent_start" | "agent_end" | "group_start" | "group_end" | "phase";
+	agentId?: string;
+	structuralPath?: string[];
+	role?: string;
+	occurrence?: number;
+	ok?: boolean;
+	code?: string;
+	name?: string;
+	taskNames?: string[];
+}
+
 export function runWorkflow(
 	script: string,
 	args: JsonValue = null,
 	bridge: WorkflowBridge = {},
 	signal?: AbortSignal,
+	onProgress?: (event: WorkflowProgressEvent) => void,
 ): WorkflowExecution {
 	encoded(args);
 	const config = JSON.stringify({
@@ -739,6 +761,14 @@ export function runWorkflow(
 					);
 				if (message.type === "heartbeat") {
 					lastHeartbeatAt = performance.now();
+					return;
+				}
+				if (message.type === "progress") {
+					try {
+						onProgress?.(message as unknown as WorkflowProgressEvent);
+					} catch {
+						// El progreso es best-effort: nunca debe romper la ejecución.
+					}
 					return;
 				}
 				if (message.type === "result") {

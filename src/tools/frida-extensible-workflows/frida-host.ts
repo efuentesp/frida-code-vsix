@@ -23,6 +23,7 @@ import {
 	readShellResult,
 	runWorkflow,
 	shellIdentityPath,
+	type WorkflowProgressEvent,
 } from "./core/execution";
 import {
 	RunStore,
@@ -219,6 +220,8 @@ interface RunWithStoreOptions {
 	usage?: WorkflowBudgetUsage;
 	replaySources?: readonly RunStore[];
 	createSpawnerForCwd?: (cwd: string) => SpawnAgentFn;
+	/** Progreso en vivo (issue #7): agent_start/end, group_start/end, phase. */
+	onProgress?: (event: WorkflowProgressEvent) => void;
 }
 
 async function runWithStore(
@@ -240,7 +243,7 @@ async function runWithStore(
 			? { createSpawnerForCwd: opts.createSpawnerForCwd }
 			: {}),
 	});
-	const exec = runWorkflow(opts.script, opts.args, bridge, opts.signal);
+	const exec = runWorkflow(opts.script, opts.args, bridge, opts.signal, opts.onProgress);
 	try {
 		const result = await exec.result;
 		await store.saveState({ ...run, state: "completed", usage });
@@ -287,6 +290,8 @@ export interface RunWorkflowInStoreOptions {
 	foreground?: boolean;
 	budget?: WorkflowBudget;
 	onCheckpoint?: CheckpointNotifier;
+	/** Progreso en vivo (issue #7). */
+	onProgress?: (event: WorkflowProgressEvent) => void;
 	/** Stores adicionales para replay (retry pasa [sourceStore]). */
 	replaySources?: readonly RunStore[];
 	createSpawnerForCwd?: (cwd: string) => SpawnAgentFn;
@@ -341,6 +346,7 @@ export async function runWorkflowInStore(
 		...(opts.createSpawnerForCwd
 			? { createSpawnerForCwd: opts.createSpawnerForCwd }
 			: {}),
+		...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
 	});
 	return { runId, result };
 }
