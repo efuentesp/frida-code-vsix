@@ -1,0 +1,145 @@
+{
+  "_comment": "Ledger de proveniencia Frida↔pi. Source of truth para scripts/upstream-drift.mjs. Init clean-slate (basedOn = instalado/latest a 2026-08-09). Mapeos 'reference' y fridaAdditions se refinan en auditoría manual (enfoque híbrido). Feature: issue #11.",
+  "_schema": "v1",
+  "updated": "2026-08-09",
+  "platform": {
+    "package": "@earendil-works/pi-coding-agent",
+    "kind": "runtime",
+    "mode": "platform",
+    "basedOn": "0.81.1",
+    "repo": "https://github.com/earendil-works/pi",
+    "note": "Runtime/SDK base de TODO Frida. Drift aquí afecta al host y a los 16 wrappers."
+  },
+  "sources": [
+    {
+      "wrapper": "src/tools/frida-mcp-adapter",
+      "upstream": "pi-mcp-adapter",
+      "kind": "runtime",
+      "mode": "delegate",
+      "basedOn": "2.17.0",
+      "repo": null,
+      "fridaAdditions": "delegate sobre createMcpAdapter; panel de diagnóstico + puente de logs",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-subagents",
+      "upstream": "@tintinweb/pi-subagents",
+      "kind": "port",
+      "mode": "fork",
+      "basedOn": "0.14.3",
+      "repo": "https://github.com/tintinweb/pi-subagents",
+      "fridaAdditions": "TODO (auditoría manual)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-extensible-workflows",
+      "upstream": "pi-extensible-workflows",
+      "kind": "port",
+      "mode": "fork",
+      "basedOn": "5.2.0",
+      "repo": "https://github.com/vekexasia/pi-extensible-workflows",
+      "fridaAdditions": "TODO (auditoría manual)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-supi-web",
+      "upstream": "@mrclrchtr/supi-web",
+      "kind": "port",
+      "mode": "fork",
+      "basedOn": "4.7.0",
+      "repo": "https://github.com/mrclrchtr/supi",
+      "fridaAdditions": "TODO (auditoría manual)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-agent-browser",
+      "upstream": "pi-agent-browser-native",
+      "kind": "port",
+      "mode": "fork",
+      "basedOn": "0.3.0",
+      "repo": "https://github.com/fitchmultz/pi-agent-browser-native",
+      "fridaAdditions": "TODO (auditoría manual)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-permission-system",
+      "upstream": "@gotgenes/pi-permission-system",
+      "kind": "port",
+      "mode": "fork",
+      "basedOn": "24.0.0",
+      "repo": "https://github.com/gotgenes/pi-packages",
+      "fridaAdditions": "TODO (auditoría manual)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-context",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Utilidad original de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-args",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Utilidad original de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-git-sync",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Utilidad original de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-workflow",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Infra de workflows propia de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-multi-skills",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Utilidad original de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-pipeline",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Pipeline propio de Frida (depende del peer @earendil-works/pi-tui)",
+      "lastSync": "2026-08-09"
+    },
+    {
+      "wrapper": "src/tools/frida-pix-skills",
+      "upstream": null,
+      "kind": "reference",
+      "mode": "fork",
+      "basedOn": "n/a",
+      "repo": null,
+      "fridaAdditions": "Utilidad original de Frida (sin upstream directo)",
+      "lastSync": "2026-08-09"
+    }
+  ]
+}

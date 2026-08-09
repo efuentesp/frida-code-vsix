@@ -280,6 +280,7 @@
     "watch": "node esbuild.js --watch",
     "package": "npm run build && vsce package --allow-missing-repository",
     "release": "node scripts/release.mjs",
+    "upstream:drift": "node scripts/upstream-drift.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
