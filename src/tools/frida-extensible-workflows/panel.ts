@@ -12,6 +12,7 @@
 
 import type { ReactElement } from "react";
 import { createExtensibleWorkflowPanelElement } from "./WorkflowPanel";
+import { wfLog } from "./telemetry";
 
 export interface ExtensibleWorkflowWebBridge {
 	mountPersistent: (
@@ -27,13 +28,22 @@ let wired = false;
 export function wireExtensibleWorkflowPanel(
 	webBridge: ExtensibleWorkflowWebBridge,
 ): { unmount: () => void } {
+	wfLog("wire_enter", { alreadyWired: wired, hasMounted: !!mounted });
 	if (wired && mounted) return mounted;
 	wired = true;
 	if (!mounted) {
-		mounted = webBridge.mountPersistent(
-			createExtensibleWorkflowPanelElement,
-			"footer",
-		);
+		try {
+			mounted = webBridge.mountPersistent(
+				createExtensibleWorkflowPanelElement,
+				"footer",
+			);
+			wfLog("wire_mount_ok", {
+				hasUnmount: typeof mounted?.unmount === "function",
+			});
+		} catch (e) {
+			wfLog("wire_mount_error", { error: String(e) });
+			throw e;
+		}
 	}
 	return mounted;
 }

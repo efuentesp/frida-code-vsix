@@ -12,6 +12,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
+import { wfLog } from "./telemetry";
 import {
 	getWorkflowRuns,
 	pathKey,
@@ -31,6 +32,11 @@ export function createExtensibleWorkflowPanelElement(): ReactElement {
 function WorkflowPanel(): ReactElement | null {
 	const runs = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
 	const active = runs.filter((r) => r.state === "running");
+	wfLog("render", {
+		totalRuns: runs.length,
+		activeRuns: active.length,
+		runs: runs.map((r) => ({ id: r.runId.slice(0, 8), state: r.state })),
+	});
 	if (active.length === 0) return null; // sólo muestra runs en curso
 	return (
 		<fbox flexDirection="column" gap={4}>

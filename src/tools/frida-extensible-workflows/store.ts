@@ -9,6 +9,8 @@
 // fridaWeb ni el SDK; por eso el tipo del evento se define aquí (sin depender
 // de core/execution, que arrastra módulos de node).
 
+import { wfLog } from "./telemetry";
+
 export type WorkflowRunState =
 	| "running"
 	| "completed"
@@ -79,8 +81,10 @@ export function pathKey(structuralPath: readonly string[] | undefined): string {
 
 export function subscribeWorkflowRuns(listener: () => void): () => void {
 	listeners.add(listener);
+	wfLog("subscribe", { listeners: listeners.size });
 	return () => {
 		listeners.delete(listener);
+		wfLog("unsubscribe", { listeners: listeners.size });
 	};
 }
 
@@ -101,6 +105,15 @@ export function upsertWorkflowRun(
 		groups?: readonly GroupProgressView[];
 	},
 ): void {
+	wfLog("upsert", {
+		runId: view.runId,
+		state: view.state,
+		phase: view.phase,
+		agents: view.agents?.length,
+		groups: view.groups?.length,
+		totalRuns: current.length,
+		listeners: listeners.size,
+	});
 	const idx = current.findIndex((r) => r.runId === view.runId);
 	if (idx >= 0) {
 		const prev = current[idx];
@@ -142,6 +155,13 @@ export function applyWorkflowProgress(opts: {
 }): void {
 	const { runId, progress } = opts;
 	const idx = current.findIndex((r) => r.runId === runId);
+	wfLog("progress", {
+		runId,
+		kind: progress.kind,
+		knownRun: idx >= 0,
+		totalRuns: current.length,
+		listeners: listeners.size,
+	});
 	if (idx < 0) return;
 	const run = current[idx];
 	const {

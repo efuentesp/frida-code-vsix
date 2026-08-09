@@ -26,6 +26,7 @@ import {
 	applyWorkflowProgress,
 	getWorkflowRuns,
 } from "./store";
+import { wfLog } from "./telemetry";
 import { RunStore } from "./core/persistence";
 import { fridaHome } from "./frida-paths";
 import {
@@ -329,6 +330,7 @@ export function createFridaExtensibleWorkflows() {
 						workflowName: name,
 					} as JsonValue);
 					upsertWorkflowRun({ runId, workflowName: name, state: "running" });
+					wfLog("launch", { runId, workflowName: name, foreground: false });
 
 					void runWorkflowInStore({
 						name,
@@ -356,6 +358,7 @@ export function createFridaExtensibleWorkflows() {
 								workflowName: name,
 								state: "completed",
 							});
+							wfLog("complete", { runId, workflowName: name });
 							deliverFollowUp(
 								pi,
 								`Workflow ${name} (runId: ${runId}) completado.\n\n${renderWorkflowResult(result)}`,
@@ -381,6 +384,7 @@ export function createFridaExtensibleWorkflows() {
 										: "failed",
 								...(cancelled || budgetExhausted ? {} : { error: message }),
 							});
+							wfLog("fail", { runId, workflowName: name, message });
 							// CANCELLED (workflow_stop) → cancelación explícita, sin follow-up.
 							if (!cancelled) {
 								deliverFollowUp(
@@ -620,6 +624,7 @@ export function createFridaExtensibleWorkflows() {
 					const existing = getWorkflowRuns().find((r) => r.runId === runId);
 					const workflowName = existing?.workflowName ?? runId.slice(0, 8);
 					upsertWorkflowRun({ runId, workflowName, state: "running" });
+					wfLog("resume", { runId, workflowName });
 					try {
 						const { result } = await resumeWorkflow(runId, {
 							cwd: ctx.cwd,
