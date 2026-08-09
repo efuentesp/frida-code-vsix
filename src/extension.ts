@@ -2311,9 +2311,7 @@ export async function activate(
 
 	/** Extrae el texto (unido) del último mensaje con `role` en `messages`. */
 	function lastMessageText(
-		messages:
-			| Array<{ role?: string; content?: unknown }>
-			| undefined,
+		messages: Array<{ role?: string; content?: unknown }> | undefined,
 		role: string,
 	): string | undefined {
 		if (!messages) return undefined;

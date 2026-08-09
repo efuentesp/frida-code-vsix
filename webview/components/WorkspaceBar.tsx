@@ -67,38 +67,36 @@ export function WorkspaceBar({
 					<code>{ws ? shortCwd(ws.cwd) : "…"}</code>
 				</span>
 			</Tooltip>
-		{ws?.sessionPath &&
-			(editing ? (
-				<input
-					className="ws-session-input"
-					value={draft}
-					placeholder="Nombre de la sesión…"
-					autoFocus
-					onChange={(e) => setDraft(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") {
-							e.preventDefault();
-							commit();
-						} else if (e.key === "Escape") {
-							e.preventDefault();
-							setEditing(false);
+			{ws?.sessionPath &&
+				(editing ? (
+					<input
+						className="ws-session-input"
+						value={draft}
+						placeholder="Nombre de la sesión…"
+						autoFocus
+						onChange={(e) => setDraft(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								commit();
+							} else if (e.key === "Escape") {
+								e.preventDefault();
+								setEditing(false);
+							}
+						}}
+						onBlur={commit}
+					/>
+				) : (
+					<span
+						className={"ws-session" + (onRename ? " editable" : "")}
+						title={
+							onRename ? "Click para renombrar la sesión" : ws?.sessionName
 						}
-					}}
-					onBlur={commit}
-				/>
-			) : (
-				<span
-					className={"ws-session" + (onRename ? " editable" : "")}
-					title={
-						onRename
-							? "Click para renombrar la sesión"
-							: ws?.sessionName
-					}
-					onClick={onRename ? startEdit : undefined}
-				>
-					• {ws?.sessionName ?? "(sin nombre)"}
-				</span>
-			))}
+						onClick={onRename ? startEdit : undefined}
+					>
+						• {ws?.sessionName ?? "(sin nombre)"}
+					</span>
+				))}
 			{ws?.branch && (
 				<Tooltip label={branchTooltip(ws)} side="top">
 					<span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>
