@@ -10,7 +10,7 @@
 import * as vscode from "vscode";
 import { loadCommitMessageConfig } from "./config";
 import { generateCommitMessage } from "./generator";
-import { getActiveRepository } from "./git";
+import { getActiveRepository, getCommitDiff } from "./git";
 
 /** Contexto que extension.ts provee al handler (tomado del scope de activate). */
 export interface CommandContext {
@@ -52,19 +52,14 @@ export async function runGenerateCommitMessage(
 		return;
 	}
 
-	// 3. Diff: staged si hay; si no, working tree (mirror de GitHub Copilot).
-	//    Así el botón sirve aunque el usuario aún no haya hecho `git add`.
+	// 3. Diff: staged si hay; si no, working tree INCLUYENDO untracked (git diff
+	//    los excluye, aunque VS Code y el footer los muestren). Issue #9.
 	let diff: string;
 	let diffSource: "staged" | "working tree";
 	try {
-		const staged = await repo.diff(true);
-		if (staged.trim()) {
-			diff = staged;
-			diffSource = "staged";
-		} else {
-			diff = await repo.diff(false);
-			diffSource = "working tree";
-		}
+		const result = await getCommitDiff(repo);
+		diff = result.diff;
+		diffSource = result.source;
 	} catch (e) {
 		await vscode.window.showErrorMessage(
 			`Frida no pudo leer el diff: ${e instanceof Error ? e.message : String(e)}`,
