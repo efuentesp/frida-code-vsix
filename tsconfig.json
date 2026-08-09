@@ -13,7 +13,10 @@
     "sourceMap": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+		"@/*": ["src/*"],
+		"pi-mcp-adapter": ["types/pi-mcp-adapter.d.ts"]
+	}
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }
