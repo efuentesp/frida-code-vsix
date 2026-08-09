@@ -15,11 +15,11 @@
 // `render`/`subscribe` (panel) se confirma o descarta la hipótesis de procesos
 // separados, y se localiza exactamente dónde se corta la cadena.
 //
-// TEMPORAL: sin gate (siempre-on) mientras se diagnostica #7. Se quita o se
-// gatea (env/centinela) en el fix definitivo. La telemetría jamás debe romper
-// el flujo: todo va envuelto en try/catch.
+// Gate: OFF por defecto (ver isTelemetryEnabled). Se elimina por completo en el
+// fix definitivo de #7. La telemetría jamás debe romper el flujo: todo va
+// envuelto en try/catch.
 
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -27,15 +27,28 @@ const LOG_PATH =
 	process.env.FRIDA_WF_PANEL_LOG ??
 	join(homedir(), ".frida", "logs", "workflow-panel.log");
 
+// Gate: la telemetría está OFF por defecto (no ensucia producción). Se activa con
+// la env FRIDA_WF_PANEL_DEBUG=1 o creando el centinela ~/.frida/wf-panel-debug
+// (detectable en runtime, sin reiniciar). Para diagnosticar el issue #7:
+//   touch ~/.frida/wf-panel-debug   → reproducir → leer el log.
+const SENTINEL = join(homedir(), ".frida", "wf-panel-debug");
+
+function isTelemetryEnabled(): boolean {
+	if (process.env.FRIDA_WF_PANEL_DEBUG === "1") return true;
+	try {
+		return existsSync(SENTINEL);
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Escribe una línea JSON de telemetría. No lanza: si el FS falla, se ignora.
  * @param tag   corto (wire/launch/upsert/progress/render/subscribe/...).
  * @param detail campos extra; `pid`/`ppid`/`ts` se añaden siempre.
  */
-export function wfLog(
-	tag: string,
-	detail: Record<string, unknown> = {},
-): void {
+export function wfLog(tag: string, detail: Record<string, unknown> = {}): void {
+	if (!isTelemetryEnabled()) return;
 	try {
 		const line = JSON.stringify({
 			ts: new Date().toISOString(),
