@@ -43,7 +43,9 @@ async function prepare(): Promise<{
 }
 
 /** Comando VS Code `frida.worktree` — pickers nativos de VS Code. */
-export async function runWorktreeCommand(ctx: WorktreeCommandContext): Promise<void> {
+export async function runWorktreeCommand(
+	ctx: WorktreeCommandContext,
+): Promise<void> {
 	const { git, settings } = await prepare();
 	await runWorktreeFlows(git, settings, ctx.cwd, createVscodeWorktreeUI());
 }
