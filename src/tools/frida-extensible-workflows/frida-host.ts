@@ -364,6 +364,8 @@ export interface RecoveryOptions {
 	signal?: AbortSignal;
 	home?: string;
 	onCheckpoint?: CheckpointNotifier;
+	/** Progreso en vivo (issue #7): agent_start/end, group_start/end, phase. */
+	onProgress?: (event: WorkflowProgressEvent) => void;
 }
 
 /**
@@ -398,6 +400,7 @@ export async function retryWorkflow(
 		replaySources: [sourceStore],
 		...(source.run.budget ? { budget: source.run.budget } : {}),
 		...(opts.onCheckpoint ? { onCheckpoint: opts.onCheckpoint } : {}),
+		...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
 	});
 }
 
@@ -443,6 +446,7 @@ export async function resumeWorkflow(
 		usage,
 		...(budget ? { budget } : {}),
 		...(opts.onCheckpoint ? { onCheckpoint: opts.onCheckpoint } : {}),
+		...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
 	});
 	return { runId, result };
 }

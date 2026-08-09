@@ -21,7 +21,11 @@ import {
 	resumeWorkflow,
 	type CheckpointNotifier,
 } from "./frida-host";
-import { upsertWorkflowRun, applyWorkflowProgress } from "./store";
+import {
+	upsertWorkflowRun,
+	applyWorkflowProgress,
+	getWorkflowRuns,
+} from "./store";
 import { RunStore } from "./core/persistence";
 import { fridaHome } from "./frida-paths";
 import {
@@ -610,15 +614,35 @@ export function createFridaExtensibleWorkflows() {
 						throw new Error("workflow_resume: runId is required");
 					const budgetPatch = (params as { budget?: unknown }).budget;
 					const sessionId = ctx.sessionManager.getSessionId();
-					const { result } = await resumeWorkflow(runId, {
-						cwd: ctx.cwd,
-						sessionId,
-						spawnAgent: createFridaAgentSpawner(ctx),
-						...(budgetPatch !== undefined ? { budgetPatch } : {}),
-					});
-					return toolResult(
-						`Workflow ${runId} reanudada y completada.\n\n${renderWorkflowResult(result)}`,
-					);
+					// Issue #7: registrar el run reanudado en el panel de progreso antes de
+					// ejecutar (resumeWorkflow no expone onProgress, así que sólo
+					// running→completed/failed; el contador del workflow sí se ve).
+					const existing = getWorkflowRuns().find((r) => r.runId === runId);
+					const workflowName = existing?.workflowName ?? runId.slice(0, 8);
+					upsertWorkflowRun({ runId, workflowName, state: "running" });
+					try {
+						const { result } = await resumeWorkflow(runId, {
+							cwd: ctx.cwd,
+							sessionId,
+							spawnAgent: createFridaAgentSpawner(ctx),
+							...(budgetPatch !== undefined ? { budgetPatch } : {}),
+							onProgress: (event) =>
+								applyWorkflowProgress({ runId, progress: event }),
+						});
+						upsertWorkflowRun({ runId, workflowName, state: "completed" });
+						return toolResult(
+							`Workflow ${runId} reanudada y completada.\n\n${renderWorkflowResult(result)}`,
+						);
+					} catch (err) {
+						upsertWorkflowRun({
+							runId,
+							workflowName,
+							state: "failed",
+							error:
+								err instanceof Error ? err.message : String(err),
+						});
+						throw err;
+					}
 				},
 			}),
 		);

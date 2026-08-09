@@ -72,6 +72,7 @@ import type {
 	WorkflowOrigin,
 } from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
+import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
 import {
 	computePipelineStatus,
 	formatPipelineStatus,
@@ -794,6 +795,10 @@ export async function activate(
 				// Widget de estado de frida-git-sync en el footer (sync en curso + botón
 				// Cancel). Idempotente; se actualiza vía syncWidgetStore.
 				wireGitSyncWidget(s.webBridge);
+				// WorkflowPanel de frida-extensible-workflows (issue #7): panel de progreso
+				// del tool `workflow`. Idempotente; se monta una vez por sesión para que
+				// cualquier workflow lanzado por el agente (no sólo vía /wf) sea visible.
+				wireExtensibleWorkflowPanel(s.webBridge);
 				setAgentWidgetListener((snapshot) => {
 					const n = snapshot.filter(
 						(a) => a.status === "running" || a.status === "queued",
