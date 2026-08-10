@@ -3497,20 +3497,26 @@ kbd {
 	overflow-y: auto;
 }
 
-/* Roots Remote React en el footer (ej. panel del tool `todo`): marco de panel
-   compacto, hermano del .lens-panel. Auto-oculto si vacío (no hay footer-roots). */
+/* Roots Remote React en el footer (ej. panel del tool `todo`, workflow,
+   subagentes): contenedor que apila los paneles con separación. Cada panel root
+   (.fbox) es su propia tarjeta (.web-footer > .fbox); .web-footer ya NO es un
+   marco compartido (issue #17). Auto-oculto si vacío (no hay footer-roots). */
 .web-footer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 	margin: 6px 12px;
-	border: 1px solid var(--vscode-panel-border);
-	border-radius: 8px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
-	/* Sin padding: el contenido (panel del todo, cuestionario) aporta el suyo.
-	   overflow:auto para que el destaque .tone-active respete el radio y haya scroll. */
+	/* overflow:auto para que haya scroll si los paneles superan max-height. */
 	overflow: auto;
 	max-height: 60vh;
+}
+/* Cada panel persistente del footer es su propia tarjeta (issue #17): separación
+   visual clara cuando coexisten varios paneles (workflow + todo + subagentes). */
+.web-footer > .fbox {
+	border: 1px solid
+		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+	border-radius: 8px;
+	background: var(--vscode-list-hoverBackground);
 }
 /* Divisor entre filas (fbox) del panel del todo dentro del footer: cualquier fbox
    con un hermano fbox previo (filas tras el header). */

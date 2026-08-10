@@ -10,8 +10,9 @@
 //
 // Tags intrinsic de frida-webview (fbox/ftext), tipados en src/frida-webview/index.ts.
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 import { wfLog } from "./telemetry";
 import {
 	getWorkflowRuns,
@@ -32,6 +33,7 @@ export function createExtensibleWorkflowPanelElement(): ReactElement {
 function WorkflowPanel(): ReactElement | null {
 	const runs = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
 	const active = runs.filter((r) => r.state === "running");
+	const [collapsed, setCollapsed] = useState(false);
 	wfLog("render", {
 		totalRuns: runs.length,
 		activeRuns: active.length,
@@ -39,12 +41,22 @@ function WorkflowPanel(): ReactElement | null {
 	});
 	if (active.length === 0) return null; // sólo muestra runs en curso
 	return (
-		<fbox flexDirection="column" gap={4}>
-			<ftext bold>Workflows ({active.length})</ftext>
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={() => setCollapsed((c) => !c)}
+			padding={6}
+			gap={4}
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext bold>Workflows</ftext>
+					<ftext color="#888">({active.length})</ftext>
+				</fbox>
+			}
+		>
 			{active.map((r) => (
 				<RunView key={r.runId} run={r} />
 			))}
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 
