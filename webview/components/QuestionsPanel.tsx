@@ -416,8 +416,8 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 										</span>
 									</div>
 									<div className="q-review-value">
-								<Markdown>{value}</Markdown>
-							</div>
+										<Markdown>{value}</Markdown>
+									</div>
 								</div>
 							);
 						})}
@@ -430,14 +430,14 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				</div>
 			) : (
 				<>
-				{!isMulti && q!.header ? (
-					<div className="q-header">
-						<Markdown>{q!.header}</Markdown>
+					{!isMulti && q!.header ? (
+						<div className="q-header">
+							<Markdown>{q!.header}</Markdown>
+						</div>
+					) : null}
+					<div className="q-question">
+						<Markdown>{q!.question}</Markdown>
 					</div>
-				) : null}
-				<div className="q-question">
-					<Markdown>{q!.question}</Markdown>
-				</div>
 
 					{hasPreviews && !inputMode ? (
 						<div className="q-with-preview">
