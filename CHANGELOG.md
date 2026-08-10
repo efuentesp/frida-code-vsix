@@ -17,7 +17,44 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.18.0] - 2026-08-10
+
+### Añadido
+
+- **worktree** — indicador de worktree en el header del chat (Refs #13)
+- **worktree** — slash command /worktree en el chat, fiel al original (Refs #13)
+- **worktree** — porte nativo de @narumitw/pi-worktree (issue #13)
+
+### Corregido
+
+- **webview** — renderizar markdown en QuestionsPanel (ask_user_question)
+- **commit-message** — incluir archivos untracked en el diff del working tree
+- **commit-message** — usar working tree cuando no hay staged (Refs #9)
+- **webview** — clasificar read_skills, mcp y mcpScript como tools internas
+- **chat** — surfacear errores del provider tragados como stopReason=error (issue #6)
+- **typecheck** — shim de tipos para pi-mcp-adapter (issue #10)
+- **webview** — tipos de iconos lucide + destructure onCopy (typecheck pre-existente)
+
+### Interno
+
+- **webview** — formato de QuestionsPanel tras el Markdown del #15
+- **workflows** — gatear telemetría del panel (off por defecto)
+- **workflows** — telemetría de diagnóstico del panel (issue #7)
+- **commit-message** — formato de getActiveRepository
+- **workflows** — formato del handler workflow_resume
+- **worktree** — formatter sobre extension.ts y App.tsx (Refs #13)
+- **worktree** — formatter sobre command.ts e index.ts (Refs #13)
+- **worktree** — aplicar formatter + reducir exports internos de settings
+- **agents** — todo commit debe referenciar su issue (Refs #N)
+- **agents** — gestión de issues (creación, etiquetas, confirmación)
+- **agents** — política de cierre de issues (validación del usuario)
+- aplicar prettier a scripts upstream + types/pi-mcp-adapter.d.ts
+- **adr** — ADR-0029 surfaceado de errores del provider (issue #6)
+- **upstream** — digest Action semanal + análisis de factibilidad (issue #11)
+- **upstream** — ledger de proveniencia Frida↔pi + drift detection (issue #11)
+
 ## [0.17.0] - 2026-08-09
+
 ### Añadido
 
 - **scm** — botón "Generar commit message" en Source Control (issue #9)
@@ -48,6 +85,7 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 - **abort** — reformato Biome de la persistencia del log de abort
 
 ## [0.16.0] - 2026-08-07
+
 ### Añadido
 
 - **frida-workflow** — integración del motor de workflows (ADR-0020, porte nativo
