@@ -23,13 +23,31 @@ export interface ExtensibleWorkflowWebBridge {
 
 let mounted: { unmount: () => void } | undefined;
 let wired = false;
+// Issue #7 (reapertura): ¿cada sesión recibe una webBridge DISTINTA? Si la 2ª
+// sesión llega con otra webBridge pero el singleton `wired`/`mounted` ya está
+// puesto, se retorna el mount STALE (sobre la webBridge de la sesión anterior)
+// y el panel no aparece en la nueva sesión. `lastBridge` detecta ese caso.
+let lastBridge: ExtensibleWorkflowWebBridge | undefined;
 
 /** Monta el panel persistente en el footer (idempotente). */
 export function wireExtensibleWorkflowPanel(
 	webBridge: ExtensibleWorkflowWebBridge,
 ): { unmount: () => void } {
-	wfLog("wire_enter", { alreadyWired: wired, hasMounted: !!mounted });
-	if (wired && mounted) return mounted;
+	// ¿Llegó una webBridge distinta a la del montaje previo? (clave para H2)
+	const bridgeChanged = lastBridge !== undefined && lastBridge !== webBridge;
+	wfLog("wire_enter", {
+		alreadyWired: wired,
+		hasMounted: !!mounted,
+		bridgeChanged,
+		hasLastBridge: !!lastBridge,
+	});
+	lastBridge = webBridge;
+	if (wired && mounted) {
+		// Retornó sin re-montar. Si bridgeChanged, se devolvió el mount stale
+		// (sobre la webBridge anterior) → el panel no se pinta en la sesión nueva.
+		wfLog("wire_return_stale", { bridgeChanged });
+		return mounted;
+	}
 	wired = true;
 	if (!mounted) {
 		try {
@@ -53,4 +71,5 @@ export function _resetExtensibleWorkflowPanel(): void {
 	mounted?.unmount();
 	mounted = undefined;
 	wired = false;
+	lastBridge = undefined;
 }
