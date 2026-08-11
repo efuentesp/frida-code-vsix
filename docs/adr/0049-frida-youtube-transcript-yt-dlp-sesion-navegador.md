@@ -1,6 +1,24 @@
 # `frida-youtube-transcript`: transcripciones de YouTube sin límites diarios
 
-**Estado:** aceptado (#37). No bloqueado (prerrequisitos ya instalados).
+> ## ❌ RECHAZADO (no se implementa)
+>
+> **Motivo:** la única ruta viable requiere **`yt-dlp` + `deno`** instalados en el
+> host. En el entorno destino (usuarios sin permisos de instalación) estas
+> dependencias **no son instalables** → el tool nunca funcionaría para ellos. Un
+> tool que siempre da error por dependencias ausentes es peso muerto y confuso.
+>
+> **No existe ruta zero-install fiable:** las 3 que no requieren nada (timedtext
+> HTTP, `pi-youtube-transcript`, `agent_browser`) fallan por el bot-check / POT
+> challenge de YouTube. Resolver el challenge exige un runtime JS externo
+> (deno) que el usuario no puede instalar.
+>
+> El código se eliminó (commit de reversión). Este ADR se conserva como
+> **registro de la investigación** para evitar re-explorar el mismo callejón.
+> Alternativas futuras (si cambian las restricciones): (a) empaquetar los
+> binarios de yt-dlp+deno dentro del `.vsix` (pesado, multi-plataforma); (b)
+> inyección de cookies de Brave en fetch Node (compleja, poco fiable por POT).
+>
+> Issue **#37** (rechazado).
 
 ## Contexto
 

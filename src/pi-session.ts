@@ -51,7 +51,6 @@ import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaExtensibleWorkflows } from "./tools/frida-extensible-workflows";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
-import { createFridaYoutubeTranscript } from "./tools/frida-youtube-transcript";
 import { createFridaWorktree } from "./worktree";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
@@ -512,15 +511,6 @@ export async function createFridaSession(
 			{
 				name: "frida-git-sync",
 				factory: createFridaGitSync(),
-			},
-			// frida-youtube-transcript (ADR-0049): tool `youtube_transcript`. Envuelve
-			// yt-dlp con la sesión logueada del navegador (--cookies-from-browser) +
-			// solver de challenges (--remote-components ejs:github, requiere deno) para
-			// evadir el bot-check y los límites diarios de YouTube. Apto para lotes.
-			// Main only (usa navegador + tools externas del host).
-			{
-				name: "frida-youtube-transcript",
-				factory: createFridaYoutubeTranscript(),
 			},
 			// frida-worktree (issue #13): porte nativo de @narumitw/pi-worktree.
 			// Registra /worktree (slash command del chat, UI vía ctx.ui). El comando
