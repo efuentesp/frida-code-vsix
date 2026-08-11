@@ -56,3 +56,27 @@ siguen disponibles.
 - Extiende: `frida-subagents`.
 - Coordina con: **#18** (token accounting) — `Refs #18`.
 - Sinergia: `frida-extensible-workflows` (`parallel()`).
+
+---
+
+## Addendum: scope refinado + piezas extraíbles (Refs #35)
+
+**Refinamiento:** el título original "detached/**sandboxed**" mezclaba dos conceptos. Se separan:
+
+- **#26 = detached PROCESS** (lifecycle de proceso separado; sobrevive al padre, no bloquea
+  foreground). **Esto es #26.**
+- **Sandboxed = container** → **`frida-sandboxes` (#35, ADR-0047)**, extensión independiente.
+- **#26 compone `frida-sandboxes` OPCIONALMENTE** (detached-in-sandbox si hace falta aislamiento
+  fuerte; proceso plano si no).
+
+**📦 Extraíble (NO inventar de cero):**
+
+- **`pi-goal-list-loop-audit`** (DraconDev, MIT): `goal-loop-core.ts` (~línea 1214, *"spawning a
+  detached worker"*), `goal-loop-auditor.ts` (235 LOC — worker extension-less detached),
+  `goal-loop-subagents.ts` (336 LOC — integración subagentes), `goal-heartbeat.ts`.
+- **`@earendil-works/pi-agent-core`** (peer dep): *transport abstraction + attachment support* — la
+  base para procesos detached (un detached = agent-core con transport propio).
+- **`pi-better-subagents`** (upstream original de #26): extension point base.
+
+**Dependencias refinadas:** base `frida-subagents` · coordina **#18** · compone opc. **#35**
+(`frida-sandboxes`, ADR-0047).

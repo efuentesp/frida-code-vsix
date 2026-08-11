@@ -107,3 +107,23 @@ intermitente (#7) y cuyo *measured usage* aún no contabiliza tokens (#18) — e
 - Issue **#19** (este trabajo) — bloqueado por **#7** y **#18**.
 - ADR-0028 — porte de `frida-extensible-workflows` (runtime base sobre el que se monta esta capa).
 - Upstream: <https://github.com/QuintinShaw/pi-dynamic-workflows>.
+
+---
+
+## Addendum: +2 patrones (detached-auditor, factory-router) — Refs #19, #35
+
+Además de los 5 patrones originales, la capa #19 añade **2 patrones** del modelo Agentic Engineering
+(video *"FORGET Loop Engineering"*, IndyDevDan, youtube `VQy50fuxI34`):
+
+**Patrón 6 — `detached-auditor` (separar implementación de verificación):** ADW que verifica el trabajo
+en un **proceso fresh, read-only, sin extensiones**. Anti-bamboozle: el agente que implementó no puede
+auto-verificarse. **📦 Extraíble de `pi-goal-list-loop-audit`** (DraconDev, MIT):
+`goal-loop-auditor.ts` (235 LOC) + `goal-loop-shield.ts` (131 LOC, *regression shield*: raw output
+por ítem del verification-contract) + `reviewer.ts`. *Usa:* **#26** (proceso detached) +
+`frida-permission-system` (read-only); opc. **#35** sandboxes.
+
+**Patrón 7 — `factory-router` (lee codebase → elige ADW):** ADW que lee el codebase (**pi-lens**,
+integrado ADR-0008) y elige el ADW correcto del `workflow_catalog` por precio/rendimiento/velocidad.
+**📦 Inspira en** `pi-fabric` (capability routing — CONCEPTO, no runtime; el runtime QuickJS/mesh se
+descarta por redundante con `frida-extensible-workflows`) + `pi-dynamic-workflows` (dispatch).
+Mayormente **Frida-original**. *Usa:* pi-lens + `workflow_catalog`.
