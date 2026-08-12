@@ -21,7 +21,8 @@ decide and verify. All creative work happens inside disposable adapter sessions.
 
 Asumiendo todas las extensiones planeadas (#16 skills/plugins, #18 tokens, #19
 patrones, #20 goal, #21 hermes, #24 bg-tasks, #27 plan-mode, #29 knowledge-base,
-# 34 advise, #36 kanban, #13 worktree) **ya construidas**, lo que falta es:
+
+# 34 advise, #36 kanban, #13 worktree) **ya construidas**, lo que falta es
 
 - **1 paquete de contenido** (skills de metodología — portable, bajo riesgo).
 - **1 sub-capacidad** (resolver de customización 3-capas — pertenece a #16).
@@ -210,6 +211,67 @@ meta-workflow** que los componga. Esta nota refuerza la conclusión de toda la
 serie de investigación: Frida tiene la arquitectura correcta; el desbloqueador
 sigue siendo **#18** (token accounting, prereq del loop) y **#16** (skills, prereq
 de la metodología).
+
+## Addendum (2026-08-12) — plugin bundled de TEA: evidencia del patrón de composición
+
+Re-exploración de `bmad-loop` tras los portes `frida-cis` (ADR-0052/#40) y
+`frida-tea` (ADR-0053/#41). El repo sigue siendo el mismo orquestador Python
+(~80 módulos en `src/bmad_loop/`, 6.2 MB, 84★) y el `engine.py` docstring no
+cambió. **Hallazgo nuevo:** `src/bmad_loop/data/plugins/tea/plugin.toml` — un
+**plugin bundled de TEA** que confirma concretamente cómo el orquestador compone
+un módulo.
+
+### Qué hace el plugin `tea`
+
+bmad-loop inyecta los 6 workflows de TEA (el agente Murat + `bmad-testarch-*` de
+`bmad-method-test-architecture-enterprise`) en **2 fases del loop** sobre un
+worktree vivo:
+
+```
+post_dev_phase  → test-design (TD) + atdd (AT) + automate (TA)   [role=dev]
+pre_commit_gate → trace (TR) + nfr (NR) + test-review (RV)       [role=review]
+```
+
+Los gate steps (TR/NR/RV) se bindean a `pre_commit_gate` — el injection point
+que dispara **incondicionalmente justo antes de cada commit**, así evalúan el
+árbol exacto a commitear. Flags `*_enabled`/`*_blocking` por workflow:
+`nfr_blocking=true` → una veredict FAIL/CONCERNS escala la unidad en commit en
+vez de aterrizar (`TeaPlugin.on_pre_commit`). Las fases de generación (TD/AT/TA)
+son advisory por diseño; las de gate exponen `*_blocking`.
+
+### El mapeo a Frida (plantilla de composición)
+
+El plugin es la **demostración concreta** de cómo `frida-aidd-loop` (#38
+meta-workflow) compondría `frida-tea` (#41 skill pack) — mismo modelo, sin el
+impuesto del orquestador externo:
+
+| BMAD (orquestador externo) | Frida (harness nativo) |
+| --- | --- |
+| bmad-loop drivar TEA vía adapters TMux/psmux en sesiones CLI desechables | `frida-aidd-loop` (#38) → `agent()`/`parallel()` a `frida-tea` (#41) en sesiones hijas nativas |
+| `post_dev_phase` / `pre_commit_gate` hooks | `phase()` de frida-extensible-workflows + checkpoint |
+| `pre_commit_gate` evaluation sobre el árbol a commitear | detached-auditor (#19) sobre el diff post-implementación |
+| `*_blocking` flags → FAIL/CONCERNS escala | gate-decision (#19) + `workflow_respond` |
+| `require_tea` readiness gate (fail-fast si TEA no instalado) | validación de `required_tools` (extensión menor de frida-extensible-workflows, ADR-0053 D8) |
+
+### Por qué refuerza el veredicto
+
+1. **El orquestador y el módulo son capas separadas** en BMAD: bmad-loop
+   (Python) ↔ TEA (markdown). En Frida, `frida-aidd-loop` (#38) ↔ `frida-tea`
+   (#41) son **exactamente** las dos capas equivalentes, pero ambas nativas.
+2. **Las 2 fases (`post_dev`/`pre_commit`) + el patrón advisory-vs-blocking**
+   son recetas portables al meta-workflow #38 — no son patrones nuevos, son la
+   **instalación concreta** de gate-decision + detached-auditor (#19) sobre el
+   dominio QA de #41.
+3. **La composición es por inyección de prompts en sesiones desechables**
+   ("All creative work happens inside disposable adapter sessions"), que es
+   el modelo ADW de frida-extensible-workflows. El plugin TEA no añade lógica
+   al motor — solo declara qué workflow inyectar en qué fase. = patrón de
+   **workflow-overlay**, reutilizable para cualquier módulo futuro.
+
+**Conclusión del addendum:** el plugin `tea` es la **plantilla de referencia**
+para cómo `frida-aidd-loop` (#38) compondrá skill packs (TEA #41, CIS #40) como
+fases inyectadas con gates blocking. Refuerza que bmad-loop no es un porte — es
+la **fuente de patrones** que #19 + #38 ya recogen.
 
 ## Referencias
 
