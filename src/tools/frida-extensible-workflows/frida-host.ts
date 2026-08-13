@@ -52,7 +52,7 @@ import type {
 import { WorkflowError } from "./core/types";
 import { fridaHome } from "./frida-paths";
 import { registerCheckpoint, unregisterCheckpoint } from "./frida-delivery";
-import type { SpawnAgentFn } from "./frida-agent-execution";
+import { unpackSpawnResult, type SpawnAgentFn } from "./frida-agent-execution";
 
 export type CheckpointNotifier = (checkpoint: {
 	runId: string;
@@ -133,8 +133,18 @@ export function createJournaledBridge(
 				(identity.worktreeOwner
 					? worktreeSpawners.get(identity.worktreeOwner)
 					: undefined) ?? opts.spawnAgent;
-			const value = await scopedSpawner(prompt, options, signal, identity);
+			// Issue #18: el spawner devuelve value + accounting (+ durationMs).
+			// Acumulamos tokens/costUsd/durationMs en `usage` para que el reporte y
+			// el budget hard de tokens reflejen el consumo real de los sub-agentes.
+			const startedAt = Date.now();
+			const raw = await scopedSpawner(prompt, options, signal, identity);
+			const { value, accounting, durationMs } = unpackSpawnResult(raw);
 			usage.agentLaunches += 1;
+			if (accounting) {
+				usage.tokens += accounting.input + accounting.output;
+				usage.costUsd += accounting.cost;
+			}
+			usage.durationMs += durationMs ?? Date.now() - startedAt;
 			await opts.store.complete(path, value);
 			return value;
 		},

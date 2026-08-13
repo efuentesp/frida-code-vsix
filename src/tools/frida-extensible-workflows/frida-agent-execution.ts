@@ -26,10 +26,12 @@ import {
 	SettingsManager,
 	type AgentSession,
 	type ExtensionContext,
+	type SessionStats,
 } from "@earendil-works/pi-coding-agent";
 import { executeShellCommand } from "./core/execution";
 import { loadAgentDefinitions } from "./core/validation";
 import type {
+	AgentAccounting,
 	AgentDefinition,
 	AgentIdentity,
 	JsonValue,
@@ -56,12 +58,91 @@ const WORKFLOW_EXCLUDED_TOOLS = [
 	"steer_subagent",
 ];
 
+/**
+ * Resultado enriquecido de un spawn de agente: el `value` (lo que el orquestador
+ * ve y se persiste en el journal) más el `accounting` y `durationMs` consumidos
+ * por la sesión hija (issue #18). Los spawners que no reporten accounting
+ * (p. ej. mocks en tests) pueden devolver un `JsonValue` plano; se trata como
+ * `value` sin contabilización (backward-compatible).
+ */
+const SPAWN_RESULT = Symbol("frida.workflow.spawnResult");
+export interface AgentSpawnResult {
+	readonly [SPAWN_RESULT]: true;
+	value: JsonValue;
+	accounting?: AgentAccounting;
+	durationMs?: number;
+}
+
+/** Envuelve el valor de un spawn junto con su accounting/duración (spawner real). */
+export function spawnResult(
+	value: JsonValue,
+	extra?: { accounting?: AgentAccounting; durationMs?: number },
+): AgentSpawnResult {
+	return {
+		[SPAWN_RESULT]: true,
+		value,
+		...(extra?.accounting ? { accounting: extra.accounting } : {}),
+		...(extra?.durationMs !== undefined
+			? { durationMs: extra.durationMs }
+			: {}),
+	};
+}
+
+/** ¿Es un resultado enriquecido (spawn real) o un JsonValue plano (mock)? */
+export function isSpawnResult(value: unknown): value is AgentSpawnResult {
+	return (
+		value !== null &&
+		typeof value === "object" &&
+		!Array.isArray(value) &&
+		(value as Record<symbol, unknown>)[SPAWN_RESULT] === true
+	);
+}
+
+/**
+ * Normaliza lo devuelto por un spawner a { value, accounting?, durationMs? }.
+ * Un `JsonValue` plano (mocks) se envuelve como `{ value }` sin contabilización.
+ */
+export function unpackSpawnResult(raw: JsonValue | AgentSpawnResult): {
+	value: JsonValue;
+	accounting?: AgentAccounting;
+	durationMs?: number;
+} {
+	if (isSpawnResult(raw)) {
+		return {
+			value: raw.value,
+			...(raw.accounting ? { accounting: raw.accounting } : {}),
+			...(raw.durationMs !== undefined ? { durationMs: raw.durationMs } : {}),
+		};
+	}
+	return { value: raw };
+}
+
+/**
+ * Mapea las estadísticas de una sesión Pi (tokens/cost facturados) al modelo de
+ * accounting del workflow. `SessionStats.tokens` ya agrega TODAS las entries
+ * (incluida historia compactada) → refleja lo realmente facturado en la sesión.
+ * Función pura (testeable sin SDK).
+ */
+export function sessionStatsToAccounting(
+	stats: SessionStats | undefined,
+): AgentAccounting | undefined {
+	if (!stats) return undefined;
+	const t = stats.tokens;
+	return {
+		input: t?.input ?? 0,
+		output: t?.output ?? 0,
+		cacheRead: t?.cacheRead ?? 0,
+		cacheWrite: t?.cacheWrite ?? 0,
+		cost: stats.cost ?? 0,
+	};
+}
+
 export type SpawnAgentFn = (
 	prompt: string,
 	options: Readonly<Record<string, JsonValue>>,
 	signal: AbortSignal,
 	identity: AgentIdentity,
-) => Promise<JsonValue>;
+) => Promise<JsonValue | AgentSpawnResult>;
 
 /**
  * Resuelve los overrides de modelo/thinking/tools para una llamada agent(),
@@ -114,7 +195,12 @@ export function createWorkflowBridge(
 	opts: WorkflowBridgeOptions,
 ): WorkflowBridge {
 	return {
-		agent: opts.agent as NonNullable<WorkflowBridge["agent"]>,
+		// El spawner puede devolver { value, accounting? } (issue #18); aquí sólo
+		// nos interesa el `value` que el orquestador persiste/consume.
+		agent: (prompt, options, signal, identity) =>
+			opts
+				.agent(prompt, options, signal, identity)
+				.then((raw) => unpackSpawnResult(raw).value),
 		shell: (
 			command: string,
 			options: ShellOptions,
@@ -212,9 +298,19 @@ export function createFridaAgentSpawner(
 		if (signal.aborted) void sessionAbort.abort();
 		else signal.addEventListener("abort", onAbort, { once: true });
 
+		const startedAt = Date.now();
 		try {
 			await session.prompt(prompt);
-			return lastAssistantValue(session);
+			const value = lastAssistantValue(session);
+			// Issue #18: contabiliza el consumo real (tokens/cost facturados por la
+			// sesión hija) y su duración, para que el orquestador los acumule en su
+			// `usage`. getSessionStats() agrega TODAS las entries (incluida historia
+			// compactada) → refleja lo realmente facturado. Se lee antes del dispose.
+			const accounting = sessionStatsToAccounting(session.getSessionStats());
+			return spawnResult(value, {
+				accounting,
+				durationMs: Date.now() - startedAt,
+			});
 		} finally {
 			signal.removeEventListener("abort", onAbort);
 			await sessionAbort.dispose?.();

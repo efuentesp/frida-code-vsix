@@ -17,6 +17,11 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+- **frida-extensible-workflows** — los sub-agentes ahora contabilizan sus
+  tokens/coste/duración en el `usage` del workflow (antes siempre 0); el budget
+  hard de `tokens` (y `costUsd`/`durationMs`) ya detiene el workflow, y
+  `workflow_resume` re-hidrata el `usage` con tokens acumulados (Refs #18)
+
 ## [0.18.0] - 2026-08-10
 
 ### Añadido
