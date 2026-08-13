@@ -13,6 +13,10 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Añadido
 
+- **providers** — activa OpenAI (ChatGPT) como proveedor de API key (built-in
+  Bearer del registry; selector, onboarding y auth-check ya genéricos por
+  ADR-0017/0018) (Refs #43, ADR-0055)
+
 ### Cambiado
 
 ### Corregido
