@@ -17,6 +17,7 @@
 // Este módulo da el mapeo id → {secretKey, displayName, authMode} para que el host
 // itere al cargar/guardar keys y poblar el onboarding/selector.
 
+import { OPENAI_PROVIDER, OPENAI_PROVIDER_DISPLAY } from "./openai-provider";
 import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
@@ -51,6 +52,12 @@ export const API_KEY_PROVIDERS: readonly ApiKeyProviderDef[] = [
 		id: MOONSHOT_PROVIDER,
 		displayName: MOONSHOT_PROVIDER_DISPLAY,
 		secretKey: "frida.moonshotKey",
+		authMode: "bearer",
+	},
+	{
+		id: OPENAI_PROVIDER,
+		displayName: OPENAI_PROVIDER_DISPLAY,
+		secretKey: "frida.openaiKey",
 		authMode: "bearer",
 	},
 ];

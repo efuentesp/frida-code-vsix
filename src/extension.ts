@@ -47,6 +47,10 @@ import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
 } from "./providers/moonshot-provider";
+import {
+	OPENAI_PROVIDER,
+	OPENAI_PROVIDER_DISPLAY,
+} from "./providers/openai-provider";
 import { getWebviewHtml } from "./webview-html";
 import { analyzeContext } from "./tools/frida-context/analysis";
 import { readSessionStats } from "./session-stats";
@@ -1008,6 +1012,7 @@ export async function activate(
 		if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
 		if (id === ZAI_PROVIDER) return ZAI_PROVIDER_DISPLAY;
 		if (id === MOONSHOT_PROVIDER) return MOONSHOT_PROVIDER_DISPLAY;
+		if (id === OPENAI_PROVIDER) return OPENAI_PROVIDER_DISPLAY;
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
 	}
@@ -1186,6 +1191,16 @@ export async function activate(
 		const models: any[] =
 			frida?.modelRuntime?.getModels?.(MOONSHOT_PROVIDER) ?? [];
 		return models.find((m: any) => m.id === "kimi-k3")?.id ?? models[0]?.id;
+	}
+
+	// OpenAI (ChatGPT): modelo default del provider. El catálogo built-in trae
+	// gpt-4o, gpt-5, gpt-5.1…gpt-5.6, o3, o4-mini…; fijamos gpt-5 como
+	// pre-selección al configurar por primera vez (mismo patrón que
+	// copilotDefaultModelId / moonshotDefaultModelId).
+	function openaiDefaultModelId(): string | undefined {
+		const models: any[] =
+			frida?.modelRuntime?.getModels?.(OPENAI_PROVIDER) ?? [];
+		return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
 	}
 
 	// Serializa un error de login a texto útil — NUNCA vacío. El catch anterior
@@ -3794,6 +3809,12 @@ export async function activate(
 			// pre-seleccionar kimi-k3 como default del provider.
 			if (providerId === MOONSHOT_PROVIDER && !activeModel) {
 				const defaultId = moonshotDefaultModelId();
+				if (defaultId) await selectModel(providerId, defaultId);
+			}
+			// OpenAI: al configurar por primera vez (sin modelo activo aún),
+			// pre-seleccionar gpt-5 como default del provider.
+			if (providerId === OPENAI_PROVIDER && !activeModel) {
+				const defaultId = openaiDefaultModelId();
 				if (defaultId) await selectModel(providerId, defaultId);
 			}
 			postResources();

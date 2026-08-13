@@ -48,6 +48,15 @@ export const PROVIDER_REGISTRY: ProviderMeta[] = [
 		blurb: "Modelos GLM-4.x / GLM-5 con razonamiento nativo.",
 	},
 	{
+		id: "openai",
+		name: "OpenAI (ChatGPT)",
+		authType: "apikey",
+		keyHint: "API key · Authorization Bearer",
+		keyPlaceholder: "sk-...",
+		getKeyUrl: "https://platform.openai.com/api-keys",
+		blurb: "Modelos GPT-5 / o-series de OpenAI (requiere API key de pago).",
+	},
+	{
 		id: "github-copilot",
 		name: "GitHub Copilot",
 		authType: "oauth",
