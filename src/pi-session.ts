@@ -11,11 +11,13 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
 	buildSofttekProviderConfig,
+	type CanonicalModelMeta,
 	createSofttekProviderHooks,
 	DEVENGINE_BASE_URL,
-	fetchDevengineContextWindow,
+	fetchDevengineModelsContext,
 	lookupCanonicalModelMeta,
 	SOFTTEK_MODEL,
+	SOFTTEK_MODELS,
 	SOFTTEK_PROVIDER,
 } from "./providers/softtek-provider";
 import {
@@ -227,18 +229,24 @@ export async function createFridaSession(
 	});
 	// Registramos los proveedores DIRECTAMENTE en ModelRuntime para que getModel los
 	// vea. ADR-0017: cada proveedor de API-key trae su config y su auth.
-	// ADR-0019: el contextWindow/maxTokens del modelo DevEngine se RESUELVEN por
+	// ADR-0019: el contextWindow/maxTokens de cada modelo DevEngine se RESUELVEN por
 	// prioridad: override (settings) > gateway (GET /models real) > catálogo canónico
-	// (gpt-5.4-mini en azure/openai → 400000) > default. Los demás metadatos
-	// (reasoning/input/thinkingLevelMap) del catálogo canónico; el compat
-	// (requiresThinkingAsText etc.) es específico del bug de DevEngine (ADR-0009).
+	// (gpt-5.4-mini en azure/openai → 400000) > default. Los nuevos ids internos
+	// (gpt-5.6-luna/sol/terra) NO están en los catálogos de pi-ai → caen a
+	// gateway/default. Los demás metadatos (reasoning/input/thinkingLevelMap) del
+	// catálogo canónico; el compat (requiresThinkingAsText etc.) es específico del
+	// bug de DevEngine (ADR-0009) y se comparte entre todos los modelos.
 	const devCfg = readDevengineConfig();
-	const canonicalMeta = lookupCanonicalModelMeta(modelRuntime, SOFTTEK_MODEL);
+	const metaByModel: Record<string, CanonicalModelMeta | undefined> = {};
+	for (const def of SOFTTEK_MODELS) {
+		metaByModel[def.id] = lookupCanonicalModelMeta(modelRuntime, def.id);
+	}
 	// El GET /models a DevEngine SÓLO si DevEngine va a ser el modelo usado en esta
 	// sesión (el activo, o el fallback si el activo no está autenticado). Así no
 	// llamamos al gateway cuando el usuario usa z.ai/Copilot pero tiene la key de
 	// DevEngine guardada. La resolución del modelo usa hasConfiguredAuth (no el
-	// contextWindow), así que podemos pre-calcularlo aquí.
+	// contextWindow), así que podemos pre-calcularlo aquí. UNA sola llamada trae
+	// los contextWindow de TODOS los modelos del catálogo (mapa id → cw).
 	const activeProvider = opts.activeModel?.provider;
 	// ¿Usaremos DevEngine en esta sesión? Sólo si no hay modelo guardado o el
 	// guardado es DevEngine. Ya NO exigimos hasConfiguredAuth aquí: la auth de la
@@ -248,28 +256,32 @@ export async function createFridaSession(
 	// cada recarga.)
 	const willUseDevengine =
 		!opts.activeModel || activeProvider === SOFTTEK_PROVIDER;
-	let gatewayCtx: number | undefined;
+	let gatewayCtxByModel: Record<string, number> | undefined;
 	const devKey = keyHolders[SOFTTEK_PROVIDER];
 	if (devKey && willUseDevengine) {
-		gatewayCtx = await fetchDevengineContextWindow(
+		gatewayCtxByModel = await fetchDevengineModelsContext(
 			DEVENGINE_BASE_URL,
 			devKey,
-			SOFTTEK_MODEL,
 		);
 	}
-	const contextWindow =
-		devCfg.contextWindow ??
-		gatewayCtx ??
-		canonicalMeta?.contextWindow ??
-		300000;
-	const maxTokens = devCfg.maxTokens ?? canonicalMeta?.maxTokens ?? 128000;
+	const limitsByModel: Record<
+		string,
+		{ contextWindow: number; maxTokens: number }
+	> = {};
+	for (const def of SOFTTEK_MODELS) {
+		const meta = metaByModel[def.id];
+		limitsByModel[def.id] = {
+			contextWindow:
+				devCfg.contextWindow ??
+				gatewayCtxByModel?.[def.id] ??
+				meta?.contextWindow ??
+				300000,
+			maxTokens: devCfg.maxTokens ?? meta?.maxTokens ?? 128000,
+		};
+	}
 	modelRuntime.registerProvider(
 		SOFTTEK_PROVIDER,
-		buildSofttekProviderConfig({
-			contextWindow,
-			maxTokens,
-			meta: canonicalMeta,
-		}),
+		buildSofttekProviderConfig({ limitsByModel, metaByModel }),
 	);
 	// Z.ai es un provider BUILT-IN de pi-ai (`providers/zai`): NO se registra aquí.
 	// El ModelRuntime ya lo carga con baseUrl, modelos oficiales (glm-4.5-air / 4.7 /

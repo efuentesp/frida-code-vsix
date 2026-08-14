@@ -2,10 +2,31 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { writeFileSync } from "node:fs";
 
 export const SOFTTEK_PROVIDER = "softtek-devengine";
-export const SOFTTEK_MODEL = "gpt-5.4-mini";
-export const SOFTTEK_MODEL_DISPLAY = "GPT-5.4 Mini";
 export const SOFTTEK_PROVIDER_DISPLAY = "Softtek DevEngine";
 export const DEVENGINE_BASE_URL = "https://mywork.softtek.com/apg/devengine";
+
+/** Definición de un modelo del gateway DevEngine (id + nombre visible). */
+export interface SofttekModelDef {
+	id: string;
+	display: string;
+}
+
+/** Catálogo de modelos que ofrece el gateway DevEngine. El PRIMERO es el
+ *  default/fallback (se usa cuando no hay modelo activo guardado). Los
+ *  gpt-5.6-* son ids internos de Softtek: NO existen en los catálogos
+ *  canónicos de pi-ai, así que sus metadatos caen a los defaults (o a lo que
+ *  exponga GET /models del gateway). */
+export const SOFTTEK_MODELS: SofttekModelDef[] = [
+	{ id: "gpt-5.4-mini", display: "GPT-5.4 Mini" },
+	{ id: "gpt-5.6-luna", display: "GPT-5.6 Luna" },
+	{ id: "gpt-5.6-sol", display: "GPT-5.6 Sol" },
+	{ id: "gpt-5.6-terra", display: "GPT-5.6 Terra" },
+];
+
+/** Modelo default de DevEngine (el primero del catálogo). Se mantiene como
+ *  constante porque es el fallback de resolución de modelo en pi-session. */
+export const SOFTTEK_MODEL = SOFTTEK_MODELS[0].id;
+export const SOFTTEK_MODEL_DISPLAY = SOFTTEK_MODELS[0].display;
 
 /** Metadatos del modelo resueltos del catálogo canónico de pi-ai (modelo NATIVO,
  *  no del gateway). */
@@ -50,15 +71,16 @@ export function lookupCanonicalModelMeta(
 	return undefined;
 }
 
-/** Auto-detect del contextWindow REAL del gateway DevEngine vía GET /models.
- *  Best-effort (timeout 10s): lee context_window/context_length del modelo; si no lo
- *  expone o falla, devuelve undefined y el caller hace fallback. Reutiliza el patrón
- *  de diagnoseGateway (X-Api-Key, probe /models). */
-export async function fetchDevengineContextWindow(
+/** Auto-detect de los contextWindow REALES del gateway DevEngine vía GET /models.
+ *  UNA sola llamada: parsea la lista completa y devuelve un mapa id → contextWindow
+ *  (sólo entradas con valor numérico > 0). Best-effort (timeout 10s): si falla o el
+ *  gateway no lo expone, devuelve undefined y el caller hace fallback por modelo
+ *  (override > gateway > catálogo > default). Reutiliza el patrón de
+ *  diagnoseGateway (X-Api-Key, probe /models). */
+export async function fetchDevengineModelsContext(
 	baseUrl: string,
 	key: string,
-	modelId: string,
-): Promise<number | undefined> {
+): Promise<Record<string, number> | undefined> {
 	const ctrl = new AbortController();
 	const timer = setTimeout(() => ctrl.abort(), 10000);
 	try {
@@ -69,22 +91,44 @@ export async function fetchDevengineContextWindow(
 		});
 		if (!res.ok) return undefined;
 		const json = (await res.json()) as any;
-		// Formato OpenAI {data:[{id,…}]} o variante del gateway; buscamos por id.
+		// Formato OpenAI {data:[{id,…}]} o variante del gateway.
 		const list: any[] = Array.isArray(json?.data)
 			? json.data
 			: Array.isArray(json)
 				? json
 				: [];
-		const match = list.find((m) => m?.id === modelId) ?? list[0];
-		const cw =
-			match?.context_window ?? match?.context_length ?? match?.contextWindow;
-		return typeof cw === "number" && cw > 0 ? cw : undefined;
+		const map: Record<string, number> = {};
+		for (const m of list) {
+			const cw =
+				m?.context_window ?? m?.context_length ?? m?.contextWindow;
+			if (typeof m?.id === "string" && typeof cw === "number" && cw > 0) {
+				map[m.id] = cw;
+			}
+		}
+		return map;
 	} catch {
 		return undefined;
 	} finally {
 		clearTimeout(timer);
 	}
 }
+
+/** Workaround de compat del GATEWAY DevEngine (bug ADR-0009): es propiedad del
+ *  endpoint, no del modelo, así que se aplica a TODOS los modelos del catálogo.
+ *  - supportsReasoningEffort: DevEngine acepta reasoning_effort (low/medium/high).
+ *  - requiresThinkingAsText: el gateway DEVUELVE reasoning_content en el stream,
+ *    pero NO lo acepta de vuelta como campo de un mensaje assistant del historial
+ *    (responde 500 al continuar una sesión con razonamiento previo); pi reenvía el
+ *    thinking como TEXTO plano en `content` (estándar OpenAI) → el gateway lo acepta.
+ *  - requiresAssistantAfterToolResult: el gateway rechaza `content: null` en
+ *    mensajes assistant con tool_calls (responde 500); pi envía `content: ""`.
+ *    Efecto colateral menor: inserta un assistant puente ("I have processed the
+ *    tool results.") entre toolResult y user; benigno. */
+const DEVENGINE_COMPAT = {
+	supportsReasoningEffort: true,
+	requiresThinkingAsText: true,
+	requiresAssistantAfterToolResult: true,
+};
 
 /**
  * Config del proveedor (ProviderConfigInput). Se registra DIRECTAMENTE en el
@@ -97,9 +141,12 @@ export async function fetchDevengineContextWindow(
  *  (requiresThinkingAsText etc.) es específico del bug de DevEngine (ADR-0009).
  */
 export function buildSofttekProviderConfig(opts: {
-	contextWindow: number;
-	maxTokens: number;
-	meta?: CanonicalModelMeta;
+	/** Límites ya RESUELTOS por modelo (override > gateway > catálogo > default). */
+	limitsByModel: Record<string, { contextWindow: number; maxTokens: number }>;
+	/** Metadatos canónicos por modelo (reasoning/input/thinkingLevelMap del modelo
+	 *  nativo). Los ids internos de Softtek (gpt-5.6-*) no están en los catálogos
+	 *  de pi-ai → undefined → defaults. */
+	metaByModel?: Record<string, CanonicalModelMeta | undefined>;
 }) {
 	return {
 		name: "Softtek DevEngine Gateway",
@@ -107,36 +154,29 @@ export function buildSofttekProviderConfig(opts: {
 		api: "openai-completions", // ⚠️ Pi añade /chat/completions — verificar el path en runtime
 		authHeader: false, // el gateway NO usa Authorization: Bearer; la key va como X-Api-Key
 		// vía before_provider_headers. Esto además evita el gate "No API key".
-		models: [
-			{
-				id: SOFTTEK_MODEL,
-				name: SOFTTEK_MODEL_DISPLAY,
-				reasoning: opts.meta?.reasoning ?? true,
-				input: (opts.meta?.input ?? ["text", "image"]) as ("text" | "image")[],
-				...(opts.meta?.thinkingLevelMap
-					? { thinkingLevelMap: opts.meta.thinkingLevelMap }
+		models: SOFTTEK_MODELS.map((def) => {
+			const meta = opts.metaByModel?.[def.id];
+			const limits = opts.limitsByModel[def.id] ?? {
+				contextWindow: 300000,
+				maxTokens: 128000,
+			};
+			return {
+				id: def.id,
+				name: def.display,
+				reasoning: meta?.reasoning ?? true,
+				input: (meta?.input ?? ["text", "image"]) as ("text" | "image")[],
+				...(meta?.thinkingLevelMap
+					? { thinkingLevelMap: meta.thinkingLevelMap }
 					: {}),
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 				// Ajustables desde settings (frida.devengine.contextWindow / maxTokens).
-				contextWindow: opts.contextWindow,
-				maxTokens: opts.maxTokens,
-				compat: {
-					supportsReasoningEffort: true, // DevEngine acepta reasoning_effort (low/medium/high)
-					// El gateway DEVUELVE reasoning_content en el stream, pero NO lo acepta de vuelta
-					// como campo de un mensaje assistant del historial (responde 500 al continuar una
-					// sesión con razonamiento previo). requiresThinkingAsText hace que pi reenvíe el
-					// thinking como TEXTO plano en `content` (estándar OpenAI) en vez de como el campo
-					// `reasoning_content` → el gateway lo acepta. Fix de fondo: ver ADR-0009.
-					requiresThinkingAsText: true,
-					// El gateway rechaza `content: null` en mensajes assistant con tool_calls
-					// (responde 500). requiresAssistantAfterToolResult hace que pi envíe
-					// `content: ""` (string vacío) en vez de `null`. Efecto colateral menor:
-					// inserta un assistant puente ("I have processed the tool results.") entre
-					// toolResult y user; benigno. Fix de fondo: ver ADR-0009.
-					requiresAssistantAfterToolResult: true,
-				},
-			},
-		],
+				contextWindow: limits.contextWindow,
+				maxTokens: limits.maxTokens,
+				// El `compat` es un workaround del GATEWAY (ADR-0009), no del modelo:
+				// aplica a TODOS los ids que sirve DevEngine.
+				compat: { ...DEVENGINE_COMPAT },
+			};
+		}),
 	};
 }
 
