@@ -99,8 +99,7 @@ export async function fetchDevengineModelsContext(
 				: [];
 		const map: Record<string, number> = {};
 		for (const m of list) {
-			const cw =
-				m?.context_window ?? m?.context_length ?? m?.contextWindow;
+			const cw = m?.context_window ?? m?.context_length ?? m?.contextWindow;
 			if (typeof m?.id === "string" && typeof cw === "number" && cw > 0) {
 				map[m.id] = cw;
 			}
