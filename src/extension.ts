@@ -2066,23 +2066,18 @@ export async function activate(
 			// Acciones del panel de cola (issue #45). El store sincroniza el SDK
 			// (clearQueue + re-prompt) y notifica → postQueued actualiza la UI.
 			case "queue_remove":
-				await queueStore
-					.remove(String(msg.id ?? ""))
-				.catch(() => undefined);
+				await queueStore.remove(String(msg.id ?? "")).catch(() => undefined);
 				break;
 			case "queue_edit": {
 				const entry = await queueStore
 					.takeout(String(msg.id ?? ""))
-				.catch(() => undefined);
+					.catch(() => undefined);
 				if (entry) post({ type: "composer_insert", text: entry.text });
 				break;
 			}
 			case "queue_move":
 				await queueStore
-					.move(
-						String(msg.id ?? ""),
-						msg.dir === -1 ? -1 : 1,
-					)
+					.move(String(msg.id ?? ""), msg.dir === -1 ? -1 : 1)
 					.catch(() => undefined);
 				break;
 			case "abort_diag":

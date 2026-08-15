@@ -32,7 +32,10 @@ export interface QueueEntry {
 export interface SdkQueuePort {
 	isStreaming(): boolean;
 	clearQueue(): void;
-	prompt(text: string, options: { streamingBehavior: QueueMode }): Promise<unknown>;
+	prompt(
+		text: string,
+		options: { streamingBehavior: QueueMode },
+	): Promise<unknown>;
 }
 
 type Listener = (items: readonly QueueEntry[]) => void;
@@ -93,7 +96,11 @@ export function createPendingQueueStore(
 
 	const store: PendingQueueStore = {
 		add(text, mode) {
-			const entry: QueueEntry = { id: `q-${Date.now().toString(36)}-${++seq}`, text, mode };
+			const entry: QueueEntry = {
+				id: `q-${Date.now().toString(36)}-${++seq}`,
+				text,
+				mode,
+			};
 			items = [...items, entry];
 			emit();
 			return entry;

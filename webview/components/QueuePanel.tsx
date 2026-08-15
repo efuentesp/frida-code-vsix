@@ -38,9 +38,7 @@ export function QueuePanel({
 				title={open ? "Contraer" : "Expandir"}
 			>
 				<span className="queue-head-label">Cola de mensajes</span>
-				<span className="queue-count">
-					({items.length})
-				</span>
+				<span className="queue-count">({items.length})</span>
 				<span className={"queue-caret" + (open ? "" : " closed")}>
 					<Icon name="chevron" size={12} />
 				</span>
@@ -54,7 +52,10 @@ export function QueuePanel({
 								{q.text}
 							</span>
 							{q.mode === "followUp" && (
-								<span className="queue-tag" title="Se entrega como follow-up tras el turno en curso">
+								<span
+									className="queue-tag"
+									title="Se entrega como follow-up tras el turno en curso"
+								>
 									follow-up
 								</span>
 							)}
