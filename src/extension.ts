@@ -484,6 +484,9 @@ export async function activate(
 	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
 	// pierde en arranque frío (el listener del webview monta en webview_ready).
 	let pendingSettingsTab: string | undefined;
+	// ¿El webview ya montó su listener (llegó webview_ready)? Distingue apertura
+	// en caliente (post directo confiable) de arranque frío (flush diferido).
+	let webviewReady = false;
 
 	function postCodebaseIndexState(): void {
 		post({
@@ -1916,6 +1919,7 @@ export async function activate(
 	async function handleWebviewMessage(msg: any): Promise<void> {
 		switch (msg?.type) {
 			case "webview_ready":
+				webviewReady = true;
 				post({ type: "mode", mode: approvalMode });
 				post({ type: "version", version: fridaVersion });
 				postToolToggles();
@@ -4260,10 +4264,14 @@ export async function activate(
 		vscode.commands.registerCommand("frida.codebaseIndex", () => {
 			pendingSettingsTab = "codebaseIndex";
 			void vscode.commands.executeCommand("frida.openPanel").then(() => {
-				post({ type: "open_settings", tab: "codebaseIndex" });
-				// El post directo ya cubrió la apertura en caliente: limpiamos el
-				// pendiente para que un re-mount posterior NO reabra el tab solo.
-				pendingSettingsTab = undefined;
+				// En caliente (webview ya montado) el post directo llega confiable:
+				// limpiamos el pendiente para que un re-mount posterior NO reabra el
+				// tab solo. En frío lo dejamos seteado: el listener aún no existe, el
+				// post se perdería y el flush de webview_ready es quien abre el tab.
+				if (webviewReady) {
+					post({ type: "open_settings", tab: "codebaseIndex" });
+					pendingSettingsTab = undefined;
+				}
 			});
 		}),
 		vscode.window.onDidChangeWindowState((s) => {
