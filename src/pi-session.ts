@@ -27,6 +27,7 @@ import {
 	ZAI_PROVIDER,
 } from "./providers/z-ai-provider";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
+import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
 import { GateStatsStore } from "./tools/frida-permission-system/session-store";
 import { SessionApprovals } from "./tools/frida-permission-system/session-approvals";
@@ -44,6 +45,11 @@ import {
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
+import { createFridaCodebaseIndex, CODEBASE_INDEX_FACTORY_NAME } from "./tools/frida-codebase-index";
+import {
+	ensureGitignore,
+	syncOpenAiKeyToAuthJson,
+} from "./tools/frida-codebase-index/host-setup";
 import { createFridaSupiWeb } from "./tools/frida-supi-web";
 import { createFridaArgs } from "./tools/frida-args";
 import { createFridaMultiSkills } from "./tools/frida-multi-skills";
@@ -184,6 +190,12 @@ export interface CreateFridaSessionOptions {
 	 *  `process.env.CONTEXT7_API_KEY`. Se inyecta en las tools web_docs_* para que
 	 *  la key NUNCA viva en disco/env en claro (patrón ADR-0017 aplicado a Context7). */
 	getContext7Key: () => string | undefined;
+	/** ¿Está activo frida-codebase-index? (frida.codebaseIndex.enabled, default true). */
+	codebaseIndexEnabled?: () => boolean;
+	/** Estado del wrapper (installed/capturedTools) para el tab Index del webview. */
+	onCodebaseIndexState?: (
+		s: import("./tools/frida-codebase-index").CodebaseIndexState,
+	) => void;
 }
 
 export async function createFridaSession(
@@ -211,6 +223,19 @@ export async function createFridaSession(
 	for (const id of API_KEY_PROVIDER_IDS) {
 		const k = opts.getKeyFor(id);
 		if (k) keyHolders[id] = k;
+	}
+
+	// D4 (ADR-0036) — frida-codebase-index: exponer la OpenAI key de Frida (si
+	// existe) al detector de embeddings del upstream vía ~/.frida/auth.json
+	// (merge defensivo, la auth propia del usuario manda), y gitignore del
+	// storage del índice (.codebase-index/ dentro del workspace). Best-effort.
+	if (opts.codebaseIndexEnabled?.() ?? true) {
+		syncOpenAiKeyToAuthJson(
+			opts.agentDir,
+			keyHolders[OPENAI_PROVIDER],
+			(line) => console.warn(line),
+		);
+		ensureGitignore(opts.cwd, (line) => console.warn(line));
 	}
 
 	// ADR-0010: agentDir propio (~/.frida); asegurarlo antes de usarlo (auth/models/loader).
@@ -473,6 +498,25 @@ export async function createFridaSession(
 			{
 				name: "frida-agent-browser",
 				factory: createFridaAgentBrowser({ agentDir: opts.agentDir }),
+			},
+			// frida-codebase-index (ADR-0036): búsqueda semántica + call graph vía
+			// wrapper del paquete upstream open-codebase-index instalado on-demand
+			// en ~/.frida/npm. La factory es ASYNC y el loader awaita su retorno
+			// (loader.js:389) para que el import() del paquete complete antes de
+			// dar la sesión por lista — por eso NO usamos toggleable() (su wrapper
+			// síncrono descartaría la promesa y re-introduciría la race de registro
+			// documentada en el plan). Gate manual: sólo registra si enabled.
+			// Si falta el paquete/Ollama, las 6 tools se registran en modo guía
+			// accionable (D6). Main only (igual que frida-agent-browser).
+			{
+				name: CODEBASE_INDEX_FACTORY_NAME,
+				factory: (pi: any) =>
+					(opts.codebaseIndexEnabled?.() ?? true)
+						? createFridaCodebaseIndex({
+								agentDir: opts.agentDir,
+								onStateChange: opts.onCodebaseIndexState,
+							})(pi)
+						: undefined,
 			},
 			// frida-supi-web: porte nativo de @mrclrchtr/supi-web. Tools web_fetch_md
 			// (URL pública → Markdown limpio), web_docs_search y web_docs_fetch (docs de

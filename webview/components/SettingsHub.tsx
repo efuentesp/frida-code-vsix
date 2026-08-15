@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
 	BarChart3,
+	Database,
 	Library,
 	Plug,
 	RotateCw,
@@ -9,6 +10,7 @@ import {
 	X,
 } from "lucide-react";
 import type { OutMessage, State } from "../types";
+import { IndexTab } from "./IndexTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
 import { UsageDashboard } from "./UsageDashboard";
@@ -23,7 +25,8 @@ export type SettingsTab =
 	| "approval"
 	| "resources"
 	| "tools"
-	| "usage";
+	| "usage"
+	| "codebaseIndex";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
 	{ id: "providers", label: "Proveedores", icon: Plug },
@@ -32,6 +35,7 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
 	{ id: "resources", label: "Recursos", icon: Library },
 	{ id: "tools", label: "Herramientas", icon: Wrench },
 	{ id: "usage", label: "Uso", icon: BarChart3 },
+	{ id: "codebaseIndex", label: "Index", icon: Database },
 ];
 
 export function SettingsHub({
@@ -152,6 +156,8 @@ export function SettingsHub({
 				)}
 
 				{tab === "usage" && <UsageDashboard state={state} post={post} />}
+
+				{tab === "codebaseIndex" && <IndexTab state={state} post={post} />}
 			</div>
 		</div>
 	);

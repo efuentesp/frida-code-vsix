@@ -44,7 +44,7 @@ import { AnimatedLabel } from "./components/AnimatedLabel";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
 import { ModelPanel } from "./components/ModelPanel";
-import { SettingsHub } from "./components/SettingsHub";
+import { SettingsHub, type SettingsTab } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 import { Icon } from "./components/Icon";
@@ -99,6 +99,11 @@ export function App() {
 	const [modelsOpen, setModelsOpen] = useState(false);
 	const [forkOpen, setForkOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
+	// Tab pedido del hub (p.ej. el comando frida.codebaseIndex pide "codebaseIndex").
+	// Fuerza re-monte del SettingsHub vía key para entrar al tab correcto incluso
+	// con el hub ya abierto; se limpia al cerrar para que el engrane vuelva a
+	// "providers".
+	const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
 	// Wizard de onboarding: se muestra cuando no hay proveedor configurado
 	// (keyNeeded) y permanece hasta que el usuario completa el paso "¡Listo!".
 	const [wizardVisible, setWizardVisible] = useState(false);
@@ -114,6 +119,11 @@ export function App() {
 		const vscode = getVsCode();
 		const handler = (e: MessageEvent) => {
 			const msg = e.data as InMessage;
+			if (msg.type === "open_settings") {
+				setConfigOpen(true);
+				setSettingsTab(msg.tab);
+				return; // no despachar al reducer
+			}
 			if (msg.type === "open_models") {
 				setModelsOpen(true);
 				getVsCode().postMessage({ type: "list_models" });
@@ -843,9 +853,14 @@ export function App() {
 			)}
 			{configOpen && (
 				<SettingsHub
+					key={settingsTab ?? "default"}
 					state={state}
 					post={post}
-					onClose={() => setConfigOpen(false)}
+					onClose={() => {
+						setConfigOpen(false);
+						setSettingsTab(undefined);
+					}}
+					initialTab={(settingsTab ?? "providers") as SettingsTab}
 				/>
 			)}
 		</div>

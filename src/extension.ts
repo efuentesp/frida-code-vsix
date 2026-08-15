@@ -107,15 +107,24 @@ import {
 } from "./tools/frida-subagents/panel";
 import { wireGitSyncWidget } from "./tools/frida-git-sync";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
+import {
+	ensureInstalled,
+	installedVersion,
+	isInstalledAtPin,
+} from "./tools/frida-codebase-index/installer";
+import { loadUpstreamTools } from "./tools/frida-codebase-index/shim";
+import { upstreamEntryPath } from "./tools/frida-codebase-index/constants";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { notifyCompletion } from "./notify";
 import { notifyAttention } from "./notify";
 import {
 	isAskUserQuestionEnabled,
+	isCodebaseIndexEnabled,
 	isContextEnabled,
 	isTelemetryOptIn,
 	isTodoEnabled,
+	readCodebaseIndexConfig,
 	readGatePatterns,
 	readToolToggles,
 	setTelemetryOptIn,
@@ -463,6 +472,39 @@ export async function activate(
 		context.globalStorageUri.fsPath,
 		"devengine-last-request.json",
 	);
+	// Estado de frida-codebase-index para el tab Index del webview (ADR-0036).
+	// Se alimenta del onCodebaseIndexState de la sesión (factory del wrapper) y
+	// de las acciones del host (install/index/rebuild/status).
+	let ciUi: import("./tools/frida-codebase-index").CodebaseIndexState = {
+		installed: false,
+		capturedTools: [],
+	};
+	let ciBusy: "install" | "index" | null = null;
+	let ciLastLine: string | undefined;
+	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
+	// pierde en arranque frío (el listener del webview monta en webview_ready).
+	let pendingSettingsTab: string | undefined;
+
+	function postCodebaseIndexState(): void {
+		post({
+			type: "codebase_index_state",
+			state: {
+				...ciUi,
+				version: ciUi.installed
+					? installedVersion(defaultAgentDir())
+					: undefined,
+				busy: ciBusy,
+				lastLine: ciLastLine,
+			},
+		});
+	}
+
+	/** Resume el resultado de un tool upstream (content[0].text, primeras líneas). */
+	function ciSummarize(res: any): string {
+		const t = res?.content?.[0]?.text;
+		if (typeof t === "string") return t.split("\n").slice(0, 12).join("\n");
+		return JSON.stringify(res).slice(0, 400);
+	}
 	let approvalMode: PermissionMode = "manual";
 	let frida: FridaSession | undefined;
 	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
@@ -788,6 +830,11 @@ export async function activate(
 					getContext7Key,
 					onProviderError,
 					requestDumpPath,
+					codebaseIndexEnabled: isCodebaseIndexEnabled,
+					onCodebaseIndexState: (s) => {
+						ciUi = s;
+						postCodebaseIndexState();
+					},
 				});
 				frida = s;
 				wireSession(s.session);
@@ -1872,6 +1919,11 @@ export async function activate(
 				post({ type: "mode", mode: approvalMode });
 				post({ type: "version", version: fridaVersion });
 				postToolToggles();
+				postCodebaseIndexState();
+				if (pendingSettingsTab) {
+					post({ type: "open_settings", tab: pendingSettingsTab });
+					pendingSettingsTab = undefined;
+				}
 				bootstrapSession(); // crea la sesión siempre (incluso sin key) → modelRuntime disponible para OAuth
 				{
 					// Si la sesión YA existía (webview recreado, o sesión restaurada al
@@ -2100,6 +2152,55 @@ export async function activate(
 				// no pierde el historial; el estado de `todo` se recupera por replay.
 				await reloadResources();
 				break;
+			case "codebase_index_action": {
+				const action = msg.action as "install" | "index" | "rebuild" | "status";
+				ciBusy = action === "install" ? "install" : "index";
+				ciLastLine = undefined;
+				postCodebaseIndexState();
+				try {
+					if (action === "install") {
+						await ensureInstalled(defaultAgentDir(), {
+							keepOtherPlatforms: readCodebaseIndexConfig().keepOtherPlatforms,
+							onProgress: (line) => {
+								ciLastLine = line;
+								postCodebaseIndexState();
+							},
+						});
+						ciLastLine =
+							"Instalado. Recarga la sesión (Frida: Recargar extensiones y recursos) para activar las tools.";
+						// Refresh inmediato del estado instalado (sin esperar recarga de
+						// sesión): el tab debe dejar de mostrar "No instalado".
+						ciUi = {
+							installed: isInstalledAtPin(defaultAgentDir()),
+							capturedTools: ciUi.capturedTools,
+						};
+					} else {
+						// index/rebuild/status: ejecutamos el tool upstream capturado DIRECTO
+						// desde el host (mismo shim que el wrapper) — sin depender del
+						// agente. ctx mínimo con cwd del workspace.
+						const tools = await loadUpstreamTools(
+							upstreamEntryPath(defaultAgentDir()),
+						);
+						const toolName =
+							action === "status" ? "index_status" : "index_codebase";
+						const t = tools.get(toolName);
+						if (!t) throw new Error(`${toolName} no disponible en el paquete`);
+						const res = await t.execute(
+							`host-${action}`,
+							{ force: action === "rebuild" },
+							undefined,
+							undefined,
+							{ cwd: workspaceCwd() },
+						);
+						ciLastLine = ciSummarize(res);
+					}
+				} catch (e: any) {
+					ciLastLine = e?.guide ?? e?.message ?? String(e);
+				}
+				ciBusy = null;
+				postCodebaseIndexState();
+				break;
+			}
 			case "set_thinking":
 				try {
 					frida?.session?.setThinkingLevel?.(String(msg.level ?? "medium"));
@@ -3660,6 +3761,11 @@ export async function activate(
 				onLensDiagnostics: mergeLens,
 				onProviderError,
 				requestDumpPath,
+				codebaseIndexEnabled: isCodebaseIndexEnabled,
+				onCodebaseIndexState: (s) => {
+					ciUi = s;
+					postCodebaseIndexState();
+				},
 			});
 			wireSession(frida.session);
 			// Sesión abierta por switch: el acumulador lens es stale → limpiar y ocultar.
@@ -4148,6 +4254,18 @@ export async function activate(
 			() => void generateCommitMessageCmd(),
 		),
 		vscode.commands.registerCommand("frida.worktree", () => void worktreeCmd()),
+		// frida.codebaseIndex (ADR-0036): abre el SettingsHub en el tab Index. El
+		// post directo cubre apertura en caliente; el flush de webview_ready el
+		// arranque frío (el listener del webview monta ahí).
+		vscode.commands.registerCommand("frida.codebaseIndex", () => {
+			pendingSettingsTab = "codebaseIndex";
+			void vscode.commands.executeCommand("frida.openPanel").then(() => {
+				post({ type: "open_settings", tab: "codebaseIndex" });
+				// El post directo ya cubrió la apertura en caliente: limpiamos el
+				// pendiente para que un re-mount posterior NO reabra el tab solo.
+				pendingSettingsTab = undefined;
+			});
+		}),
 		vscode.window.onDidChangeWindowState((s) => {
 			vscodeWindowFocused = s.focused;
 		}),

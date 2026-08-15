@@ -178,3 +178,49 @@ export async function setTelemetryOptIn(on: boolean): Promise<void> {
 		.getConfiguration(CONFIG_SECTION)
 		.update("telemetry.optIn", on, vscode.ConfigurationTarget.Global);
 }
+
+// === Codebase index (frida-codebase-index, ADR-0036 / issue #25) ===
+
+/** Config de frida.codebaseIndex.*. */
+export interface CodebaseIndexConfig {
+	enabled: boolean;
+	/** Conservar los natives de otras plataformas tras instalar (debug/multi-target). */
+	keepOtherPlatforms: boolean;
+	/** Provider de embeddings: auto (Ollama→OpenAI→Google) | ollama | custom. */
+	provider: "auto" | "ollama" | "custom";
+	/** Endpoint custom OpenAI-compatible (vacío = no configurado). */
+	customBaseUrl: string;
+	/** Modelo del endpoint custom (vacío = default del upstream). */
+	customModel: string;
+}
+
+/** ¿Está activo frida-codebase-index? Default: true (degrada con guía si falta el paquete). */
+export function isCodebaseIndexEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("codebaseIndex.enabled", true);
+}
+
+/** Snapshot de la config del índice de código. */
+export function readCodebaseIndexConfig(): CodebaseIndexConfig {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const provider = cfg.get<string>(
+		"codebaseIndex.embeddings.provider",
+		"auto",
+	);
+	return {
+		enabled: isCodebaseIndexEnabled(),
+		keepOtherPlatforms: cfg.get<boolean>(
+			"codebaseIndex.keepOtherPlatforms",
+			false,
+		),
+		provider:
+			provider === "ollama" || provider === "custom" ? provider : "auto",
+		customBaseUrl: String(
+			cfg.get<string>("codebaseIndex.embeddings.custom.baseUrl", ""),
+		).trim(),
+		customModel: String(
+			cfg.get<string>("codebaseIndex.embeddings.custom.model", ""),
+		).trim(),
+	};
+}

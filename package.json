@@ -85,6 +85,10 @@
         "command": "frida.worktree",
         "title": "Frida: Worktrees",
         "icon": "$(git-branch)"
+      },
+      {
+        "command": "frida.codebaseIndex",
+        "title": "Frida: Codebase Index"
       }
     ],
     "menus": {
@@ -245,6 +249,36 @@
           "type": "number",
           "default": 16000,
           "markdownDescription": "Máximo de tokens de salida (`max_tokens`) por defecto para los modelos Z.ai descubiertos. ADR-0017."
+        },
+        "frida.codebaseIndex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-codebase-index**: búsqueda semántica de código, grafo de llamadas y lookup de implementaciones (wrapper de `open-codebase-index`, instalado on-demand en `~/.frida/npm`). Si el paquete no está instalado, las tools responden con la guía de instalación."
+        },
+        "frida.codebaseIndex.keepOtherPlatforms": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Conserva los binarios nativos (`.node`) de otras plataformas tras la instalación on-demand. Por defecto se podan (solo queda el de tu plataforma) para ahorrar disco."
+        },
+        "frida.codebaseIndex.embeddings.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "ollama",
+            "custom"
+          ],
+          "default": "auto",
+          "markdownDescription": "Proveedor de embeddings del índice. `auto` intenta Ollama → OpenAI (si guardaste la key de OpenAI en Frida) → Google. `ollama` fuerza local (cero datos salen del equipo). `custom` usa el endpoint OpenAI-compatible configurado abajo."
+        },
+        "frida.codebaseIndex.embeddings.custom.baseUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Endpoint OpenAI-compatible para embeddings (`POST {baseUrl}/embeddings`). Vacío = no configurado."
+        },
+        "frida.codebaseIndex.embeddings.custom.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Modelo de embeddings del endpoint custom. Vacío = el default del upstream."
         },
         "frida.notifyOnComplete": {
           "type": "boolean",

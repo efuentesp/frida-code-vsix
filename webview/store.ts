@@ -560,6 +560,11 @@ export function reduce(state: State, msg: InMessage): State {
 				toolToggles: { askUserQuestion: msg.askUserQuestion, todo: msg.todo },
 			};
 
+		// Estado del índice de código (frida-codebase-index) para el tab Index
+		// del SettingsHub: instalado/versión/tools/busy/última línea de progreso.
+		case "codebase_index_state":
+			return { ...state, codebaseIndex: msg.state };
+
 		// D16 — resumen de diagnósticos de pi-lens del turno (null → oculta el panel).
 		case "lens_diagnostics":
 			return { ...state, lens: msg.summary };

@@ -401,6 +401,19 @@ export interface ToolToggles {
 	todo: boolean;
 }
 
+/** Estado publicado por el host para el tab "Index" del SettingsHub. */
+export interface CodebaseIndexUiState {
+	/** Paquete upstream instalado al pin (y tools capturadas). */
+	installed: boolean;
+	/** Versión instalada del paquete upstream. */
+	version?: string;
+	capturedTools?: string[];
+	/** Acción en curso (botones deshabilitados). */
+	busy?: "install" | "index" | null;
+	/** Última línea de progreso/resultado/error (guía incluida). */
+	lastLine?: string;
+}
+
 // D16 — resumen de diagnósticos de pi-lens para un turno (publicado por el host
 // en turn_end/agent_end). NO son squiggles del editor; es visibilidad en el panel
 // de lo que pi-lens calculó.
@@ -493,6 +506,8 @@ export interface State {
 	compactions: CompactionEntry[];
 	branchSummaries: BranchSummaryEntry[];
 	toolToggles?: ToolToggles;
+	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
+	codebaseIndex?: CodebaseIndexUiState;
 	lens?: LensSummary | null;
 	retry?: RetryState | null;
 	/** Error efímero del provider (401/500/"sin respuesta"): banner en el footer,
@@ -631,6 +646,8 @@ export type InMessage =
 	| { type: "retry_end"; success: boolean }
 	| { type: "lens_status"; loaded: boolean; active: boolean }
 	| { type: "composer_insert"; text: string }
+	| { type: "open_settings"; tab?: string }
+	| { type: "codebase_index_state"; state: CodebaseIndexUiState }
 	| { type: "error"; text: string };
 
 // webview → host
@@ -703,4 +720,8 @@ export type OutMessage =
 			type: "set_tool_toggle";
 			key: "askUserQuestion" | "todo";
 			enabled: boolean;
+	  }
+	| {
+			type: "codebase_index_action";
+			action: "install" | "index" | "rebuild" | "status";
 	  };
