@@ -548,6 +548,15 @@ export async function activate(
 	const abortLogMax = 1024 * 1024;
 	let abortLogReady = false;
 	let abortLogBytes = -1;
+	// Tag de sesión (issue #2): TODAS las ventanas VS Code (y sus Frida) escriben al
+	// mismo abort.log global. Sin tag, líneas de sesiones distintas se intercalan
+	// y el diagnóstico confunde agent_start/abort de una ventana con la otra.
+	// Tag = basename del workspace + sufijo corto estable por instancia de la extensión.
+	const abortSessionTag = `${path
+		.basename(
+			vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
+		)
+		.slice(0, 24)}-${Math.random().toString(16).slice(2, 6)}`;
 	function appendAbortLog(line: string): void {
 		try {
 			if (!abortLogReady) {
@@ -581,7 +590,7 @@ export async function activate(
 		}
 	}
 	function abortDiag(msg: string): void {
-		const line = `[${new Date().toISOString()}] ${msg}`;
+		const line = `[${new Date().toISOString()}] [${abortSessionTag}] ${msg}`;
 		try {
 			abortChannel.appendLine(line);
 		} catch {
@@ -1596,7 +1605,16 @@ export async function activate(
 	function wireSession(session: any): void {
 		session.subscribe((event: any) => {
 			switch (event?.type) {
-				case "agent_start":
+					case "agent_settled":
+						// issue #2: el SDK asentó el run (_isAgentRunActive=false). Si esto llega
+						// MIENTRAS un request sigue en vuelo (o antes de un abort pedido), el run
+						// escapó al tracking del AgentSession → abort() será no-op aunque siga
+						// quemando tokens (modo de fallo 1 y 2 del issue).
+						abortDiag(
+							`agent_settled — isIdle=${!!session.isIdle} isRetrying=${!!session.isRetrying} retryAttempt=${session.retryAttempt ?? 0}`,
+						);
+						break;
+					case "agent_start":
 					abortDiag(
 						`agent_start — isStreaming=${!!session.isStreaming} isBashRunning=${!!session.isBashRunning} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
 					);
@@ -3498,7 +3516,7 @@ export async function activate(
 			const { session } = await ensureSession();
 			const s = session.session;
 			abortDiag(
-				`pre-abort — isStreaming=${!!s?.isStreaming} isBashRunning=${!!s?.isBashRunning} isIdle=${s?.isIdle ?? "?"} queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+				`pre-abort — isStreaming=${!!s?.isStreaming} isBashRunning=${!!s?.isBashRunning} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
 			);
 			// VACIAR LA COLA DE ENCOLADOS ANTES DE ABORTAR. El abort() del SDK NO vacía
 			// la cola interna de steer/followUp: si hay mensajes encolados, sobreviven
@@ -3553,7 +3571,7 @@ export async function activate(
 			await Promise.race([
 				Promise.resolve(s?.abort?.()).then(() => {
 					abortDiag(
-						`abort() RESOLVED tras ${Date.now() - t0}ms — isIdle=${s?.isIdle ?? "?"} isStreaming=${!!s?.isStreaming}`,
+						`abort() RESOLVED tras ${Date.now() - t0}ms — isIdle=${s?.isIdle ?? "?"} isStreaming=${!!s?.isStreaming} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted}`,
 					);
 				}),
 				new Promise<void>((resolve) =>
@@ -3565,7 +3583,7 @@ export async function activate(
 			]);
 			if (timedOut) {
 				abortDiag(
-					`abort() TIMEOUT 8000ms — SIGUE isStreaming=${!!s?.isStreaming} isIdle=${s?.isIdle ?? "?"} (probable tool/MCP/subagente que ignora la señal de abort)`,
+					`abort() TIMEOUT 8000ms — SIGUE isStreaming=${!!s?.isStreaming} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} (probable tool/MCP/subagente que ignora la señal de abort)`,
 				);
 			}
 			abortDiag(`abortRun END tras ${Date.now() - t0}ms`);
