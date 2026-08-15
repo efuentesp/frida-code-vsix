@@ -1,5 +1,13 @@
 // Protocolo postMessage host ↔ webview + estado.
 
+// Cola de mensajes encolados (issue #45): id estable para acciones del panel
+// (quitar/editar/mover), mode = cómo se entregará (paridad con el SDK).
+export interface QueueItem {
+	id: string;
+	text: string;
+	mode: "steer" | "followUp";
+}
+
 export type ToolState = "running" | "ok" | "error";
 
 /** Nivel de un toast: error NO se auto-cierra (cierre manual); los demás sí. */
@@ -500,7 +508,7 @@ export interface State {
 	};
 	forkPoints?: { entryId: string; text: string }[];
 	oauthDeviceCode?: { userCode: string; verificationUri: string };
-	queued: string[];
+	queued: QueueItem[];
 	isCompacting: boolean;
 	compactReason?: CompactionReason;
 	compactions: CompactionEntry[];
@@ -557,7 +565,7 @@ export type InMessage =
 			truncated?: boolean;
 			fullOutputPath?: string;
 	  }
-	| { type: "queued"; items: string[] }
+	| { type: "queued"; items: QueueItem[] }
 	| { type: "approvals"; approvals: ApprovalRequest[] }
 	| { type: "model_changes"; items: ModelChangeRequest[] }
 	| { type: "ui_requests"; items: UiRequest[] }
@@ -699,6 +707,9 @@ export type OutMessage =
 	| { type: "reload" }
 	| { type: "abort" }
 	| { type: "abort_diag"; text: string }
+	| { type: "queue_remove"; id: string }
+	| { type: "queue_edit"; id: string }
+	| { type: "queue_move"; id: string; dir: -1 | 1 }
 	| { type: "new_session" }
 	| { type: "search_files"; query: string }
 	| { type: "list_sessions"; scope?: "project" | "all" }

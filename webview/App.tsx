@@ -28,7 +28,6 @@ import {
 	CircleAlert,
 	CircleCheck,
 	CircleStop,
-	CornerDownRight,
 	GitBranch,
 	History,
 	Info,
@@ -47,6 +46,7 @@ import { ModelPanel } from "./components/ModelPanel";
 import { SettingsHub, type SettingsTab } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
+import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
@@ -586,11 +586,6 @@ export function App() {
 					<ArrowDown size={18} />
 				</button>
 				<div ref={approvalsRef} className="approvals-area">
-					{state.queued.map((q, i) => (
-						<div key={i} className="queued-msg">
-							<CornerDownRight size={12} /> encolado: {q}
-						</div>
-					))}
 					{/* Las tarjetas de aprobación se renderizan ahora en el footer, en lugar
 					    del Composer, cuando hay pendientes (más abajo). */}
 					{state.uiRequests.map((r) => (
@@ -660,6 +655,12 @@ export function App() {
 							/>
 						))}
 				</div>
+				<QueuePanel
+					items={state.queued}
+					onRemove={(id) => post({ type: "queue_remove", id })}
+					onEdit={(id) => post({ type: "queue_edit", id })}
+					onMove={(id, dir) => post({ type: "queue_move", id, dir })}
+				/>
 				<LensDiagnostics lens={state.lens} />
 				{state.modelChanges.length > 0 ? (
 					// Confirmación de cambio de proveedor pendiente (red de seguridad):

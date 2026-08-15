@@ -2,6 +2,8 @@ import {
 	Check,
 	CheckCheck,
 	ChevronRight,
+	ChevronDown,
+	ChevronUp,
 	Circle,
 	Link,
 	Pencil,
@@ -27,6 +29,8 @@ const ICONS: Record<string, LucideIcon> = {
 	term: Terminal,
 	edit: Pencil,
 	wrench: Wrench,
+	up: ChevronUp,
+	down: ChevronDown,
 };
 
 export function Icon({ name, size = 14 }: { name: string; size?: number }) {

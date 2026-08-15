@@ -1,3 +1,4 @@
+import { createPendingQueueStore } from "./queue/pending-queue";
 import path from "node:path";
 import * as fs from "node:fs/promises";
 import {
@@ -523,7 +524,10 @@ export async function activate(
 	let modelChangeBridge: ModelChangeBridge | undefined;
 	// Message Queue (pi): mensajes encolados mientras el agente trabaja + contador
 	// de turnos dentro del agent run actual (para saber cuándo se entrega uno).
-	const pendingQueue: { text: string }[] = [];
+	// Issue #45: store testeable (src/queue) — fuente de verdad de la UI del panel
+	// de cola; sincroniza el SDK en remove/takeout/move. subscribe → postQueued.
+	const queueStore = createPendingQueueStore(() => frida?.session as any);
+	queueStore.subscribe(postQueued);
 	let turnsInRun = 0;
 	// Baseline de usage al iniciar el turno (agent_start) para calcular el delta
 	// (input+output) que consumió el turno y repartirlo entre sus tarjetas (~llm).
@@ -1593,11 +1597,16 @@ export async function activate(
 	}
 
 	function postQueued(): void {
-		post({ type: "queued", items: pendingQueue.map((q) => q.text) });
+		post({
+			type: "queued",
+			items: queueStore
+				.snapshot()
+				.map((q) => ({ id: q.id, text: q.text, mode: q.mode })),
+		});
 	}
 
 	function resetQueue(): void {
-		pendingQueue.length = 0;
+		queueStore.clearLocal();
 		turnsInRun = 0;
 		postQueued();
 	}
@@ -1605,18 +1614,18 @@ export async function activate(
 	function wireSession(session: any): void {
 		session.subscribe((event: any) => {
 			switch (event?.type) {
-					case "agent_settled":
-						// issue #2: el SDK asentó el run (_isAgentRunActive=false). Si esto llega
-						// MIENTRAS un request sigue en vuelo (o antes de un abort pedido), el run
-						// escapó al tracking del AgentSession → abort() será no-op aunque siga
-						// quemando tokens (modo de fallo 1 y 2 del issue).
-						abortDiag(
-							`agent_settled — isIdle=${!!session.isIdle} isRetrying=${!!session.isRetrying} retryAttempt=${session.retryAttempt ?? 0}`,
-						);
-						break;
-					case "agent_start":
+				case "agent_settled":
+					// issue #2: el SDK asentó el run (_isAgentRunActive=false). Si esto llega
+					// MIENTRAS un request sigue en vuelo (o antes de un abort pedido), el run
+					// escapó al tracking del AgentSession → abort() será no-op aunque siga
+					// quemando tokens (modo de fallo 1 y 2 del issue).
 					abortDiag(
-						`agent_start — isStreaming=${!!session.isStreaming} isBashRunning=${!!session.isBashRunning} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+						`agent_settled — isIdle=${!!session.isIdle} isRetrying=${!!session.isRetrying} retryAttempt=${session.retryAttempt ?? 0}`,
+					);
+					break;
+				case "agent_start":
+					abortDiag(
+						`agent_start — isStreaming=${!!session.isStreaming} isBashRunning=${!!session.isBashRunning} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"} pendingLocal=${queueStore.snapshot().length}`,
 					);
 					turnsInRun = 0;
 					// Snapshot del usage aggregate para repartir el delta del turno entre
@@ -1715,9 +1724,9 @@ export async function activate(
 				case "turn_start": {
 					// turn_start tras el primero (turnsInRun>0) = entrega de un mensaje
 					// encolado: creamos su turno aquí para que los deltas caigan en él.
-					if (turnsInRun > 0 && pendingQueue.length > 0) {
-						post({ type: "user", text: pendingQueue.shift()!.text });
-						postQueued();
+					if (turnsInRun > 0 && queueStore.snapshot().length > 0) {
+						const delivered = queueStore.shift();
+						if (delivered) post({ type: "user", text: delivered.text });
 					}
 					const isFirstTurn = turnsInRun === 0;
 					turnsInRun++;
@@ -2053,6 +2062,28 @@ export async function activate(
 			case "abort":
 				abortDiag(`host ← webview {type:"abort"} recibido`);
 				await abortRun();
+				break;
+			// Acciones del panel de cola (issue #45). El store sincroniza el SDK
+			// (clearQueue + re-prompt) y notifica → postQueued actualiza la UI.
+			case "queue_remove":
+				await queueStore
+					.remove(String(msg.id ?? ""))
+				.catch(() => undefined);
+				break;
+			case "queue_edit": {
+				const entry = await queueStore
+					.takeout(String(msg.id ?? ""))
+				.catch(() => undefined);
+				if (entry) post({ type: "composer_insert", text: entry.text });
+				break;
+			}
+			case "queue_move":
+				await queueStore
+					.move(
+						String(msg.id ?? ""),
+						msg.dir === -1 ? -1 : 1,
+					)
+					.catch(() => undefined);
 				break;
 			case "abort_diag":
 				// Trazado reenviado desde el webview (Esc / botón) para unificar el timeline
@@ -3389,17 +3420,14 @@ export async function activate(
 		// (turn_start>0 en wireSession), para que los deltas del turno en curso
 		// sigan cayendo en su propio turno y no se mezclen.
 		if (session.session?.isStreaming) {
-			pendingQueue.push({ text: toPost });
-			postQueued();
+			queueStore.add(toPost, mode); // subscribe → postQueued
 			try {
 				await session.session.prompt(toSend, {
 					streamingBehavior: mode,
 					images: imgs,
 				});
 			} catch (e: any) {
-				const idx = pendingQueue.findIndex((q) => q.text === toPost);
-				if (idx >= 0) pendingQueue.splice(idx, 1);
-				postQueued();
+				queueStore.removeLastByText(toPost); // subscribe → postQueued
 				post({ type: "error", text: String(e?.message ?? e) });
 			}
 			return;
@@ -3509,14 +3537,14 @@ export async function activate(
 
 	async function abortRun(): Promise<void> {
 		abortDiag(
-			`abortRun START — pendingLocal=${pendingQueue.length} inRetry=${inRetry}`,
+			`abortRun START — pendingLocal=${queueStore.snapshot().length} inRetry=${inRetry}`,
 		);
 		const t0 = Date.now();
 		try {
 			const { session } = await ensureSession();
 			const s = session.session;
 			abortDiag(
-				`pre-abort — isStreaming=${!!s?.isStreaming} isBashRunning=${!!s?.isBashRunning} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+				`pre-abort — isStreaming=${!!s?.isStreaming} isBashRunning=${!!s?.isBashRunning} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${queueStore.snapshot().length}`,
 			);
 			// VACIAR LA COLA DE ENCOLADOS ANTES DE ABORTAR. El abort() del SDK NO vacía
 			// la cola interna de steer/followUp: si hay mensajes encolados, sobreviven
@@ -3526,7 +3554,7 @@ export async function activate(
 			// el Esc de la TUI de pi: restoreQueuedMessagesToEditor({abort:true}) llama
 			// clearAllQueues() ANTES de agent.abort()). Restauramos los textos al
 			// composer (vía composer_insert) para no perder lo encolado.
-			const restoreTexts = pendingQueue.map((q) => q.text);
+			const restoreTexts = queueStore.restoreAll();
 			try {
 				s?.clearQueue?.();
 			} catch {
@@ -3534,7 +3562,7 @@ export async function activate(
 			}
 			resetQueue();
 			abortDiag(
-				`post-clearQueue — queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${pendingQueue.length}`,
+				`post-clearQueue — queueSteer=${s?.getSteeringMessages?.().length ?? "?"} queueFollow=${s?.getFollowUpMessages?.().length ?? "?"} pendingLocal=${queueStore.snapshot().length}`,
 			);
 			if (restoreTexts.length > 0) {
 				post({ type: "composer_insert", text: restoreTexts.join("\n\n") });
