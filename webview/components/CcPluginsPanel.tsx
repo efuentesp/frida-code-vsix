@@ -714,7 +714,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						</div>
 					) : (
 						<div className="ccp-mkt-full">
-							<div className="ccp-list" ref={listRef}>
+							<div className="ccp-list ccp-list-full" ref={listRef}>
 								{filteredMkts.map((m, i) => (
 									<button
 										key={m.name}
@@ -1015,7 +1015,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						</div>
 					</div>
 					) : (
-						<div className="ccp-list" ref={listRef}>
+						<div className="ccp-list ccp-list-full" ref={listRef}>
 							{(["skill", "cmd", "mcp"] as const).map((kind) => {
 								const items = filteredResources.filter((r) => r.kind === kind);
 								if (!items.length) return null;

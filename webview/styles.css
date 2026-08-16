@@ -1801,6 +1801,12 @@ body {
 	cursor: pointer;
 }
 
+/* Lista SOLA (sin ficha derecha): Instalados/Marketplaces usan todo el
+   ancho — antes heredaban el 46% del split y desperdiciaban la mitad. */
+.ccp-list-full {
+	width: 100%;
+}
+
 /* ── CcPluginsPanel (/ccplugin — UX #49): lista filtrable + ficha lado a lado ── */
 .ccp-panel {
 	position: relative;
