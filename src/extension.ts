@@ -128,6 +128,9 @@ import {
 	isKnowledgeBaseEnabled,
 	isCcPluginsEnabled,
 	readCcPluginsExtraMarketplaces,
+	isSandboxesEnabled,
+	readSandboxesDefaultImage,
+	readSandboxesAllowDomains,
 	readCcPluginsEnabledPlugins,
 	isTelemetryOptIn,
 	isTodoEnabled,
@@ -946,6 +949,10 @@ export async function activate(
 					ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 					ccPluginsPresenter: createCcPluginsPresenter(),
 					ccPluginsPanel: handleCcPanel,
+					sandboxesEnabled: isSandboxesEnabled,
+					sandboxesDefaultImage: readSandboxesDefaultImage,
+					sandboxesAllowDomains: readSandboxesAllowDomains,
+					sandboxesPanel: handleSandboxPanel,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -2040,6 +2047,33 @@ export async function activate(
 		string,
 		import("./tools/frida-cc-plugins/panel").CcPanelActions
 	>();
+	// ── Panel nativo de /sandbox (#35): acciones host-side por id ──
+	const sbxPanelActions = new Map<
+		string,
+		import("./tools/frida-sandboxes/panel").SandboxPanelActions
+	>();
+	function handleSandboxPanel(
+		req: import("./tools/frida-sandboxes/panel").SandboxPanelRequest | null,
+	): void {
+		if (!req) {
+			sbxPanelActions.delete(lastSbxPanelId);
+			post({ type: "sandbox_panel", panel: null });
+			return;
+		}
+		sbxPanelActions.set(req.id, req.actions);
+		lastSbxPanelId = req.id;
+		post({
+			type: "sandbox_panel",
+			panel: {
+				id: req.id,
+				title: req.title,
+				sandboxes: req.sandboxes,
+				docker: req.docker,
+			},
+		});
+	}
+	let lastSbxPanelId = "";
+
 	function handleCcPanel(
 		req: import("./tools/frida-cc-plugins/panel").CcPanelRequest | null,
 	): void {
@@ -2212,6 +2246,91 @@ export async function activate(
 			case "ccplugins_panel_close":
 				handleCcPanel(null);
 				break;
+			case "sandbox_panel_action":
+			case "sandbox_panel_changes":
+			case "sandbox_panel_merge":
+			case "sandbox_panel_terminal":
+			case "sandbox_panel_close": {
+				// Acciones del panel /sandbox (#35). El confirm de destroy vive
+				// en el webview (doble click); el host ejecuta y el toast de UNA
+				// línea confirma (regla de UI: listas en webview, toasts cortos).
+				if (msg.type === "sandbox_panel_close") {
+					handleSandboxPanel(null);
+					break;
+				}
+				const actions = sbxPanelActions.get(String(msg.id ?? ""));
+				if (!actions) break;
+				const name = typeof msg.name === "string" ? msg.name : "";
+				void (async () => {
+					try {
+						if (msg.type === "sandbox_panel_action") {
+							switch (msg.action) {
+								case "refresh":
+									await actions.refresh();
+									break;
+								case "reprobe":
+									await actions.reprobe();
+									break;
+								case "pause":
+								case "resume":
+								case "destroy": {
+									if (!name) return;
+									const out =
+										msg.action === "pause"
+											? await actions.pause(name)
+											: msg.action === "resume"
+												? await actions.resume(name)
+												: await actions.destroy(name);
+									post({ type: "info", text: out });
+									break;
+								}
+							}
+						} else if (msg.type === "sandbox_panel_changes") {
+							if (!name) return;
+							const files = await actions.changes(name);
+							post({
+								type: "info",
+								text: files.length
+									? `${name}: ${files.length} cambio(s) sin mergear — pide el merge al agente (sandbox_merge) o desde la sesión.`
+									: `${name}: sin cambios (árbol limpio).`,
+							});
+						} else if (msg.type === "sandbox_panel_merge") {
+							if (!name || !Array.isArray(msg.files)) return;
+							const out = await actions.mergeFiles(name, msg.files);
+							post({ type: "info", text: out });
+						} else if (msg.type === "sandbox_panel_terminal") {
+							// Terminal interactiva del container (docker exec -it)
+							// en la terminal integrada de VS Code.
+							if (!name) return;
+							if (actions.terminal) await actions.terminal(name);
+							else {
+								const term = vscode.window.createTerminal({
+									name: `sandbox:${name}`,
+									shellPath: "docker",
+									shellArgs: [
+										"exec",
+										"-it",
+										"-w",
+										"/workspace",
+										`frida-sbx-${name}`,
+										"bash",
+										"-l",
+									],
+								});
+								term.show();
+							}
+						}
+					} catch (e: any) {
+						await actions.refresh().catch(() => {});
+						post({
+							type: "info",
+							level: "error",
+							text: `sandbox: ${e?.message ?? e}`,
+						});
+					}
+				})();
+				break;
+			}
 			case "model_change_response":
 				// Respuesta del diálogo de confirmación de cambio de proveedor.
 				modelChangeBridge?.resolve({
@@ -4020,6 +4139,10 @@ export async function activate(
 				ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 				ccPluginsPresenter: createCcPluginsPresenter(),
 				ccPluginsPanel: handleCcPanel,
+				sandboxesEnabled: isSandboxesEnabled,
+				sandboxesDefaultImage: readSandboxesDefaultImage,
+				sandboxesAllowDomains: readSandboxesAllowDomains,
+				sandboxesPanel: handleSandboxPanel,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

@@ -2,7 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node", "vitest"]
+    "types": ["node", "vitest"],
+    "module": "esnext",
+    "moduleResolution": "node"
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

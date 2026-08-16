@@ -265,6 +265,22 @@
           "default": true,
           "markdownDescription": "Habilita **frida-knowledge-base**: base de conocimiento OKF v0.2 del proyecto, Obsidian-compatible (wrapper de `@zosmaai/pi-llm-wiki`, instalado on-demand en `~/.frida/npm`; vault en `<proyecto>/.llm-wiki/`). Añade las tools `wiki_*` + `kb_search`/`kb_neighbors`, los comandos `/wiki-*` y la skill `llm-wiki`. La capa de grafo/backlinks para el humano la provee Foam (dependencia del VSIX)."
         },
+        "frida.sandboxes.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-sandboxes** (#35): containers Docker locales por agente (el «own computer» — tier-2 de aislamiento). Añade las tools `sandbox_*` y el comando `/sandbox`. Si Docker no está en el host, todo degrada con un aviso honesto de una línea (nada truena)."
+        },
+        "frida.sandboxes.defaultImage": {
+          "type": "string",
+          "default": "node:22",
+          "markdownDescription": "Imagen Docker para nuevos sandboxes. Debe incluir `git` y el runtime del proyecto (default `node:22`: Debian con git+npm) — `sandbox_changes`/`sandbox_merge` usan `git status` in-container."
+        },
+        "frida.sandboxes.allowDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Allowlist de dominios de red permitidos DENTRO del sandbox (patrones glob: `*.npmjs.org`). Vacía = sin restricción (el container es el boundary; esto es refinamiento, patrón pi-sandbox)."
+        },
         "frida.ccPlugins.enabled": {
           "type": "boolean",
           "default": true,

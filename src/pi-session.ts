@@ -62,6 +62,10 @@ import {
 	CC_PLUGINS_FACTORY_NAME,
 } from "./tools/frida-cc-plugins";
 import {
+	createFridaSandboxes,
+	SANDBOXES_FACTORY_NAME,
+} from "./tools/frida-sandboxes";
+import {
 	ensureGitignore,
 	syncOpenAiKeyToAuthJson,
 } from "./tools/frida-codebase-index/host-setup";
@@ -231,6 +235,13 @@ export interface CreateFridaSessionOptions {
 	onCcPluginsState?: (
 		s: import("./tools/frida-cc-plugins").CcPluginsState,
 	) => void;
+	/** frida-sandboxes (#35): toggle, imagen default y allowlist de dominios. */
+	sandboxesEnabled?: () => boolean;
+	sandboxesDefaultImage?: () => string;
+	sandboxesAllowDomains?: () => string[];
+	/** Sink del panel nativo del webview para /sandbox (null = cerrar). */
+	sandboxesPanel?: import("./tools/frida-sandboxes/panel").SandboxPanelSink;
+	onSandboxesState?: (s: { ready: boolean; sandboxes: number }) => void;
 	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
 	onHermesMemoryState?: (
 		s: import("./tools/frida-hermes-memory").HermesMemoryState,
@@ -610,6 +621,26 @@ export async function createFridaSession(
 			// add/remove/list/enable/disable, bootstrap). La extensión nunca
 			// instala sola: todo install es /ccplugin add explícito (D8). MCP con
 			// nombres originales + colisión = fallo (D5). Main only.
+			{
+				// frida-sandboxes (ADR-0047, #35): container Docker local por
+				// agente — tier-2 de aislamiento (worktree = tier-1). Tools
+				// sandbox_* + /sandbox + redirección bash→container (hook
+				// tool_call) mientras haya sandbox activo. Gating D5: sin
+				// Docker todo degrada con nota honesta. Main only.
+				name: SANDBOXES_FACTORY_NAME,
+				factory: (pi: any) =>
+					(opts.sandboxesEnabled?.() ?? true)
+						? createFridaSandboxes({
+								agentDir: opts.agentDir,
+								cwd: opts.cwd,
+								panel: opts.sandboxesPanel,
+								policy: {
+									allowDomains: opts.sandboxesAllowDomains?.() ?? [],
+								},
+								onStateChange: opts.onSandboxesState,
+							})(pi)
+						: undefined,
+			},
 			{
 				name: CC_PLUGINS_FACTORY_NAME,
 				factory: (pi: any) =>

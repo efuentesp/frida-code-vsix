@@ -16,6 +16,7 @@ import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
 import { UiDialog } from "./components/UiDialog";
 import { CcPluginsPanel } from "./components/CcPluginsPanel";
+import { SandboxesPanel } from "./components/SandboxesPanel";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
@@ -620,6 +621,36 @@ export function App() {
 								post({ type: "ccplugins_row_meta", id, ref })
 							}
 							onClose={(id) => post({ type: "ccplugins_panel_close", id })}
+						/>
+					) : null}
+					{state.sbxPanel ? (
+						<SandboxesPanel
+							panel={state.sbxPanel}
+							onAction={(id, a) =>
+								a.kind === "merge"
+									? post({
+											type: "sandbox_panel_merge",
+											id,
+											name: a.name,
+											files: a.files,
+										})
+									: a.kind === "changes" || a.kind === "terminal"
+										? post({
+												type:
+													a.kind === "terminal"
+														? "sandbox_panel_terminal"
+														: "sandbox_panel_changes",
+												id,
+												name: a.name,
+											})
+										: post({
+												type: "sandbox_panel_action",
+												id,
+												action: a.kind,
+												name: "name" in a ? a.name : undefined,
+											})
+							}
+							onClose={(id) => post({ type: "sandbox_panel_close", id })}
 						/>
 					) : null}
 					{Object.entries(state.webRoots ?? {})

@@ -1759,6 +1759,52 @@ body {
 	color: var(--vscode-list-activeSelectionForeground);
 }
 
+/* ── frida-sandboxes: panel /sandbox (#35) — reutiliza la familia ccp ── */
+.sbx-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 32px 16px;
+	color: var(--vscode-descriptionForeground);
+}
+.sbx-empty-icon {
+	font-size: 28px;
+}
+.sbx-empty p {
+	margin: 0;
+}
+.sbx-empty-reason {
+	font-size: 0.9em;
+	opacity: 0.85;
+}
+.sbx-empty-guide {
+	font-size: 0.85em;
+	opacity: 0.65;
+}
+.sbx-state {
+	flex-shrink: 0;
+	font-size: 0.8em;
+	opacity: 0.85;
+}
+.sbx-state-on {
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.sbx-state-off {
+	color: var(--vscode-descriptionForeground);
+}
+.sbx-detail-name {
+	font-size: 1.1em;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+.sbx-detail-meta {
+	color: var(--vscode-descriptionForeground);
+	font-size: 0.88em;
+	margin-bottom: 4px;
+	word-break: break-all;
+}
+
 /* Diálogo modal "Agregar marketplace" (estilo Add Marketplace de Claude). */
 .ccp-overlay {
 	position: absolute;

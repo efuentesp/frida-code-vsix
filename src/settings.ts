@@ -247,6 +247,29 @@ export function readCcPluginsExtraMarketplaces(): string[] {
 		.get<string[]>("ccPlugins.extraMarketplaces", []);
 }
 
+/** ¿Está activa frida-sandboxes (#35)? Default: true (Docker se probea). */
+export function isSandboxesEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("sandboxes.enabled", true);
+}
+
+/** Imagen Docker default de nuevos sandboxes (frida.sandboxes.defaultImage). */
+export function readSandboxesDefaultImage(): string {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string>("sandboxes.defaultImage", "node:22");
+}
+
+/** Allowlist de dominios de red in-container (vacía = sin restricción). */
+export function readSandboxesAllowDomains(): string[] {
+	return (
+		vscode.workspace
+			.getConfiguration(CONFIG_SECTION)
+			.get<string[]>("sandboxes.allowDomains", []) ?? []
+	);
+}
+
 /** enabledPlugins del equipo: "plugin@marketplace" → true. */
 export function readCcPluginsEnabledPlugins(): Record<string, boolean> {
 	const raw = vscode.workspace

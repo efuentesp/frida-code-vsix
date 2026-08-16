@@ -508,6 +508,24 @@ export interface CcPanelErrorWs {
 }
 
 /** Panel /ccplugin abierto (null = cerrado) — tabs completas. */
+/** frida-sandboxes (#35): fila del panel /sandbox (serializable). */
+export interface SandboxInfoWs {
+	name: string;
+	image: string;
+	state: "active" | "paused";
+	createdAt: string;
+	projectDir: string;
+	createdBy: string;
+	lastSeen?: string;
+}
+
+export interface SandboxPanelWs {
+	id: string;
+	title: string;
+	sandboxes: SandboxInfoWs[];
+	docker: { available: boolean; reason?: string };
+}
+
 export interface CcPanelWs {
 	id: string;
 	/** Interna: true = patch async (row_meta) — NO limpia pendientes. */
@@ -545,6 +563,7 @@ export interface State {
 	/** Panel /ccplugin activo (UX #49): lista filtrable + ficha lado a lado.
 	 *  null = cerrado. */
 	ccPanel?: CcPanelWs | null;
+	sbxPanel?: SandboxPanelWs | null;
 	/** Árbol Remote React actual (null = sin UI remota activa). */
 	/** Roots Remote React activos, keyados por rootId, cada uno con su zona
 	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
@@ -598,6 +617,7 @@ export interface State {
 // Host → webview
 export type InMessage =
 	| { type: "ccplugins_panel"; panel: CcPanelWs | null }
+	| { type: "sandbox_panel"; panel: SandboxPanelWs | null }
 	| {
 			/** Patch async: "Last updated" de una fila (git log). */
 			type: "ccplugins_row_meta";
@@ -754,6 +774,21 @@ export type OutMessage =
 			source?: string;
 	  }
 	| { type: "ccplugins_panel_close"; id: string }
+	| {
+			type: "sandbox_panel_action";
+			id: string;
+			action:
+				| "refresh"
+				| "pause"
+				| "resume"
+				| "destroy"
+				| "reprobe";
+			name?: string;
+	  }
+	| { type: "sandbox_panel_changes"; id: string; name: string }
+	| { type: "sandbox_panel_merge"; id: string; name: string; files: string[] }
+	| { type: "sandbox_panel_terminal"; id: string; name: string }
+	| { type: "sandbox_panel_close"; id: string }
 	| { type: "ccplugins_row_meta"; id: string; ref: string }
 	| {
 			type: "submit";

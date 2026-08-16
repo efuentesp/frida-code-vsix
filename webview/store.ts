@@ -224,6 +224,8 @@ export function reduce(state: State, msg: InMessage): State {
 			return { ...state, keyNeeded: true };
 		case "ccplugins_panel":
 			return { ...state, ccPanel: msg.panel ?? null };
+		case "sandbox_panel":
+			return { ...state, sbxPanel: msg.panel ?? null };
 		case "ccplugins_row_meta": {
 			// Patch async del panel abierto: fusiona lastUpdated en la fila
 			// (discover E instalados) conservando tab/filtro del componente.
