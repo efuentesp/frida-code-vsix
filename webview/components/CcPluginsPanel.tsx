@@ -886,14 +886,6 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 											)}
 										</button>
 									))}
-									<button
-										type="button"
-										tabIndex={-1}
-										className="ccp-btn"
-										onClick={() => onClose(panel.id)}
-									>
-										Cerrar
-									</button>
 								</div>
 							</div>
 						</div>
@@ -1003,14 +995,6 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										)}
 									</button>
 								))}
-								<button
-									type="button"
-									tabIndex={-1}
-									className="ccp-btn"
-									onClick={() => onClose(panel.id)}
-								>
-									Cerrar
-								</button>
 							</div>
 						</div>
 					</div>
@@ -1182,16 +1166,6 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								))}
 							</div>
 						) : null}
-						<div className="ccp-actions">
-							<button
-								type="button"
-								tabIndex={-1}
-								className="ccp-btn"
-								onClick={() => onClose(panel.id)}
-							>
-								Cerrar
-							</button>
-						</div>
 					</div>
 				) : null}
 			</div>
