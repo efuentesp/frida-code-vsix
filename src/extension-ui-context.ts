@@ -10,9 +10,13 @@
 // runRpcQuestionnaire) detectan ctx.mode==="rpc" + hasDialogUI(ctx.ui) y caminan
 // las preguntas con select/input en vez de la factory Ink del TUI.
 //
-// `custom()` resuelve `undefined` a propósito: es la señal que rpiv usa como
-// backstop para caer al dialog walker cuando el host no puede renderizar la
-// overlay Ink (issue #78 de rpiv). Por eso NO se implementa.
+// `custom()` NO se define (ADR-0058): frida no renderiza TUI. Las
+// extensiones upstream que protegen su UI con `typeof ctx.ui.custom !==
+// "function"` degradan solas a texto (ej. /memory-skills de pi-hermes-memory);
+// rpiv-ask-user-question enruta por `ctx.mode === "rpc"` + hasDialogUI
+// (dialog walker) y jamás alcanza custom en frida. Definirlo como no-op
+// ROMPE esa degradación: la guarda pasa, no hay texto y no hay modal —
+// comando mudo. UI rica de extensión en frida = fridaWeb/fridaWebMount.
 
 import { randomUUID } from "node:crypto";
 import type { ReactElement } from "react";
@@ -84,7 +88,7 @@ export function createFridaUiContext(
 	};
 
 	// El resto del contrato es TUI/Ink y no aplica al webview: no-ops.
-	// custom() devuelve Promise<undefined> a propósito (backstop de rpiv).
+	// OJO: custom NO está — ver ADR-0058 (degradación por guarda upstream).
 	const ctx = {
 		select,
 		confirm,
@@ -102,7 +106,6 @@ export function createFridaUiContext(
 		setFooter: noop,
 		setHeader: noop,
 		setTitle: noop,
-		custom: async () => undefined,
 		pasteToEditor: noop,
 		setEditorText: noop,
 		getEditorText: () => "",

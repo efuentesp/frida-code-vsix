@@ -62,8 +62,17 @@ review cada 10 turnos / 15 tool calls, correction detection on).
   `turn_end` (contadores), `session_shutdown` (flush + index).
 - **Entry TS vía jiti**: el upstream distribuye TypeScript fuente
   (`src/index.ts`, manifiesto `pi.extensions`) — se carga con jiti + aliases.
+- **Sin TUI (ADR-0058)**: `/memory-skills` (modal TUI en pi real) degrada a
+  lista de texto — frida no define `ctx.ui.custom` y la guarda del upstream
+  dispara su fallback por `notify`. `pi-tui` se resuelve por alias solo para
+  las utilidades de texto que el factory importa como valor.
 - **Peer-deps via alias**: `--legacy-peer-deps` no instala `pi-ai` /
   `pi-coding-agent`; los aliases de jiti los apuntan a la copia del SDK que Frida
+  shipea. **Keys por subpath EXACTO** (`pi-ai/oauth`, `pi-ai/providers/all`,
+  …): una vez que el alias toca `pi-coding-agent`, TODO el SDK dist carga bajo
+  jiti y jiti hace prefix-match — una key prefijo rompe los subpaths internos
+  (`dist/index.js/oauth`). El contract-test escanea el SDK dist y falla antes
+  que el usuario si un bump añade un subpath sin alias.
   ya shipea en su VSIX (misma versión, cero duplicación).
 - **Main only**: las sesiones hijas de workflow no inyectan memoria ni aprenden.
 - **Sin poda de natives**: `better-sqlite3` resuelve su prebuild N-API (ABI-estable,
