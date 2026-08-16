@@ -93,6 +93,8 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	// refresca en ambos) + timeout de seguridad de 20s por acción.
 	const [pending, setPending] = useState<Map<string, string>>(new Map());
 	const [pendingMkt, setPendingMkt] = useState<string | null>(null);
+	// Secciones colapsadas en Instalados (skill/cmd/mcp) — menos scroll.
+	const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 	const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
 		new Map(),
 	);
@@ -171,6 +173,12 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			`${r.name} ${r.plugin} ${r.kind}`.toLowerCase().includes(q),
 		);
 	}, [tab, panel.resources, query, inInstView, inResView]);
+	// La navegación (↑↓/⏎/Espacio) opera solo sobre recursos VISIBLES:
+	// los de secciones colapsadas quedan fuera del orden.
+	const visibleResources = useMemo(
+		() => filteredResources.filter((r) => !collapsed.has(r.kind)),
+		[filteredResources, collapsed],
+	);
 
 	const filteredRows = useMemo(() => {
 		if (tab !== "discover") return [];
@@ -219,7 +227,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			: tab === "errors"
 				? panel.errors.length
 				: tab === "installed"
-					? filteredResources.length
+					? visibleResources.length
 					: filteredRows.length;
 
 	useEffect(() => {
@@ -234,7 +242,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				: undefined,
 		[resView, panel.resources],
 	);
-	const resItem = filteredResources[focusIdx];
+	const resItem = visibleResources[focusIdx];
 	const mkt = inMktMenu ? menuMkt : filteredMkts[focusIdx];
 	const err = panel.errors[focusIdx];
 
@@ -543,6 +551,25 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			move(-1);
 			return;
 		}
+		if (
+			tab === "installed" &&
+			!inInstView &&
+			!inResView &&
+			zone === "list" &&
+			(e.key === "ArrowLeft" || e.key === "ArrowRight")
+		) {
+			// Acordeón: ← pliega la sección del recurso enfocado · → despliega.
+			e.preventDefault();
+			const kind = resItem?.kind;
+			if (!kind) return;
+			setCollapsed((prev) => {
+				const next = new Set(prev);
+				if (e.key === "ArrowLeft") next.add(kind);
+				else next.delete(kind);
+				return next;
+			});
+			return;
+		}
 		if (zone === "buttons" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
 			e.preventDefault();
 			setFocusBtn((i) => {
@@ -592,7 +619,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						: tab === "errors"
 							? "↑↓ error · ⏎ reintentar"
 							: tab === "installed"
-								? "↑↓ recurso · Espacio alterna plugin · ⏎ detalle"
+								? "↑↓ recurso · Espacio alterna plugin · ⏎ detalle · ←/→ pliega sección"
 								: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
 
 	const menuLabels = useMemo(() => {
@@ -1001,20 +1028,41 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 					) : (
 						<div className="ccp-list ccp-list-full" ref={listRef}>
 							{(["skill", "cmd", "mcp"] as const).map((kind) => {
-								const items = filteredResources.filter((r) => r.kind === kind);
-								if (!items.length) return null;
+								const items = visibleResources.filter((r) => r.kind === kind);
+								const total = filteredResources.filter(
+									(r) => r.kind === kind,
+								).length;
+								if (!total) return null;
+								const isCol = collapsed.has(kind);
 								return (
 									<div key={kind} className="ccp-res-section">
-										<div className="ccp-res-header">
+										<button
+											type="button"
+											tabIndex={-1}
+											className="ccp-res-header"
+											title={isCol ? "Desplegar (→)" : "Plegar (←)"}
+											onClick={() =>
+												setCollapsed((prev) => {
+													const next = new Set(prev);
+													if (isCol) next.delete(kind);
+													else next.add(kind);
+													return next;
+												})
+											}
+										>
+											<span className="ccp-res-caret">{isCol ? "▸" : "▾"}</span>
 											{kind === "skill"
 												? "Skills"
 												: kind === "cmd"
 													? "Commands"
 													: "Servidores MCP"}
-										</div>
-										{items.map((r) => {
-											const i = filteredResources.indexOf(r);
-											return (
+											<span className="ccp-res-count">{total}</span>
+										</button>
+										{isCol
+											? null
+											: items.map((r) => {
+													const i = visibleResources.indexOf(r);
+													return (
 												<button
 													key={r.name}
 													type="button"
@@ -1051,7 +1099,6 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 																: "Deshabilitado — click para habilitar (afecta a todo el plugin)"
 														}
 														onClick={(ev) => {
-															// Mouse: toggle directo sin abrir el detalle.
 															ev.stopPropagation();
 															onAction(panel.id, {
 																kind:
@@ -1062,9 +1109,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 													>
 														<span className="ccp-switch-knob" />
 													</button>
-												</button>
-											);
-										})}
+													</button>
+												);
+												})}
 									</div>
 								);
 							})}

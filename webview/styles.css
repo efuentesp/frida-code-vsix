@@ -1605,13 +1605,33 @@ body {
 	margin-bottom: 4px;
 }
 .ccp-res-header {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	width: 100%;
+	text-align: left;
 	color: var(--vscode-descriptionForeground);
+	font: inherit;
 	font-size: 0.85em;
 	font-weight: 600;
-	text-transform: none;
 	padding: 6px 4px 2px;
+	border: none;
 	border-bottom: 1px solid var(--vscode-input-border, transparent);
 	margin-bottom: 2px;
+	background: transparent;
+	cursor: pointer;
+}
+.ccp-res-header:hover {
+	color: var(--vscode-foreground);
+}
+.ccp-res-caret {
+	width: 12px;
+	flex-shrink: 0;
+}
+.ccp-res-count {
+	font-size: 0.85em;
+	font-weight: 400;
+	opacity: 0.75;
 }
 .ccp-res-row {
 	display: flex;
