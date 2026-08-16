@@ -1,6 +1,7 @@
 import { createPendingQueueStore } from "./queue/pending-queue";
 import path from "node:path";
 import * as fs from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import {
 	appendFileSync,
 	copyFileSync,
@@ -152,7 +153,12 @@ import {
 	setTelemetryOptIn,
 	writeToolToggle,
 } from "./settings";
-import { TOOL_TOGGLES } from "./tool-toggles";
+import { TOOL_TOGGLES, TOOL_TOGGLE_BASES, TOOL_TOGGLE_KEY_BY_FACTORY } from "./tool-toggles";
+import {
+	attributeResources,
+	type AttribSkill,
+} from "./module-attribution";
+import { loadRegistry } from "./tools/frida-cc-plugins/registry";
 import {
 	classifySeverity,
 	type LensDiagnosticsPayload,
@@ -1542,6 +1548,61 @@ export async function activate(
 		// la sección Comandos con source "extension" para distinguirlos de los
 		// built-in del host. Dedupe: si un nombre ya es built-in, gana el built-in.
 		const builtinNames = new Set(BUILTIN_COMMANDS.map((c) => c.name));
+		// #54 — Atribución de recursos a módulos (toggles #53 + bases): los
+		// tools/comandos/skills/prompts/errores de cada módulo frida se muestran
+		// en el acordeón de Configuración > Herramientas; Recursos queda con lo
+		// general (extensiones externas, skills globales/proyecto, built-ins).
+		const attribution = attributeResources({
+			extensions: extensionsData,
+			skills: (skills.skills ?? []).map(
+					(s: any): AttribSkill => {
+						const p = String(s.filePath ?? "");
+						let realPath = p;
+						try {
+							realPath = realpathSync(p);
+						} catch {
+							/* sin realpath (archivo normal o ausente) → path */
+						}
+						return {
+							name: String(s.name),
+							path: p,
+							realPath,
+							description: String(s.description ?? ""),
+							source: String(s?.sourceInfo?.scope ?? "path"),
+						};
+					},
+			),
+			prompts: (prompts.prompts ?? []).map((p: any) => ({
+				name: String(p.name),
+				description: String(p.description ?? ""),
+			})),
+			errors,
+			bundledSkillNames: getBundledSkillNames(),
+			ccSkillNames: (() => {
+				const names = new Set<string>();
+				try {
+					const reg = loadRegistry(defaultAgentDir());
+					const plugins: any[] = Object.values(reg.plugins ?? {});
+					for (const p of plugins)
+						for (const s of p?.skills ?? []) names.add(String(s));
+				} catch {
+					/* sin registry → sin atribución cc-plugins */
+				}
+				return names;
+			})(),
+			kbRealPathPrefixes: [
+				path.join(
+					defaultAgentDir(),
+					"npm",
+					"node_modules",
+					"@zosmaai",
+					"pi-llm-wiki",
+				),
+			],
+		});
+		const factoryEsModulo = (f: string): boolean =>
+			TOOL_TOGGLE_KEY_BY_FACTORY.has(f) ||
+			TOOL_TOGGLE_BASES.some((b) => b.factory === f);
 		const extCommands: {
 			name: string;
 			description: string;
@@ -1551,6 +1612,9 @@ export async function activate(
 		}[] = [];
 		for (const e of (ext.extensions ?? []).filter((e: any) => !e.hidden)) {
 			const extLabel = extNameOf(String(e.path ?? ""));
+			// #54: los comandos de módulos frida (toggles/base) van al acordeón de
+			// Herramientas; aquí solo quedan los de extensiones externas.
+			if (factoryEsModulo(extLabel)) continue;
 			for (const name of Array.from(e.commands?.keys?.() ?? [])) {
 				const n = String(name);
 				if (!n || builtinNames.has(n)) continue;
@@ -1563,32 +1627,14 @@ export async function activate(
 			}
 		}
 		return {
-			extensions: extensionsData,
-			skills: (skills.skills ?? []).map((s: any) => {
-				const scope = s?.sourceInfo?.scope;
-				// Procedencia: las skills empaquetadas por frida-pipeline se
-				// sincronizan a ~/.frida/skills/ y Pi las marca scope "user" igual
-				// que las creadas a mano → cruzamos con el set empaquetado para
-				// distinguir "extensión" de "global" real.
-				const isBundled = getBundledSkillNames().has(String(s.name));
-				const source = isBundled
-					? "extension"
-					: scope === "project"
-						? "project"
-						: scope === "user"
-							? "global"
-							: "path";
-				return {
-					name: String(s.name),
-					description: String(s.description ?? ""),
-					source,
-					path: String(s.filePath ?? ""),
-				};
-			}),
-			prompts: (prompts.prompts ?? []).map((p: any) => ({
-				name: String(p.name),
-				description: String(p.description ?? ""),
+			extensions: attribution.general.extensions,
+			skills: attribution.general.skills.map((s) => ({
+				name: s.name,
+				description: s.description,
+				source: s.source === "project" ? "project" : s.source === "user" ? "global" : "path",
+				path: s.path,
 			})),
+			prompts: attribution.general.prompts,
 			themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
 			// Comandos slash: built-in del host (fuente única: BUILTIN_COMMANDS) más
 			// los registrados por extensiones vía la API de Pi. Se muestran en
@@ -1605,7 +1651,9 @@ export async function activate(
 			contextFiles: (agents.agentsFiles ?? []).map((f: any) => ({
 				path: String(f.path),
 			})),
-			errors,
+			errors: attribution.general.errors,
+			// #54: recursos por módulo para el acordeón de Herramientas.
+			modules: attribution.modules,
 		};
 	}
 

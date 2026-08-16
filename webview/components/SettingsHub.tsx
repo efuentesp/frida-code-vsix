@@ -9,7 +9,8 @@ import {
 	Wrench,
 	X,
 } from "lucide-react";
-import type { OutMessage, State } from "../types";
+import type { ModuleResources, OutMessage, State } from "../types";
+import { Icon } from "./Icon";
 import { IndexTab } from "./IndexTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
@@ -54,8 +55,9 @@ export function SettingsHub({
 
 	// Al abrir la pestaña Recursos, refrescar la lista desde el host (el botón
 	// Library ya no está en el header; lo dispara esto al entrar a la pestaña).
+	// #54: Herramientas también consume resources (módulos del acordeón).
 	useEffect(() => {
-		if (tab === "resources") post({ type: "list_resources" });
+		if (tab === "resources" || tab === "tools") post({ type: "list_resources" });
 	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	return (
@@ -128,35 +130,56 @@ export function SettingsHub({
 				{tab === "tools" && (
 					<>
 						<div className="cfg-section">Herramientas del agente</div>
-						{(state.toolToggleDefs ?? []).map((d) => (
-							<ToggleRow
-								key={d.key}
-								title={d.title}
-								desc={d.desc}
-								on={state.toolToggles?.[d.key] ?? true}
-								onToggle={() =>
-									post({
-										type: "set_tool_toggle",
-										key: d.key,
-										enabled: !(state.toolToggles?.[d.key] ?? true),
-									})
-								}
-							/>
-						))}
-						{(state.toolToggleDefs ?? []).length === 0 && (
-							<div className="cfg-stub">Cargando herramientas…</div>
+						{(state.resources?.modules ?? []).map((m) =>
+							m.toggleable ? (
+								<ToolAccordionRow
+									key={m.module}
+									title={m.title}
+									desc={m.desc}
+									on={state.toolToggles?.[m.module] ?? true}
+									onToggle={() =>
+										post({
+											type: "set_tool_toggle",
+											key: m.module,
+											enabled: !(state.toolToggles?.[m.module] ?? true),
+										})
+									}
+									res={m}
+								/>
+							) : null,
 						)}
-						<div className="cfg-row">
-							<div className="cfg-row-info">
-								<div className="cfg-row-title">Módulos base (no conmutables)</div>
-								<div className="cfg-row-desc">
-									Proveedores (sin ellos no hay LLM), sistema de permisos (la
-									seguridad; usa los modos de aprobación), motor de skills
-									(frida-args/multi-skills) y pipeline RPIV quedan siempre activos
-									por diseño.
-								</div>
-						</div>
-					</div>
+						{(state.resources?.modules ?? []).length === 0 &&
+							(state.toolToggleDefs ?? []).map((d) => (
+								<ToggleRow
+									key={d.key}
+									title={d.title}
+									desc={d.desc}
+									on={state.toolToggles?.[d.key] ?? true}
+									onToggle={() =>
+										post({
+											type: "set_tool_toggle",
+											key: d.key,
+											enabled: !(state.toolToggles?.[d.key] ?? true),
+										})
+									}
+								/>
+						))}
+						{(state.resources?.modules ?? []).filter((m) => !m.toggleable).length > 0 && (
+							<>
+								<div className="cfg-section">Módulos base (siempre activos)</div>
+								{(state.resources?.modules ?? [])
+									.filter((m) => !m.toggleable)
+									.map((m) => (
+										<ToolAccordionRow
+											key={m.module}
+											title={m.title}
+											desc={m.desc}
+											on={true}
+											res={m}
+										/>
+									))}
+							</>
+						)}
 					</>
 				)}
 
@@ -186,6 +209,119 @@ function ToggleRow({
 				<div className="cfg-row-desc">{desc}</div>
 			</div>
 			<button className={"switch" + (on ? " on" : "")} onClick={onToggle} />
+		</div>
+	);
+}
+
+/** Fila de recurso en el acordeón (#54): etiqueta + pills separadas por ·. */
+function ResLine({
+	label,
+	items,
+	prefix,
+}: {
+	label: string;
+	items: string[];
+	prefix?: string;
+}) {
+	const shown = items.slice(0, 12);
+	const rest = items.length - shown.length;
+	return (
+		<div className="tool-res-line">
+			<span className="tool-res-label">{label}</span>
+			{shown.length === 0 ? (
+				<span className="tool-res-empty">—</span>
+			) : (
+				<span className="tool-res-items">
+					{shown.map((v) => (
+						<code key={v}>
+							{prefix}
+							{v}
+						</code>
+					))}
+					{rest > 0 && <span className="muted">+{rest} más</span>}
+				</span>
+			)}
+		</div>
+	);
+}
+
+/** Toggle con acordeón de recursos del módulo (#54): tools, comandos,
+ *  skills, prompts y errores — lo que se activa/desactiva con el toggle. */
+function ToolAccordionRow({
+	title,
+	desc,
+	on,
+	onToggle,
+	res,
+}: {
+	title: string;
+	desc: string;
+	on: boolean;
+	onToggle?: () => void;
+	res: ModuleResources;
+}) {
+	const [open, setOpen] = useState(false);
+	const total =
+		res.tools.length +
+		res.commands.length +
+		res.skills.length +
+		res.prompts.length +
+		res.errors.length;
+	return (
+		<div className={"tool-acc" + (open ? " open" : "")}>
+			<div className="tool-acc-head">
+				<button
+					className="tool-acc-exp"
+					aria-label={open ? "Colapsar" : "Expandir"}
+					onClick={() => setOpen(!open)}
+				>
+					<Icon name="chevron" size={12} />
+				</button>
+				<button
+					className="tool-acc-info"
+					title={desc}
+					onClick={() => setOpen(!open)}
+				>
+					<span className="tool-acc-title">{title}</span>
+					<span className={"tool-acc-count" + (total === 0 ? " zero" : "")}>
+						{total}
+					</span>
+				</button>
+				{onToggle ? (
+					<button
+						className={"switch" + (on ? " on" : "")}
+						aria-label="Activar/desactivar"
+						onClick={onToggle}
+					/>
+				) : (
+					<span className="tag" title="Módulo base — siempre activo">
+						base
+					</span>
+				)}
+			</div>
+			{open && (
+				<div className="tool-acc-body">
+					{on ? null : (
+						<div className="tool-res-off">
+							Desactivado: la sesión se recarga al mover el toggle; los
+							recursos listados reaparecen al reactivarlo.
+						</div>
+					)}
+					<ResLine label="Tools" items={res.tools} />
+					<ResLine label="Comandos" items={res.commands} prefix="/" />
+					<ResLine label="Skills" items={res.skills} />
+					<ResLine label="Prompts" items={res.prompts} prefix="/" />
+					{res.errors.length > 0 && (
+						<div className="tool-res-errors">
+							{res.errors.map((e, i) => (
+								<div key={i} className="tool-res-err">
+									<code>{e.path}</code> <span>{e.error}</span>
+								</div>
+							))}
+						</div>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

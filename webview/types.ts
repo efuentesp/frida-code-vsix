@@ -350,6 +350,25 @@ export interface ResourceSummary {
 	}[];
 	contextFiles: { path: string }[];
 	errors: { path: string; error: string }[];
+	/** #54 — Recursos por módulo frida para el acordeón de Configuración >
+	 *  Herramientas (toggles #53 + módulos base). Lo general queda en las
+	 *  secciones de arriba. */
+	modules?: ModuleResources[];
+}
+
+/** Recursos atribuidos a un módulo frida (toggle o base), issue #54. */
+export interface ModuleResources {
+	/** Key del toggle (#53) o factory para los módulos base. */
+	module: string;
+	title: string;
+	desc: string;
+	/** true = conmutable (toggle); false = módulo base. */
+	toggleable: boolean;
+	tools: string[];
+	commands: string[];
+	skills: string[];
+	prompts: string[];
+	errors: { path: string; error: string }[];
 }
 
 /** Conteo de cambios del árbol de trabajo (parse de `git status --porcelain`). */
