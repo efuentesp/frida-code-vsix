@@ -17,6 +17,23 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.22.0] - 2026-08-16
+### Añadido
+
+- **frida** — acordeón de recursos por módulo en Herramientas (Refs #54)
+- **frida** — toggles de todas las extensiones conmutables en Configuración > Herramientas (Refs #53)
+- **frida-subagents** — modo detached — subagente en proceso propio que sobrevive al padre (Refs #26)
+
+### Corregido
+
+- **frida-knowledge-base** — ID correcto de Foam — foam.foam-vscode, no foam.foam (Refs #52)
+
+### Interno
+
+- **webview** — hover del acordeón al patrón unificado de tabs (Refs #54)
+- **research** — ripgrep vs FFF/ffgrep vs grep — evaluación de extensión de búsqueda
+- **frida-subagents** — how-to de usuario — modos foreground/background/detached (Refs #26)
+
 ## [0.21.0] - 2026-08-16
 ### Añadido
 
