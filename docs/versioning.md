@@ -107,12 +107,14 @@ npm run package            # genera frida-code-<versión>.vsix
 gh release create v<versión> frida-code-<versión>.vsix \
   --repo efuentesp/frida-code-vsix \
   --title "<versión>" \
-  --notes-file <(awk '/^## \[<versión>\]/{f=1;next}/^## \[/{exit}f' CHANGELOG.md)
+  --notes-file <(awk '/^## \[<versión>\]/{f=1;next} f && /^## \[/{exit} f' CHANGELOG.md)
 ```
 
 > El paso 3 toma las notas de la sección `[<versión>]` del `CHANGELOG.md` (lo que
 > el script acaba de generar). Sustituye `<versión>` por el número real (p.ej.
-> `0.7.0`).
+> `0.7.0`). El `f &&` del guard es imprescindible: `## [Unreleased]` aparece
+> ANTES de la sección de versión y, sin el guard, la regla `exit` mata el awk
+> en esa línea → notas vacías (detectado al publicar 0.22.0).
 
 ### Checklist del release
 
