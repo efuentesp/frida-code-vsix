@@ -194,6 +194,31 @@ var __import_meta_resolve = function(specifier, parent) {
 		]);
 	}
 
+	// jiti 2.x bundleado hace createRequire(import.meta.url)("../dist/babel.cjs")
+	// EN RUNTIME (transform lazy) — esbuild no puede reescribir ese require
+	// dinámico y, con el shim del banner, resuelve relativo al bundle:
+	// dist/extension.js → dist/babel.cjs. Sin esta copia, la activación de
+	// frida-knowledge-base/hermes truena con "Cannot find module
+	// '../dist/babel.cjs'" (reporte e2e #29). Un solo archivo sirve para los
+	// tres bundles de dist/ (extension, frida-workflow, sdk-passthrough) y
+	// para ambas copias de jiti (top-level y anidada del SDK, idénticas 2.7.0).
+	const jitiBabelCandidates = [
+		nodePath.resolve("node_modules/jiti/dist/babel.cjs"),
+		nodePath.resolve(
+			"node_modules/@earendil-works/pi-coding-agent/node_modules/jiti/dist/babel.cjs",
+		),
+	];
+	const jitiBabelSrc = jitiBabelCandidates.find((p) => fsSync.existsSync(p));
+	if (!jitiBabelSrc) {
+		throw new Error(
+			"build: no se encontró jiti/dist/babel.cjs (npm install?) — sin él, " +
+				"jiti bundleado falla al transformar en runtime",
+		);
+	}
+	const jitiBabelDst = nodePath.resolve("dist/babel.cjs");
+	fsSync.copyFileSync(jitiBabelSrc, jitiBabelDst);
+	if (!watch) console.log("  dist/babel.cjs  copied (jiti lazy transform)");
+
 	// ADR-0023: copiar app-bridge.bundle.js a dist/ para MCP UI integration.
 	// ui-server.ts lo sirve desde import.meta.dirname (que en el bundle = dist/).
 	// Sin esto, las UIs de MCP servers no cargan el bridge JS del browser.
