@@ -64,6 +64,17 @@ function writeFakeUpstream(
 		path.join(pkgRoot, "package.json"),
 		JSON.stringify({ name: "@zosmaai/pi-llm-wiki", version: KNOWLEDGE_BASE_PIN }),
 	);
+	// Runtime-dep fantasma (Refs #29): isInstalledAtPin lo exige — sin esto
+	// el fixture simula un install PRE-FIX y el wrapper lo daría por ausente.
+	const coreRoot = path.join(
+		agentDir,
+		"npm",
+		"node_modules",
+		"@mariozechner",
+		"pi-agent-core",
+	);
+	fs.mkdirSync(coreRoot, { recursive: true });
+	fs.writeFileSync(path.join(coreRoot, "package.json"), JSON.stringify({}));
 
 	// Entry con import de VALOR del peer alias (@mariozechner → SDK real).
 	fs.writeFileSync(

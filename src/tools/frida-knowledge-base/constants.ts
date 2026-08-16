@@ -20,6 +20,21 @@ export const KNOWLEDGE_BASE_PIN = "0.11.4";
 export const KNOWLEDGE_BASE_SPEC = `${KNOWLEDGE_BASE_PACKAGE}@${KNOWLEDGE_BASE_PIN}`;
 
 /**
+ * Runtime-dep FANTASMA del upstream (Refs #29, hallazgo e2e): subagent.ts
+ * importa `agentLoop` como VALOR desde "@mariozechner/pi-agent-core"
+ * (background lanes: ingest synthesis, topic inference) — pero el upstream
+ * NO lo declara en dependencies NI peerDependencies (asume que el host de
+ * pi lo provee; el pi real sí). Con --legacy-peer-deps npm no lo instala y
+ * jiti truena al cargar el entry: "Cannot find module
+ * '@mariozechner/pi-agent-core'".
+ *
+ * NO se resuelve con alias: frida no shipea copia (el SDK renombró su core
+ * a @earendil-works/* y lo bundlea — no hay agentLoop en dist). Se instala
+ * EXPLÍCITO junto al upstream (268KB + su @mariozechner/pi-ai).
+ */
+export const PI_AGENT_CORE_SPEC = "@mariozechner/pi-agent-core@0.73.1";
+
+/**
  * Entry de la extensión Pi del paquete. Fuente: manifest del paquete npm
  * (`package.json` → `"pi": { "extensions": ["./extensions"] }` → el loader
  * resuelve extensions/llm-wiki/index.ts). Es TS fuente, cargamos vía jiti.
@@ -38,6 +53,17 @@ export function upstreamEntryPath(agentDir: string): string {
   KNOWLEDGE_BASE_PACKAGE,
   KNOWLEDGE_BASE_PI_ENTRY,
  );
+}
+
+/** Dir del runtime-dep fantasma (@mariozechner/pi-agent-core) en ~/.frida/npm. */
+export function piAgentCoreDir(agentDir: string): string {
+	return path.join(
+		agentDir,
+		"npm",
+		"node_modules",
+		"@mariozechner",
+		"pi-agent-core",
+	);
 }
 
 /** Versión instalada del paquete en ~/.frida/npm (lee su package.json). */
@@ -62,9 +88,9 @@ export const KNOWLEDGE_BASE_FACTORY_NAME = "frida-knowledge-base";
  * - `@mariozechner/pi-coding-agent`: el SDK se renombró a
  *   @earendil-works/pi-coding-agent; los 2 imports de VALOR del upstream
  *   (getAgentDir, isToolCallEventType) existen en nuestra copia (verificado
- *   contra 0.84.2). Los otros peers (@mariozechner/pi-ai,
- *   @mariozechner/pi-agent-core) son imports type-only → borrados por jiti,
- *   no necesitan alias.
+ *   contra 0.84.2). @mariozechner/pi-ai SÍ es type-only (borrado por jiti,
+ *   sin alias) — pero pi-agent-core tiene un import de VALOR (agentLoop en
+ *   subagent.ts): se instala explícito (PI_AGENT_CORE_SPEC), no alias.
  * - `typebox`: copia top-level que frida ya shipea (1.1.38 ≥ ^1.1.34) —
  *   alias por subpath EXACTO porque el SDK dist que cargamos vía jiti
  *   importa typebox, typebox/compile y typebox/value (alias a archivo

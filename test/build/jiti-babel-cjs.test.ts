@@ -25,7 +25,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const repoRoot = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	"../..",
+);
 
 /** Receta esbuild del host (esbuild.js): banner + define de import.meta.url. */
 async function buildMiniBundle(outFile: string): Promise<void> {
@@ -58,52 +61,44 @@ function runNode(script: string, args: string[]) {
 }
 
 describe("jiti bundleado — lazy require de ../dist/babel.cjs", () => {
-	it(
-		"mecanismo: sin babel.cjs al lado truena con el error exacto; con él transforma",
-		async () => {
-			// Dir de salida DEBE llamarse "dist": el require lazy "../dist/babel.cjs"
-			// desde <dir>/extension.js resuelve al mismo dir (como en producción).
-			const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frida-jiti-fix-"));
-			const outDir = path.join(tmp, "dist");
-			fs.mkdirSync(outDir);
-			const fixture = path.join(tmp, "fixture.ts");
-			fs.writeFileSync(fixture, "export const value: number = 1;\n");
-			const bundle = path.join(outDir, "extension.js");
-			await buildMiniBundle(bundle);
+	it("mecanismo: sin babel.cjs al lado truena con el error exacto; con él transforma", async () => {
+		// Dir de salida DEBE llamarse "dist": el require lazy "../dist/babel.cjs"
+		// desde <dir>/extension.js resuelve al mismo dir (como en producción).
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frida-jiti-fix-"));
+		const outDir = path.join(tmp, "dist");
+		fs.mkdirSync(outDir);
+		const fixture = path.join(tmp, "fixture.ts");
+		fs.writeFileSync(fixture, "export const value: number = 1;\n");
+		const bundle = path.join(outDir, "extension.js");
+		await buildMiniBundle(bundle);
 
-			// ROJO — sin dist/babel.cjs: el error original del usuario.
-			const red = runNode(bundle, [fixture]);
-			expect(red.status).not.toBe(0);
-			expect(red.stderr).toContain("Cannot find module '../dist/babel.cjs'");
+		// ROJO — sin dist/babel.cjs: el error original del usuario.
+		const red = runNode(bundle, [fixture]);
+		expect(red.status).not.toBe(0);
+		expect(red.stderr).toContain("Cannot find module '../dist/babel.cjs'");
 
-			// VERDE — con la copia que hace esbuild.js post-build.
-			fs.copyFileSync(
-				path.join(repoRoot, "node_modules/jiti/dist/babel.cjs"),
-				path.join(outDir, "babel.cjs"),
-			);
-			const green = runNode(bundle, [fixture]);
-			expect(green.status).toBe(0);
-			expect(green.stdout).toContain("TRANSFORM OK number");
+		// VERDE — con la copia que hace esbuild.js post-build.
+		fs.copyFileSync(
+			path.join(repoRoot, "node_modules/jiti/dist/babel.cjs"),
+			path.join(outDir, "babel.cjs"),
+		);
+		const green = runNode(bundle, [fixture]);
+		expect(green.status).toBe(0);
+		expect(green.stdout).toContain("TRANSFORM OK number");
 
-			fs.rmSync(tmp, { recursive: true, force: true });
-		},
-		60_000,
-	);
+		fs.rmSync(tmp, { recursive: true, force: true });
+	}, 60_000);
 
-	it(
-		"contrato: build:host (node esbuild.js) deja dist/babel.cjs junto a los bundles",
-		() => {
-			const r = spawnSync(process.execPath, ["esbuild.js"], {
-				cwd: repoRoot,
-				encoding: "utf-8",
-				timeout: 120_000,
-			});
-			expect(r.status).toBe(0);
-			const dst = path.join(repoRoot, "dist/babel.cjs");
-			expect(fs.existsSync(dst)).toBe(true);
-			// Es el babel real de jiti (no un stub): ~1.5MB.
-			expect(fs.statSync(dst).size).toBeGreaterThan(1_000_000);
-		},
-		180_000,
-	);
+	it("contrato: build:host (node esbuild.js) deja dist/babel.cjs junto a los bundles", () => {
+		const r = spawnSync(process.execPath, ["esbuild.js"], {
+			cwd: repoRoot,
+			encoding: "utf-8",
+			timeout: 120_000,
+		});
+		expect(r.status).toBe(0);
+		const dst = path.join(repoRoot, "dist/babel.cjs");
+		expect(fs.existsSync(dst)).toBe(true);
+		// Es el babel real de jiti (no un stub): ~1.5MB.
+		expect(fs.statSync(dst).size).toBeGreaterThan(1_000_000);
+	}, 180_000);
 });

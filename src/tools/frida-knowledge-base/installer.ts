@@ -6,7 +6,10 @@
  * / frida-hermes-memory): `npm install <spec> --prefix <agentDir>/npm
  * --legacy-peer-deps`. Los peer-deps (@mariozechner/pi-coding-agent y
  * typebox) NO se instalan — se resuelven vía aliases de jiti a las copias que
- * frida ya shipea (constants.upstreamPeerAliases).
+ * frida ya shipea (constants.upstreamPeerAliases). El runtime-dep fantasma
+ * @mariozechner/pi-agent-core (import de VALOR agentLoop en subagent.ts, no
+ * declarado por el upstream) SÍ se instala: PI_AGENT_CORE_SPEC en el mismo
+ * comando. isInstalledAtPin lo exige → installs pre-fix se auto-reparan.
  *
  * A diferencia de hermes-memory NO hay deps nativas (mejor-sqlite3): las 6
  * dependencies del upstream son JS puro → timeout más corto y sin casos de
@@ -18,7 +21,9 @@ import * as path from "node:path";
 import {
 	KNOWLEDGE_BASE_PIN,
 	KNOWLEDGE_BASE_SPEC,
+	PI_AGENT_CORE_SPEC,
 	installedVersionPath,
+	piAgentCoreDir,
 	upstreamEntryPath,
 } from "./constants";
 
@@ -57,11 +62,16 @@ export function installedVersion(agentDir: string): string | undefined {
 	}
 }
 
-/** ¿El paquete está instalado con el pin actual y entry válido? */
+/**
+ * ¿El paquete está instalado con el pin actual, entry válido y su
+ * runtime-dep fantasma presente? (installs pre-fix sin pi-agent-core →
+ * false → ensureInstalled reinstala y auto-repara).
+ */
 export function isInstalledAtPin(agentDir: string): boolean {
 	return (
 		installedVersion(agentDir) === KNOWLEDGE_BASE_PIN &&
-		fs.existsSync(upstreamEntryPath(agentDir))
+		fs.existsSync(upstreamEntryPath(agentDir)) &&
+		fs.existsSync(piAgentCoreDir(agentDir))
 	);
 }
 
@@ -108,7 +118,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 /** Comando manual equivalente, con prefix ABSOLUTO entre comillas (win32). */
 export function manualInstallCmd(agentDir: string): string {
-	return `npm install ${KNOWLEDGE_BASE_SPEC} --prefix "${path.join(agentDir, "npm")}" --legacy-peer-deps`;
+	return `npm install ${KNOWLEDGE_BASE_SPEC} ${PI_AGENT_CORE_SPEC} --prefix "${path.join(agentDir, "npm")}" --legacy-peer-deps`;
 }
 
 export interface EnsureInstalledResult {
@@ -135,7 +145,7 @@ export async function ensureInstalled(
 		timeoutMs = 3 * 60_000,
 	} = opts.deps ?? {};
 	opts.onProgress?.(
-		`Instalando ${KNOWLEDGE_BASE_SPEC} en ${path.join(agentDir, "npm")}…`,
+		`Instalando ${KNOWLEDGE_BASE_SPEC} + ${PI_AGENT_CORE_SPEC} en ${path.join(agentDir, "npm")}…`,
 	);
 	fs.mkdirSync(path.join(agentDir, "npm"), { recursive: true });
 	let res: { code: number | null; stderr: string };
@@ -144,6 +154,7 @@ export async function ensureInstalled(
 			run(npmBin, [
 				"install",
 				KNOWLEDGE_BASE_SPEC,
+				PI_AGENT_CORE_SPEC,
 				"--prefix",
 				path.join(agentDir, "npm"),
 				"--legacy-peer-deps",
@@ -166,7 +177,11 @@ export async function ensureInstalled(
 				manualInstallCmd(agentDir),
 		);
 	}
-	if (res.code !== 0 || !fs.existsSync(upstreamEntryPath(agentDir))) {
+	if (
+		res.code !== 0 ||
+		!fs.existsSync(upstreamEntryPath(agentDir)) ||
+		!fs.existsSync(piAgentCoreDir(agentDir))
+	) {
 		throw new KnowledgeBaseInstallError(
 			`npm install falló (exit ${res.code}). ${res.stderr.slice(0, 500)}`,
 			"Revisa la salida (red/proxy corporativo son las causas típicas — el paquete es JS puro, no hay compilación nativa). Comando manual: " +

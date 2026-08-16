@@ -85,7 +85,7 @@ la resuelve.)
    `~/.frida/npm` (JS puro, sin deps nativas) + materializa prompts/skill.
 2. Al completar, VS Code notifica: ejecuta `/reload` — aparecen `/wiki-*`, la skill
    y las tools `wiki_*`/`kb_*`.
-3. Manual: `npm install @zosmaai/pi-llm-wiki@0.11.4 --prefix "~/.frida/npm" --legacy-peer-deps`.
+3. Manual: `npm install @zosmaai/pi-llm-wiki@0.11.4 @mariozechner/pi-agent-core@0.73.1 --prefix "~/.frida/npm" --legacy-peer-deps` (pi-agent-core = runtime-dep no declarada por el upstream que `subagent.ts` importa como valor).
 
 Config `llm-wiki.*` en `~/.frida/settings.json` (la lee el upstream vía
 `getAgentDir()`). Embeddings: opcional (sin credencial funciona en modo léxico).

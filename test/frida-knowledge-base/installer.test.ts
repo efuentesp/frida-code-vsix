@@ -15,7 +15,11 @@ import {
 	isInstalledAtPin,
 	manualInstallCmd,
 } from "../../src/tools/frida-knowledge-base/installer";
-import { KNOWLEDGE_BASE_PIN } from "../../src/tools/frida-knowledge-base/constants";
+import {
+	KNOWLEDGE_BASE_PIN,
+	KNOWLEDGE_BASE_SPEC,
+	PI_AGENT_CORE_SPEC,
+} from "../../src/tools/frida-knowledge-base/constants";
 
 let agentDir: string;
 
@@ -47,6 +51,16 @@ function writeFakePackage(): void {
 		path.join(pkgRoot, "extensions", "llm-wiki", "index.ts"),
 		"export default function () {}\n",
 	);
+	// Runtime-dep fantasma del upstream (Refs #29): isInstalledAtPin lo exige.
+	const coreRoot = path.join(
+		agentDir,
+		"npm",
+		"node_modules",
+		"@mariozechner",
+		"pi-agent-core",
+	);
+	fs.mkdirSync(coreRoot, { recursive: true });
+	fs.writeFileSync(path.join(coreRoot, "package.json"), JSON.stringify({}));
 }
 
 describe("frida-knowledge-base / installer", () => {
@@ -71,6 +85,37 @@ describe("frida-knowledge-base / installer", () => {
 		);
 		fs.writeFileSync(pj, JSON.stringify({ version: "0.0.1" }));
 		expect(isInstalledAtPin(agentDir)).toBe(false);
+	});
+
+	it("isInstalledAtPin exige pi-agent-core (runtime-dep fantasma): install pre-fix se auto-repara", async () => {
+		writeFakePackage();
+		// Simular install PRE-FIX: upstream al pin pero sin pi-agent-core.
+		fs.rmSync(
+			path.join(agentDir, "npm", "node_modules", "@mariozechner"),
+			{ recursive: true, force: true },
+		);
+		expect(isInstalledAtPin(agentDir)).toBe(false);
+
+		// → ensureInstalled reinstala; el comando incluye AMBOS specs.
+		let installArgs: string[] = [];
+		await ensureInstalled(agentDir, {
+			deps: {
+				run: async (_bin, args) => {
+					installArgs = args;
+					writeFakePackage(); // el install trae ambos paquetes
+					return { code: 0, stderr: "" };
+				},
+			},
+		});
+		expect(installArgs).toContain(KNOWLEDGE_BASE_SPEC);
+		expect(installArgs).toContain(PI_AGENT_CORE_SPEC);
+		expect(isInstalledAtPin(agentDir)).toBe(true);
+	});
+
+	it("manualInstallCmd instala upstream + pi-agent-core juntos", () => {
+		const cmd = manualInstallCmd(agentDir);
+		expect(cmd).toContain(KNOWLEDGE_BASE_SPEC);
+		expect(cmd).toContain(PI_AGENT_CORE_SPEC);
 	});
 
 	it("ensureInstalled es idempotente: ya instalado no llama npm", async () => {

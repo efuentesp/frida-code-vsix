@@ -26,7 +26,7 @@
    ```bash
    npm install open-codebase-index --prefix ~/.frida/npm --legacy-peer-deps
    npm install pi-hermes-memory@0.9.5 --prefix ~/.frida/npm --legacy-peer-deps
-   npm install @zosmaai/pi-llm-wiki@0.11.4 --prefix ~/.frida/npm --legacy-peer-deps
+   npm install @zosmaai/pi-llm-wiki@0.11.4 @mariozechner/pi-agent-core@0.73.1 --prefix ~/.frida/npm --legacy-peer-deps
    ```
 
 4. **Gates** (todos default `true`): `frida.codebaseIndex.enabled`,

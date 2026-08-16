@@ -57,18 +57,15 @@ const watch = process.argv.includes("--watch");
 const fixExtensionLoader = {
 	name: "fix-extension-loader-aliases",
 	setup(build) {
-		build.onLoad(
-			{ filter: /[\\/]extensions[\\/]loader\.js$/ },
-			async (args) => {
-				let code = await fsSync.promises.readFile(args.path, "utf8");
-				// Hacer que packageIndex apunte al passthrough del SDK (no al monorepo).
-				code = code.replace(
-					'const packageIndex = path.resolve(__dirname, "../..", "index.js");',
-					'const packageIndex = path.join(__dirname, "sdk-passthrough.js");',
-				);
-				return { contents: code, loader: "js" };
-			},
-		);
+		build.onLoad({ filter: /[\\/]extensions[\\/]loader\.js$/ }, async (args) => {
+			let code = await fsSync.promises.readFile(args.path, "utf8");
+			// Hacer que packageIndex apunte al passthrough del SDK (no al monorepo).
+			code = code.replace(
+				'const packageIndex = path.resolve(__dirname, "../..", "index.js");',
+				'const packageIndex = path.join(__dirname, "sdk-passthrough.js");',
+			);
+			return { contents: code, loader: "js" };
+		});
 	},
 };
 
