@@ -541,6 +541,17 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						<div className="ccp-mkt-full">
 							<div className="ccp-mkt-menu">
 								<div className="ccp-mkt-menu-head">
+									<button
+										type="button"
+										tabIndex={-1}
+										className="ccp-back"
+										onClick={() => {
+											setConfirmRemove(false);
+											setMktMenu(null);
+										}}
+									>
+										← Volver
+									</button>
 									<span className="ccp-mkt-name">✻ {menuMkt.name}</span>
 									<span className="ccp-mkt-url">{menuMkt.url}</span>
 									<span className="ccp-mkt-stats">
@@ -648,6 +659,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 					<div className="ccp-mkt-full">
 						<div className="ccp-instview">
 							<div className="ccp-instview-head">
+								<button
+									type="button"
+									tabIndex={-1}
+									className="ccp-back"
+									onClick={() => setInstView(null)}
+								>
+									← Volver
+								</button>
 								<span className="ccp-instview-name">
 									{viewRow.label}
 									{viewRow.version ? ` v${viewRow.version}` : ""}
@@ -752,8 +771,21 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								key={r.ref}
 								className={`ccp-row${i === focusIdx ? " ccp-row-focus" : ""}`}
 								data-focused={i === focusIdx ? "true" : "false"}
-								onClick={() => setFocusIdx(i)}
-								onDoubleClick={() => buttons[0] && submitBtn(buttons[0].key)}
+								onClick={() => {
+									setFocusIdx(i);
+									// Mouse: un click abre la vista completa en Instalados
+									// (misma acción que ⏎ — usuarios de mouse y teclado
+									// llegan al mismo lugar).
+									if (tab === "installed") {
+										setInstView(r.ref);
+										setStateIdx(r.status === "disabled" ? 1 : 0);
+									}
+								}}
+								onDoubleClick={
+									tab === "installed"
+										? undefined
+										: () => buttons[0] && submitBtn(buttons[0].key)
+								}
 							>
 								<span className="ccp-row-label">{r.label}</span>
 								{r.category ? <span className="ccp-cat">{r.category}</span> : null}
@@ -881,6 +913,30 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								}
 							}}
 						/>
+						<div className="ccp-modal-actions">
+							<button
+								type="button"
+								tabIndex={-1}
+								className="ccp-btn ccp-btn-primary"
+								disabled={!addSpec.trim()}
+								onClick={() => {
+									if (!addSpec.trim()) return;
+									onAction(panel.id, { kind: "mkt_add", value: addSpec.trim() });
+									setAddSpec("");
+									setAddOpen(false);
+								}}
+							>
+								Agregar
+							</button>
+							<button
+								type="button"
+								tabIndex={-1}
+								className="ccp-btn"
+								onClick={() => setAddOpen(false)}
+							>
+								Cancelar
+							</button>
+						</div>
 						<div className="ccp-modal-hint">⏎ agregar · Esc cancelar</div>
 					</div>
 				</div>
