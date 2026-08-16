@@ -19,7 +19,7 @@ Hay **dos audiencias** para la KB, con necesidades distintas:
 
 [`@zosmaai/pi-llm-wiki`](https://github.com/zosmaai/pi-llm-wiki) es el mejor núcleo de KB de proyecto
 (auto-mantenida, OKF v0.2, Obsidian-compatible, MCP). Y **[Foam](https://github.com/foambubble/foam)**
-(`foam.foam`, activo en 2026) entrega *exactamente* la experiencia Obsidian dentro de VS Code: **graph
+(`foam.foam-vscode`, activo en 2026) entrega *exactamente* la experiencia Obsidian dentro de VS Code: **graph
 visualization**, **backlinks panel**, **wikilinks** `[[...]]` + autocompletado + diagnóstico,
 **sync links on rename**, **templates**, **tag explorer**, **orphans/placeholders**, **link preview**.
 Para diagramas, **`bierner.markdown-mermaid`** renderiza mermaid en el preview nativo.
@@ -44,6 +44,11 @@ comandos `/wiki-init`, `/wiki-ingest` (markdown/texto/PDF/URL), `/wiki-query`.
 > siempre; al arranque se detecta la ausencia de Foam/mermaid (`vscode.extensions.
 > getExtension`) y se avisa con acción "Instalar Foam" (`extension.open`). Sin ellas la
 > capa agente del KB funciona igual; la vista de grafo es opcional por diseño.
+>
+> **Enmienda (2026-08-17, #52):** el ID `foam.foam` nunca existió en el marketplace —
+> el real es **`foam.foam-vscode`**. Detector, texto del aviso y `extension.open` usaban
+> el ID erróneo → aviso eterno + botón "Instalar Foam" silencioso. Corregido en
+> `extension.ts` y docs vigentes; D3 arriba conserva el ID original como registro.
 Grafo *force-directed*, backlinks, autocompletado/diagnóstico de wikilinks, sync al renombrar,
 plantillas, tags y orphans → **todo Foam**. Mermaid → `bierner.markdown-mermaid` en el preview
 nativo. **#29 NO construye ninguna de esas UIs.**
@@ -102,7 +107,7 @@ vía `markitdown-ts`. Office (Word/Excel/PPT) → **#30** (ADR-0041, dependiente
 ## Referencias
 
 - Issue **#29**.
-- Capa humana (VS Code): **[Foam](https://github.com/foambubble/foam)** (`foam.foam`) ·
+- Capa humana (VS Code): **[Foam](https://github.com/foambubble/foam)** (`foam.foam-vscode`) ·
   **`bierner.markdown-mermaid`** — declaradas `extensionDependencies`.
 - Capa agente (upstream): <https://github.com/zosmaai/pi-llm-wiki> · OKF v0.2.
 - Complementario: `@d1g1tlprim8/pi-okf-wiki` (integridad de grafo / ledger).

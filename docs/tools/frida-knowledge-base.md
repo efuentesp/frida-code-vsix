@@ -12,7 +12,7 @@ agente. Wrapper del paquete upstream
 | Capa | Quién | Qué |
 | --- | --- | --- |
 | **Agente** | `frida-knowledge-base` (este módulo) | 11 tools `wiki_*`, recall layering, guardrails, `/wiki-*`, `kb_search`/`kb_neighbors`, skill `llm-wiki`, MCP |
-| **Humana** | **Foam** (`foam.foam`) + `bierner.markdown-mermaid` — **dependencia blanda**: si faltan, frida avisa al arranque con acción "Instalar Foam"; sin ellas la capa agente funciona igual (ADR-0040 D3 enmendado) | Grafo force-directed, backlinks, autocompletado de `[[wikilinks]]`, sync al renombrar, plantillas, tags, orphans. Mermaid en el preview nativo |
+| **Humana** | **Foam** (`foam.foam-vscode`) + `bierner.markdown-mermaid` — **dependencia blanda**: si faltan, frida avisa al arranque con acción "Instalar Foam"; sin ellas la capa agente funciona igual (ADR-0040 D3 enmendado) | Grafo force-directed, backlinks, autocompletado de `[[wikilinks]]`, sync al renombrar, plantillas, tags, orphans. Mermaid en el preview nativo |
 | **Compartida** | Vault markdown `<proyecto>/.llm-wiki/` | Ambos operan sobre los mismos archivos |
 
 ## Qué aporta la capa agente
@@ -140,7 +140,7 @@ background inyectada, entry corrupto degrada sin crash).
 - Issue [#29](https://github.com/efuentesp/frida-code-vsix/issues/29) · ADR-0040.
 - Upstream: `@zosmaai/pi-llm-wiki` (npm, MIT) —
   <https://github.com/zosmaai/pi-llm-wiki>
-- Capa humana: [Foam](https://github.com/foambubble/foam) (`foam.foam`) ·
+- Capa humana: [Foam](https://github.com/foambubble/foam) (`foam.foam-vscode`) ·
   `bierner.markdown-mermaid` — `extensionDependencies`.
 - Derivados: **#30 `frida-doc-converter`** (ingest Office, depende de este issue).
 - Patrones reutilizados: `frida-codebase-index` (installer on-demand + guía D6),

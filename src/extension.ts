@@ -587,8 +587,8 @@ export async function activate(
 	// del KB funciona igual y avisamos cómo instalar la vista de grafo.
 	function checkKnowledgeBaseViewDeps(): void {
 		const faltan: string[] = [];
-		if (!vscode.extensions.getExtension("foam.foam")) {
-			faltan.push("Foam (foam.foam) — grafo/backlinks del vault");
+		if (!vscode.extensions.getExtension("foam.foam-vscode")) {
+			faltan.push("Foam (foam.foam-vscode) — grafo/backlinks del vault");
 		}
 		if (!vscode.extensions.getExtension("bierner.markdown-mermaid")) {
 			faltan.push("bierner.markdown-mermaid — render de diagramas");
@@ -601,7 +601,10 @@ export async function activate(
 			)
 			.then((choice) => {
 				if (choice === "Instalar Foam") {
-					void vscode.commands.executeCommand("extension.open", "foam.foam");
+					void vscode.commands.executeCommand(
+						"extension.open",
+						"foam.foam-vscode",
+					);
 				}
 			});
 	}

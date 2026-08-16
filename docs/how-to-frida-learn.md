@@ -14,8 +14,8 @@
 
 ## Prerrequisitos comunes (5 min)
 
-1. **Frida (VSIX) instalado** en VS Code. Al instalarlo se arrastran Foam y el render
-   de mermaid como dependencias (`foam.foam`, `bierner.markdown-mermaid`).
+1. **Frida (VSIX) instalado** en VS Code. Dependencia blanda: si faltan, frida avisa
+   al arranque con acción "Instalar Foam" (`foam.foam-vscode`, `bierner.markdown-mermaid`).
 2. **Node.js 20+ con npm** en el PATH (los tres paquetes upstream se instalan
    on-demand; nadie descarga nada de antemano).
 3. **Primera sesión**: los tres wrappers detectan el paquete ausente y **lo instalan
