@@ -464,13 +464,38 @@ export interface CcPanelRowWs {
 	version?: string;
 	status: "available" | "installed" | "disabled";
 	markdown: string;
+	category?: string;
+	author?: string;
+	homepage?: string;
+	/** Llega async vía ccplugins_row_meta (git log cacheado). */
+	lastUpdated?: string;
 }
 
-/** Panel /ccplugin abierto (null = cerrado). */
+/** Tarjeta de marketplace (tab Marketplaces). */
+export interface CcMarketplaceWs {
+	name: string;
+	url: string;
+	plugins: number;
+	refreshedAt?: string;
+	autoUpdate: boolean;
+}
+
+/** Entrada de error (tab Errores). */
+export interface CcPanelErrorWs {
+	id: string;
+	when: string;
+	source: "bootstrap" | "marketplace" | "install";
+	message: string;
+}
+
+/** Panel /ccplugin abierto (null = cerrado) — tabs completas. */
 export interface CcPanelWs {
 	id: string;
 	title: string;
 	rows: CcPanelRowWs[];
+	installed: CcPanelRowWs[];
+	marketplaces: CcMarketplaceWs[];
+	errors: CcPanelErrorWs[];
 }
 
 export interface State {
@@ -551,6 +576,13 @@ export interface State {
 // Host → webview
 export type InMessage =
 	| { type: "ccplugins_panel"; panel: CcPanelWs | null }
+	| {
+			/** Patch async: "Last updated" de una fila (git log). */
+			type: "ccplugins_row_meta";
+			id: string;
+			ref: string;
+			lastUpdated: string;
+	  }
 	| { type: "need_key" }
 	| { type: "key_set" }
 	| { type: "session_ready" }
@@ -684,10 +716,23 @@ export type OutMessage =
 	| {
 			type: "ccplugins_panel_action";
 			id: string;
-			action: "install" | "uninstall" | "enable" | "disable";
-			ref: string;
+			action:
+				| "install"
+				| "uninstall"
+				| "enable"
+				| "disable"
+				| "mkt_add"
+				| "mkt_remove"
+				| "mkt_update"
+				| "retry";
+			ref?: string;
+			/** mkt_add: spec; mkt_remove/update: nombre. */
+			value?: string;
+			name?: string;
+			source?: string;
 	  }
 	| { type: "ccplugins_panel_close"; id: string }
+	| { type: "ccplugins_row_meta"; id: string; ref: string }
 	| {
 			type: "submit";
 			text: string;

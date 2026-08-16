@@ -375,6 +375,10 @@ export interface AvailablePlugin {
 	enabled: boolean;
 	/** Source remoto aún no instalable en el MVP. */
 	remote: boolean;
+	/** Metadata de descubrimiento (panel #49: señal sin downloads). */
+	category?: string;
+	author?: string;
+	homepage?: string;
 }
 
 /**
@@ -408,6 +412,12 @@ export function listAvailable(
 				installed: !!rec && rec.marketplace === name,
 				enabled: !!rec && rec.marketplace === name && rec.enabled,
 				remote: p.source.kind !== "path",
+				category: p.category,
+				author:
+					typeof p.author === "string"
+						? p.author
+						: (p.author?.name ?? undefined),
+				homepage: p.homepage,
 			});
 		}
 	}
@@ -864,4 +874,54 @@ export function listInstalled(
 				plugin: name,
 			}) as PluginRecord & { plugin: string; scope?: PluginScope },
 	);
+}
+
+/** Cache de pluginLastUpdated (spawn git por plugin, una sola vez). */
+const lastUpdatedCache = new Map<string, string | undefined>();
+
+/**
+ * Fecha del último commit que tocó el dir del plugin dentro del clon del
+ * marketplace (monorepo estilo claude-plugins-official). Solo sources `path`;
+ * remotos y no-git → undefined. Panel #49: "Last updated" de la ficha.
+ */
+export async function pluginLastUpdated(
+	agentDir: string,
+	ref: string,
+	opts: { cwd?: string } = {},
+): Promise<string | undefined> {
+	const [name, mkt] = ref.split("@");
+	const reg = loadRegistry(agentDir);
+	const m = mkt ? reg.marketplaces[mkt] : undefined;
+	if (!m || !name) return undefined;
+	const dir = marketplaceDirOf(agentDir, m);
+	const cat = (() => {
+		try {
+			return readMarketplaceCatalog(dir);
+		} catch {
+			return undefined;
+		}
+	})();
+	const entry = cat?.plugins.find((p) => p.name === name);
+	// Narrowing ANTES del closure: las propiedades no fluyen a callbacks.
+	const relPath =
+		entry && entry.source.kind === "path" ? entry.source.path : undefined;
+	if (!relPath) return undefined;
+	const cacheKey = `${dir}|${relPath}`;
+	if (lastUpdatedCache.has(cacheKey)) return lastUpdatedCache.get(cacheKey);
+	const when = await new Promise<string | undefined>((resolve) => {
+		const child = spawn(
+			"git",
+			["-C", dir, "log", "-1", "--format=%cs", "--", relPath],
+			{
+				env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+				timeout: 10_000,
+			},
+		);
+		let out = "";
+		child.stdout?.on("data", (d) => (out += String(d)));
+		child.on("error", () => resolve(undefined));
+		child.on("close", (code) => resolve(code === 0 ? out.trim() || undefined : undefined));
+	});
+	lastUpdatedCache.set(cacheKey, when);
+	return when;
 }

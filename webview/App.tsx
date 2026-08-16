@@ -601,8 +601,23 @@ export function App() {
 					{state.ccPanel ? (
 						<CcPluginsPanel
 							panel={state.ccPanel}
-							onAction={(id, action, ref) =>
-								post({ type: "ccplugins_panel_action", id, action, ref })
+							onAction={(id, a) =>
+								post({
+									type: "ccplugins_panel_action",
+									id,
+									action: a.kind,
+									ref: "ref" in a ? a.ref : undefined,
+									value: a.kind === "mkt_add" ? a.value : undefined,
+									name:
+										(a.kind === "mkt_remove" || a.kind === "mkt_update") &&
+										"name" in a
+											? a.name
+											: undefined,
+									source: a.kind === "retry" ? a.source : undefined,
+								})
+							}
+							onRowMeta={(id, ref) =>
+								post({ type: "ccplugins_row_meta", id, ref })
 							}
 							onClose={(id) => post({ type: "ccplugins_panel_close", id })}
 						/>

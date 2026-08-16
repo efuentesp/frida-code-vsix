@@ -10,7 +10,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createFridaCcPlugins } from "../../src/tools/frida-cc-plugins/index";
-import { addMarketplace, installPlugin } from "../../src/tools/frida-cc-plugins/installer";
+import {
+	addMarketplace,
+	installPlugin,
+} from "../../src/tools/frida-cc-plugins/installer";
 import type {
 	CcPanelRequest,
 	CcPanelSink,
@@ -34,6 +37,9 @@ function writeFixture(): void {
 					source: "./plugins/p1",
 					version: "1.0.0",
 					displayName: "Plugin Uno",
+					category: "productivity",
+					author: "anthropic",
+					homepage: "https://example.com/p1",
 				},
 			],
 		}),
@@ -52,8 +58,14 @@ function writeFixture(): void {
 }
 
 function fakePi() {
-	const events = new Map<string, ((e: unknown, ctx: unknown) => Promise<unknown>)[]>();
-	const commands = new Map<string, { handler: (a: string, c: unknown) => Promise<void> }>();
+	const events = new Map<
+		string,
+		((e: unknown, ctx: unknown) => Promise<unknown>)[]
+	>();
+	const commands = new Map<
+		string,
+		{ handler: (a: string, c: unknown) => Promise<void> }
+	>();
 	return {
 		events,
 		commands,
@@ -145,6 +157,21 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 		expect(req.rows[0]?.status).toBe("available");
 		expect(req.rows[0]?.markdown).toContain("## p1 v1.0.0");
 		expect(req.rows[0]?.markdown).toContain("**instalará**: 1 skills");
+		// Metadata de descubrimiento (popularidad sin downloads).
+		expect(req.rows[0]?.category).toBe("productivity");
+		expect(req.rows[0]?.author).toBe("anthropic");
+		expect(req.rows[0]?.homepage).toBe("https://example.com/p1");
+		// Tabs completas: instalados/marketplaces/errores viajan siempre.
+		expect(req.installed).toEqual([]);
+		expect(req.marketplaces[0]?.name).toBe("m");
+		expect(req.marketplaces[0]?.plugins).toBe(1);
+		expect(typeof req.marketplaces[0]?.refreshedAt).toBe("string");
+		expect(req.errors).toEqual([]);
+		// Acciones v2 presentes.
+		expect(typeof req.actions.marketplaceAdd).toBe("function");
+		expect(typeof req.actions.marketplaceUpdate).toBe("function");
+		expect(typeof req.actions.rowMeta).toBe("function");
+		expect(typeof req.actions.retry).toBe("function");
 	});
 
 	it("acción install del panel instala de verdad y REFRESCA con el mismo id", async () => {
@@ -224,6 +251,45 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 		expect(req.rows[0]?.markdown).toContain("## p1 v1.0.0");
 		expect(req.rows[0]?.markdown).toContain("scope user");
 		expect(req.rows[0]?.markdown).toContain("**instalado**: 1 skills");
+	});
+
+	it("acción marketplaceAdd agrega y refresca con el mismo id", async () => {
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		await pi.commands
+			.get("ccplugin")
+			?.handler("list --available", fakeCtx(workDir));
+
+		const req = requests[0]!;
+		expect(req.marketplaces).toHaveLength(0); // fixture no agregado aún
+		const msg = await req.actions.marketplaceAdd(mktDir);
+		expect(msg).toMatch(/Marketplace 'm' agregado/);
+		expect(requests[1]?.id).toBe(req.id);
+		expect(requests[1]?.marketplaces[0]?.name).toBe("m");
+		expect(requests[1]?.rows).toHaveLength(1); // p1 descubierto
+	});
+
+	it("rowMeta de fixture no-git → undefined (sin crash)", async () => {
+		await addMarketplace(agentDir, mktDir, { cwd: workDir });
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		await pi.commands
+			.get("ccplugin")
+			?.handler("list --available", fakeCtx(workDir));
+		const when = await requests[0]!.actions.rowMeta("p1@m");
+		expect(when).toBeUndefined();
 	});
 
 	it("info <plugin> abre panel de fila única con la ficha", async () => {

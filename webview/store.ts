@@ -1,4 +1,4 @@
-import type {
+import type { CcPanelRowWs,
 	CompactionReason,
 	InMessage,
 	Segment,
@@ -224,6 +224,24 @@ export function reduce(state: State, msg: InMessage): State {
 			return { ...state, keyNeeded: true };
 		case "ccplugins_panel":
 			return { ...state, ccPanel: msg.panel ?? null };
+		case "ccplugins_row_meta": {
+			// Patch async del panel abierto: fusiona lastUpdated en la fila
+			// (discover E instalados) conservando tab/filtro del componente.
+			const p = state.ccPanel;
+			if (!p || p.id !== msg.id) return state;
+			const patch = (rows: CcPanelRowWs[]): CcPanelRowWs[] =>
+				rows.map((r) =>
+					r.ref === msg.ref ? { ...r, lastUpdated: msg.lastUpdated } : r,
+				);
+			return {
+				...state,
+				ccPanel: {
+					...p,
+					rows: patch(p.rows),
+					installed: patch(p.installed),
+				},
+			};
+		}
 		case "key_set":
 		case "session_ready":
 			return { ...state, keyNeeded: false };

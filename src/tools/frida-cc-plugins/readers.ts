@@ -49,6 +49,10 @@ export interface MarketplacePluginEntry {
 	/** Metadata de descubrimiento (fase autor #51 — informativa). */
 	category?: string;
 	tags?: string[];
+	/** Autor (string o {name}) — señal de popularidad sin downloads. */
+	author?: string | { name?: string };
+	/** Homepage del proyecto (link en la ficha del panel). */
+	homepage?: string;
 	/** Declaraciones de componentes en la entrada (autoridad si strict:false). */
 	skills?: string | string[];
 	commands?: string | string[];
@@ -425,6 +429,8 @@ export function readMarketplaceCatalog(
 			strict: typeof e.strict === "boolean" ? e.strict : undefined,
 			displayName: typeof e.displayName === "string" ? e.displayName : undefined,
 			category: typeof e.category === "string" ? e.category : undefined,
+			author: typeof e.author === "string" ? e.author : authorName(e.author),
+			homepage: typeof e.homepage === "string" ? e.homepage : undefined,
 			tags: Array.isArray(e.tags)
 				? e.tags.filter((t): t is string => typeof t === "string")
 				: undefined,
@@ -568,4 +574,14 @@ export function discoverComponents(
 	}
 
 	return { skills, commands, mcpServers, skipped };
+}
+
+/** author: string | {name} → string (señal de popularidad del panel #49). */
+function authorName(a: unknown): string | undefined {
+	if (typeof a === "string") return a;
+	if (a && typeof a === "object" && "name" in a) {
+		const n = (a as { name?: unknown }).name;
+		return typeof n === "string" ? n : undefined;
+	}
+	return undefined;
 }

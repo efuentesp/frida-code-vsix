@@ -40,6 +40,7 @@ import {
 	removeMarketplace,
 	setPluginEnabled,
 	uninstallPlugin,
+	pluginLastUpdated,
 } from "./installer";
 import { validateMarketplaceDir } from "./validate";
 import { readMarketplaceCatalog, type RenameMap } from "./readers";
@@ -417,14 +418,79 @@ function installedRowMarkdown(p: ScopedPlugin): string {
 	return lines.join("\n");
 }
 
+/** "hace 2 días" — relativo en español (refreshedAt / when del panel). */
+function relativeEs(iso?: string): string | undefined {
+	if (!iso) return undefined;
+	const t = Date.parse(iso);
+	if (!Number.isFinite(t)) return undefined;
+	const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+	if (s < 120) return "hace un momento";
+	const m = Math.floor(s / 60);
+	if (m < 60) return `hace ${m} min`;
+	const h = Math.floor(m / 60);
+	if (h < 24) return `hace ${h} h`;
+	const d = Math.floor(h / 24);
+	if (d < 7) return `hace ${d} día${d === 1 ? "" : "s"}`;
+	const w = Math.floor(d / 7);
+	if (w < 5) return `hace ${w} sem`;
+	return `hace ${Math.floor(d / 30)} mes(es)`;
+}
+
+/** Errores runtime del panel (tab Errores — no persisten; últimos 20). */
+interface PanelErrors {
+	list(): import("./panel").CcPanelError[];
+	push(
+		source: import("./panel").CcPanelError["source"],
+		message: string,
+	): void;
+	clear(source: import("./panel").CcPanelError["source"]): void;
+}
+function createPanelErrors(): PanelErrors {
+	const items: import("./panel").CcPanelError[] = [];
+	let n = 0;
+	return {
+		list: () => items.slice(),
+		push: (source, message) => {
+			items.push({
+				id: `err-${++n}`,
+				when: relativeEs(new Date().toISOString()) ?? "hace un momento",
+				source,
+				message,
+			});
+			if (items.length > 20) items.shift();
+		},
+		clear: (source) => {
+			for (let i = items.length - 1; i >= 0; i--)
+				if (items[i].source === source) items.splice(i, 1);
+		},
+	};
+}
+
+/** Filas de la tab Instalados (merge de scopes). */
+function buildInstalledRows(
+	agentDir: string,
+	cwd: string,
+): import("./panel").CcPanelRow[] {
+	return mergeLayers(loadLayers(agentDir, cwd)).plugins.map(
+		(p): import("./panel").CcPanelRow => ({
+			ref: `${p.name}@${p.rec.marketplace}`,
+			label: p.scope !== "user" ? `${p.name} [${p.scope}]` : p.name,
+			version: p.rec.version,
+			status: p.rec.enabled ? "installed" : "disabled",
+			markdown: installedRowMarkdown(p),
+		}),
+	);
+}
+
 /**
- * Acciones del panel (host-side; el webview las invoca por ref vía id).
- * `refresh` re-emite el panel (mismo id → el webview conserva filtro/foco).
+ * Acciones del panel (host-side; el webview las invoca por id/ref).
+ * `refresh` re-emite el panel (mismo id → el webview conserva tab/filtro).
  */
 function panelActions(
 	agentDir: string,
 	workCwd: string,
 	refresh: () => void,
+	errs: PanelErrors,
 ): import("./panel").CcPanelActions {
 	return {
 		install: async (ref) => {
@@ -444,14 +510,55 @@ function panelActions(
 			refresh();
 			return `Plugin '${name}' ${enable ? "habilitado" : "deshabilitado"}. Ejecuta /reload.`;
 		},
+		marketplaceAdd: async (spec) => {
+			const res = await addMarketplace(agentDir, spec, { cwd: workCwd });
+			errs.clear("marketplace");
+			refresh();
+			return `Marketplace '${res.name}' agregado (${res.plugins} plugins).`;
+		},
+		marketplaceRemove: async (name) => {
+			const n = await removeMarketplace(agentDir, name);
+			refresh();
+			return `Marketplace eliminado (+${n} plugins desinstalados). Ejecuta /reload.`;
+		},
+		marketplaceUpdate: async (name) => {
+			const reg = loadRegistry(agentDir);
+			const targets = name
+				? Object.entries(reg.marketplaces).filter(([n]) => n === name)
+				: Object.entries(reg.marketplaces);
+			for (const [, m] of targets)
+				await addMarketplace(agentDir, m.url, { cwd: workCwd });
+			errs.clear("marketplace");
+			refresh();
+			return `${targets.length} marketplace(s) actualizados.`;
+		},
+		rowMeta: (ref) => pluginLastUpdated(agentDir, ref, { cwd: workCwd }),
+		retry: async (source) => {
+			if (source === "bootstrap") {
+				await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, { cwd: workCwd });
+				errs.clear("bootstrap");
+				refresh();
+				return "Bootstrap completado.";
+			}
+			if (source === "marketplace") {
+				const reg = loadRegistry(agentDir);
+				for (const [, m] of Object.entries(reg.marketplaces))
+					await addMarketplace(agentDir, m.url, { cwd: workCwd });
+				errs.clear("marketplace");
+				refresh();
+				return "Marketplaces actualizados.";
+			}
+			return "Reintenta el comando correspondiente.";
+		},
 	};
 }
 
 /**
- * Emite el panel nativo del webview. `buildRows` se re-invoca en cada refresh
- * (tras una acción) para re-emitir filas frescas CON EL MISMO id — así el
- * componente conserva filtro y foco. Devuelve false si no hay sink (tests/TUI)
- * para que el caller caiga al fallback notify.
+ * Emite el panel nativo del webview (tabs completas): discover via
+ * `buildRows`; instalados/marketplaces/errores se computan aquí SIEMPRE.
+ * `buildRows` se re-invoca en cada refresh (tras una acción) para re-emitir
+ * filas frescas CON EL MISMO id — el componente conserva tab y filtro.
+ * Devuelve false si no hay sink (tests/TUI) → fallback notify.
  */
 function emitPanel(
 	sink: import("./panel").CcPanelSink | undefined,
@@ -460,20 +567,42 @@ function emitPanel(
 	id: string,
 	title: string,
 	buildRows: () => import("./panel").CcPanelRow[],
+	errs: PanelErrors,
 ): boolean {
 	if (!sink) return false;
-	const refresh = () => emitPanel(sink, agentDir, cwd, id, title, buildRows);
+	const refresh = () =>
+		emitPanel(sink, agentDir, cwd, id, title, buildRows, errs);
+	const workCwd = cwd ?? process.cwd();
+	const counts = new Map<string, number>();
+	for (const a of listAvailable(agentDir))
+		counts.set(a.marketplace, (counts.get(a.marketplace) ?? 0) + 1);
+	const marketplaces: import("./panel").CcMarketplaceInfo[] = Object.entries(
+		loadRegistry(agentDir).marketplaces,
+	).map(([n, m]) => ({
+		name: n,
+		url: m.url,
+		plugins: counts.get(n) ?? 0,
+		refreshedAt: relativeEs(m.refreshedAt),
+		autoUpdate: !!m.autoUpdate,
+	}));
 	sink({
 		id,
 		title,
 		rows: buildRows(),
-		actions: panelActions(agentDir, cwd ?? process.cwd(), refresh),
+		installed: buildInstalledRows(agentDir, workCwd),
+		marketplaces,
+		errors: errs.list(),
+		actions: panelActions(agentDir, workCwd, refresh, errs),
 	});
 	return true;
 }
 
 /** Registra el comando /ccplugin con sus subcomandos. */
-function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
+function registerCommand(
+	pi: ExtensionAPI,
+	opts: CreateCcPluginsOpts,
+	errs: PanelErrors,
+): void {
 	const { agentDir, cwd, onLog, presenter, panel } = opts;
 	pi.registerCommand(CC_PLUGINS_COMMAND, {
 		description:
@@ -524,6 +653,9 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 											agentDir,
 											`${a.name}@${a.marketplace}`,
 										),
+										category: a.category,
+										author: a.author,
+										homepage: a.homepage,
 									}),
 								);
 							if (
@@ -534,6 +666,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									randomUUID(),
 									`Disponibles (${avail.length})`,
 									buildAvailRows,
+									errs,
 								)
 							) {
 								notifyCtx(body); // fallback: toast (tests/sin VS Code)
@@ -560,25 +693,17 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							...bodyList.split("\n"),
 							"",
 						]);
-						const buildInstalledRows = () =>
-							mergeLayers(loadLayers(agentDir, workCwd)).plugins.map(
-								(p): import("./panel").CcPanelRow => ({
-									ref: `${p.name}@${p.rec.marketplace}`,
-									label:
-										p.scope !== "user" ? `${p.name} [${p.scope}]` : p.name,
-									version: p.rec.version,
-									status: p.rec.enabled ? "installed" : "disabled",
-									markdown: installedRowMarkdown(p),
-								}),
-							);
+						const installedRows = () =>
+							buildInstalledRows(agentDir, workCwd);
 						if (
 							!emitPanel(
 								panel,
 								agentDir,
 								workCwd,
 								randomUUID(),
-								`Instalados (${buildInstalledRows().length})`,
-								buildInstalledRows,
+								`Instalados (${installedRows().length})`,
+								installedRows,
+								errs,
 							)
 						) {
 							notifyCtx(bodyList);
@@ -748,8 +873,12 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 											version: cat.version,
 											status,
 											markdown: catalogRowMarkdown(agentDir, ref),
+											category: hit?.category,
+											author: hit?.author,
+											homepage: hit?.homepage,
 										},
 									],
+									errs,
 								);
 								return;
 							} catch (e: any) {
@@ -824,6 +953,10 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 				onLog?.(`[cc-plugins] ${sub} falló: ${msg}`);
 				notifyCtx(`cc-plugins: ${msg}`, "error");
 				if (e?.guide) notifyCtx(`Guía: ${e.guide}`, "info");
+				errs.push(
+					sub === "marketplace" ? "marketplace" : "install",
+					msg,
+				);
 			}
 		},
 	});
@@ -839,6 +972,9 @@ export function createFridaCcPlugins(
 	},
 ) {
 	const { agentDir, onLog, onStateChange } = opts;
+	// Errores runtime (tab Errores del panel #49): compartidos por el
+	// discover (backgroundSetup) y el comando /ccplugin.
+	const errs = createPanelErrors();
 	// Singleton del setup background: un solo disparo por factory (los
 	// discovers repetidos no relanzan bootstrap/installs).
 	let bgStarted = false;
@@ -865,6 +1001,7 @@ export function createFridaCcPlugins(
 				bgStarted = true;
 				void backgroundSetup(agentDir, cwd, opts, onLog).catch((e: any) => {
 					onLog?.(`[cc-plugins] background setup falló: ${e?.message ?? e}`);
+					errs.push("bootstrap", String(e?.message ?? e));
 				});
 			}
 
@@ -906,7 +1043,7 @@ export function createFridaCcPlugins(
 			return { skillPaths, promptPaths };
 		});
 
-		registerCommand(pi, opts);
+		registerCommand(pi, opts, errs);
 		onLog?.(
 			`[cc-plugins] extensión activa (registry: ${registryPath(agentDir)}).`,
 		);

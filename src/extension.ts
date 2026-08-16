@@ -2051,7 +2051,14 @@ export async function activate(
 		ccPanelActions.set(req.id, req.actions);
 		post({
 			type: "ccplugins_panel",
-			panel: { id: req.id, title: req.title, rows: req.rows },
+			panel: {
+				id: req.id,
+				title: req.title,
+				rows: req.rows,
+				installed: req.installed,
+				marketplaces: req.marketplaces,
+				errors: req.errors,
+			},
 		});
 	}
 
@@ -2119,24 +2126,54 @@ export async function activate(
 				// Acción del panel /ccplugin: ejecutar host-side y confirmar con
 				// toast CORTO (confirmación de una línea — no listas).
 				const actions = ccPanelActions.get(String(msg.id ?? ""));
-				const ref = String(msg.ref ?? "");
-				if (!actions || !ref) break;
+				if (!actions) break;
+				const ref = typeof msg.ref === "string" ? msg.ref : "";
 				void (async () => {
 					try {
 						let result: string;
 						switch (msg.action) {
 							case "install":
+								if (!ref) return;
 								result = await actions.install(ref);
 								break;
 							case "uninstall":
+								if (!ref) return;
 								result = await actions.uninstall(ref);
 								break;
 							case "enable":
+								if (!ref) return;
 								result = await actions.toggle(ref, true);
 								break;
 							case "disable":
+								if (!ref) return;
 								result = await actions.toggle(ref, false);
 								break;
+							case "mkt_add":
+								result = await actions.marketplaceAdd(
+									String(msg.value ?? ""),
+								);
+								break;
+							case "mkt_remove":
+								result = await actions.marketplaceRemove(
+									String(msg.name ?? ""),
+								);
+								break;
+							case "mkt_update":
+								result = await actions.marketplaceUpdate(
+									msg.name ? String(msg.name) : undefined,
+								);
+								break;
+							case "retry": {
+								const s = String(msg.source ?? "");
+								if (
+									s !== "bootstrap" &&
+									s !== "marketplace" &&
+									s !== "install"
+								)
+									return;
+								result = await actions.retry(s);
+								break;
+							}
 							default:
 								return;
 						}
@@ -2149,6 +2186,23 @@ export async function activate(
 						});
 					}
 				})();
+				break;
+			}
+			case "ccplugins_row_meta": {
+				// "Last updated" de la fila enfocada: git log cacheado host-side;
+				// el patch viaja solo si hay valor (evita renders vacíos).
+				const actions = ccPanelActions.get(String(msg.id ?? ""));
+				const ref = String(msg.ref ?? "");
+				if (!actions || !ref) break;
+				void actions.rowMeta(ref).then((lastUpdated) => {
+					if (lastUpdated)
+						post({
+							type: "ccplugins_row_meta",
+							id: String(msg.id ?? ""),
+							ref,
+							lastUpdated,
+						});
+				});
 				break;
 			}
 			case "ccplugins_panel_close":

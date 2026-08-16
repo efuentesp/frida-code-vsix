@@ -40,13 +40,17 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    /ccplugin list --available
    ```
 
-   Se abre el **panel de cc-plugins dentro de la ventana de frida**: a la izquierda la
-   lista de plugins (filtra escribiendo — como el autocompletado de `/` o `@`), a la
-   derecha la ficha del plugin enfocado (qué instalará, costo en contexto, skills/MCP)
-   con sus botones. Todo por teclado: `↑↓` mueve el foco (la ficha se actualiza en
-   vivo), `⏎` ejecuta la acción primaria (*Instalar*, *Habilitar*/*Deshabilitar*),
-   `Tab` salta a los botones, `Esc` cierra. Cada comando también queda en el panel
-   **Output "Frida — cc-plugins"** (silencioso; ábrelo manualmente para el log copiable).
+   Se abre el **panel de cc-plugins dentro de la ventana de frida**, con tabs al estilo
+   de `/plugins` de Claude Code: **Discover** (lista filtrable escribiendo — como el
+   autocompletado de `/` — con chip de categoría y ficha lado a lado: qué instalará,
+   costo en contexto, skills/MCP, autor, actualizado, homepage), **Instalados**,
+   **Marketplaces** (tarjetas con contador y "actualizado hace…", botones
+   Actualizar/Quitar y campo para **agregar** con `owner/repo`, URL git, npm o zip) y
+   **Errores** (avisos con Reintentar; se oculta si no hay). Teclado: `Tab` cicla
+   zonas (tabs → lista → botones), `←/→` o `1-4` cambia tab, `↑↓` mueve el foco (la
+   ficha se actualiza en vivo), `⏎` ejecuta la acción primaria, `Esc` sube de nivel
+   hasta cerrar. Cada comando también queda en el panel **Output "Frida — cc-plugins"**
+   (silencioso; ábrelo manualmente para el log copiable).
 
 3. Consulta el detalle ANTES de instalar (qué traerá y su costo):
 
@@ -260,11 +264,17 @@ En `marketplace.json`, cada entrada declara de dónde baja el plugin:
 
 Todo vive **dentro del webview de frida** (nada de paletas de VS Code):
 
-- **Panel nativo** (`list`, `list --available`, `info`): lista filtrable (fuzzy,
-  como el autocompletado de `/`) + ficha markdown lado a lado con botones
-  *Instalar* / *Habilitar* / *Deshabilitar* / *Desinstalar*. Teclado: escribir
-  filtra · `↑↓` mueve (ficha en vivo) · `⏎` acción primaria · `Tab`/`←/→` botones ·
-  `Esc` cierra. Tras cada acción el panel se refresca conservando tu filtro y foco.
+- **Panel nativo** (`list`, `list --available`, `info`), tabs al estilo `/plugins` de
+  Claude Code: **Discover** (fuzzy como el autocompletado de `/`; chip de categoría
+  por fila — no hay downloads públicos, la categoría+autor son la señal — y ficha
+  markdown lado a lado con botones *Instalar* / *Habilitar* / *Deshabilitar* /
+  *Desinstalar*, autor, actualizado y homepage), **Instalados** (mismo formato,
+  acciones de ciclo de vida), **Marketplaces** (agregar con `owner/repo` · URL git ·
+  `npm:paq` · URL zip; Actualizar/Quitar por tarjeta; contador y "actualizado
+  hace…") y **Errores** (avisos runtime con Reintentar; oculta si vacía).
+  Teclado: `Tab` cicla zonas · `←/→`/`1-4` tabs · `↑↓` mueve (ficha en vivo) ·
+  `⏎` acción primaria · `Esc` sube de nivel. Tras cada acción el panel se refresca
+  conservando tab, filtro y foco.
 - **Output channel** `Frida — cc-plugins`: log silencioso de todos los comandos
   (`$ ccplugin …`); ábrelo desde el panel Output cuando lo necesites.
 - Confirmaciones de una línea ("Plugin instalado…") sí van por toast corto.

@@ -89,11 +89,18 @@ solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
   `ccplugins_panel_action {id, action, ref}`; el host ejecuta, confirma con
   toast corto y el comando re-emite filas frescas con el MISMO id (el componente
   conserva filtro y foco).
-- **Componente** (`webview/components/CcPluginsPanel.tsx`): lista filtrable
-  fuzzy (subseqScore, como el autocompletado de `/`) a la izquierda, ficha
-  markdown (Markdown) + botones a la derecha. Zonas de foco list/buttons
-  (estilo QuestionsPanel): escribir filtra · `↑↓` mueve · `⏎` acción primaria ·
-  `Tab`/`←/→` cicla botones · `Esc` cierra.
+- **Componente** (`webview/components/CcPluginsPanel.tsx`): tabs Discover |
+  Instalados | Marketplaces | Errores (estilo `/plugins` de Claude Code; Errores
+  oculta si vacía). Discover/Instalados: lista fuzzy (subseqScore, como el
+  autocompletado de `/`) a la izquierda + ficha markdown y botones a la derecha;
+  chip de categoría por fila (no hay downloads públicos — la categoría+autor del
+  catálogo son la señal) y "Actualizado"/autor/homepage en la ficha (el primero
+  llega async: git log del dir en el clon, cacheado, vía `ccplugins_row_meta`).
+  Marketplaces: tarjetas (contador, refreshedAt relativo, auto-update) con
+  Actualizar/Quitar y campo Agregar (los 4 sources). Errores: avisos runtime
+  (bootstrap/marketplace/install) con Reintentar. Zonas de foco tabs/list/buttons/add
+  (estilo QuestionsPanel): `Tab` cicla · `←/→`/`1-4` tabs · escribir filtra ·
+  `↑↓` mueve · `⏎` acción primaria · `Esc` sube de nivel hasta cerrar.
 - **Output channel** `Frida — cc-plugins` (`presenter.ts`): append silencioso
   de cada comando — log de consulta, nunca roba foco.
 

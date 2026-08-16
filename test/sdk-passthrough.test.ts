@@ -59,13 +59,20 @@ const distExists =
 	fs.existsSync(path.join(projectRoot, "dist/sdk-passthrough.js"));
 
 describe.skipIf(!distExists)("dist/ (requiere build)", () => {
-	it("sdk-passthrough.js exporta defineTool", async () => {
-		const url = pathToFileURL(
-			path.join(projectRoot, "dist/sdk-passthrough.js"),
-		).href;
-		const mod = (await import(url)) as Record<string, unknown>;
-		expect(typeof mod.defineTool).toBe("function");
-	});
+	it(
+		"sdk-passthrough.js exporta defineTool",
+		async () => {
+			const url = pathToFileURL(
+				path.join(projectRoot, "dist/sdk-passthrough.js"),
+			).href;
+			const mod = (await import(url)) as Record<string, unknown>;
+			expect(typeof mod.defineTool).toBe("function");
+		},
+		// El bundle CJS (~15MB) se importa a través del pipeline de transform
+		// de vitest: carga manual ~0.5s, pero bajo carga el transform excede el
+		// default de 5s (flaky documentado). Smoke de artefacto, no de velocidad.
+		30_000,
+	);
 
 	it("extension.js tiene el shim fix (catch { return __import_meta_url; })", () => {
 		const content = fs.readFileSync(
