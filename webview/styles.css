@@ -1374,6 +1374,13 @@ body {
 	background: var(--vscode-list-activeSelectionBackground);
 	color: var(--vscode-list-activeSelectionForeground);
 }
+/* Hover = par completo del tema (como "+ Agregar marketplace"): la regla
+   global button:hover solo cambia fondo → letras blancas sobre azul.
+   Especificidad 0,2,0 > button:hover 0,1,1. */
+.ccp-tab:hover {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
 .ccp-tab-count {
 	font-size: 0.8em;
 	opacity: 0.75;
@@ -1572,6 +1579,16 @@ body {
 .ccp-switch-on {
 	background: var(--vscode-inputValidation-infoBorder, #2ea043);
 }
+/* El pill es <button>: button:hover lo volvía azul. Conserva su estado
+   (rojo deshabilitado / verde habilitado) con un brillo sutil. */
+.ccp-switch:hover {
+	background: var(--vscode-inputValidation-errorBorder, #f14c4c);
+	filter: brightness(1.25);
+}
+.ccp-switch-on:hover {
+	background: var(--vscode-inputValidation-infoBorder, #2ea043);
+	filter: brightness(1.25);
+}
 .ccp-switch-knob {
 	position: absolute;
 	top: 2px;
@@ -1613,6 +1630,7 @@ body {
 	cursor: pointer;
 }
 .ccp-res-header:hover {
+	background: transparent;
 	color: var(--vscode-foreground);
 }
 .ccp-res-caret {
@@ -1644,7 +1662,8 @@ body {
 	cursor: pointer;
 	font: inherit;
 }
-.ccp-res-row.ccp-row-focus {
+.ccp-res-row.ccp-row-focus,
+.ccp-res-row:hover {
 	background: var(--vscode-list-activeSelectionBackground);
 	color: var(--vscode-list-activeSelectionForeground);
 }
