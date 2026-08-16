@@ -951,7 +951,9 @@ export async function activate(
 					},
 				});
 				frida = s;
-				checkKnowledgeBaseViewDeps();
+				// Aviso de Foam solo si la KB está habilitada — con el setting en
+				// false no hay vault y el aviso sería ruido (Refs #29).
+				if (isKnowledgeBaseEnabled()) checkKnowledgeBaseViewDeps();
 				wireSession(s.session);
 				// Monta el widget de agentes en el footer (idempotente) y publica el conteo
 				// de subagentes en background al webview. Así el indicador de procesamiento
