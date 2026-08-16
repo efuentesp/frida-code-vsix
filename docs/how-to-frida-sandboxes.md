@@ -271,8 +271,11 @@ por qué — no es un "no" seco.
 
 ## Relación con el resto de Frida
 
-- **#26 better-subagents** (próximo): los subagentes detached podrán correr
-  in-sandbox — "audita esto mientras yo sigo, en tu propia computadora".
+- **#26 better-subagents**: el modo detached ya está entregado (proceso
+  propio que sobrevive al padre — ver
+  [how-to-frida-subagents](how-to-frida-subagents.md)). La composición
+  in-sandbox ("audita esto mientras yo sigo, en tu propia computadora") es
+  el seguimiento pendiente del ADR-0047.
 - **`withSandbox()` de workflows** (futuro): pasos de workflow con aislamiento
   declarativo, análogo a `withWorktree()`.
 - **Panel `/sandbox` + chips de sesión**: la superficie visual seguirá
