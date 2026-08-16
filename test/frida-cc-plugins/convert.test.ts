@@ -25,7 +25,10 @@ import {
 	loadRegistry,
 	saveRegistry,
 } from "../../src/tools/frida-cc-plugins/registry";
-import { resourcesPromptsDir, resourcesSkillsDir } from "../../src/tools/frida-cc-plugins/constants";
+import {
+	resourcesPromptsDir,
+	resourcesSkillsDir,
+} from "../../src/tools/frida-cc-plugins/constants";
 
 let agentDir: string;
 
@@ -114,9 +117,9 @@ describe("frida-cc-plugins / convert / recursos", () => {
 
 		// remove limpia ambos.
 		removePluginResources(agentDir, "pr");
-		expect(
-			fs.existsSync(path.join(resourcesSkillsDir(agentDir), "pr")),
-		).toBe(false);
+		expect(fs.existsSync(path.join(resourcesSkillsDir(agentDir), "pr"))).toBe(
+			false,
+		);
 		expect(fs.existsSync(prompt)).toBe(false);
 	});
 });

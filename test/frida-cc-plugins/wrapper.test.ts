@@ -35,7 +35,9 @@ let workDir: string;
 function writeMarketplaceFixture(): void {
 	const cat = {
 		name: "fixture-market",
-		plugins: [{ name: "pr-review", source: "./plugins/pr-review", version: "1.0.0" }],
+		plugins: [
+			{ name: "pr-review", source: "./plugins/pr-review", version: "1.0.0" },
+		],
 	};
 	fs.mkdirSync(path.join(marketplaceSrc, ".claude-plugin"), { recursive: true });
 	fs.writeFileSync(
@@ -54,7 +56,10 @@ function writeMarketplaceFixture(): void {
 		"---\nname: review\ndescription: Revisa PRs\n---\nRevisa el PR.\n",
 	);
 	fs.mkdirSync(path.join(p, "commands"), { recursive: true });
-	fs.writeFileSync(path.join(p, "commands", "review.md"), "# Review\n$ARGUMENTS\n");
+	fs.writeFileSync(
+		path.join(p, "commands", "review.md"),
+		"# Review\n$ARGUMENTS\n",
+	);
 	fs.writeFileSync(
 		path.join(p, ".mcp.json"),
 		JSON.stringify({
@@ -87,10 +92,7 @@ function fakePi() {
 			name: string,
 			opts: { handler: (args: string, ctx: unknown) => Promise<void> },
 		) => commands.set(name, opts),
-		on: (
-			ev: string,
-			h: (e: unknown, ctx: unknown) => Promise<unknown>,
-		) => {
+		on: (ev: string, h: (e: unknown, ctx: unknown) => Promise<unknown>) => {
 			const list = events.get(ev) ?? [];
 			list.push(h);
 			events.set(ev, list);
@@ -180,9 +182,9 @@ describe("frida-cc-plugins / wrapper (E2E marketplace local)", () => {
 		expect(out.skillPaths[0]).toContain(
 			path.join("skills", "pr-review", "review"),
 		);
-		expect(
-			out.promptPaths.some((p) => p.endsWith("pr-review-review.md")),
-		).toBe(true);
+		expect(out.promptPaths.some((p) => p.endsWith("pr-review-review.md"))).toBe(
+			true,
+		);
 
 		// Comando /ccplugin registrado.
 		expect(pi.commands.has("ccplugin")).toBe(true);

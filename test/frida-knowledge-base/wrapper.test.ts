@@ -253,9 +253,9 @@ describe("frida-knowledge-base / wrapper", () => {
 		const p1 = path.join(agentDir, "prompts", "wiki-init.md");
 		expect(fs.existsSync(p1)).toBe(true);
 		expect(fs.readFileSync(p1, "utf-8")).toContain("$ARGUMENTS");
-		expect(
-			fs.existsSync(path.join(agentDir, "prompts", "wiki-query.md")),
-		).toBe(true);
+		expect(fs.existsSync(path.join(agentDir, "prompts", "wiki-query.md"))).toBe(
+			true,
+		);
 		// Skill en <agentDir>/skills/llm-wiki (symlink al paquete o copia).
 		const sk = path.join(agentDir, "skills", "llm-wiki", "SKILL.md");
 		expect(fs.existsSync(sk)).toBe(true);
