@@ -14,6 +14,16 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import type { DetachedRunMeta } from "./detached-registry";
+import {
+	bootDetached,
+	detachedSnapshot,
+	spawnDetachedAgent,
+	stopDetachedRun,
+} from "./detached-runner";
+import { buildDetachedPanel, type DetachedPanelData } from "./detached-panel";
 import {
 	resolveAgentConfig,
 	runAgent,
@@ -52,7 +62,7 @@ function toolResult(text: string): {
 // Descripción del tool Agent (lo que ve el LLM)
 // ---------------------------------------------------------------------------
 
-const AGENT_TOOL_DESCRIPTION = `Launch a new sub-agent that runs in an isolated session with its own context window. Each agent type has specialized tools, system prompts, and optional model selection. Foreground agents block until complete and return results inline. Background agents return an agent ID immediately and notify on completion.
+const AGENT_TOOL_DESCRIPTION = `Launch a new sub-agent that runs in an isolated session with its own context window. Each agent type has specialized tools, system prompts, and optional model selection. Foreground agents block until complete and return results inline. Background agents return an agent ID immediately and notify on completion. Detached agents (detached:true) run in a SEPARATE OS process that survives this session — use them for long tasks the user can leave running (closes VS Code, /reload) and collect later via get_subagent_result.
 
 When you delegate work to a sub-agent, do not duplicate that work yourself — wait for the result or continue with other tasks.`;
 
@@ -61,12 +71,33 @@ When you delegate work to a sub-agent, do not duplicate that work yourself — w
 // ---------------------------------------------------------------------------
 
 /**
- * Factory de la extensión frida-subagents para el loader de Pi.
- * Registra los 3 tools del modelo.
+ * Opts del host para el modo detached (#26): agentDir, auth del provider
+ * activo y sink del panel /detached.
  */
-export function createFridaSubagents() {
+export interface FridaSubagentsOpts {
+	/** agentDir de Frida (~/.frida) — el child detached lo hereda via env. */
+	agentDir: string;
+	/** API key del provider del modelo activo (SecretStorage del host). */
+	apiKey?: string;
+	/** Provider del modelo activo ("devengine", "zai", …). */
+	provider?: string;
+	/** Sink del panel /detached: postea el snapshot al webview. */
+	onDetachedPanel?: (panel: DetachedPanelData) => void;
+	/** Notificación al host cuando un run detached settlea (toast). */
+	onDetachedSettled?: (meta: DetachedRunMeta) => void;
+}
+
+/**
+ * Factory de la extensión frida-subagents para el loader de Pi.
+ * Registra los 3 tools del modelo + el comando /detached.
+ */
+export function createFridaSubagents(opts?: Partial<FridaSubagentsOpts>) {
+	const agentDir = opts?.agentDir ?? join(homedir(), ".frida");
 	return (pi: ExtensionAPI): void => {
 		const cwd = process.cwd();
+
+		// --- #26 detached: reconciliar runs huérfanos del disco al arrancar ---
+		bootDetached((meta) => opts?.onDetachedSettled?.(meta));
 
 		// --- Tool: Agent ---
 		pi.registerTool(
@@ -129,6 +160,12 @@ export function createFridaSubagents() {
 								"If true, agent gets no extension tools — only built-in tools.",
 						}),
 					),
+					detached: Type.Optional(
+						Type.Boolean({
+							description:
+								"Run in a SEPARATE OS process that survives this session (even a VS Code restart). Returns a run id (det-N) immediately; poll with get_subagent_result. Cannot be steered. Use for long tasks.",
+						}),
+					),
 				}),
 				execute: async (
 					_toolCallId: string,
@@ -142,6 +179,7 @@ export function createFridaSubagents() {
 						max_turns?: number;
 						resume?: string;
 						isolated?: boolean;
+						detached?: boolean;
 					},
 					signal: AbortSignal | undefined,
 					onUpdate: AgentToolUpdateCallback | undefined,
@@ -151,6 +189,53 @@ export function createFridaSubagents() {
 					const config =
 						resolveAgentConfig(params.subagent_type, ctx.cwd) ??
 						GENERAL_PURPOSE_AGENT;
+
+					// --- #26 detached: proceso separado, handle inmediato ---
+					if (params.detached) {
+						// Modelo: pattern del agente > pattern pedido > modelo activo del padre.
+						const parentModel =
+							(ctx.model as { provider?: string; id?: string } | undefined) ??
+							undefined;
+						const parentPattern =
+							parentModel?.provider && parentModel?.id
+								? `${parentModel.provider}/${parentModel.id}`
+								: undefined;
+						const notify = (msg: string): void => {
+							try {
+								ctx.ui.notify(msg, "info");
+							} catch {
+								/* headless */
+							}
+						};
+						const handle = spawnDetachedAgent({
+							prompt: params.prompt,
+							description: params.description,
+							config,
+							model: params.model ?? parentPattern,
+							thinking: params.thinking,
+							apiKey: opts?.apiKey,
+							provider: opts?.provider,
+							agentDir,
+							cwd: ctx.cwd,
+							onSettled: (meta) => {
+								// Notificación honesta al terminar (resultado + tokens #18).
+								const icon =
+									meta.status === "completed" ? "✓" : meta.status === "killed" ? "⏹" : "✗";
+								const tokens =
+									meta.tokensIn || meta.tokensOut
+										? ` · ${(meta.tokensIn ?? 0) + (meta.tokensOut ?? 0)} tok`
+										: "";
+								const res = meta.result ? `\n  ⎿  ${meta.result.slice(0, 200)}` : "";
+								notify(
+									`${icon} Detached ${meta.id} (${meta.name ?? meta.agentType}) ${meta.status === "completed" ? "completó" : meta.status === "killed" ? "detenido" : `falló: ${meta.failureReason ?? meta.status}`}${tokens}${res}`,
+								);
+								opts?.onDetachedSettled?.(meta);
+							},
+						});
+						return toolResult(
+							`🛰 Detached ${handle.id} spawnado (PID ${handle.pid}, proceso propio — sobrevive a esta sesión y a un reinicio de VS Code). Tipo: ${config.name}. Consulta el resultado con get_subagent_result("${handle.id}") o el panel /detached; te notificaré al completar.`,
+						);
+					}
 
 					const options: SpawnOptions = {
 						prompt: params.prompt,
@@ -263,6 +348,29 @@ export function createFridaSubagents() {
 					onUpdate: AgentToolUpdateCallback | undefined,
 					_ctx: ExtensionContext,
 				) => {
+					// --- #26 detached: el registry durable responde primero ---
+					const snap = detachedSnapshot(params.agent_id);
+					if (snap) {
+						const lines: string[] = [
+							`Detached: ${snap.meta.name ?? snap.meta.agentType} (${snap.meta.id} · PID ${snap.meta.pid})`,
+							`Estado: ${snap.meta.status}${snap.alive ? " · proceso vivo" : ""}`,
+						];
+						if (snap.turnCount || snap.toolUses) {
+							lines.push(
+								`Progreso: turn ${snap.turnCount} · ${snap.toolUses} tools · ${snap.tokensIn + snap.tokensOut} tok · ${snap.activity}`,
+							);
+						}
+						if (snap.meta.result) lines.push(`Resultado: ${snap.meta.result}`);
+						if (snap.meta.failureReason)
+							lines.push(`Error: ${snap.meta.failureReason}`);
+						if (snap.meta.status === "running" || snap.meta.status === "orphaned") {
+							lines.push(
+								"Sigue corriendo en su propio proceso — consulta de nuevo más tarde (wait no aplica a detached: el proceso no es de esta sesión).",
+							);
+						}
+						return toolResult(lines.join("\n"));
+					}
+
 					const agent = getAgent(params.agent_id);
 					if (!agent) {
 						return toolResult(`Agente ${params.agent_id} no encontrado.`);
@@ -342,6 +450,13 @@ export function createFridaSubagents() {
 					_onUpdate: unknown,
 					_ctx: ExtensionContext,
 				) => {
+					// #26: detached corre en otro proceso — steer necesita modo rpc (MVP no).
+					const det = detachedSnapshot(params.agent_id);
+					if (det) {
+						return toolResult(
+							`El detached ${params.agent_id} corre en su propio proceso y no acepta steering en este MVP. Si ya no sirve, el usuario puede detenerlo desde el panel /detached (SIGTERM limpio).`,
+						);
+					}
 					const ok = await steerAgent(params.agent_id, params.message);
 					return toolResult(
 						ok
@@ -351,6 +466,37 @@ export function createFridaSubagents() {
 				},
 			}),
 		);
+
+		// --- Comando /detached (#26): panel de runs en el webview ---
+		pi.registerCommand("detached", {
+			description:
+				"Subagentes detached: panel de runs activos e históricos (/detached · /detached stop <id>)",
+			handler: async (args: string, cmdCtx: any) => {
+				const [sub, idArg] = (args ?? "").trim().split(/\s+/);
+				const notify = (m: string, kind: "info" | "error" = "info") => {
+					try {
+						cmdCtx?.ui?.notify?.(m, kind);
+					} catch {
+						/* headless */
+					}
+				};
+				if (sub === "stop") {
+					if (!idArg) {
+						notify("Uso: /detached stop <id>", "error");
+						return;
+					}
+					const ok = stopDetachedRun(idArg);
+					notify(
+						ok
+							? `⏹ Detached ${idArg} detenido (SIGTERM al grupo)`
+							: `Detached ${idArg} no existe o ya terminó`,
+					);
+					return;
+				}
+				// Default (y "list"): abrir/refresh del panel.
+				opts?.onDetachedPanel?.(buildDetachedPanel());
+			},
+		});
 	};
 }
 

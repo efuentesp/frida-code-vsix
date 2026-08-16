@@ -61,16 +61,29 @@ describe("frida-subagents / factory", () => {
 	});
 
 	it("la factory acepta ExtensionAPI sin crashear", () => {
-		const factory = createFridaSubagents();
-		// Pi invoca la factory con la ExtensionAPI. Mock mínimo.
-		const tools: string[] = [];
-		const mockPi = {
-			registerTool: (tool: { name: string }) => tools.push(tool.name),
-		};
-		expect(() => factory(mockPi as never)).not.toThrow();
-		expect(tools).toContain("Agent");
-		expect(tools).toContain("get_subagent_result");
-		expect(tools).toContain("steer_subagent");
+		// Registry detached aislado (la factory bootea reconcileRuns al inicio).
+		const tmp = require("node:fs").mkdtempSync(
+			require("node:path").join(require("node:os").tmpdir(), "sbx-fac-"),
+		);
+		process.env.FRIDA_DETACHED_DIR = require("node:path").join(tmp, "runs");
+		try {
+			const factory = createFridaSubagents();
+			// Pi invoca la factory con la ExtensionAPI. Mock mínimo.
+			const tools: string[] = [];
+			const commands: string[] = [];
+			const mockPi = {
+				registerTool: (tool: { name: string }) => tools.push(tool.name),
+				registerCommand: (name: string) => commands.push(name),
+			};
+			expect(() => factory(mockPi as never)).not.toThrow();
+			expect(tools).toContain("Agent");
+			expect(tools).toContain("get_subagent_result");
+			expect(tools).toContain("steer_subagent");
+			expect(commands).toContain("detached"); // #26
+		} finally {
+			delete process.env.FRIDA_DETACHED_DIR;
+			require("node:fs").rmSync(tmp, { recursive: true, force: true });
+		}
 	});
 });
 

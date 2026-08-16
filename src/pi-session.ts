@@ -242,6 +242,10 @@ export interface CreateFridaSessionOptions {
 	/** Sink del panel nativo del webview para /sandbox (null = cerrar). */
 	sandboxesPanel?: import("./tools/frida-sandboxes/panel").SandboxPanelSink;
 	onSandboxesState?: (s: { ready: boolean; sandboxes: number }) => void;
+	/** frida-subagents #26: sink del panel /detached (null = cerrar). */
+	detachedPanel?: (
+		panel: import("./tools/frida-subagents/detached-panel").DetachedPanelData | null,
+	) => void;
 	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
 	onHermesMemoryState?: (
 		s: import("./tools/frida-hermes-memory").HermesMemoryState,
@@ -682,7 +686,20 @@ export async function createFridaSession(
 			// los agentes ya estén sincronizados al discovery.
 			{
 				name: "frida-subagents",
-				factory: createFridaSubagents(),
+				// #26 detached: auth del provider activo (SecretStorage → --api-key
+				// del child) + sink del panel /detached.
+				factory: createFridaSubagents({
+					agentDir: opts.agentDir,
+					apiKey: activeProvider
+						? keyHolders[activeProvider]
+					: undefined,
+					provider: activeProvider,
+					onDetachedPanel: (p) => {
+						if (typeof opts.detachedPanel === "function") {
+							opts.detachedPanel(p);
+						}
+					},
+				}),
 			},
 			// frida-extensible-workflows (ADR-0028): orquestación multi-agente
 			// determinista (porte de pi-extensible-workflows). Fase 2: registra el

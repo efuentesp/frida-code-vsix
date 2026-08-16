@@ -107,6 +107,11 @@ import {
 	wireAgentWidget,
 	unmountAgentWidget,
 } from "./tools/frida-subagents/panel";
+import {
+	buildDetachedPanel,
+	type DetachedPanelData,
+} from "./tools/frida-subagents/detached-panel";
+import { stopDetachedRun } from "./tools/frida-subagents/detached-runner";
 import { wireGitSyncWidget } from "./tools/frida-git-sync";
 import { loadSettings, formatSettings } from "./tools/frida-subagents/settings";
 import {
@@ -953,6 +958,7 @@ export async function activate(
 					sandboxesDefaultImage: readSandboxesDefaultImage,
 					sandboxesAllowDomains: readSandboxesAllowDomains,
 					sandboxesPanel: handleSandboxPanel,
+					detachedPanel: handleDetachedPanel,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -2052,6 +2058,35 @@ export async function activate(
 		string,
 		import("./tools/frida-sandboxes/panel").SandboxPanelActions
 	>();
+	// Sink del panel /detached (#26): postea el snapshot y, mientras el panel
+	// está abierto, lo refresca cada 3s (tail de logs corriendo). Al cerrar,
+	// limpia el timer.
+	let dtRefreshTimer: ReturnType<typeof setInterval> | undefined;
+	function handleDetachedPanel(panel: DetachedPanelData | null): void {
+		if (dtRefreshTimer) {
+			clearInterval(dtRefreshTimer);
+			dtRefreshTimer = undefined;
+		}
+		if (!panel) {
+			post({ type: "detached_panel", panel: null });
+			return;
+		}
+		post({
+			type: "detached_panel",
+			panel: { id: "detached", title: "Subagentes detached", runs: panel.runs },
+		});
+		dtRefreshTimer = setInterval(() => {
+			post({
+				type: "detached_panel",
+				panel: {
+					id: "detached",
+					title: "Subagentes detached",
+					runs: buildDetachedPanel().runs,
+				},
+			});
+		}, 3_000);
+	}
+
 	function handleSandboxPanel(
 		req: import("./tools/frida-sandboxes/panel").SandboxPanelRequest | null,
 	): void {
@@ -2246,6 +2281,33 @@ export async function activate(
 			case "ccplugins_panel_close":
 				handleCcPanel(null);
 				break;
+			case "detached_panel_action":
+			case "detached_panel_close": {
+				// Acciones del panel /detached (#26). El confirm de Detener vive en el
+				// webview (doble-⏎); el host ejecuta y el toast de UNA línea confirma.
+				if (msg.type === "detached_panel_close") {
+					handleDetachedPanel(null);
+					break;
+				}
+				const dtRun = typeof msg.runId === "string" ? msg.runId : "";
+				void (async () => {
+					try {
+						if (msg.action === "stop" && dtRun) {
+							const ok = stopDetachedRun(dtRun);
+							post({
+								type: "info",
+								text: ok
+									? `⏹ Detached ${dtRun} detenido (SIGTERM al grupo)`
+										: `Detached ${dtRun} no existe o ya terminó`,
+							});
+						}
+					} finally {
+					// refresh siempre (la acción ya mutó el registry).
+						handleDetachedPanel(buildDetachedPanel());
+					}
+				})();
+				break;
+			}
 			case "sandbox_panel_action":
 			case "sandbox_panel_changes":
 			case "sandbox_panel_merge":
@@ -4143,6 +4205,7 @@ export async function activate(
 				sandboxesDefaultImage: readSandboxesDefaultImage,
 				sandboxesAllowDomains: readSandboxesAllowDomains,
 				sandboxesPanel: handleSandboxPanel,
+				detachedPanel: handleDetachedPanel,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

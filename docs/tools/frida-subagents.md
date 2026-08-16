@@ -42,6 +42,35 @@ Agent({
 Foreground bloquea hasta completar; background devuelve un ID y notifica al
 terminar.
 
+### Modo detached (#26 — ADR-0037)
+
+`detached: true` corre el subagente en un **proceso OS separado** (`pi -p
+--mode json`, el CLI embebido del VSIX) que **sobrevive a esta sesión y hasta a
+un reinicio de VS Code**. El tool devuelve el handle (`det-N`) de inmediato; el
+progreso se lee del log file-backed y el resultado queda en un registry durable
+(`~/.frida/detached/<id>/`):
+
+```
+Agent({
+  subagent_type: "Explore",
+  prompt: "Audita src/auth …",
+  description: "auditoría auth",
+  detached: true,
+})
+→ 🛰 Detached det-1 spawnado (PID 8412) — sobrevive a esta sesión.
+
+get_subagent_result("det-1")
+→ Estado: running · turn 3 · 12.4k tok · escribiendo…
+```
+
+- **Resultado + tokens (#18)** al completar: notificación y `meta.json`
+  persisten el texto final y el consumo acumulado (message_end del log).
+- **Detener**: panel `/detached` (SIGTERM al grupo de procesos).
+- **Sin steer / sin max_turns** (necesita `--mode rpc`): MVP documentado.
+- **Auth**: mismo agentDir (`PI_CODING_AGENT_DIR=~/.frida`) + `--api-key` del
+  SecretStorage del host.
+- **Composición con #35** (in-sandbox): follow-up del ADR-0047.
+
 ## Agentes disponibles
 
 **Defaults (3):**
@@ -121,7 +150,12 @@ src/tools/frida-subagents/
 ├── AgentWidget.tsx     # panel React del footer (fridaWeb) con progreso en vivo
 ├── store.ts            # agentWidgetStore reactivo (useSyncExternalStore)
 ├── panel.ts            # montaje idempotente del widget en el footer
-└── worktree.ts         # git worktree create/cleanup/prune (aislamiento por agente)
+├── worktree.ts         # git worktree create/cleanup/prune (aislamiento por agente)
+├── detached-spawn.ts   # #26 spawn detached (ELECTRON_RUN_AS_NODE + log file-backed)
+├── detached-registry.ts# #26 meta.json durable + reconcile (orphaned/lost)
+├── detached-log.ts     # #26 parser del log --mode json (progreso + resultado + tokens)
+├── detached-runner.ts  # #26 orquestador (spawn/stop/snapshot/boot + adopción)
+└── detached-panel.ts   # #26 contrato del panel /detached
 ```
 
 ## Estado y madurez

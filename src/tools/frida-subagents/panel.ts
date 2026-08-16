@@ -6,6 +6,7 @@
 import type { ReactElement } from "react";
 import { createAgentWidgetElement } from "./AgentWidget";
 import { startAutoPrune, stopAutoPrune } from "./store";
+import { startDetachedWidgetFeed, stopDetachedWidgetFeed } from "./detached-panel";
 
 export interface AgentWidgetWebBridge {
 	mountPersistent: (
@@ -27,19 +28,22 @@ export function mountAgentWidget(webBridge: AgentWidgetWebBridge): {
 	return widgetMounted;
 }
 
-/** Cableja todo una vez: monta el widget + arranca auto-prune. Idempotente. */
+/** Cableja todo una vez: monta el widget + arranca auto-prune + feed detached
+ *  (#26: runs 🛰 del registry durable también en el footer). Idempotente. */
 export function wireAgentWidget(webBridge: AgentWidgetWebBridge): void {
 	if (wired) return;
 	wired = true;
 	mountAgentWidget(webBridge);
+	startDetachedWidgetFeed();
 }
 
-/** Desmonta el widget y detiene el auto-prune. */
+/** Desmonta el widget y detiene el auto-prune + feed detached. */
 export function unmountAgentWidget(): void {
 	widgetMounted?.unmount();
 	widgetMounted = undefined;
 	wired = false;
 	stopAutoPrune();
+	stopDetachedWidgetFeed();
 }
 
 /** Sólo tests. */

@@ -17,6 +17,7 @@ import { BranchSummaryCard } from "./components/BranchSummaryCard";
 import { UiDialog } from "./components/UiDialog";
 import { CcPluginsPanel } from "./components/CcPluginsPanel";
 import { SandboxesPanel } from "./components/SandboxesPanel";
+import { DetachedPanel } from "./components/DetachedPanel";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
@@ -652,8 +653,22 @@ export function App() {
 							}
 							onClose={(id) => post({ type: "sandbox_panel_close", id })}
 						/>
-					) : null}
-					{Object.entries(state.webRoots ?? {})
+				) : null}
+				{state.dtPanel ? (
+					<DetachedPanel
+						panel={state.dtPanel}
+						onAction={(id, a) =>
+							post({
+								type: "detached_panel_action",
+								id,
+								action: a.kind,
+								runId: "runId" in a ? a.runId : undefined,
+							})
+						}
+						onClose={(id) => post({ type: "detached_panel_close", id })}
+					/>
+				) : null}
+				{Object.entries(state.webRoots ?? {})
 						.filter(([, r]) => r.placement === "overlay" && r.tree)
 						.map(([id, r]) => (
 							<RemoteRoot

@@ -526,6 +526,31 @@ export interface SandboxPanelWs {
 	docker: { available: boolean; reason?: string };
 }
 
+/** frida-subagents #26: fila del panel /detached (serializable). */
+export interface DetachedRunWs {
+	id: string;
+	name: string;
+	agentType: string;
+	model?: string;
+	status: "running" | "completed" | "failed" | "killed" | "orphaned" | "lost";
+	startedAt: number;
+	endedAt?: number;
+	turnCount: number;
+	toolUses: number;
+	tokensIn: number;
+	tokensOut: number;
+	activity: string;
+	text: string;
+	promptPreview: string;
+	failureReason?: string;
+}
+
+export interface DetachedPanelWs {
+	id: string;
+	title: string;
+	runs: DetachedRunWs[];
+}
+
 export interface CcPanelWs {
 	id: string;
 	/** Interna: true = patch async (row_meta) — NO limpia pendientes. */
@@ -564,6 +589,7 @@ export interface State {
 	 *  null = cerrado. */
 	ccPanel?: CcPanelWs | null;
 	sbxPanel?: SandboxPanelWs | null;
+	dtPanel?: DetachedPanelWs | null;
 	/** Árbol Remote React actual (null = sin UI remota activa). */
 	/** Roots Remote React activos, keyados por rootId, cada uno con su zona
 	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
@@ -618,6 +644,7 @@ export interface State {
 export type InMessage =
 	| { type: "ccplugins_panel"; panel: CcPanelWs | null }
 	| { type: "sandbox_panel"; panel: SandboxPanelWs | null }
+	| { type: "detached_panel"; panel: DetachedPanelWs | null }
 	| {
 			/** Patch async: "Last updated" de una fila (git log). */
 			type: "ccplugins_row_meta";
@@ -789,6 +816,13 @@ export type OutMessage =
 	| { type: "sandbox_panel_merge"; id: string; name: string; files: string[] }
 	| { type: "sandbox_panel_terminal"; id: string; name: string }
 	| { type: "sandbox_panel_close"; id: string }
+	| {
+			type: "detached_panel_action";
+			id: string;
+			action: "refresh" | "stop";
+			runId?: string;
+		  }
+	| { type: "detached_panel_close"; id: string }
 	| { type: "ccplugins_row_meta"; id: string; ref: string }
 	| {
 			type: "submit";
