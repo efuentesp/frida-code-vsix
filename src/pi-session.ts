@@ -58,6 +58,10 @@ import {
 	KNOWLEDGE_BASE_FACTORY_NAME,
 } from "./tools/frida-knowledge-base";
 import {
+	createFridaCcPlugins,
+	CC_PLUGINS_FACTORY_NAME,
+} from "./tools/frida-cc-plugins";
+import {
 	ensureGitignore,
 	syncOpenAiKeyToAuthJson,
 } from "./tools/frida-codebase-index/host-setup";
@@ -213,6 +217,11 @@ export interface CreateFridaSessionOptions {
 	knowledgeBaseEnabled?: () => boolean;
 	onKnowledgeBaseState?: (
 		s: import("./tools/frida-knowledge-base").KnowledgeBaseState,
+	) => void;
+	/** ¿Está activo frida-cc-plugins? (frida.ccPlugins.enabled, default true). */
+	ccPluginsEnabled?: () => boolean;
+	onCcPluginsState?: (
+		s: import("./tools/frida-cc-plugins").CcPluginsState,
 	) => void;
 	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
 	onHermesMemoryState?: (
@@ -582,6 +591,25 @@ export async function createFridaSession(
 								distDir: __dirname,
 								cwd: opts.cwd,
 								onStateChange: opts.onKnowledgeBaseState,
+							})(pi)
+						: undefined,
+			},
+			// frida-cc-plugins (ADR-0057): porte nativo para plugins de Claude Code.
+			// Expone skills/prompts convertidos de plugins instalados vía
+			// resources_discover (root aislado <agentDir>/cc-plugins — cero
+			// contaminación de dirs del usuario) y el comando /ccplugin con el
+			// ciclo de vida completo (marketplace add/list/remove/update,
+			// add/remove/list/enable/disable, bootstrap). La extensión nunca
+			// instala sola: todo install es /ccplugin add explícito (D8). MCP con
+			// nombres originales + colisión = fallo (D5). Main only.
+			{
+				name: CC_PLUGINS_FACTORY_NAME,
+				factory: (pi: any) =>
+					(opts.ccPluginsEnabled?.() ?? true)
+						? createFridaCcPlugins({
+								agentDir: opts.agentDir,
+								cwd: opts.cwd,
+								onStateChange: opts.onCcPluginsState,
 							})(pi)
 						: undefined,
 			},

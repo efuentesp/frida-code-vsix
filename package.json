@@ -269,6 +269,11 @@
           "default": true,
           "markdownDescription": "Habilita **frida-knowledge-base**: base de conocimiento OKF v0.2 del proyecto, Obsidian-compatible (wrapper de `@zosmaai/pi-llm-wiki`, instalado on-demand en `~/.frida/npm`; vault en `<proyecto>/.llm-wiki/`). Añade las tools `wiki_*` + `kb_search`/`kb_neighbors`, los comandos `/wiki-*` y la skill `llm-wiki`. La capa de grafo/backlinks para el humano la provee Foam (dependencia del VSIX)."
         },
+        "frida.ccPlugins.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-cc-plugins**: instalación de plugins de Claude Code desde sus marketplaces (`/ccplugin marketplace add owner/repo`, `/ccplugin add <plugin>@<marketplace>`). Skills y commands se convierten a recursos nativos (namespaced `<plugin>-<nombre>`); los servers MCP se registran en `~/.frida/mcp.json` con su nombre original. La extensión nunca instala nada por sí sola: todo install requiere `/ccplugin add` explícito."
+        },
         "frida.codebaseIndex.keepOtherPlatforms": {
           "type": "boolean",
           "default": false,

@@ -227,6 +227,19 @@ export function isKnowledgeBaseEnabled(): boolean {
 		.get<boolean>("knowledgeBase.enabled", true);
 }
 
+// === Claude Code plugins (frida-cc-plugins, ADR-0057 / issue #49) ===
+
+/**
+ * ¿Está activo frida-cc-plugins? Default: true — la extensión nunca instala
+ * nada sola (todo install requiere /ccplugin add explícito); el gate sólo
+ * apaga la superficie (comando + resources_discover) si el usuario lo pide.
+ */
+export function isCcPluginsEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("ccPlugins.enabled", true);
+}
+
 /** Snapshot de la config del índice de código. */
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);

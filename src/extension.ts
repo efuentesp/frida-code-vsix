@@ -125,6 +125,7 @@ import {
 	isContextEnabled,
 	isHermesMemoryEnabled,
 	isKnowledgeBaseEnabled,
+	isCcPluginsEnabled,
 	isTelemetryOptIn,
 	isTodoEnabled,
 	readCodebaseIndexConfig,
@@ -554,6 +555,18 @@ export async function activate(
 		}
 	}
 
+	// frida-cc-plugins (#49): estado leve — los errores de /ccplugin ya se
+	// notifican por la UI de la sesión; aquí solo se registra disponibilidad.
+	function handleCcPluginsState(
+		s: import("./tools/frida-cc-plugins").CcPluginsState,
+	): void {
+		if (s.error) {
+			void vscode.window.showWarningMessage(
+				`frida-cc-plugins: ${s.error}`,
+			);
+		}
+	}
+
 	/** Resume el resultado de un tool upstream (content[0].text, primeras líneas). */
 	function ciSummarize(res: any): string {
 		const t = res?.content?.[0]?.text;
@@ -896,6 +909,8 @@ export async function activate(
 					onHermesMemoryState: handleHermesMemoryState,
 					knowledgeBaseEnabled: isKnowledgeBaseEnabled,
 					onKnowledgeBaseState: handleKnowledgeBaseState,
+					ccPluginsEnabled: isCcPluginsEnabled,
+					onCcPluginsState: handleCcPluginsState,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -3829,6 +3844,8 @@ export async function activate(
 				onHermesMemoryState: handleHermesMemoryState,
 				knowledgeBaseEnabled: isKnowledgeBaseEnabled,
 				onKnowledgeBaseState: handleKnowledgeBaseState,
+				ccPluginsEnabled: isCcPluginsEnabled,
+				onCcPluginsState: handleCcPluginsState,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();
