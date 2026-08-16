@@ -12,10 +12,6 @@
   "categories": [
     "Other"
   ],
-  "extensionDependencies": [
-    "foam.foam",
-    "bierner.markdown-mermaid"
-  ],
   "main": "./dist/extension.js",
   "icon": "media/frida-logo.png",
   "repository": {

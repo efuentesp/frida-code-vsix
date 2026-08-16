@@ -36,6 +36,14 @@ comandos `/wiki-init`, `/wiki-ingest` (markdown/texto/PDF/URL), `/wiki-query`.
 
 **D3 — La CAPA HUMANA la provee Foam, no el webview de Frida.** Frida declara **Foam
 (`foam.foam`) + `bierner.markdown-mermaid` como `extensionDependencies`** en su `package.json`.
+
+> **Enmienda (2026-08-16, post-implementación #29):** `extensionDependencies` resultó un
+> **bloqueo duro de activación** — VS Code rechaza activar frida si la dependencia no está
+> instalada, y en VSIX/Dev Host no se auto-instalan ("Cannot activate... depends on an
+> unknown 'foam.foam' extension"). Se cambia a **dependencia blanda**: frida activa
+> siempre; al arranque se detecta la ausencia de Foam/mermaid (`vscode.extensions.
+> getExtension`) y se avisa con acción "Instalar Foam" (`extension.open`). Sin ellas la
+> capa agente del KB funciona igual; la vista de grafo es opcional por diseño.
 Grafo *force-directed*, backlinks, autocompletado/diagnóstico de wikilinks, sync al renombrar,
 plantillas, tags y orphans → **todo Foam**. Mermaid → `bierner.markdown-mermaid` en el preview
 nativo. **#29 NO construye ninguna de esas UIs.**

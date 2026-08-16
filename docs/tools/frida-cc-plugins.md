@@ -76,6 +76,15 @@ nada sola** — todo install requiere `/ccplugin add` explícito (gate D8:
 | `{source:"archive", url, sha256}` | ✅ zip https ≤256 MiB + digest verificado + unzip propio (zlib, cero deps nuevas) |
 | Marketplace local (path del FS) | ✅ Vía `marketplace add <path>` |
 
+## Arranque no bloqueante
+
+Bootstrap auto del marketplace oficial, settings de equipo (`extraMarketplaces`/
+`enabledPlugins`) y auto-update corren **en background** tras abrir la sesión (singleton):
+la sesión abre al instante con lo ya instalado y los avisos llegan como notificaciones
+("ejecuta /reload" al terminar) — paridad con Claude Code, que instala async y pide
+`/reload-plugins`. Los spawns de git/npm llevan `GIT_TERMINAL_PROMPT=0` (sin prompts que
+cuelguen el extension host) y timeout de 120s.
+
 ## Git
 
 Marketplaces remotos usan `git clone --depth 1 --filter=blob:none` (spawn; git está

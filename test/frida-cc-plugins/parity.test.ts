@@ -231,32 +231,47 @@ describe("frida-cc-plugins / paridad / list --available + info", () => {
 });
 
 describe("frida-cc-plugins / paridad / bootstrap auto + refresh-lookup", () => {
-	it("primer arranque con registro vacío agrega el oficial (una sola vez)", async () => {
+	it("primer arranque con registro vacío agrega el oficial (background, una sola vez)", async () => {
 		const fake = fakeGit();
 		const pi = fakePi();
+		const states: { notice?: string }[] = [];
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
 			deps: fake.deps,
+			onStateChange: (s) => states.push(s),
 		})(asApi(pi));
-		const ctx = fakeCtx(workDir);
-		await (pi.events.get("resources_discover") ?? [])[0]?.({ cwd: workDir }, ctx);
+		// El discover NO awaita el bootstrap (la sesión abre al instante);
+		// el setup corre en background → poll hasta que registre.
+		await (pi.events.get("resources_discover") ?? [])[0]?.(
+			{ cwd: workDir },
+			fakeCtx(workDir),
+		);
+		const deadline = Date.now() + 3_000;
+		while (
+			Date.now() < deadline &&
+			!loadRegistry(agentDir).marketplaces["fixture-market"]
+		) {
+			await new Promise((r) => setTimeout(r, 25));
+		}
 		const reg = loadRegistry(agentDir);
 		expect(reg.marketplaces["fixture-market"]).toBeTruthy();
 		expect(reg.bootstrapped).toBe(true);
+		// El aviso viaja por onStateChange.notice (el host lo muestra).
 		expect(
-			ctx.notifications.some(([m]) => /agregado automáticamente/.test(m)),
+			states.some((s) => /agregado automáticamente/.test(s.notice ?? "")),
 		).toBe(true);
 		// El clone fue contra el oficial.
 		const clone = fake.calls.find((c) => c[0] === "clone");
 		expect(clone?.some((a) => a.includes(OFFICIAL_MARKETPLACE))).toBe(true);
 
-		// Segundo discover: ya NO re-bootstrap (no más clones).
+		// Segundo discover: ya NO re-bootstrap (singleton, no más clones).
 		const clonesAntes = fake.calls.filter((c) => c[0] === "clone").length;
 		await (pi.events.get("resources_discover") ?? [])[0]?.(
 			{ cwd: workDir },
 			fakeCtx(workDir),
 		);
+		await new Promise((r) => setTimeout(r, 100));
 		expect(fake.calls.filter((c) => c[0] === "clone").length).toBe(clonesAntes);
 	});
 

@@ -87,13 +87,25 @@ async function defaultRun(
 		const child = spawn(bin, args, {
 			cwd: opts.cwd,
 			shell: process.platform === "win32",
+			// Anti-hang: git no debe pedir credenciales interactivamente
+			// desde el extension host (sin TTY se colgaría la sesión).
+			env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "echo" },
 		});
 		let stderr = "";
 		child.stderr?.on("data", (d) => {
 			stderr += String(d);
 		});
 		child.on("error", reject);
-		child.on("close", (code) => resolve({ code, stderr }));
+		// Timeout: un spawn colgado (proxy mudo) muere a los 120s — jamás
+		// bloquea la sesión indefinidamente.
+		const killer = setTimeout(() => {
+			stderr += "\n[timeout 120s]";
+			child.kill();
+		}, 120_000);
+		child.on("close", (code) => {
+			clearTimeout(killer);
+			resolve({ code, stderr });
+		});
 	});
 }
 

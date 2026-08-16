@@ -33,20 +33,35 @@ async function spawnLocal(
 ): Promise<{ code: number | null; stderr: string }> {
 	const { spawn } = await import("node:child_process");
 	return new Promise((resolve, reject) => {
-		const child = spawn(bin, args, { cwd, shell: process.platform === "win32" });
+		const child = spawn(bin, args, {
+			cwd,
+			shell: process.platform === "win32",
+			env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "echo" },
+		});
 		let stderr = "";
 		child.stderr?.on("data", (d) => {
 			stderr += String(d);
 		});
 		child.on("error", reject);
 		child.on("close", (code) => resolve({ code, stderr }));
+		const killer = setTimeout(() => {
+			stderr += "\n[timeout 120s]";
+			child.kill();
+		}, 120_000);
+		child.on("close", () => clearTimeout(killer));
 	});
 }
 
 /** Deps inyectables (git/npm spawn + https fetch) para tests. */
 export interface FetchDeps {
-	gitRun?: (args: string[], cwd: string) => Promise<{ code: number | null; stderr: string }>;
-	npmRun?: (args: string[], cwd: string) => Promise<{ code: number | null; stderr: string }>;
+	gitRun?: (
+		args: string[],
+		cwd: string,
+	) => Promise<{ code: number | null; stderr: string }>;
+	npmRun?: (
+		args: string[],
+		cwd: string,
+	) => Promise<{ code: number | null; stderr: string }>;
 	/** Impl real: GET https → Buffer (respeta https-only + límite). */
 	fetchArchive?: (url: string) => Promise<Buffer>;
 }
@@ -65,7 +80,8 @@ async function runGit(
 	args: string[],
 	cwd: string,
 ): Promise<void> {
-	const run = deps?.gitRun ?? ((a: string[], c: string) => spawnLocal("git", a, c));
+	const run =
+		deps?.gitRun ?? ((a: string[], c: string) => spawnLocal("git", a, c));
 	const res = await run(args, cwd);
 	if (res.code !== 0) {
 		throw new Error(
@@ -79,7 +95,8 @@ async function headSha(
 	deps: FetchDeps | undefined,
 	dir: string,
 ): Promise<string> {
-	const run = deps?.gitRun ?? ((a: string[], c: string) => spawnLocal("git", a, c));
+	const run =
+		deps?.gitRun ?? ((a: string[], c: string) => spawnLocal("git", a, c));
 	// rev-parse por process spawn no da stdout en el deps tipo estándar;
 	// usamos git rev-parse vía archivo: se escribe en .git/HEAD → refs.
 	// Simplificación robusta: leer .git/HEAD y resolver la ref manualmente.
@@ -115,7 +132,8 @@ export function unzipSync(zip: Buffer, destDir: string): void {
 			break;
 		}
 	}
-	if (eocd < 0) throw new Error("zip: EOCD no encontrado (¿archivo zip válido?)");
+	if (eocd < 0)
+		throw new Error("zip: EOCD no encontrado (¿archivo zip válido?)");
 	const entries = zip.readUInt16LE(eocd + 10);
 	let ptr = zip.readUInt32LE(eocd + 16); // offset del central directory
 
@@ -135,9 +153,7 @@ export function unzipSync(zip: Buffer, destDir: string): void {
 
 		if (name.endsWith("/")) continue; // directorio
 		// zip-slip: nombres absolutos o con .. → rechazar.
-		const safe = path
-			.normalize(name)
-			.replace(/^([/\\])+/, "");
+		const safe = path.normalize(name).replace(/^([/\\])+/, "");
 		if (safe.startsWith("..") || path.isAbsolute(name)) {
 			throw new Error(`zip: entrada insegura '${name}' (zip-slip)`);
 		}
@@ -158,7 +174,9 @@ export function unzipSync(zip: Buffer, destDir: string): void {
 		} else if (method === 8) {
 			fs.writeFileSync(outPath, zlib.inflateRawSync(comp));
 		} else {
-			throw new Error(`zip: método de compresión ${method} no soportado ('${name}')`);
+			throw new Error(
+				`zip: método de compresión ${method} no soportado ('${name}')`,
+			);
 		}
 	}
 }
@@ -176,7 +194,12 @@ async function defaultFetchArchive(url: string): Promise<Buffer> {
 			if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
 				// Seguir redirects SOLO https.
 				const loc = res.headers.location;
-				if (loc && res.statusCode >= 300 && res.statusCode < 400 && /^https:\/\//.test(new URL(loc, url).href)) {
+				if (
+					loc &&
+					res.statusCode >= 300 &&
+					res.statusCode < 400 &&
+					/^https:\/\//.test(new URL(loc, url).href)
+				) {
 					defaultFetchArchive(new URL(loc, url).href).then(resolve, reject);
 					return;
 				}
@@ -246,14 +269,14 @@ export async function materializeGit(
 	}
 	const full = await headSha(deps, stagingDir);
 	if (opts.sha && full !== opts.sha.toLowerCase()) {
-		throw new Error(
-			`sha no coincide: esperado ${opts.sha}, resuelto ${full}`,
-		);
+		throw new Error(`sha no coincide: esperado ${opts.sha}, resuelto ${full}`);
 	}
 	const rev = (opts.sha ?? full).slice(0, 12);
 	const dir = opts.subdir ? path.join(stagingDir, opts.subdir) : stagingDir;
 	if (!fs.existsSync(dir)) {
-		throw new Error(`subdirectorio del plugin inexistente en el repo: ${opts.subdir}`);
+		throw new Error(
+			`subdirectorio del plugin inexistente en el repo: ${opts.subdir}`,
+		);
 	}
 	return { dir, rev };
 }
@@ -265,7 +288,8 @@ export async function materializeNpm(
 	opts: { version?: string; registry?: string },
 	deps?: FetchDeps,
 ): Promise<{ dir: string; rev: string }> {
-	const run = deps?.npmRun ?? ((a: string[], c: string) => spawnLocal("npm", a, c));
+	const run =
+		deps?.npmRun ?? ((a: string[], c: string) => spawnLocal("npm", a, c));
 	fs.mkdirSync(stagingDir, { recursive: true });
 	const spec = opts.version ? `${pkg}@${opts.version}` : pkg;
 	const res = await run(
@@ -290,8 +314,11 @@ export async function materializeNpm(
 	}
 	const version = (() => {
 		try {
-			return (JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf-8")) as { version?: string })
-				.version;
+			return (
+				JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf-8")) as {
+					version?: string;
+				}
+			).version;
 		} catch {
 			return undefined;
 		}
@@ -333,29 +360,56 @@ export async function materializeSource(
 ): Promise<MaterializedSource> {
 	switch (source.kind) {
 		case "github":
-			return materializeGit(agentDirStaging, `https://github.com/${source.repo}.git`, {
-				ref: source.ref,
-				sha: source.sha,
-			}, deps);
+			return materializeGit(
+				agentDirStaging,
+				`https://github.com/${source.repo}.git`,
+				{
+					ref: source.ref,
+					sha: source.sha,
+				},
+				deps,
+			);
 		case "url":
-			return materializeGit(agentDirStaging, source.url, {
-				ref: source.ref,
-				sha: source.sha,
-			}, deps);
+			return materializeGit(
+				agentDirStaging,
+				source.url,
+				{
+					ref: source.ref,
+					sha: source.sha,
+				},
+				deps,
+			);
 		case "git-subdir":
-			return materializeGit(agentDirStaging, source.url, {
-				ref: source.ref,
-				sha: source.sha,
-				subdir: source.path,
-			}, deps);
+			return materializeGit(
+				agentDirStaging,
+				source.url,
+				{
+					ref: source.ref,
+					sha: source.sha,
+					subdir: source.path,
+				},
+				deps,
+			);
 		case "npm":
-			return materializeNpm(agentDirStaging, source.package, {
-				version: source.version,
-				registry: source.registry,
-			}, deps);
+			return materializeNpm(
+				agentDirStaging,
+				source.package,
+				{
+					version: source.version,
+					registry: source.registry,
+				},
+				deps,
+			);
 		case "archive":
-			return materializeArchive(agentDirStaging, source.url, { sha256: source.sha256 }, deps);
+			return materializeArchive(
+				agentDirStaging,
+				source.url,
+				{ sha256: source.sha256 },
+				deps,
+			);
 		default:
-			throw new Error(`source no materializable: ${(source as { kind: string }).kind}`);
+			throw new Error(
+				`source no materializable: ${(source as { kind: string }).kind}`,
+			);
 	}
 }

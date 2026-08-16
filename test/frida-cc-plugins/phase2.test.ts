@@ -198,13 +198,21 @@ function fakeFetchDeps() {
 }
 
 function fakePi() {
-	const events = new Map<string, ((e: unknown, ctx: unknown) => Promise<unknown>)[]>();
-	const commands = new Map<string, { handler: (a: string, c: unknown) => Promise<void> }>();
+	const events = new Map<
+		string,
+		((e: unknown, ctx: unknown) => Promise<unknown>)[]
+	>();
+	const commands = new Map<
+		string,
+		{ handler: (a: string, c: unknown) => Promise<void> }
+	>();
 	return {
 		events,
 		commands,
-		registerCommand: (n: string, o: { handler: (a: string, c: unknown) => Promise<void> }) =>
-			commands.set(n, o),
+		registerCommand: (
+			n: string,
+			o: { handler: (a: string, c: unknown) => Promise<void> },
+		) => commands.set(n, o),
 		on: (ev: string, h: (e: unknown, c: unknown) => Promise<unknown>) => {
 			const l = events.get(ev) ?? [];
 			l.push(h);
@@ -256,7 +264,10 @@ describe("#50 / fetch remoto: github con sha", () => {
 			],
 		});
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
 		const fetch = fakeFetchDeps();
 		const res = await installPlugin(agentDir, "remoto-plugin@m", {
 			cwd: workDir,
@@ -268,7 +279,9 @@ describe("#50 / fetch remoto: github con sha", () => {
 		const rec = loadRegistry(agentDir).plugins["remoto-plugin"];
 		expect(rec?.rev.startsWith("fedcba987654")).toBe(true);
 		// El clone fue contra github del PLUGIN.
-		expect(fetch.gitCalls[0]?.some((a) => a.includes("owner/remoto-plugin"))).toBe(true);
+		expect(
+			fetch.gitCalls[0]?.some((a) => a.includes("owner/remoto-plugin")),
+		).toBe(true);
 	});
 
 	it("sha pin que no coincide → error de integridad", async () => {
@@ -287,7 +300,10 @@ describe("#50 / fetch remoto: github con sha", () => {
 			],
 		});
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
 		await expect(
 			installPlugin(agentDir, "remoto-plugin@m", {
 				cwd: workDir,
@@ -314,7 +330,10 @@ describe("#50 / npm source", () => {
 			],
 		});
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
 		const fetch = fakeFetchDeps();
 		const res = await installPlugin(agentDir, "pkg-plugin@m", {
 			cwd: workDir,
@@ -326,7 +345,9 @@ describe("#50 / npm source", () => {
 		const npmCall = fetch.npmCalls[0];
 		expect(npmCall?.[1]).toBe("@acme/pkg-plugin@2.1.0");
 		expect(npmCall?.includes("--registry")).toBe(true);
-		expect(npmCall?.[npmCall.indexOf("--registry") + 1]).toBe("https://npm.example.com");
+		expect(npmCall?.[npmCall.indexOf("--registry") + 1]).toBe(
+			"https://npm.example.com",
+		);
 	});
 });
 
@@ -357,7 +378,10 @@ describe("#50 / archive source + unzip propio", () => {
 			],
 		});
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
 		const res = await installPlugin(agentDir, "zip-plugin@m", {
 			cwd: workDir,
 			deps: {
@@ -371,7 +395,9 @@ describe("#50 / archive source + unzip propio", () => {
 		expect(res.skills).toEqual(["zip-plugin-zip-plugin"]);
 		expect(res.commands).toEqual(["zip-plugin-zip"]);
 		// rev derivada del digest.
-		expect(loadRegistry(agentDir).plugins["zip-plugin"]?.rev.startsWith("zip-")).toBe(true);
+		expect(
+			loadRegistry(agentDir).plugins["zip-plugin"]?.rev.startsWith("zip-"),
+		).toBe(true);
 	});
 
 	it("sha256 incorrecto → rechaza y no registra", async () => {
@@ -395,7 +421,10 @@ describe("#50 / archive source + unzip propio", () => {
 			],
 		});
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
 		await expect(
 			installPlugin(agentDir, "zip-plugin@m", {
 				cwd: workDir,
@@ -406,9 +435,7 @@ describe("#50 / archive source + unzip propio", () => {
 	});
 
 	it("unzipSync rechaza zip-slip", () => {
-		const zip = makeZip([
-			{ name: "../evil.txt", data: Buffer.from("x") },
-		]);
+		const zip = makeZip([{ name: "../evil.txt", data: Buffer.from("x") }]);
 		const out = path.join(workDir, "unzip-out");
 		expect(() => unzipSync(zip, out)).toThrow(/insegura|zip-slip/);
 	});
@@ -427,7 +454,9 @@ describe("#50 / scopes", () => {
 	it("install --scope project escribe el registro del workspace", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		await installPlugin(agentDir, "p1@m", { cwd: workDir, scope: "project" });
-		const proj = JSON.parse(fs.readFileSync(projectRegistryPath(workDir), "utf-8"));
+		const proj = JSON.parse(
+			fs.readFileSync(projectRegistryPath(workDir), "utf-8"),
+		);
 		expect(proj.plugins["p1"]).toBeTruthy();
 		expect(loadRegistry(agentDir).plugins["p1"]).toBeUndefined();
 		// El merge lo ve con scope project.
@@ -449,8 +478,9 @@ describe("#50 / scopes", () => {
 		// disable en su scope.
 		setPluginEnabled(agentDir, "p1", false, { cwd: workDir });
 		expect(
-			mergeLayers(loadLayers(agentDir, workDir)).plugins.find((p) => p.name === "p1")
-				?.rec.enabled,
+			mergeLayers(loadLayers(agentDir, workDir)).plugins.find(
+				(p) => p.name === "p1",
+			)?.rec.enabled,
 		).toBe(false);
 	});
 });
@@ -465,18 +495,32 @@ describe("#50 / team settings + auto-update", () => {
 		writePluginAt(path.join(mktDir, "plugins", "p1"), "p1");
 
 		const pi = fakePi();
+		const states: { notice?: string }[] = [];
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
 			extraMarketplaces: [mktDir],
 			enabledPlugins: { "p1@m": true },
+			onStateChange: (s) => states.push(s),
 		})(asApi(pi));
-		const ctx = fakeCtx(workDir);
-		await (pi.events.get("resources_discover") ?? [])[0]?.({ cwd: workDir }, ctx);
+		await (pi.events.get("resources_discover") ?? [])[0]?.(
+			{ cwd: workDir },
+			fakeCtx(workDir),
+		);
+		// Instalación de equipo en background → poll.
+		const deadline = Date.now() + 3_000;
+		while (
+			Date.now() < deadline &&
+			!mergeLayers(loadLayers(agentDir, workDir)).plugins.some(
+				(p) => p.name === "p1",
+			)
+		) {
+			await new Promise((r) => setTimeout(r, 25));
+		}
 		const merged = mergeLayers(loadLayers(agentDir, workDir));
 		expect(Object.keys(merged.marketplaces)).toContain("m");
 		expect(merged.plugins.find((p) => p.name === "p1")).toBeTruthy();
-		expect(ctx.notifications.some(([m]) => /del equipo/.test(m))).toBe(true);
+		expect(states.some((s) => /del equipo/.test(s.notice ?? ""))).toBe(true);
 	});
 
 	it("auto-update: rev nueva → re-install + notifica /reload", async () => {
@@ -488,8 +532,14 @@ describe("#50 / team settings + auto-update", () => {
 		writePluginAt(path.join(mktDir, "plugins", "p1"), "p1");
 
 		const mkt = fakeMktGit();
-		await addMarketplace(agentDir, "owner/market", { cwd: workDir, deps: mkt.deps });
-		await installPlugin(agentDir, "p1@m", { cwd: workDir, deps: { fetch: fakeFetchDeps().deps } });
+		await addMarketplace(agentDir, "owner/market", {
+			cwd: workDir,
+			deps: mkt.deps,
+		});
+		await installPlugin(agentDir, "p1@m", {
+			cwd: workDir,
+			deps: { fetch: fakeFetchDeps().deps },
+		});
 		setMarketplaceAutoUpdate(agentDir, "m", true);
 		const revAntes = loadRegistry(agentDir).marketplaces["m"]?.rev;
 
@@ -511,19 +561,31 @@ describe("#50 / team settings + auto-update", () => {
 		};
 		bump = true;
 		const pi = fakePi();
+		const states: { notice?: string }[] = [];
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
 			autoUpdateDelayMs: 0,
 			deps: mkt.deps,
+			onStateChange: (s) => states.push(s),
 		})(asApi(pi));
-		const ctx = fakeCtx(workDir);
-		await (pi.events.get("resources_discover") ?? [])[0]?.({ cwd: workDir }, ctx);
-		// Esperar el tick async (delay 0 + microtasks).
-		await new Promise((r) => setTimeout(r, 300));
-		// Comportamiento verificado: notificación + rev nueva + plugin re-instalado.
+		await (pi.events.get("resources_discover") ?? [])[0]?.(
+			{ cwd: workDir },
+			fakeCtx(workDir),
+		);
+		// El tick corre en background (delay 0) → poll del aviso vía notice.
+		const deadline = Date.now() + 3_000;
+		while (
+			Date.now() < deadline &&
+			!states.some((s) => /actualizado/.test(s.notice ?? ""))
+		) {
+			await new Promise((r) => setTimeout(r, 25));
+		}
+		// Comportamiento verificado: aviso + rev nueva + plugin re-instalado.
 		expect(
-			ctx.notifications.some(([m]) => /actualizado/.test(m) && /re-instalados/.test(m)),
+			states.some(
+				(s) => /actualizado/.test(s.notice ?? "") && /re-instalados/.test(s.notice ?? ""),
+			),
 		).toBe(true);
 		const revDespues = loadRegistry(agentDir).marketplaces["m"]?.rev;
 		expect(revDespues).toBeTruthy();

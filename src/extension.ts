@@ -565,6 +565,36 @@ export async function activate(
 		if (s.error) {
 			void vscode.window.showWarningMessage(`frida-cc-plugins: ${s.error}`);
 		}
+		// Avisos del setup background (bootstrap auto/equipo/auto-update).
+		if (s.notice) {
+			void vscode.window.showInformationMessage(s.notice);
+		}
+	}
+
+	// Dependencia blanda de la vista humana del KB (ADR-0040 D3, revisado):
+	// VS Code NO auto-instala extensionDependencies en VSIX/Dev Host y
+	// RECHAZA activar frida si falta una — bloqueo duro de activación.
+	// Con dependencia blanda frida activa siempre; sin Foam la capa agente
+	// del KB funciona igual y avisamos cómo instalar la vista de grafo.
+	function checkKnowledgeBaseViewDeps(): void {
+		const faltan: string[] = [];
+		if (!vscode.extensions.getExtension("foam.foam")) {
+			faltan.push("Foam (foam.foam) — grafo/backlinks del vault");
+		}
+		if (!vscode.extensions.getExtension("bierner.markdown-mermaid")) {
+			faltan.push("bierner.markdown-mermaid — render de diagramas");
+		}
+		if (faltan.length === 0) return;
+		void vscode.window
+			.showInformationMessage(
+				`frida-knowledge-base: falta${faltan.length > 1 ? "n" : ""} la vista humana: ${faltan.join(" · ")}. La KB del agente funciona igual; instálal${faltan.length > 1 ? "as" : "a"} para ver el grafo.`,
+				"Instalar Foam",
+			)
+			.then((choice) => {
+				if (choice === "Instalar Foam") {
+					void vscode.commands.executeCommand("extension.open", "foam.foam");
+				}
+			});
 	}
 
 	/** Resume el resultado de un tool upstream (content[0].text, primeras líneas). */
@@ -919,6 +949,7 @@ export async function activate(
 					},
 				});
 				frida = s;
+				checkKnowledgeBaseViewDeps();
 				wireSession(s.session);
 				// Monta el widget de agentes en el footer (idempotente) y publica el conteo
 				// de subagentes en background al webview. Así el indicador de procesamiento

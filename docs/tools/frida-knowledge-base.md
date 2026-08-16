@@ -12,7 +12,7 @@ agente. Wrapper del paquete upstream
 | Capa | Quién | Qué |
 | --- | --- | --- |
 | **Agente** | `frida-knowledge-base` (este módulo) | 11 tools `wiki_*`, recall layering, guardrails, `/wiki-*`, `kb_search`/`kb_neighbors`, skill `llm-wiki`, MCP |
-| **Humana** | **Foam** (`foam.foam`) + `bierner.markdown-mermaid` — `extensionDependencies` del VSIX | Grafo force-directed, backlinks, autocompletado de `[[wikilinks]]`, sync al renombrar, plantillas, tags, orphans. Mermaid en el preview nativo |
+| **Humana** | **Foam** (`foam.foam`) + `bierner.markdown-mermaid` — **dependencia blanda**: si faltan, frida avisa al arranque con acción "Instalar Foam"; sin ellas la capa agente funciona igual (ADR-0040 D3 enmendado) | Grafo force-directed, backlinks, autocompletado de `[[wikilinks]]`, sync al renombrar, plantillas, tags, orphans. Mermaid en el preview nativo |
 | **Compartida** | Vault markdown `<proyecto>/.llm-wiki/` | Ambos operan sobre los mismos archivos |
 
 ## Qué aporta la capa agente

@@ -83,8 +83,10 @@ export interface CreateCcPluginsOpts {
 /** Estado del wrapper para el host (notificaciones). */
 export interface CcPluginsState {
 	ready: boolean;
-	marketplaces: number;
-	plugins: number;
+	marketplaces?: number;
+	plugins?: number;
+	/** Aviso informativo del trabajo background (bootstrap/equipo/update). */
+	notice?: string;
 	error?: string;
 }
 
@@ -220,6 +222,94 @@ function formatList(agentDir: string, cwd: string): string {
 		);
 	}
 	return lines.join("\n");
+}
+
+/**
+ * Setup background (#49/#50): bootstrap auto del oficial, marketplaces/
+ * plugins del equipo y auto-update. Se dispara UNA vez por factory (singleton
+ * en el closure) desde resources_discover como fire-and-forget — NUNCA se
+ * awaita: la sesión abre al instante con lo instalado (paridad Claude Code,
+ * que carga plugins async y pide /reload-plugins al terminar). Los avisos
+ * viajan por onStateChange.notice (el host los muestra como info).
+ */
+async function backgroundSetup(
+	agentDir: string,
+	cwd: string,
+	opts: CreateCcPluginsOpts & {
+		onStateChange?: (s: CcPluginsState) => void;
+	},
+	onLog?: (line: string) => void,
+): Promise<void> {
+	const notifyBg = (m: string) => {
+		try {
+			opts.onStateChange?.({ ready: true, notice: m });
+		} catch {
+			/* best-effort */
+		}
+	};
+	let reg = loadRegistry(agentDir);
+	// Bootstrap auto (intento único flag bootstrapped).
+	if (!reg.bootstrapped) {
+		reg.bootstrapped = true;
+		if (Object.keys(reg.marketplaces).length === 0) {
+			try {
+				const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
+					cwd,
+					deps: opts.deps,
+					reg,
+				});
+				reg = loadRegistry(agentDir);
+				notifyBg(
+					`cc-plugins: marketplace oficial '${res.name}' agregado automáticamente (${res.plugins} plugins). /ccplugin list --available para explorar; /ccplugin marketplace remove ${res.name} si no lo quieres.`,
+				);
+			} catch (e: any) {
+				onLog?.(`[cc-plugins] bootstrap auto falló: ${e?.message ?? e}`);
+			}
+		} else {
+			saveRegistry(agentDir, reg);
+		}
+	}
+	// Team marketplaces (settings del equipo).
+	for (const ref of opts.extraMarketplaces ?? []) {
+		try {
+			const res = await addMarketplace(agentDir, ref, {
+				cwd,
+				deps: opts.deps,
+			});
+			notifyBg(
+				`cc-plugins: marketplace del equipo '${res.name}' agregado desde settings (${res.plugins} plugins).`,
+			);
+		} catch (e: any) {
+			onLog?.(`[cc-plugins] extraMarketplace '${ref}' falló: ${e?.message ?? e}`);
+		}
+	}
+	// enabledPlugins: instalar los que falten.
+	for (const [ref, on] of Object.entries(opts.enabledPlugins ?? {})) {
+		if (!on) continue;
+		const mergedNow = mergeLayers(loadLayers(agentDir, cwd));
+		const [pn] = ref.split("@");
+		if (mergedNow.plugins.some((p) => p.name === pn)) continue;
+		try {
+			const res = await installPlugin(agentDir, ref, {
+				cwd,
+				deps: opts.deps,
+			});
+			notifyBg(
+				`cc-plugins: '${res.plugin}' instalado automáticamente (enabledPlugins del equipo). Ejecuta /reload para activarlo.`,
+			);
+		} catch (e: any) {
+			onLog?.(`[cc-plugins] enabledPlugin '${ref}' falló: ${e?.message ?? e}`);
+		}
+	}
+	// Auto-update al final (con su delay propio).
+	await autoUpdateTick(
+		agentDir,
+		cwd,
+		(m) => notifyBg(m),
+		onLog,
+		opts.deps,
+		opts.autoUpdateDelayMs ?? 5_000,
+	);
 }
 
 /**
@@ -536,6 +626,9 @@ export function createFridaCcPlugins(
 	},
 ) {
 	const { agentDir, onLog, onStateChange } = opts;
+	// Singleton del setup background: un solo disparo por factory (los
+	// discovers repetidos no relanzan bootstrap/installs).
+	let bgStarted = false;
 	return async (pi: ExtensionAPI): Promise<void> => {
 		// Recursos declarativos: crear dirs base (idempotente).
 		fs.mkdirSync(resourcesSkillsDir(agentDir), { recursive: true });
@@ -551,78 +644,19 @@ export function createFridaCcPlugins(
 					/* UI no disponible (RPC) — el estado queda en el log */
 				}
 			};
-			let reg = loadRegistry(agentDir);
-			// Bootstrap auto (paridad Claude: el oficial se agrega en el primer
-			// arranque). Intento ÚNICO (bootstrapped), best-effort: offline no
-			// bloquea la carga — el usuario puede /ccplugin bootstrap manual.
-			if (!reg.bootstrapped) {
-				reg.bootstrapped = true;
-				if (Object.keys(reg.marketplaces).length === 0) {
-					try {
-						// reg (bootstrapped=true ya mutado) viaja al save interno:
-						// persiste marketplace + flag en una sola escritura.
-						const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
-							cwd,
-							deps: opts.deps,
-							reg,
-						});
-						reg = loadRegistry(agentDir); // re-leer tras el save
-						notify(
-							`cc-plugins: marketplace oficial '${res.name}' agregado automáticamente (${res.plugins} plugins). /ccplugin list --available para explorar; /ccplugin marketplace remove ${res.name} si no lo quieres.`,
-						);
-					} catch (e: any) {
-						onLog?.(
-							`[cc-plugins] bootstrap auto falló: ${e?.message ?? e}`,
-						);
-					}
-				} else {
-					saveRegistry(agentDir, reg); // solo marcar bootstrapped
-				}
-			}
-			// Team marketplaces (#50 F4): instalar refs de settings que falten.
-			for (const ref of opts.extraMarketplaces ?? []) {
-				try {
-					const res = await addMarketplace(agentDir, ref, {
-						cwd,
-						deps: opts.deps,
-					});
-					notify(
-						`cc-plugins: marketplace del equipo '${res.name}' agregado desde settings (${res.plugins} plugins).`,
-					);
-				} catch (e: any) {
-					onLog?.(`[cc-plugins] extraMarketplace '${ref}' falló: ${e?.message ?? e}`);
-				}
-			}
-			// enabledPlugins (#50 F4): instalar los que falten (merge de scopes).
-			for (const [ref, on] of Object.entries(opts.enabledPlugins ?? {})) {
-				if (!on) continue;
-				const mergedNow = mergeLayers(loadLayers(agentDir, cwd));
-				const [pn] = ref.split("@");
-				if (mergedNow.plugins.some((p) => p.name === pn)) continue;
-				try {
-					const res = await installPlugin(agentDir, ref, { cwd, deps: opts.deps });
-					notify(
-						`cc-plugins: '${res.plugin}' instalado automáticamente (enabledPlugins del equipo).`,
-					);
-				} catch (e: any) {
-					onLog?.(`[cc-plugins] enabledPlugin '${ref}' falló: ${e?.message ?? e}`);
-				}
+			const reg = loadRegistry(agentDir);
+			// Setup background (bootstrap auto + equipo + auto-update):
+			// fire-and-forget con singleton — NUNCA en el camino awaitado del
+			// discover (bug: git lento colgaba la carga de la sesión).
+			if (!bgStarted) {
+				bgStarted = true;
+				void backgroundSetup(agentDir, cwd, opts, onLog).catch((e: any) => {
+					onLog?.(`[cc-plugins] background setup falló: ${e?.message ?? e}`);
+				});
 			}
 
 			// Reconcile self-healing (best-effort, nunca bloquea la carga).
 			await reconcile(agentDir, reg, cwd, notify, onLog, opts.deps);
-
-			// Auto-update (#50 F5): background fire-and-forget — refresca los
-			// marketplaces con autoUpdate on; si cambió la rev, re-instala sus
-			// plugins y notifica /reload. Nunca bloquea la sesión.
-			void autoUpdateTick(
-				agentDir,
-				cwd,
-				notify,
-				onLog,
-				opts.deps,
-				opts.autoUpdateDelayMs ?? 5_000,
-			);
 
 			// Plugins habilitados del MERGE de scopes (precedencia por nombre).
 			const mergedView = mergeLayers(loadLayers(agentDir, cwd));
