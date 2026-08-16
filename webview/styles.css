@@ -252,6 +252,7 @@ body {
 }
 .info-toast-close:hover {
 	opacity: 1;
+	background: transparent;
 }
 /* Niveles: acento del contorno (borde izq.) + color del icono. */
 .info-toast.error {
@@ -413,6 +414,7 @@ body {
 .sub-version:hover {
 	color: var(--vscode-textLink-foreground, #4daafc);
 	border-color: var(--vscode-textLink-foreground, #4daafc);
+	background: transparent;
 }
 /* Estadísticas de sesión en el header (⏱ tiempo + ↑↓ tokens acumulados), tenue
    como .sub-version. Siempre visible; el Tooltip explica la métrica. */
@@ -625,6 +627,7 @@ body {
 .turn-copy:hover {
 	opacity: 1 !important;
 	color: var(--vscode-foreground);
+	background: none;
 }
 /* Variante thinking (Razonamiento): borde azul textLink en los 4 lados + fondo
    blockquote, conservando el look del antiguo <details class="thinking">. El
@@ -2439,6 +2442,7 @@ button.sec:hover {
 }
 .chip-x:hover {
 	color: var(--vscode-errorForeground, #f85149);
+	background: none;
 }
 .img-chips {
 	display: flex;
@@ -4539,6 +4543,16 @@ kbd {
 		rgba(127, 127, 127, 0.3)
 	);
 	cursor: pointer;
+	transition: filter 0.15s ease;
+}
+/* button:hover global (0,1,1) vencía a .switch (0,1,0) y volvía azul el
+   pill. Conserva su identidad neutral con brillo (patrón ccp-switch). */
+.switch:hover {
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(127, 127, 127, 0.3)
+	);
+	filter: brightness(1.25);
 	transition: background 0.15s ease;
 }
 .switch.on {
@@ -4732,6 +4746,7 @@ kbd {
 }
 .onb-link-btn:hover {
 	text-decoration: underline;
+	background: none;
 }
 .onb-hint {
 	font-size: 11px;
