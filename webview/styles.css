@@ -5471,6 +5471,19 @@ kbd {
 	padding: 7px 0;
 	user-select: none;
 }
+/* El expander y el título son <button>: button:hover global inyecta el hover
+   PRIMARIO (violeta) sobre TODO el renglón → texto ilegible. Mismo fix que
+   tabs (cfg-tab/q-tab/ccp-tab): especificidad 0,2,0 > button:hover 0,1,1,
+   con los colores de selección de lista. */
+.tool-acc-info:hover,
+.tool-acc-exp:hover {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+.tool-acc-info:hover .tool-acc-count {
+	border-color: var(--vscode-list-activeSelectionForeground);
+	opacity: 0.9;
+}
 .tool-acc-exp {
 	display: flex;
 	align-items: center;
