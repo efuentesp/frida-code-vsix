@@ -1992,6 +1992,17 @@ body {
 	outline: 2px solid var(--vscode-focusBorder);
 }
 .ccp-btn:hover {
+	/* button:hover global inyecta el hoverBackground PRIMARIO (azul) sobre
+	   un botón secundario → texto claro sobre azul brillante. Par correcto
+	   del tema: secondaryHover + secondaryForeground (elección #364d462). */
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		var(--vscode-button-secondaryBackground)
+	);
+	filter: brightness(1.1);
+}
+.ccp-btn-primary:hover {
+	background: var(--vscode-button-hoverBackground);
 	filter: brightness(1.1);
 }
 .ccp-empty {
