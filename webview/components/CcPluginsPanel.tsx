@@ -876,9 +876,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 											}`}
 											onClick={() => submitBtn(b.key, { ref: resRow.pluginRef })}
 										>
-											{b.primary && pending.has(resRow.pluginRef)
-												? `⟳ ${pending.get(resRow.pluginRef)}`
-												: b.label}
+											{b.primary && pending.has(resRow.pluginRef) ? (
+												<>
+													<span className="ccp-spin">⟳</span>{" "}
+													{pending.get(resRow.pluginRef)}
+												</>
+											) : (
+												b.label
+											)}
 										</button>
 									))}
 									<button
@@ -988,9 +993,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										}`}
 										onClick={() => submitBtn(b.key, viewRow)}
 									>
-										{b.primary && pending.has(viewRow.ref)
-											? `⟳ ${pending.get(viewRow.ref)}`
-											: b.label}
+										{b.primary && pending.has(viewRow.ref) ? (
+											<>
+												<span className="ccp-spin">⟳</span>{" "}
+												{pending.get(viewRow.ref)}
+											</>
+										) : (
+											b.label
+										)}
 									</button>
 								))}
 								<button
@@ -1160,9 +1170,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										}`}
 										onClick={() => submitBtn(b.key)}
 									>
-										{b.primary && row && pending.has(row.ref)
-											? `⟳ ${pending.get(row.ref)}`
-											: b.label}
+										{b.primary && row && pending.has(row.ref) ? (
+											<>
+												<span className="ccp-spin">⟳</span>{" "}
+												{pending.get(row.ref)}
+											</>
+										) : (
+											b.label
+										)}
 									</button>
 								))}
 							</div>
@@ -1237,7 +1252,13 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 									setAddOpen(false);
 								}}
 							>
-								{pendingMkt === "add" ? "⟳ Agregando…" : "Agregar"}
+								{pendingMkt === "add" ? (
+									<>
+										<span className="ccp-spin">⟳</span> Agregando…
+									</>
+								) : (
+									"Agregar"
+								)}
 							</button>
 							<button
 								type="button"

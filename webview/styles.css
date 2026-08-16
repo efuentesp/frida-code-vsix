@@ -1539,6 +1539,18 @@ body {
 	color: var(--vscode-charts-yellow, #e2b93d);
 	animation: ccp-pulse 1.1s ease-in-out infinite;
 }
+.ccp-spin {
+	display: inline-block;
+	animation: ccp-rotate 0.9s linear infinite;
+}
+@keyframes ccp-rotate {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
 @keyframes ccp-pulse {
 	0%,
 	100% {
