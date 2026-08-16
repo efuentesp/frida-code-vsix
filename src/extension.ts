@@ -278,11 +278,11 @@ async function listRepoFiles(cwd: string): Promise<string[]> {
 			.split("\n")
 			.map((s) => s.trim())
 			.filter(Boolean);
-		files = !wsRel
+		files = wsRel
 			? all
-			: all
 					.filter((f) => f.startsWith(wsRel + "/"))
-					.map((f) => f.slice(wsRel.length + 1));
+					.map((f) => f.slice(wsRel.length + 1))
+			: all;
 	} catch {
 		// Sin git: findFiles con excludes típicos.
 		const exclude =
@@ -313,9 +313,7 @@ async function listDirectory(prefix: string, cwd: string): Promise<string[]> {
 		return [];
 	}
 	return entries
-		.filter(
-			(e) => !e.name.startsWith(".") && !SEARCH_HIDDEN_EXCLUDE.has(e.name),
-		)
+		.filter((e) => !e.name.startsWith(".") && !SEARCH_HIDDEN_EXCLUDE.has(e.name))
 		.filter((e) => filter === "" || e.name.toLowerCase().includes(filter))
 		.sort((a, b) => {
 			if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
@@ -372,8 +370,7 @@ async function expandAtFiles(text: string, cwd: string): Promise<string> {
 					? content.slice(0, 200_000) + "\n…(truncado)"
 					: content;
 			const block = `\n\n\`\`\`${ext} // @${mt.rel}\n${trunc}\n\`\`\`\n`;
-			out =
-				out.slice(0, mt.index) + block + out.slice(mt.index + mt.full.length);
+			out = out.slice(0, mt.index) + block + out.slice(mt.index + mt.full.length);
 		} catch {
 			/* no existe / no legible → se deja el token tal cual */
 		}
@@ -495,9 +492,7 @@ export async function activate(
 			type: "codebase_index_state",
 			state: {
 				...ciUi,
-				version: ciUi.installed
-					? installedVersion(defaultAgentDir())
-					: undefined,
+				version: ciUi.installed ? installedVersion(defaultAgentDir()) : undefined,
 				busy: ciBusy,
 				lastLine: ciLastLine,
 			},
@@ -586,9 +581,7 @@ export async function activate(
 	// y el diagnóstico confunde agent_start/abort de una ventana con la otra.
 	// Tag = basename del workspace + sufijo corto estable por instancia de la extensión.
 	const abortSessionTag = `${path
-		.basename(
-			vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
-		)
+		.basename(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd())
 		.slice(0, 24)}-${Math.random().toString(16).slice(2, 6)}`;
 	function appendAbortLog(line: string): void {
 		try {
@@ -788,8 +781,7 @@ export async function activate(
 				const c = m.content;
 				if (Array.isArray(c) && c.some((b: any) => b?.type === "image_url"))
 					withImages++;
-				if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0)
-					withToolCalls++;
+				if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) withToolCalls++;
 			}
 		}
 		const parts = [`${msgs.length} mensajes`];
@@ -806,10 +798,7 @@ export async function activate(
 	// fallaron, identificables por cuándo y qué sesión. Ver ADR-0009.
 	function rotateErrorDump(): string {
 		try {
-			const dir = path.join(
-				context.globalStorageUri.fsPath,
-				"devengine-errors",
-			);
+			const dir = path.join(context.globalStorageUri.fsPath, "devengine-errors");
 			mkdirSync(dir, { recursive: true });
 			const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 			const rawName = frida?.sessionManager?.getSessionName?.() ?? "sesion";
@@ -913,7 +902,8 @@ export async function activate(
 					);
 					post({
 						type: "info",
-						text: "La sesión inició pero no hay modelo activo. Abre Ayuda → Toggle Developer Tools → Console y busca ‘[frida]’ para ver el detalle.",
+						text:
+							"La sesión inició pero no hay modelo activo. Abre Ayuda → Toggle Developer Tools → Console y busca ‘[frida]’ para ver el detalle.",
 						level: "warning",
 					});
 				}
@@ -1292,8 +1282,7 @@ export async function activate(
 	// pre-selección al configurar por primera vez (mismo patrón que
 	// copilotDefaultModelId / moonshotDefaultModelId).
 	function openaiDefaultModelId(): string | undefined {
-		const models: any[] =
-			frida?.modelRuntime?.getModels?.(OPENAI_PROVIDER) ?? [];
+		const models: any[] = frida?.modelRuntime?.getModels?.(OPENAI_PROVIDER) ?? [];
 		return models.find((m: any) => m.id === "gpt-5")?.id ?? models[0]?.id;
 	}
 
@@ -1325,11 +1314,7 @@ export async function activate(
 	async function loginProvider(providerId: string): Promise<void> {
 		if (!frida) return;
 		try {
-			await frida.modelRuntime.login?.(
-				providerId,
-				"oauth",
-				makeAuthInteraction(),
-			);
+			await frida.modelRuntime.login?.(providerId, "oauth", makeAuthInteraction());
 			// login() puede resolver SIN lanzar pero sin guardar credencial (éxito
 			// falso silencioso). Verificamos que de verdad quedó autenticado.
 			const authed = isProviderAuthed(frida.modelRuntime, providerId);
@@ -1558,11 +1543,10 @@ export async function activate(
 		const cwd = workspaceCwd();
 		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
 		try {
-			const { stdout } = await execFileP(
-				"git",
-				["status", "--porcelain", "-b"],
-				{ cwd, timeout: 3000 },
-			);
+			const { stdout } = await execFileP("git", ["status", "--porcelain", "-b"], {
+				cwd,
+				timeout: 3000,
+			});
 			const lines = stdout.split("\n");
 			// 1ª línea "## branch...up [ahead N, behind M]" (o "## HEAD (no branch)").
 			const head = parseStatusHead(lines[0] ?? "");
@@ -1684,8 +1668,7 @@ export async function activate(
 						if (
 							cur &&
 							activeModel &&
-							(cur.provider !== activeModel.provider ||
-								cur.id !== activeModel.modelId)
+							(cur.provider !== activeModel.provider || cur.id !== activeModel.modelId)
 						) {
 							modelChangeBridge ??= new ModelChangeBridge((reqs) =>
 								post({ type: "model_changes", items: reqs }),
@@ -1708,10 +1691,7 @@ export async function activate(
 										// Acepta el nuevo proveedor: sincroniza activeModel para no
 										// volver a flaggear en el próximo agent_end.
 										activeModel = { provider: cur.provider, modelId: cur.id };
-										void context.globalState.update(
-											ACTIVE_MODEL_KEY,
-											activeModel,
-										);
+										void context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
 										sendModelInfo();
 									} else {
 										// Revertir al proveedor anterior.
@@ -1859,9 +1839,8 @@ export async function activate(
 					const partial = summarizeResult(event.partialResult);
 					// details estructurado (p. ej. subagent_progress del tool agent /
 					// get_subagent_result): se reenvía al webview para render rico. Opcional.
-					const details = (
-						event.partialResult as { details?: unknown } | undefined
-					)?.details;
+					const details = (event.partialResult as { details?: unknown } | undefined)
+						?.details;
 					if (partial || details) {
 						const msg: Record<string, unknown> = {
 							type: "tool_update",
@@ -2049,9 +2028,7 @@ export async function activate(
 					String(msg.handlerId ?? ""),
 					{
 						value:
-							typeof msg.payload?.value === "string"
-								? msg.payload.value
-								: undefined,
+							typeof msg.payload?.value === "string" ? msg.payload.value : undefined,
 						checked:
 							typeof msg.payload?.checked === "boolean"
 								? msg.payload.checked
@@ -2143,10 +2120,7 @@ export async function activate(
 				try {
 					const items = await SessionManager.listAll(sessionDirPath);
 					const nameByPath = new Map(
-						items.map((i: any) => [
-							String(i.path),
-							i.name as string | undefined,
-						]),
+						items.map((i: any) => [String(i.path), i.name as string | undefined]),
 					);
 					for (const s of snapshot.sessions) s.name = nameByPath.get(s.path);
 				} catch {
@@ -2260,8 +2234,7 @@ export async function activate(
 						const tools = await loadUpstreamTools(
 							upstreamEntryPath(defaultAgentDir()),
 						);
-						const toolName =
-							action === "status" ? "index_status" : "index_codebase";
+						const toolName = action === "status" ? "index_status" : "index_codebase";
 						const t = tools.get(toolName);
 						if (!t) throw new Error(`${toolName} no disponible en el paquete`);
 						const res = await t.execute(
@@ -2439,7 +2412,8 @@ export async function activate(
 				else
 					post({
 						type: "info",
-						text: "Uso: /logout <provider | context7>  (ej. github-copilot, context7)",
+						text:
+							"Uso: /logout <provider | context7>  (ej. github-copilot, context7)",
 					});
 				break;
 			case "name":
@@ -2753,13 +2727,7 @@ export async function activate(
 			label: "frida-args",
 		},
 		{
-			match: [
-				"multi-skills",
-				"multi-skill",
-				"$skill",
-				"skills",
-				"skills-search",
-			],
+			match: ["multi-skills", "multi-skill", "$skill", "skills", "skills-search"],
 			file: "docs/tools/frida-multi-skills.md",
 			label: "frida-multi-skills",
 		},
@@ -2788,10 +2756,7 @@ export async function activate(
 		{ match: ["todo-web"], file: "docs/tools/todo-web.md", label: "todo-web" },
 	];
 
-	async function openHelpDoc(
-		relPath: string,
-		fragment?: string,
-	): Promise<void> {
+	async function openHelpDoc(relPath: string, fragment?: string): Promise<void> {
 		const full = path.join(context.extensionPath, relPath);
 		let uri = vscode.Uri.file(full);
 		if (fragment) uri = uri.with({ fragment });
@@ -2899,9 +2864,7 @@ export async function activate(
 			contextReportHandle?.unmount();
 			contextReportHandle = frida.webBridge.mountPersistent(
 				() =>
-					createContextReportElement(analysis, () =>
-						contextReportHandle?.unmount(),
-					),
+					createContextReportElement(analysis, () => contextReportHandle?.unmount()),
 				"overlay",
 			);
 		} catch (e) {
@@ -2926,11 +2889,7 @@ export async function activate(
 			runsDirBase: path.join(context.globalStorageUri.fsPath, "workflows"),
 			cwd: workspaceCwd(),
 			agentDir: defaultAgentDir(),
-			dslBundlePath: path.join(
-				context.extensionPath,
-				"dist",
-				"frida-workflow.js",
-			),
+			dslBundlePath: path.join(context.extensionPath, "dist", "frida-workflow.js"),
 			pickWorkflow,
 			checkWorkflows,
 		});
@@ -3105,12 +3064,7 @@ export async function activate(
 				);
 			}
 		}
-		if (
-			!config.defaults &&
-			!config.skills &&
-			!config.agents &&
-			!config.stages
-		) {
+		if (!config.defaults && !config.skills && !config.agents && !config.stages) {
 			lines.push("(sin overrides configurados)");
 		}
 		lines.push("");
@@ -3193,7 +3147,8 @@ export async function activate(
 		if (skills.length === 0) {
 			post({
 				type: "info",
-				text: "No hay skills instaladas. Colócalas en ~/.frida/skills/ o .frida/skills/ y recarga con /reload.",
+				text:
+					"No hay skills instaladas. Colócalas en ~/.frida/skills/ o .frida/skills/ y recarga con /reload.",
 			});
 			return;
 		}
@@ -3256,8 +3211,7 @@ export async function activate(
 			const entries = readAuditLog(approvalLogPath);
 			auditPanelHandle?.unmount();
 			auditPanelHandle = frida.webBridge.mountPersistent(
-				() =>
-					createAuditPanelElement(entries, () => auditPanelHandle?.unmount()),
+				() => createAuditPanelElement(entries, () => auditPanelHandle?.unmount()),
 				"overlay",
 			);
 		} catch (e) {
@@ -3298,7 +3252,8 @@ export async function activate(
 		if (!newPath) {
 			post({
 				type: "info",
-				text: "No se pudo clonar la sesión (espera al primer mensaje del asistente).",
+				text:
+					"No se pudo clonar la sesión (espera al primer mensaje del asistente).",
 			});
 			return;
 		}
@@ -3500,7 +3455,8 @@ export async function activate(
 			// indicador de “busy”; pídele que espere (como hace pi con el bash).
 			post({
 				type: "error",
-				text: "Espera a que Frida termine de procesar para ejecutar bash directo (!).",
+				text:
+					"Espera a que Frida termine de procesar para ejecutar bash directo (!).",
 			});
 			return;
 		}
@@ -3821,8 +3777,7 @@ export async function activate(
 					post({ type: "approvals", approvals: reqs });
 				},
 				onUiRequest: (reqs) => post({ type: "ui_requests", items: reqs }),
-				onUiNotify: (message, level) =>
-					post({ type: "ui_notify", message, level }),
+				onUiNotify: (message, level) => post({ type: "ui_notify", message, level }),
 				onWebCommit: (rootId, tree, placement) =>
 					post({ type: "web_commit", rootId, tree, placement }),
 				onQuestionnaire: (reqs) =>
@@ -3944,8 +3899,7 @@ export async function activate(
 							if (p.id) pendingTools.set(String(p.id), seg);
 						}
 					}
-					if (segs.length > 0)
-						items.push({ role: "assistant", segments: segs });
+					if (segs.length > 0) items.push({ role: "assistant", segments: segs });
 				} else if (role === "toolResult") {
 					// ToolResultMessage (pi-ai): role "toolResult" con toolCallId/isError/content
 					// a nivel de MENSAJE (no como content part). Empareja con su toolCall pendiente.
@@ -4019,7 +3973,8 @@ export async function activate(
 		context7KeyCache = trimmed;
 		post({
 			type: "info",
-			text: "API key de Context7 guardada. Las tools `web_docs_search`/`web_docs_fetch` ya pueden usarla.",
+			text:
+				"API key de Context7 guardada. Las tools `web_docs_search`/`web_docs_fetch` ya pueden usarla.",
 		});
 	}
 
@@ -4385,22 +4340,12 @@ export async function activate(
 			"frida.setKey",
 			() => void pickApiKeyProvider(),
 		),
-		vscode.commands.registerCommand(
-			"frida.compact",
-			() => void compactContext(),
-		),
-		vscode.commands.registerCommand(
-			"frida.reload",
-			() => void reloadResources(),
-		),
+		vscode.commands.registerCommand("frida.compact", () => void compactContext()),
+		vscode.commands.registerCommand("frida.reload", () => void reloadResources()),
 		vscode.commands.registerCommand("frida.abort", () => void abortRun()),
-		vscode.commands.registerCommand(
-			"frida.newSession",
-			() => void newSession(),
-		),
+		vscode.commands.registerCommand("frida.newSession", () => void newSession()),
 		vscode.commands.registerCommand("frida.approvalMode", async () => {
-			const next: PermissionMode =
-				approvalMode === "manual" ? "auto" : "manual";
+			const next: PermissionMode = approvalMode === "manual" ? "auto" : "manual";
 			if (next !== "manual") {
 				const ok = await requestYoloGate();
 				if (!ok) return;
@@ -4466,7 +4411,8 @@ export async function activate(
 				}
 				post({
 					type: "notice",
-					text: "🧪 Diagnosticando thinking: envío un mensaje de prueba al proveedor y mido si devuelve razonamiento…",
+					text:
+						"🧪 Diagnosticando thinking: envío un mensaje de prueba al proveedor y mido si devuelve razonamiento…",
 				});
 				let thinkingDeltas = 0;
 				let settled = false;
@@ -4493,8 +4439,7 @@ export async function activate(
 							.find((m: any) => m?.role === "assistant");
 						const reasoning = last?.usage?.reasoning;
 						const ok =
-							thinkingDeltas > 0 ||
-							(typeof reasoning === "number" && reasoning > 0);
+							thinkingDeltas > 0 || (typeof reasoning === "number" && reasoning > 0);
 						post({
 							type: "notice",
 							text: ok
@@ -4537,8 +4482,7 @@ export async function activate(
 						{
 							label: "Tarjetas",
 							description: "Cada opción como card",
-							preview:
-								"# Tarjetas\n\n```\n┌───┐ ┌───┐\n│ A │ │ B │\n└───┘ └───┘\n```",
+							preview: "# Tarjetas\n\n```\n┌───┐ ┌───┐\n│ A │ │ B │\n└───┘ └───┘\n```",
 						},
 					],
 				},
