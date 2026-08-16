@@ -582,7 +582,8 @@ export function reduce(state: State, msg: InMessage): State {
 		case "tool_toggles":
 			return {
 				...state,
-				toolToggles: { askUserQuestion: msg.askUserQuestion, todo: msg.todo },
+				toolToggles: msg.values,
+				toolToggleDefs: msg.defs,
 			};
 
 		// Estado del índice de código (frida-codebase-index) para el tab Index

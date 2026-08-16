@@ -7,6 +7,7 @@
 // (re-ejecuta las factories, que re-leen estos settings) sin perder historial.
 
 import * as vscode from "vscode";
+import { TOOL_TOGGLE_BY_KEY, TOOL_TOGGLES } from "./tool-toggles";
 import type { UserRole } from "./usage/report-schema";
 
 export const CONFIG_SECTION = "frida";
@@ -33,9 +34,16 @@ export function isContextEnabled(): boolean {
 		.get<boolean>("context.enabled", true);
 }
 
-/** Snapshot de ambos toggles para publicar al webview. */
-export function readToolToggles(): { askUserQuestion: boolean; todo: boolean } {
-	return { askUserQuestion: isAskUserQuestionEnabled(), todo: isTodoEnabled() };
+/** Snapshot de todos los toggles conmutables (#53), leído desde el registro
+ *  central (tool-toggles.ts) — fuente única de verdad. */
+export function readToolToggles(): Record<string, boolean> {
+	const out: Record<string, boolean> = {};
+	for (const t of TOOL_TOGGLES) {
+		out[t.key] = vscode.workspace
+			.getConfiguration(CONFIG_SECTION)
+			.get<boolean>(t.setting, true);
+	}
+	return out;
 }
 
 /** Lee la config de DevEngine. `contextWindow`/`maxTokens` son **null si el usuario
@@ -124,16 +132,68 @@ export const EMPTY_GATE_PATTERNS: GatePatterns = {
 	dangerousCommandSubstrings: [],
 };
 
-/** Persiste un toggle (global) y notifica al host que debe recargar. */
+/** Persiste un toggle (global, recuerda entre sesiones) del registro central.
+ *  Aplica al recargar la sesión (las factories re-leen el getter). */
 export async function writeToolToggle(
-	key: "askUserQuestion" | "todo",
+	key: string,
 	enabled: boolean,
 ): Promise<void> {
-	const settingKey =
-		key === "askUserQuestion" ? "askUserQuestion.enabled" : "todo.enabled";
+	const def = TOOL_TOGGLE_BY_KEY.get(key);
+	if (!def) throw new Error(`Toggle desconocido: ${key}`);
 	await vscode.workspace
 		.getConfiguration(CONFIG_SECTION)
-		.update(settingKey, enabled, vscode.ConfigurationTarget.Global);
+		.update(def.setting, enabled, vscode.ConfigurationTarget.Global);
+}
+
+// === Toggles Fase 2 (issue #53): gates nuevos de módulos conmutables ===
+
+/** ¿Está activo frida-subagents? Default: true. */
+export function isSubagentsEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("subagents.enabled", true);
+}
+
+/** ¿Está activo frida-agent-browser? Default: true. */
+export function isAgentBrowserEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("agentBrowser.enabled", true);
+}
+
+/** ¿Está activo frida-supi-web? Default: true. */
+export function isSupiWebEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("supiWeb.enabled", true);
+}
+
+/** ¿Está activo frida-mcp-adapter? Default: true. */
+export function isMcpAdapterEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("mcpAdapter.enabled", true);
+}
+
+/** ¿Está activo frida-extensible-workflows? Default: true. */
+export function isExtensibleWorkflowsEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("extensibleWorkflows.enabled", true);
+}
+
+/** ¿Está activo frida-git-sync? Default: true. */
+export function isGitSyncEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("gitSync.enabled", true);
+}
+
+/** ¿Está activo frida-worktree? Default: true. */
+export function isWorktreeEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("worktree.enabled", true);
 }
 
 // === Reporte de uso (frida-usage-report/v1) ===
@@ -246,6 +306,8 @@ export function readCcPluginsExtraMarketplaces(): string[] {
 		.getConfiguration(CONFIG_SECTION)
 		.get<string[]>("ccPlugins.extraMarketplaces", []);
 }
+
+// === Sandboxes (frida-sandboxes, ADR-0047 / issue #35) ===
 
 /** ¿Está activa frida-sandboxes (#35)? Default: true (Docker se probea). */
 export function isSandboxesEnabled(): boolean {

@@ -191,6 +191,20 @@ export interface CreateFridaSessionOptions {
 	 *  pendiente aquí; el webview responde vía questionnaire_answer. */
 	onQuestionnaire: (reqs: QuestionnaireRequest[]) => void;
 	getMode: () => PermissionMode;
+	/** Toggles Fase 2 (#53): gates de módulos conmutables (default true). */
+	subagentsEnabled?: () => boolean;
+	/** ¿Está activo frida-agent-browser? (frida.agentBrowser.enabled). */
+	agentBrowserEnabled?: () => boolean;
+	/** ¿Está activo frida-supi-web? (frida.supiWeb.enabled). */
+	supiWebEnabled?: () => boolean;
+	/** ¿Está activo frida-mcp-adapter? (frida.mcpAdapter.enabled). */
+	mcpAdapterEnabled?: () => boolean;
+	/** ¿Está activo frida-extensible-workflows? (frida.extensibleWorkflows.enabled). */
+	extensibleWorkflowsEnabled?: () => boolean;
+	/** ¿Está activo frida-git-sync? (frida.gitSync.enabled). */
+	gitSyncEnabled?: () => boolean;
+	/** ¿Está activo frida-worktree? (frida.worktree.enabled). */
+	worktreeEnabled?: () => boolean;
 	/** Toggles de tools (Configuración). Las factories se registran según estos. */
 	askUserQuestionEnabled: () => boolean;
 	todoEnabled: () => boolean;
@@ -549,7 +563,11 @@ export async function createFridaSession(
 			// main only (las hijas de workflow quedan curadas: providers + gates).
 			{
 				name: "frida-agent-browser",
-				factory: createFridaAgentBrowser({ agentDir: opts.agentDir }),
+				// Gate #53 (frida.agentBrowser.enabled, default true).
+				factory: (pi: any) =>
+					(opts.agentBrowserEnabled?.() ?? true)
+						? createFridaAgentBrowser({ agentDir: opts.agentDir })(pi)
+						: undefined,
 			},
 			// frida-codebase-index (ADR-0036): búsqueda semántica + call graph vía
 			// wrapper del paquete upstream open-codebase-index instalado on-demand
@@ -669,7 +687,11 @@ export async function createFridaSession(
 			// frida-agent-browser).
 			{
 				name: "frida-supi-web",
-				factory: createFridaSupiWeb({ getKey: opts.getContext7Key }),
+				// Gate #53 (frida.supiWeb.enabled, default true).
+				factory: (pi: any) =>
+					(opts.supiWebEnabled?.() ?? true)
+						? createFridaSupiWeb({ getKey: opts.getContext7Key })(pi)
+						: undefined,
 			},
 			// frida-pipeline (ADR-0021): orquestador puro — 0 tools propios. Registra
 			// los hooks invisibles de guidance recursiva (.frida/guidance/) y
@@ -687,26 +709,34 @@ export async function createFridaSession(
 			{
 				name: "frida-subagents",
 				// #26 detached: auth del provider activo (SecretStorage → --api-key
-				// del child) + sink del panel /detached.
-				factory: createFridaSubagents({
-					agentDir: opts.agentDir,
-					apiKey: activeProvider
-						? keyHolders[activeProvider]
-					: undefined,
-					provider: activeProvider,
-					onDetachedPanel: (p) => {
-						if (typeof opts.detachedPanel === "function") {
-							opts.detachedPanel(p);
-						}
-					},
-				}),
+				// del child) + sink del panel /detached. Gate #53
+				// (frida.subagents.enabled, default true).
+				factory: (pi: any) =>
+					(opts.subagentsEnabled?.() ?? true)
+						? createFridaSubagents({
+								agentDir: opts.agentDir,
+								apiKey: activeProvider
+									? keyHolders[activeProvider]
+									: undefined,
+								provider: activeProvider,
+								onDetachedPanel: (p) => {
+									if (typeof opts.detachedPanel === "function") {
+										opts.detachedPanel(p);
+									}
+								},
+							})(pi)
+						: undefined,
 			},
 			// frida-extensible-workflows (ADR-0028): orquestación multi-agente
 			// determinista (porte de pi-extensible-workflows). Fase 2: registra el
 			// tool `workflow` foreground-only. Sin dependencia de orden.
 			{
 				name: "frida-extensible-workflows",
-				factory: createFridaExtensibleWorkflows(),
+				// Gate #53 (frida.extensibleWorkflows.enabled, default true).
+				factory: (pi: any) =>
+					(opts.extensibleWorkflowsEnabled?.() ?? true)
+						? createFridaExtensibleWorkflows()(pi)
+						: undefined,
 			},
 			// frida-mcp-adapter (ADR-0023): integración MCP (Model Context Protocol).
 			// Un único tool proxy mcp({}) (~200 tokens) da acceso a cientos de
@@ -714,7 +744,11 @@ export async function createFridaSession(
 			// DESPUÉS de frida-subagents para no interferir con el registro de tools.
 			{
 				name: "frida-mcp-adapter",
-				factory: createFridaMcpAdapter(),
+				// Gate #53 (frida.mcpAdapter.enabled, default true).
+				factory: (pi: any) =>
+					(opts.mcpAdapterEnabled?.() ?? true)
+						? createFridaMcpAdapter()(pi)
+						: undefined,
 			},
 			// frida-git-sync (ADR-0026): sincroniza el agentDir (~/.frida) entre
 			// máquinas vía un repo Git privado. Porte nativo de @jachy/pi-git-sync.
@@ -722,14 +756,23 @@ export async function createFridaSession(
 			// solo cablea el adapter git (pi.exec) y los comandos.
 			{
 				name: "frida-git-sync",
-				factory: createFridaGitSync(),
+				// Gate #53 (frida.gitSync.enabled, default true).
+				factory: (pi: any) =>
+					(opts.gitSyncEnabled?.() ?? true)
+						? createFridaGitSync()(pi)
+						: undefined,
 			},
 			// frida-worktree (issue #13): porte nativo de @narumitw/pi-worktree.
 			// Registra /worktree (slash command del chat, UI vía ctx.ui). El comando
 			// VS Code frida.worktree (botón SCM) se cablea aparte en extension.ts.
 			{
 				name: "frida-worktree",
-				factory: createFridaWorktree(),
+				// Gate #53 (frida.worktree.enabled, default true). El comando VS Code
+				// frida.worktree (botón SCM) se avisa aparte en extension.ts.
+				factory: (pi: any) =>
+					(opts.worktreeEnabled?.() ?? true)
+						? createFridaWorktree()(pi)
+						: undefined,
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens

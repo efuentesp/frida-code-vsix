@@ -128,30 +128,35 @@ export function SettingsHub({
 				{tab === "tools" && (
 					<>
 						<div className="cfg-section">Herramientas del agente</div>
-						<ToggleRow
-							title="Preguntar al usuario"
-							desc="Habilita el tool ask_user_question para que el agente pregunte con opciones concretas en vez de adivinar."
-							on={state.toolToggles?.askUserQuestion ?? true}
-							onToggle={() =>
-								post({
-									type: "set_tool_toggle",
-									key: "askUserQuestion",
-									enabled: !(state.toolToggles?.askUserQuestion ?? true),
-								})
-							}
-						/>
-						<ToggleRow
-							title="Lista de tareas"
-							desc="Habilita el tool todo y el panel de Tareas para seguimiento multi-paso. Aplica al recargar (sin perder historial)."
-							on={state.toolToggles?.todo ?? true}
-							onToggle={() =>
-								post({
-									type: "set_tool_toggle",
-									key: "todo",
-									enabled: !(state.toolToggles?.todo ?? true),
-								})
-							}
-						/>
+						{(state.toolToggleDefs ?? []).map((d) => (
+							<ToggleRow
+								key={d.key}
+								title={d.title}
+								desc={d.desc}
+								on={state.toolToggles?.[d.key] ?? true}
+								onToggle={() =>
+									post({
+										type: "set_tool_toggle",
+										key: d.key,
+										enabled: !(state.toolToggles?.[d.key] ?? true),
+									})
+								}
+							/>
+						))}
+						{(state.toolToggleDefs ?? []).length === 0 && (
+							<div className="cfg-stub">Cargando herramientas…</div>
+						)}
+						<div className="cfg-row">
+							<div className="cfg-row-info">
+								<div className="cfg-row-title">Módulos base (no conmutables)</div>
+								<div className="cfg-row-desc">
+									Proveedores (sin ellos no hay LLM), sistema de permisos (la
+									seguridad; usa los modos de aprobación), motor de skills
+									(frida-args/multi-skills) y pipeline RPIV quedan siempre activos
+									por diseño.
+								</div>
+						</div>
+					</div>
 					</>
 				)}
 

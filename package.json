@@ -288,6 +288,41 @@
           "default": true,
           "markdownDescription": "Habilita **frida-cc-plugins**: instalación de plugins de Claude Code desde sus marketplaces (`/ccplugin marketplace add owner/repo`, `/ccplugin add <plugin>@<marketplace>`). Skills y commands se convierten a recursos nativos (namespaced `<plugin>-<nombre>`); los servers MCP se registran en `~/.frida/mcp.json` con su nombre original. La extensión nunca instala nada por sí sola: todo install requiere `/ccplugin add` explícito."
         },
+        "frida.subagents.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-subagents**: tools `Agent`/`get_subagent_result`/`steer_subagent`, modo detached (subagente en proceso propio que sobrevive al padre, #26) y panel `/detached`. Apágalo para aislar el comportamiento del agente principal en pruebas."
+        },
+        "frida.agentBrowser.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-agent-browser**: tool `agent_browser` (automation de navegador real vía el binario agent-browser)."
+        },
+        "frida.supiWeb.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-supi-web**: tools `web_fetch_md` (URL pública → Markdown), `web_docs_search` y `web_docs_fetch` (docs de librerías vía Context7)."
+        },
+        "frida.mcpAdapter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-mcp-adapter**: tool proxy `mcp` + comandos `/mcp` y `/mcp-auth` — acceso a servidores MCP con un solo tool (~200 tokens)."
+        },
+        "frida.extensibleWorkflows.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-extensible-workflows**: tool `workflow` (orquestación multi-agente determinista)."
+        },
+        "frida.gitSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-git-sync**: comando `/fridasync` (status/diff) — sincroniza el agentDir `~/.frida` entre máquinas vía un repo Git privado."
+        },
+        "frida.worktree.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-worktree**: comando `/worktree` y botón SCM (worktrees Git ligeros). Si está apagado, el botón avisa en vez de fallar."
+        },
         "frida.codebaseIndex.keepOtherPlatforms": {
           "type": "boolean",
           "default": false,

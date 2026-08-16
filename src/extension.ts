@@ -136,6 +136,13 @@ import {
 	isSandboxesEnabled,
 	readSandboxesDefaultImage,
 	readSandboxesAllowDomains,
+	isSubagentsEnabled,
+	isAgentBrowserEnabled,
+	isSupiWebEnabled,
+	isMcpAdapterEnabled,
+	isExtensibleWorkflowsEnabled,
+	isGitSyncEnabled,
+	isWorktreeEnabled,
 	readCcPluginsEnabledPlugins,
 	isTelemetryOptIn,
 	isTodoEnabled,
@@ -145,6 +152,7 @@ import {
 	setTelemetryOptIn,
 	writeToolToggle,
 } from "./settings";
+import { TOOL_TOGGLES } from "./tool-toggles";
 import {
 	classifySeverity,
 	type LensDiagnosticsPayload,
@@ -962,6 +970,14 @@ export async function activate(
 					sandboxesAllowDomains: readSandboxesAllowDomains,
 					sandboxesPanel: handleSandboxPanel,
 					detachedPanel: handleDetachedPanel,
+					// Toggles Fase 2 (#53): gates de módulos conmutables.
+					subagentsEnabled: isSubagentsEnabled,
+					agentBrowserEnabled: isAgentBrowserEnabled,
+					supiWebEnabled: isSupiWebEnabled,
+					mcpAdapterEnabled: isMcpAdapterEnabled,
+					extensibleWorkflowsEnabled: isExtensibleWorkflowsEnabled,
+					gitSyncEnabled: isGitSyncEnabled,
+					worktreeEnabled: isWorktreeEnabled,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -1603,7 +1619,13 @@ export async function activate(
 	// Toggles de Configuración (tools activos) → webview, para la vista de
 	// Configuración. Se leen en vivo de los settings de VS Code.
 	function postToolToggles(): void {
-		post({ type: "tool_toggles", ...readToolToggles() });
+		// #53: valores + descriptores desde el registro central — la UI renderiza
+		// desde este estado y no duplica la lista de toggles.
+		post({
+			type: "tool_toggles",
+			values: readToolToggles(),
+			defs: TOOL_TOGGLES.map(({ key, title, desc }) => ({ key, title, desc })),
+		});
 	}
 
 	// Info del workspace: carpeta de trabajo + branch git, conteo de cambios
@@ -4209,6 +4231,14 @@ export async function activate(
 				sandboxesAllowDomains: readSandboxesAllowDomains,
 				sandboxesPanel: handleSandboxPanel,
 				detachedPanel: handleDetachedPanel,
+				// Toggles Fase 2 (#53): gates de módulos conmutables.
+				subagentsEnabled: isSubagentsEnabled,
+				agentBrowserEnabled: isAgentBrowserEnabled,
+				supiWebEnabled: isSupiWebEnabled,
+				mcpAdapterEnabled: isMcpAdapterEnabled,
+				extensibleWorkflowsEnabled: isExtensibleWorkflowsEnabled,
+				gitSyncEnabled: isGitSyncEnabled,
+				worktreeEnabled: isWorktreeEnabled,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();
@@ -4617,6 +4647,13 @@ export async function activate(
 	// worktree en una ventana VS Code nueva: una por requisito, sin choques. Porte
 	// nativo de @narumitw/pi-worktree (issue #13).
 	async function worktreeCmd(): Promise<void> {
+		// Gate #53: si frida-worktree está apagado, aviso honesto en vez de correr.
+		if (!isWorktreeEnabled()) {
+			void vscode.window.showInformationMessage(
+				"frida-worktree está desactivado (frida.worktree.enabled en la configuración). Actívalo en Configuración > Herramientas.",
+			);
+			return;
+		}
 		await runWorktreeCommand({ cwd: workspaceCwd() });
 	}
 

@@ -403,11 +403,15 @@ export interface GateStats {
 	autoAllow: number;
 }
 
-// Toggles de la Configuración (qué tools del agente están activos).
-export interface ToolToggles {
-	askUserQuestion: boolean;
-	todo: boolean;
+// Toggles de la Configuración (qué módulos del agente están activos, #53).
+// El host publica valores + descriptores desde el registro central
+// (src/tool-toggles.ts); la UI no duplica la lista.
+export interface ToolToggleDescriptor {
+	key: string;
+	title: string;
+	desc: string;
 }
+export type ToolToggles = Record<string, boolean>;
 
 /** Estado publicado por el host para el tab "Index" del SettingsHub. */
 export interface CodebaseIndexUiState {
@@ -625,6 +629,8 @@ export interface State {
 	compactions: CompactionEntry[];
 	branchSummaries: BranchSummaryEntry[];
 	toolToggles?: ToolToggles;
+	/** Descriptores de toggles (título/desc) publicados por el host (#53). */
+	toolToggleDefs?: ToolToggleDescriptor[];
 	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
 	codebaseIndex?: CodebaseIndexUiState;
 	lens?: LensSummary | null;
@@ -764,7 +770,11 @@ export type InMessage =
 	| { type: "gate_stats"; stats: GateStats }
 	| { type: "version"; version: string }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
-	| { type: "tool_toggles"; askUserQuestion: boolean; todo: boolean }
+	| {
+			type: "tool_toggles";
+			values: ToolToggles;
+			defs: ToolToggleDescriptor[];
+		}
 	| { type: "lens_diagnostics"; summary: LensSummary | null }
 	| {
 			type: "retry_start";
@@ -892,9 +902,9 @@ export type OutMessage =
 	| { type: "set_thinking"; level: string }
 	| {
 			type: "set_tool_toggle";
-			key: "askUserQuestion" | "todo";
+			key: string;
 			enabled: boolean;
-	  }
+		}
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status";
