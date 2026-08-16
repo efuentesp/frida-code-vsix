@@ -29,7 +29,9 @@ import {
 	discoverComponents,
 	readMarketplaceCatalog,
 	type MarketplaceCatalog,
+	type MarketplacePluginEntry,
 	type PluginSource,
+	type RenameMap,
 } from "./readers";
 import {
 	convertPluginResources,
@@ -161,7 +163,7 @@ function marketplaceSlug(url: string): string {
 }
 
 /** Dir de un marketplace según su registro: local = path original; git = clone. */
-function marketplaceDirOf(
+export function marketplaceDirOf(
 	agentDir: string,
 	rec: { url: string; local?: boolean },
 ): string {
@@ -287,6 +289,37 @@ export async function removeMarketplace(
 
 // ─── Plugins ─────────────────────────────────────────────────────────────
 
+/**
+ * Sigue el map renames del catálogo (encadenado, paridad Claude) desde un
+ * nombre viejo. Devuelve el nombre final, o null si el plugin fue
+ * eliminado (renames[name] === null). Detecta ciclos.
+ */
+export function resolveRename(
+	renames: Record<string, string | null> | undefined,
+	from: string,
+): string | null {
+	if (!renames) return from;
+	const visited = new Set<string>([from]);
+	let current = from;
+	for (let i = 0; i < 32; i++) {
+		const next = renames[current];
+		if (next === undefined) return current; // sin entrada: nombre vigente
+		if (next === null) return null; // eliminado
+		if (visited.has(next)) {
+			throw new CcPluginsInstallError(
+				`Ciclo en renames del catálogo: ${[...visited, next].join(" → ")}`,
+				"renames debe ser append-only y terminar en un nombre existente o null (claude plugin validate lo rechaza igual).",
+			);
+		}
+		visited.add(next);
+		current = next;
+	}
+	throw new CcPluginsInstallError(
+		`Cadena renames demasiado larga desde '${from}'`,
+		"renames debe ser append-only y terminar en un nombre existente o null.",
+	);
+}
+
 /** Resuelve el directorio fuente de un plugin dentro del marketplace. */
 function resolvePluginSourceDir(
 	source: PluginSource,
@@ -317,6 +350,8 @@ function resolvePluginSourceDir(
 export interface AvailablePlugin {
 	/** Nombre de entrada en el catálogo. */
 	name: string;
+	/** Nombre legible para UI (fase autor #51). */
+	displayName?: string;
 	marketplace: string;
 	version?: string;
 	description?: string;
@@ -351,6 +386,7 @@ export function listAvailable(
 			const rec = reg.plugins[p.name];
 			out.push({
 				name: p.name,
+				displayName: p.displayName,
 				marketplace: name,
 				version: p.version,
 				description: p.description,
@@ -490,11 +526,14 @@ export async function installPlugin(
 		}
 	}
 
-	// Localizar la entrada en los marketplaces registrados.
+	// Localizar la entrada en los marketplaces registrados (con renames:
+	// si el nombre pedido ya no existe, seguir el map antes de fallar).
 	let entry: {
 		marketplace: string;
 		source: PluginSource;
 		version?: string;
+		entry?: MarketplacePluginEntry;
+		renames?: RenameMap;
 	} | null = null;
 	const candidates = Object.entries(reg.marketplaces).filter(
 		([name]) => !marketplaceName || name === marketplaceName,
@@ -504,12 +543,30 @@ export async function installPlugin(
 		if (!fs.existsSync(dir)) continue;
 		try {
 			const catalog = readMarketplaceCatalog(dir);
-			const found = catalog.plugins.find((p) => p.name === pluginName);
+			let found = catalog.plugins.find((p) => p.name === pluginName);
+			if (!found && catalog.renames) {
+				// renames: el usuario referencia un nombre viejo → migrar.
+				const resolvedName = resolveRename(catalog.renames, pluginName);
+				if (resolvedName === null) {
+					throw new CcPluginsInstallError(
+						`El plugin '${pluginName}' fue ELIMINADO de '${name}' (renames → null).`,
+						"Desinstálalo con /ccplugin remove y elige un plugin vigente del catálogo.",
+					);
+				}
+				found = catalog.plugins.find((p) => p.name === resolvedName);
+			}
 			if (found) {
-				entry = { marketplace: name, source: found.source, version: found.version };
+				entry = {
+					marketplace: name,
+					source: found.source,
+					version: found.version,
+					entry: found,
+					renames: catalog.renames,
+				};
 				break;
 			}
-		} catch {
+		} catch (e) {
+			if (e instanceof CcPluginsInstallError) throw e; // guías loud
 			/* marketplace ilegible → siguiente */
 		}
 	}
@@ -536,10 +593,13 @@ export async function installPlugin(
 		);
 	}
 
-	// Descubrir componentes ANTES de escribir nada.
-	const components = discoverComponents(resolved.dir);
+	// Descubrir componentes ANTES de escribir nada. La entrada del catálogo
+	// viaja para strict:false/pluginRoot/componentes declarados (#51).
+	const components = discoverComponents(resolved.dir, entry?.entry);
 	const manifestName = path.basename(resolved.dir);
-	const plugin = pluginName || manifestName;
+	// El nombre vigente es el de la ENTRADA resuelta (renames: instalar
+	// "p-viejo" registra "p-nuevo" — paridad Claude).
+	const plugin = entry?.entry?.name ?? pluginName ?? manifestName;
 
 	// Colisiones MCP: TODOS los slots deben tener las llaves libres (D5) —
 	// salvo las PROPIAS del plugin (record previo): un re-install/reconcile

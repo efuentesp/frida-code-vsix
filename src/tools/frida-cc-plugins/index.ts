@@ -40,6 +40,9 @@ import {
 	setPluginEnabled,
 	uninstallPlugin,
 } from "./installer";
+import { validateMarketplaceDir } from "./validate";
+import { readMarketplaceCatalog, type RenameMap } from "./readers";
+import { marketplaceDirOf, resolveRename } from "./installer";
 import {
 	loadRegistry,
 	saveRegistry,
@@ -81,6 +84,47 @@ async function reconcile(
 	onLog?: (line: string) => void,
 	deps?: import("./installer").InstallerDeps,
 ): Promise<void> {
+	// Migración renames (#51): si el catálogo renombró/eliminó un plugin
+	// instalado, seguir el map una sola vez (rewrite del registro + notice).
+	for (const [name, rec] of Object.entries({ ...reg.plugins })) {
+		const mktRec = reg.marketplaces[rec.marketplace];
+		if (!mktRec) continue;
+		const mDir = marketplaceDirOf(agentDir, mktRec);
+		let renames: import("./readers").RenameMap | undefined;
+		try {
+			renames = readMarketplaceCatalog(mDir).renames;
+		} catch {
+			continue; // marketplace ilegible → reconcile estándar lo cubre
+		}
+		if (!renames || !(name in renames)) continue;
+		const resolved = resolveRename(renames, name);
+		if (resolved === null) {
+			// Eliminado del catálogo: uninstall limpio + notice.
+			await uninstallPlugin(agentDir, name, { reg });
+			notify(
+				`cc-plugins: '${name}' fue eliminado de '${rec.marketplace}' (renames) — desinstalado.`,
+			);
+			continue;
+		}
+		if (resolved === name) continue;
+		await uninstallPlugin(agentDir, name, { reg });
+		try {
+			await installPlugin(agentDir, `${resolved}@${rec.marketplace}`, {
+				cwd,
+				deps,
+				reg,
+			});
+			notify(
+				`cc-plugins: '${name}' renombrado a '${resolved}' en '${rec.marketplace}' (renames).`,
+			);
+		} catch (e: any) {
+			notify(
+				`cc-plugins: migración de '${name}' a '${resolved}' falló (${e?.message ?? e}). /ccplugin add ${resolved}@${rec.marketplace} para completarla.`,
+				"warning",
+			);
+		}
+	}
+
 	for (const [name, rec] of Object.entries(reg.plugins)) {
 		if (!rec.enabled) continue;
 		// Solo los plugins que declaran skills/commands materializan algo
@@ -182,7 +226,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									? avail
 											.map(
 												(a) =>
-													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [remoto: fase 2]" : ""}`,
+													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.displayName && a.displayName !== a.name ? ` — ${a.displayName}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [remoto: fase 2]" : ""}`,
 											)
 											.join("\n")
 									: "Sin plugins disponibles en los marketplaces registrados.",
@@ -342,9 +386,28 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						);
 						return;
 					}
+					case "validate": {
+						if (!rest[0]) {
+							notifyCtx(
+								"Uso: /ccplugin validate <dir-del-marketplace|plugin>",
+								"warning",
+							);
+							return;
+						}
+						const target = path.resolve(rest[0]);
+						const report = validateMarketplaceDir(target);
+						for (const line of report.lines) notifyCtx(line.text, line.level);
+						notifyCtx(
+							report.ok
+								? `✔ Validación ${report.errors === 0 ? "sin errores" : "con errores"}: ${report.checks} checks, ${report.warnings} warnings, ${report.errors} errores.`
+								: `✖ Validación fallida: ${report.errors} error(es).`,
+							report.errors > 0 ? "error" : report.warnings > 0 ? "warning" : "info",
+						);
+						return;
+					}
 					default:
 						notifyCtx(
-							"Subcomandos: list | add | remove | enable | disable | info | marketplace | bootstrap",
+							"Subcomandos: list | add | remove | enable | disable | info | validate | marketplace | bootstrap",
 							"warning",
 						);
 				}

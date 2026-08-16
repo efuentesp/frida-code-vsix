@@ -23,6 +23,8 @@ export interface ClaudePluginManifest {
 	name: string;
 	description?: string;
 	version?: string;
+	/** ¿Declara componentes? (detección de conflicto strict:false). */
+	hasComponents?: boolean;
 	author?: string | { name?: string };
 	/** Declaración de raíces de skills (rutas relativas al root del plugin). */
 	skills?: string | string[];
@@ -42,8 +44,22 @@ export interface MarketplacePluginEntry {
 	version?: string;
 	/** Declaraciones de componentes en el catálogo (autoridad si strict:false). */
 	strict?: boolean;
+	/** Nombre legible para UI (no usado en namespacing/lookup). */
+	displayName?: string;
+	/** Metadata de descubrimiento (fase autor #51 — informativa). */
+	category?: string;
+	tags?: string[];
+	/** Declaraciones de componentes en la entrada (autoridad si strict:false). */
+	skills?: string | string[];
+	commands?: string | string[];
+	agents?: string | string[];
+	hooks?: unknown;
+	mcpServers?: Record<string, unknown>;
 	[k: string]: unknown;
 }
+
+/** Map renames del catálogo: viejo → nuevo (o null = eliminado). */
+export type RenameMap = Record<string, string | null>;
 
 /** Source de un plugin (formas del catálogo Claude). */
 export type PluginSource =
@@ -56,6 +72,10 @@ export type PluginSource =
 export interface MarketplaceCatalog {
 	name: string;
 	owner?: string;
+	/** Base dir prepended a sources relativos (fase autor #51). */
+	pluginRoot?: string;
+	/** Map de renombrados/eliminados para migración (fase autor #51). */
+	renames?: RenameMap;
 	plugins: MarketplacePluginEntry[];
 }
 
@@ -177,8 +197,20 @@ export function readPluginManifest(
 		);
 	}
 	assertSafeName(name, "de plugin (plugin.json)");
+	// Conflicto strict:false SOLO si el JSON declara componentes — los dirs
+	// por convención no cuentan (Claude: "a plugin.json that declares
+	// components"); con strict:false la entrada define rutas explícitas.
+	const hasComponents =
+		m.skills !== undefined ||
+		m.commands !== undefined ||
+		m.mcpServers !== undefined ||
+		m.hooks !== undefined ||
+		m.agents !== undefined ||
+		m.lspServers !== undefined ||
+		m.monitors !== undefined;
 	return {
 		name,
+		hasComponents,
 		description: typeof m.description === "string" ? m.description : undefined,
 		version: typeof m.version === "string" ? m.version : undefined,
 		author: m.author as ClaudePluginManifest["author"],
@@ -194,12 +226,31 @@ export function readPluginManifest(
 
 // ─── marketplace.json ────────────────────────────────────────────────────
 
-/** Parsea el source de una entrada del catálogo (formas Claude). */
-function parseEntrySource(entry: Record<string, unknown>): PluginSource | null {
+/**
+ * Parsea el source de una entrada del catálogo (formas Claude). Con
+ * `pluginRoot` declarado, un string SIN "./" se resuelve contra él
+ * (paridad metadata.pluginRoot: "formatter" ≡ "./plugins/formatter").
+ */
+function parseEntrySource(
+	entry: Record<string, unknown>,
+	pluginRoot?: string,
+): PluginSource | null {
 	const raw = entry.source;
 	// Path relativo al marketplace: "./dir" (forma más común).
 	if (typeof raw === "string") {
-		return { kind: "path", path: validateCatalogRelativePath(raw) };
+		if (raw.startsWith("./")) {
+			return { kind: "path", path: validateCatalogRelativePath(raw) };
+		}
+		if (pluginRoot) {
+			// pluginRoot llega como "./plugins" o "plugins" — normalizar el
+			// prefijo para no producir "././x".
+			const root = pluginRoot.replace(/^\.\//, "");
+			return {
+				kind: "path",
+				path: validateCatalogRelativePath(`./${root}/${raw}`),
+			};
+		}
+		return null; // sin pluginRoot exige "./" (omisión estructural)
 	}
 	if (raw === null || typeof raw !== "object") return null;
 	const s = raw as Record<string, unknown>;
@@ -277,7 +328,26 @@ export function readMarketplaceCatalog(
 			"El catálogo requiere 'name' (identidad autoritativa del marketplace).",
 		);
 	}
+	// owner: objeto {name, email?, url?} (schema Claude) o string legacy.
+	const owner = (() => {
+		if (typeof c.owner === "string") return c.owner;
+		if (c.owner && typeof c.owner === "object" && !Array.isArray(c.owner)) {
+			const o = c.owner as Record<string, unknown>;
+			return typeof o.name === "string" ? o.name : undefined;
+		}
+		return undefined;
+	})();
+	// metadata.pluginRoot + renames (fase autor #51).
+	const metadata = (c.metadata ?? {}) as Record<string, unknown>;
+	const pluginRoot =
+		typeof metadata.pluginRoot === "string" ? metadata.pluginRoot : undefined;
+	const renames =
+		c.renames && typeof c.renames === "object" && !Array.isArray(c.renames)
+			? (c.renames as RenameMap)
+			: undefined;
+
 	const plugins: MarketplacePluginEntry[] = [];
+	const seen = new Set<string>();
 	const rawPlugins = Array.isArray(c.plugins) ? c.plugins : [];
 	for (const p of rawPlugins) {
 		if (p === null || typeof p !== "object" || Array.isArray(p)) continue;
@@ -290,21 +360,40 @@ export function readMarketplaceCatalog(
 		// una declaración insegura tras una omisión silenciosa es peor.
 		if (!pname) continue;
 		assertSafeName(pname, "de plugin (marketplace.json)");
-		const source = parseEntrySource(e);
+		const source = parseEntrySource(e, pluginRoot);
 		if (!source) continue;
+		if (seen.has(pname)) {
+			throw new ReaderError(
+				`Nombre de plugin duplicado en el catálogo: '${pname}'`,
+				"Cada entrada de plugins[] requiere un 'name' único (claude plugin validate lo reporta igual).",
+			);
+		}
+		seen.add(pname);
 		plugins.push({
 			name: pname,
 			source,
 			description: typeof e.description === "string" ? e.description : undefined,
 			version: typeof e.version === "string" ? e.version : undefined,
-			strict: e.strict === true,
+			// undefined = default true; false = la entrada es la definición
+			// completa. NO normalizar a false (es load-bearing en
+			// discoverComponents desde #51: undefined ≠ false).
+			strict: typeof e.strict === "boolean" ? e.strict : undefined,
+			displayName: typeof e.displayName === "string" ? e.displayName : undefined,
+			category: typeof e.category === "string" ? e.category : undefined,
+			tags: Array.isArray(e.tags)
+				? e.tags.filter((t): t is string => typeof t === "string")
+				: undefined,
+			skills: e.skills as string | string[] | undefined,
+			commands: e.commands as string | string[] | undefined,
+			agents: e.agents as string | string[] | undefined,
+			hooks: e.hooks,
+			mcpServers:
+				e.mcpServers && typeof e.mcpServers === "object"
+					? (e.mcpServers as Record<string, unknown>)
+					: undefined,
 		});
 	}
-	return {
-		name,
-		owner: typeof c.owner === "string" ? c.owner : undefined,
-		plugins,
-	};
+	return { name, owner, pluginRoot, renames, plugins };
 }
 
 // ─── Descubrimiento de componentes en un plugin ─────────────────────────
@@ -315,17 +404,40 @@ function asArray(v: string | string[] | undefined): string[] {
 	return Array.isArray(v) ? v : [v];
 }
 
-/** Descubre componentes convertibles y no soportados en el root del plugin. */
-export function discoverComponents(pluginRoot: string): PluginComponents {
+/**
+ * Descubre componentes convertibles y no soportados en el root del plugin.
+ * `entry` (entrada del catálogo) habilita strict:false: la ENTRADA es la
+ * definición completa — plugin.json opcional; si existe declarando
+ * componentes → conflicto loud (paridad Claude). Con strict:true (default),
+ * plugin.json es la autoridad y la entrada puede complementar paths.
+ */
+export function discoverComponents(
+	pluginRoot: string,
+	entry?: MarketplacePluginEntry,
+): PluginComponents {
+	const strict = entry?.strict !== false; // default true
 	const manifest = readPluginManifest(pluginRoot);
+	if (!strict && manifest?.hasComponents) {
+		throw new ReaderError(
+			`strict:false con plugin.json que declara componentes (${pluginRoot})`,
+			"Con strict:false la entrada del catálogo es la definición completa: quita los componentes de plugin.json o elimina el archivo (paridad Claude: conflicto).",
+		);
+	}
 	const skills: string[] = [];
 	const commands: string[] = [];
 	const skipped: SkippedComponent[] = [];
 
-	// Skills: declaradas en el manifiesto, o skills/ por convención.
-	const skillRoots = manifest?.skills
-		? asArray(manifest.skills).map((p) => path.join(pluginRoot, p))
-		: [path.join(pluginRoot, "skills")];
+	// Skills: strict:false → solo las declaradas en la entrada; default →
+	// manifiesto (o convención), complementado por la entrada.
+	const entrySkills = asArray(entry?.skills);
+	const skillRoots = !strict
+		? entrySkills.map((p) => path.join(pluginRoot, p))
+		: [
+				...(manifest?.skills
+					? asArray(manifest.skills).map((p) => path.join(pluginRoot, p))
+					: [path.join(pluginRoot, "skills")]),
+				...entrySkills.map((p) => path.join(pluginRoot, p)),
+			];
 	for (const root of skillRoots) {
 		if (!fs.existsSync(root)) continue;
 		for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -340,9 +452,15 @@ export function discoverComponents(pluginRoot: string): PluginComponents {
 	}
 
 	// Commands: commands/*.md PLANOS (los anidados se reportan como saltados).
-	const commandRoots = manifest?.commands
-		? asArray(manifest.commands).map((p) => path.join(pluginRoot, p))
-		: [path.join(pluginRoot, "commands")];
+	const entryCommands = asArray(entry?.commands);
+	const commandRoots = !strict
+		? entryCommands.map((p) => path.join(pluginRoot, p))
+		: [
+				...(manifest?.commands
+					? asArray(manifest.commands).map((p) => path.join(pluginRoot, p))
+					: [path.join(pluginRoot, "commands")]),
+				...entryCommands.map((p) => path.join(pluginRoot, p)),
+			];
 	for (const root of commandRoots) {
 		if (!fs.existsSync(root)) continue;
 		for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -360,9 +478,13 @@ export function discoverComponents(pluginRoot: string): PluginComponents {
 		}
 	}
 
-	// MCP: inline en el manifiesto o .mcp.json por convención.
+	// MCP: strict:false → solo la entrada; default → manifiesto/entrada/.mcp.json.
 	let mcpServers: Record<string, unknown> = {};
-	if (manifest?.mcpServers) {
+	if (!strict && entry?.mcpServers) {
+		mcpServers = { ...entry.mcpServers };
+	} else if (entry?.mcpServers && !manifest?.mcpServers) {
+		mcpServers = { ...entry.mcpServers };
+	} else if (manifest?.mcpServers) {
 		mcpServers = { ...manifest.mcpServers };
 	} else {
 		const mcpPath = path.join(pluginRoot, ".mcp.json");

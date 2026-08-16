@@ -82,6 +82,24 @@ presente en prácticamente todo host con VS Code). Alternativa sin git binario:
 `isomorphic-git` (documentado como fase 2). `#ref` en la referencia pinea branch/tag
 (`--branch`). URLs SSH (`git@host:path.git`) soportadas.
 
+**Lado autor (paridad con `claude plugin validate`, #51)**:
+
+- `/ccplugin validate <dir>` — valida marketplaces y plugins con los MISMOS
+  readers del loader (cero falsos OK): schema, duplicados, sources (traversal,
+  https), versiones entry↔plugin.json, renames (terminación/ciclos),
+  strict:false sin conflictos, descubribilidad de componentes. ✔/⚠/✖ por check;
+  warnings no bloquean.
+- `metadata.pluginRoot` — sources string sin `./` resuelven contra la base
+  (`"formatter"` ≡ `"./plugins/formatter"`).
+- `renames` — migración automática al cargar (reconcile): rename → uninstall del
+  viejo + install del nuevo con notice (encadenado); `null` → uninstall limpio.
+  Install con nombre viejo sigue el map y registra el nombre vigente.
+- `strict: false` — la entrada del catálogo ES la definición (plugin.json
+  opcional; si declara componentes → conflicto loud). Skills/commands/MCP solo
+  de la entrada.
+- Metadata de descubrimiento — `displayName` (en `list --available`), `owner`
+  como objeto, `category`/`tags` parseados.
+
 **Paridad con `/plugin` de Claude Code** (mini-batch): bootstrap automático del
 oficial en el primer arranque (intento único, offline no bloquea), `list --available`
 con marcadores de instalado/remoto, `info` pre-install con inventario "instalará:",
