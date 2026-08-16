@@ -18,10 +18,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { SkippedComponent } from "./readers";
-import {
-	resourcesPromptsDir,
-	resourcesSkillsDir,
-} from "./constants";
+import { resourcesPromptsDir, resourcesSkillsDir } from "./constants";
 
 // ─── Frontmatter de skills (strings puros, sin YAML eval) ────────────────
 
@@ -30,10 +27,7 @@ import {
  * Sin frontmatter → se antepone uno con solo `name`. La única validación es
  * parse-read-only del resultado (el nombre escrito debe ser seguro).
  */
-export function rewriteSkillFrontmatter(
-	raw: string,
-	newName: string,
-): string {
+export function rewriteSkillFrontmatter(raw: string, newName: string): string {
 	const lines = raw.split("\n");
 	if (!raw.startsWith("---")) {
 		return `---\nname: ${newName}\n---\n\n${raw}`;
@@ -54,7 +48,10 @@ export function rewriteSkillFrontmatter(
 }
 
 /** Nombre de invocación final de una skill: <plugin>-<skill> con elisión. */
-export function namespacedSkillName(plugin: string, sourceName: string): string {
+export function namespacedSkillName(
+	plugin: string,
+	sourceName: string,
+): string {
 	const prefix = `${plugin}-`;
 	const elided = sourceName.startsWith(prefix)
 		? sourceName.slice(prefix.length)
@@ -160,13 +157,14 @@ export function removePluginResources(agentDir: string, plugin: string): void {
 /** Sustituye placeholders Claude en todos los strings del server config. */
 export function substituteMcpPlaceholders(
 	value: unknown,
-	ctx: { pluginRoot: string; projectDir: string; userConfig?: Record<string, string> },
+	ctx: {
+		pluginRoot: string;
+		projectDir: string;
+		userConfig?: Record<string, string>;
+	},
 ): unknown {
 	if (typeof value === "string") {
-		let out = value.replaceAll(
-			"${CLAUDE_PLUGIN_ROOT}",
-			ctx.pluginRoot,
-		);
+		let out = value.replaceAll("${CLAUDE_PLUGIN_ROOT}", ctx.pluginRoot);
 		out = out.replaceAll("${PLUGIN_ROOT}", ctx.pluginRoot);
 		out = out.replaceAll("${CLAUDE_PROJECT_DIR}", ctx.projectDir);
 		if (ctx.userConfig) {
@@ -240,10 +238,7 @@ export function mergeMcpServers(
 }
 
 /** Quita las llaves MCP de un plugin del config global (uninstall). */
-export function unmergeMcpServers(
-	configPath: string,
-	keys: string[],
-): void {
+export function unmergeMcpServers(configPath: string, keys: string[]): void {
 	if (keys.length === 0 || !fs.existsSync(configPath)) return;
 	try {
 		const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));

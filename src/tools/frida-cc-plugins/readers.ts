@@ -179,8 +179,7 @@ export function readPluginManifest(
 	assertSafeName(name, "de plugin (plugin.json)");
 	return {
 		name,
-		description:
-			typeof m.description === "string" ? m.description : undefined,
+		description: typeof m.description === "string" ? m.description : undefined,
 		version: typeof m.version === "string" ? m.version : undefined,
 		author: m.author as ClaudePluginManifest["author"],
 		skills: m.skills as string | string[] | undefined,
@@ -196,9 +195,7 @@ export function readPluginManifest(
 // ─── marketplace.json ────────────────────────────────────────────────────
 
 /** Parsea el source de una entrada del catálogo (formas Claude). */
-function parseEntrySource(
-	entry: Record<string, unknown>,
-): PluginSource | null {
+function parseEntrySource(entry: Record<string, unknown>): PluginSource | null {
 	const raw = entry.source;
 	// Path relativo al marketplace: "./dir" (forma más común).
 	if (typeof raw === "string") {
@@ -298,13 +295,16 @@ export function readMarketplaceCatalog(
 		plugins.push({
 			name: pname,
 			source,
-			description:
-				typeof e.description === "string" ? e.description : undefined,
+			description: typeof e.description === "string" ? e.description : undefined,
 			version: typeof e.version === "string" ? e.version : undefined,
 			strict: e.strict === true,
 		});
 	}
-	return { name, owner: typeof c.owner === "string" ? c.owner : undefined, plugins };
+	return {
+		name,
+		owner: typeof c.owner === "string" ? c.owner : undefined,
+		plugins,
+	};
 }
 
 // ─── Descubrimiento de componentes en un plugin ─────────────────────────

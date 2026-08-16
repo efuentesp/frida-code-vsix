@@ -561,9 +561,7 @@ export async function activate(
 		s: import("./tools/frida-cc-plugins").CcPluginsState,
 	): void {
 		if (s.error) {
-			void vscode.window.showWarningMessage(
-				`frida-cc-plugins: ${s.error}`,
-			);
+			void vscode.window.showWarningMessage(`frida-cc-plugins: ${s.error}`);
 		}
 	}
 

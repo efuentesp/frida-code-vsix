@@ -27,37 +27,37 @@ export const OFFICIAL_MARKETPLACE = "anthropics/claude-plugins-official";
  * devuelve paths; uninstall = borrar el subdir del plugin.
  */
 export function ccPluginsRoot(agentDir: string): string {
-	return path.join(agentDir, "cc-plugins");
+ return path.join(agentDir, "cc-plugins");
 }
 
 /** Registro declarativo (fuente de verdad; reconcile al cargar). */
 export function registryPath(agentDir: string): string {
-	return path.join(ccPluginsRoot(agentDir), "cc-plugins.json");
+ return path.join(ccPluginsRoot(agentDir), "cc-plugins.json");
 }
 
 /** Clones de marketplaces: marketplaces/<name>@<rev>/. */
 export function marketplacesDir(agentDir: string): string {
-	return path.join(ccPluginsRoot(agentDir), "marketplaces");
+ return path.join(ccPluginsRoot(agentDir), "marketplaces");
 }
 
 /** Contenido instalado de plugins: installed/<plugin>@<rev>/ (copia inmutable). */
 export function installedDir(agentDir: string): string {
-	return path.join(ccPluginsRoot(agentDir), "installed");
+ return path.join(ccPluginsRoot(agentDir), "installed");
 }
 
 /** Recursos convertidos expuestos vía resources_discover. */
 export function resourcesDir(agentDir: string): string {
-	return path.join(ccPluginsRoot(agentDir), "resources");
+ return path.join(ccPluginsRoot(agentDir), "resources");
 }
 
 /** Skills convertidas: resources/skills/<plugin>/<skill>/. */
 export function resourcesSkillsDir(agentDir: string): string {
-	return path.join(resourcesDir(agentDir), "skills");
+ return path.join(resourcesDir(agentDir), "skills");
 }
 
 /** Prompts convertidos (planos, hyphen): resources/prompts/<plugin>-<cmd>.md. */
 export function resourcesPromptsDir(agentDir: string): string {
-	return path.join(resourcesDir(agentDir), "prompts");
+ return path.join(resourcesDir(agentDir), "prompts");
 }
 
 /**
@@ -68,19 +68,19 @@ export function resourcesPromptsDir(agentDir: string): string {
  * = fallo con guía, nunca renombrar — rompería referencias por nombre).
  */
 export function mcpCollisionSlots(
-	agentDir: string,
-	cwd: string,
-	osHomedir: string,
+ agentDir: string,
+ cwd: string,
+ osHomedir: string,
 ): string[] {
-	return [
-		path.join(osHomedir, ".config", "mcp", "mcp.json"),
-		path.join(agentDir, "mcp.json"),
-		path.join(cwd, ".mcp.json"),
-		path.join(cwd, ".pi", "mcp.json"),
-	];
+ return [
+  path.join(osHomedir, ".config", "mcp", "mcp.json"),
+  path.join(agentDir, "mcp.json"),
+  path.join(cwd, ".mcp.json"),
+  path.join(cwd, ".pi", "mcp.json"),
+ ];
 }
 
 /** Archivo MCP global de frida (donde se registran servers de plugins). */
 export function fridaMcpConfigPath(agentDir: string): string {
-	return path.join(agentDir, "mcp.json");
+ return path.join(agentDir, "mcp.json");
 }
