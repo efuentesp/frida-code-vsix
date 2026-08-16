@@ -76,6 +76,20 @@ nada sola** — todo install requiere `/ccplugin add` explícito (gate D8:
 | `{source:"archive", url, sha256}` | ✅ zip https ≤256 MiB + digest verificado + unzip propio (zlib, cero deps nuevas) |
 | Marketplace local (path del FS) | ✅ Vía `marketplace add <path>` |
 
+## Presentación de resultados
+
+`ctx.ui.notify` es un toast efíreo — inadecuado para listas. `/ccplugin` enruta sus
+resultados por tres capas (interfaz `CcPluginsPresenter`, impl VS Code en
+`presenter.ts`, inyectada desde `extension.ts`):
+
+1. **Transcript**: `pi.sendMessage({customType: "frida.ccplugins", display: true})` —
+   bloque persistente en la conversación (renderer bonito de webview: follow-up).
+2. **Output channel** `Frida — cc-plugins`: append de cada comando + resultado.
+3. **QuickPick interactivo** para `list`/`list --available` (búsqueda + acciones
+   instalar/detalle/habilitar/deshabilitar) y **documento markdown** para `info`.
+
+Sin presenter (tests / TUI) degrada al notify actual.
+
 ## Arranque no bloqueante
 
 Bootstrap auto del marketplace oficial, settings de equipo (`extraMarketplaces`/

@@ -78,6 +78,8 @@ export interface CreateCcPluginsOpts {
 	enabledPlugins?: Record<string, boolean>;
 	/** Delay inicial del auto-update background (default 5s; tests: 0). */
 	autoUpdateDelayMs?: number;
+	/** Presenter VS Code de resultados (output/quickpick/doc). Sin él, notify. */
+	presenter?: import("./presenter").CcPluginsPresenter;
 }
 
 /** Estado del wrapper para el host (notificaciones). */
@@ -364,9 +366,82 @@ async function autoUpdateTick(
 	}
 }
 
+/** Acciones del QuickPick (cierre sobre agentDir/workCwd). */
+function quickPickActions(
+	agentDir: string,
+	workCwd: string,
+	notify: Notify,
+	presenter?: import("./presenter").CcPluginsPresenter,
+): import("./presenter").CcListActions {
+	return {
+		install: async (ref) => {
+			const res = await installPlugin(agentDir, ref, { cwd: workCwd });
+			return `Plugin '${res.plugin}' instalado (${res.skills.length} skills, ${res.commands.length} commands, ${res.mcpServers.length} MCP). Ejecuta /reload para activarlo.`;
+		},
+		uninstall: async (name) => {
+			await uninstallPlugin(agentDir, name, { cwd: workCwd });
+			return `Plugin '${name}' desinstalado. Ejecuta /reload.`;
+		},
+		toggle: async (name, enable) => {
+			setPluginEnabled(agentDir, name, enable, { cwd: workCwd });
+			return `Plugin '${name}' ${enable ? "habilitado" : "deshabilitado"}. Ejecuta /reload.`;
+		},
+		detailDoc: async (ref) => {
+			const cat = pluginCatalogInfo(agentDir, ref);
+			const lines = [
+				`## ${cat.name}@${cat.marketplace}${cat.version ? ` v${cat.version}` : ""}`,
+				"",
+				cat.description ?? "",
+				cat.remote ? `- **source remoto**: ${cat.remote}` : "",
+				cat.components
+					? `- **instalará**: ${cat.components.skills.length} skills, ${cat.components.commands.length} commands, ${cat.components.mcpServers.length} MCP`
+					: "",
+				cat.components?.estimatedTokens
+					? `- **contexto**: ~${cat.components.estimatedTokens} tokens/turno aprox.`
+					: "",
+				cat.components?.skills.length
+					? `- skills: ${cat.components.skills.join(", ")}`
+					: "",
+				cat.components?.commands.length
+					? `- commands: ${cat.components.commands.join(", ")}`
+					: "",
+				cat.components?.mcpServers.length
+					? `- MCP: ${cat.components.mcpServers.join(", ")}`
+					: "",
+				cat.components?.skipped.length
+					? `- omitidos: ${cat.components.skipped.map((s) => s.kind).join(", ")}`
+					: "",
+			].filter((l) => l !== "");
+			const md = lines.join("\n");
+			if (presenter) {
+				await presenter.document(`cc-plugins: ${ref}`, md);
+			} else {
+				notify(md);
+			}
+			return "";
+		},
+		notify: (m, l) => notify(m, l),
+	};
+}
+
 /** Registra el comando /ccplugin con sus subcomandos. */
 function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
-	const { agentDir, cwd, onLog } = opts;
+	const { agentDir, cwd, onLog, presenter } = opts;
+
+	/** Bloque persistente en el transcript (customType propio; display =
+	 *  fallback de texto plano — renderer bonito de la webview: follow-up). */
+	const chatBlock = (title: string, body: string): void => {
+		try {
+			pi.sendMessage({
+				customType: "frida.ccplugins",
+				content: `cc-plugins — ${title}\n${body}`,
+				display: true,
+				details: { title, body },
+			});
+		} catch {
+			/* transcript no disponible (RPC) — queda el output channel */
+		}
+	};
 	pi.registerCommand(CC_PLUGINS_COMMAND, {
 		description:
 			"Gestiona marketplaces y plugins de Claude Code (add/remove/list/enable/disable/marketplace/bootstrap)",
@@ -385,16 +460,47 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							const avail = listAvailable(agentDir, {
 								marketplace: positional[0],
 							});
-							notifyCtx(
+							const line = (a: (typeof avail)[number]) =>
+								`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.displayName && a.displayName !== a.name ? ` — ${a.displayName}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [source remoto]" : ""}`;
+							const body =
 								avail.length
-									? avail
-											.map(
-												(a) =>
-													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.displayName && a.displayName !== a.name ? ` — ${a.displayName}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [source remoto]" : ""}`,
-											)
-											.join("\n")
-									: "Sin plugins disponibles en los marketplaces registrados.",
+									? avail.map(line).join("\n")
+									: "Sin plugins disponibles en los marketplaces registrados.";
+							// Persistencia multicapa (UX #49): transcript + output
+							// channel; interacción solo si hay presenter (VS Code).
+							chatBlock(`disponibles (${avail.length})`, body);
+							presenter?.append(
+								[`$ ccplugin list --available`, ...body.split("\n"), ""],
+								{ show: true },
 							);
+							if (presenter) {
+								await presenter.interactiveList(
+									avail.map((a) => ({
+										label: `${a.name}@${a.marketplace}`,
+										description: a.version ? `v${a.version}` : undefined,
+										detail: [
+											a.displayName && a.displayName !== a.name
+												? a.displayName
+												: undefined,
+											a.installed
+												? a.enabled
+													? "instalado"
+													: "instalado, deshabilitado"
+												: undefined,
+											a.remote ? "source remoto" : undefined,
+										]
+											.filter(Boolean)
+											.join(" · "),
+										installed: a.installed,
+										enabled: a.enabled,
+										ref: `${a.name}@${a.marketplace}`,
+									})),
+									quickPickActions(agentDir, workCwd, notifyCtx, presenter),
+									`Disponibles (${avail.length})`,
+								);
+							} else {
+								notifyCtx(body); // fallback: toast (tests/sin VS Code)
+							}
 							return;
 						}
 						if (flags.includes("--enabled") || flags.includes("--disabled")) {
@@ -411,7 +517,41 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							);
 							return;
 						}
-						notifyCtx(formatList(agentDir, workCwd));
+						const bodyList = formatList(agentDir, workCwd);
+						chatBlock("instalados", bodyList);
+						presenter?.append(
+							[`$ ccplugin list`, ...bodyList.split("\n"), ""],
+							{ show: true },
+						);
+						if (presenter) {
+							const mergedL = mergeLayers(loadLayers(agentDir, workCwd));
+							await presenter.interactiveList(
+								mergedL.plugins.map((p) => ({
+									label: `${p.name}@${p.rec.marketplace}`,
+									description: [
+										p.rec.version ? `v${p.rec.version}` : undefined,
+										p.scope !== "user" ? `[${p.scope}]` : undefined,
+									]
+										.filter(Boolean)
+										.join(" "),
+									detail: [
+										`${p.rec.skills.length} skills`,
+										`${p.rec.commands.length} commands`,
+										`${p.rec.mcpServers.length} MCP`,
+										p.rec.enabled ? undefined : "deshabilitado",
+									]
+										.filter(Boolean)
+										.join(" · "),
+									installed: true,
+									enabled: p.rec.enabled,
+									ref: `${p.name}@${p.rec.marketplace}`,
+								})),
+								quickPickActions(agentDir, workCwd, notifyCtx, presenter),
+								`Instalados (${mergedL.plugins.length})`,
+							);
+						} else {
+							notifyCtx(bodyList);
+						}
 						return;
 					}
 					case "bootstrap": {
@@ -543,6 +683,20 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						return;
 					}
 					case "info": {
+						// Con presenter: detalle completo en documento markdown.
+						if (presenter && rest[0] && !rest[0].includes("--")) {
+							try {
+								const actions = quickPickActions(
+									agentDir,
+									workCwd,
+									notifyCtx,
+									presenter,
+								);
+								await actions.detailDoc(rest[0]);
+							} catch (e: any) {
+								notifyCtx(`cc-plugins: ${e?.message ?? e}`, "error");
+							}
+						}
 						const p: ScopedPlugin | undefined = mergeLayers(
 							loadLayers(agentDir, workCwd),
 						).plugins.find((sp) => sp.name === rest[0]);

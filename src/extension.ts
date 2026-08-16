@@ -44,6 +44,7 @@ import {
 	getApiKeyProvider,
 } from "./providers/api-key-providers";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
+import { createVscodePresenter as createCcPluginsPresenter } from "./tools/frida-cc-plugins/presenter";
 import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
@@ -943,6 +944,7 @@ export async function activate(
 					onCcPluginsState: handleCcPluginsState,
 					ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
 					ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
+				ccPluginsPresenter: createCcPluginsPresenter(),
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -3881,6 +3883,7 @@ export async function activate(
 				onCcPluginsState: handleCcPluginsState,
 				ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
 				ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
+				ccPluginsPresenter: createCcPluginsPresenter(),
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

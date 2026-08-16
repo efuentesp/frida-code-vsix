@@ -40,8 +40,12 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    /ccplugin list --available
    ```
 
-   Cada línea es `plugin@marketplace` con versión, si ya está instalado y su source
-   (`[source remoto]` = repo/npm/zip, se descarga al instalar).
+   El resultado llega por **tres canales a la vez**: un bloque en la conversación
+   (persistente, queda en el historial), el **panel Output "Frida — cc-plugins"**
+   (log de cada comando, copiable) y un **selector interactivo** — lista con búsqueda;
+   `Enter` sobre un plugin abre sus acciones: *Detalle (documento markdown con
+   inventario y costo)*, *Instalar*, *Deshabilitar/Habilitar*, *Desinstalar*. Todo se
+   puede hacer desde ahí sin escribir más comandos.
 
 3. Consulta el detalle ANTES de instalar (qué traerá y su costo):
 
@@ -251,7 +255,17 @@ En `marketplace.json`, cada entrada declara de dónde baja el plugin:
   se tocan.
 - Véalos con `/mcp` del adaptador de frida.
 
-## 9. Dónde vive todo (y limpieza manual)
+## 9. Salida de los comandos
+
+- **Conversación**: cada `list`/`info` deja un bloque propio en el transcript.
+- **Output channel** `Frida — cc-plugins`: historial persistente de todos los comandos
+  y sus resultados (`$ ccplugin …`).
+- **QuickPick interactivo** (`list`, `list --available`): búsqueda + acciones directas
+  (instalar/detalle/habilitar/desinstalar) — el modo rápido de operar.
+- **Documento markdown** (`info`, "Detalle"): ficha del plugin con componentes, costo
+  estimado y omitidos; se abre en un editor temporal.
+
+## 10. Dónde vive todo (y limpieza manual)
 
 ```text
 ~/.frida/cc-plugins/
