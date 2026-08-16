@@ -1,16 +1,18 @@
 /**
  * frida-cc-plugins — presenter de resultados (issue #49, UX post-e2e).
  *
- * El notify de la sesión es un TOAST efíreo: inadecuado para listas. Este
- * presenter da tres canales VS Code persistentes/interactivos:
+ * El notify de la sesión es un TOAST efíreo: inadecuado para listas. Canales:
  *
- *  - OutputChannel "Frida — cc-plugins": log persistente de cada comando
- *    (append + show). Siempre activo cuando hay presenter.
- *  - QuickPick interactivo: lista seleccionable con búsqueda; Enter abre el
- *    menú de acciones (Instalar/Detalle/Deshabilitar/Desinstalar) — el
- *    patrón VS Code clásico para elegir de un catálogo.
- *  - Documento markdown: detalle completo en un doc temporal (tablas,
- *    copiable).
+ *  - Bloque en el chat (pi.sendMessage customType "frida.ccplugins"): el
+ *    host lo publica al webview como bloque info — VISIBLE en la ventana de
+ *    frida, persiste en el transcript.
+ *  - Diálogo del WEBVIEW (ctx.ui.select → UiBridge → UiDialog): la lista
+ *    interactiva vive DENTRO de frida, igual que los diálogos de las
+ *    extensiones. NADA de showQuickPick: la paleta de VS Code queda fuera
+ *    del webview, roba el foco y se cierra sola (reporte e2e #49).
+ *  - OutputChannel "Frida — cc-plugins": log persistente y silencioso
+ *    (append sin robar foco; se abre manualmente desde el panel Output).
+ *  - Documento markdown: detalle completo en un doc temporal (info/Detalle).
  *
  * La INTERFAZ vive aquí (type-only para index.ts → los tests no cargan
  * vscode); la implementación `createVscodePresenter()` solo la importa
@@ -18,7 +20,7 @@
  */
 import * as vscode from "vscode";
 
-/** Fila de lista para QuickPick/output/doc. */
+/** Fila de lista para diálogo del webview/output/doc. */
 export interface CcListRow {
 	/** Etiqueta principal: "plugin@marketplace". */
 	label: string;
@@ -44,14 +46,24 @@ export interface CcListActions {
 	notify: (message: string, level?: "info" | "warning" | "error") => void;
 }
 
+/** Diálogo del webview de frida (slice de ExtensionUIContext → UiDialog). */
+export interface CcWebDialog {
+	select(title: string, options: string[]): Promise<string | undefined>;
+}
+
 export interface CcPluginsPresenter {
-	/** Log persistente (output channel). `show` lo enfoca. */
-	append(lines: string[], opts?: { show?: boolean }): void;
-	/** Lista interactiva con acciones (QuickPick). */
+	/** Log persistente (output channel). Silencioso: nunca roba foco. */
+	append(lines: string[]): void;
+	/**
+	 * Lista interactiva VÍA DIÁLOGO DEL WEBVIEW (CcWebDialog = ctx.ui del
+	 * comando): elegir plugin → elegir acción → ejecutar. Sin diálogo
+	 * (tests/TUI) no hace nada — el listado ya quedó en el bloque de chat.
+	 */
 	interactiveList(
 		rows: CcListRow[],
 		actions: CcListActions,
 		title: string,
+		ui?: CcWebDialog,
 	): Promise<void>;
 	/** Documento markdown temporal con el contenido. */
 	document(title: string, markdown: string): Promise<void>;
@@ -64,29 +76,23 @@ export function createVscodePresenter(): CcPluginsPresenter {
 		(channel ??= vscode.window.createOutputChannel("Frida — cc-plugins"));
 
 	return {
-		append(lines, opts) {
+		append(lines) {
 			const c = out();
 			for (const l of lines) c.appendLine(l);
-			c.show(!opts?.show); // preserveFocus por defecto (no roba foco)
+			// Sin show(): el panel Output NO se revela solo ni roba foco —
+			// todo lo visible vive en el webview; esto es log de consulta.
 		},
-		async interactiveList(rows, actions, title) {
-			interface PickItem extends vscode.QuickPickItem {
-				row: CcListRow;
-			}
-			const items: PickItem[] = rows.map((r) => ({
-				label: r.label,
-				description: r.description,
-				detail: r.detail,
-				row: r,
-			}));
-			const picked = (await vscode.window.showQuickPick(items, {
-				placeHolder: `${title} — selecciona un plugin (Esc para cerrar)`,
-				matchOnDescription: true,
-				matchOnDetail: true,
-			})) as PickItem | undefined;
-			if (!picked) return;
-			const row = picked.row;
-			// Menú de acciones según estado.
+		async interactiveList(rows, actions, title, ui) {
+			if (!ui) return;
+			// Paso 1: elegir plugin — DIÁLOGO DEL WEBVIEW (UiDialog).
+			const labels = rows.map((r) =>
+				[r.label, r.description].filter(Boolean).join("  "),
+			);
+			const chosen = await ui.select(`${title} — elige un plugin`, labels);
+			const idx = chosen ? labels.indexOf(chosen) : -1;
+			const row = idx >= 0 ? rows[idx] : undefined;
+			if (!row) return;
+			// Paso 2: menú de acciones según estado — mismo diálogo.
 			const opciones: string[] = ["Detalle (documento)"];
 			if (row.installed) {
 				opciones.push(row.enabled === false ? "Habilitar" : "Deshabilitar");
@@ -94,9 +100,7 @@ export function createVscodePresenter(): CcPluginsPresenter {
 			} else {
 				opciones.push("Instalar");
 			}
-			const accion = await vscode.window.showQuickPick(opciones, {
-				placeHolder: `${row.label} — ¿qué hacer?`,
-			});
+			const accion = await ui.select(`${row.label} — ¿qué hacer?`, opciones);
 			if (!accion) return;
 			try {
 				switch (accion) {

@@ -257,13 +257,17 @@ En `marketplace.json`, cada entrada declara de dónde baja el plugin:
 
 ## 9. Salida de los comandos
 
-- **Conversación**: cada `list`/`info` deja un bloque propio en el transcript.
-- **Output channel** `Frida — cc-plugins`: historial persistente de todos los comandos
-  y sus resultados (`$ ccplugin …`).
-- **QuickPick interactivo** (`list`, `list --available`): búsqueda + acciones directas
-  (instalar/detalle/habilitar/desinstalar) — el modo rápido de operar.
-- **Documento markdown** (`info`, "Detalle"): ficha del plugin con componentes, costo
-  estimado y omitidos; se abre en un editor temporal.
+Todo vive **dentro del webview de frida** (nada de paletas de VS Code):
+
+- **Conversación**: cada `list`/`info` deja un bloque propio en el transcript —
+  visible y persistente.
+- **Diálogo de selección** (`list`, `list --available`): el mismo diálogo que usan
+  las extensiones; elegir plugin → acción (instalar/detalle/habilitar/deshabilitar).
+- **Output channel** `Frida — cc-plugins`: log silencioso de todos los comandos
+  (`$ ccplugin …`); ábrelo desde el panel Output cuando lo necesites.
+- **Documento markdown** (`info`, "Detalle"): ficha del plugin (componentes, costo
+  estimado, omitidos) — también queda como bloque en el chat; el editor temporal es
+  un extra para copiar.
 
 ## 10. Dónde vive todo (y limpieza manual)
 

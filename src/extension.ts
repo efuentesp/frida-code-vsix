@@ -1878,6 +1878,20 @@ export async function activate(
 					abortDiag(
 						`message_end — role=${event.message?.role ?? "?"} stopReason=${event.message?.stopReason ?? "?"}`,
 					);
+					// Mensajes custom de extensiones con render en el chat: hoy solo
+					// frida.ccplugins (bloque de resultados de /ccplugin — UX #49).
+					// El customType es el filtro: frida-pipeline también manda customs
+					// (git-context, guidance) que NO deben pintarse. display=false los
+					// excluye (metadata silenciosa).
+					if (
+						event.message?.role === "custom" &&
+						event.message.customType === "frida.ccplugins" &&
+						event.message.display &&
+						typeof event.message.content === "string" &&
+						event.message.content.trim()
+					) {
+						post({ type: "info", text: event.message.content });
+					}
 					if (
 						event.message?.role === "assistant" &&
 						event.message?.stopReason === "aborted"

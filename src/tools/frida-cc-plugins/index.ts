@@ -371,7 +371,8 @@ function quickPickActions(
 	agentDir: string,
 	workCwd: string,
 	notify: Notify,
-	presenter?: import("./presenter").CcPluginsPresenter,
+	presenter: import("./presenter").CcPluginsPresenter | undefined,
+	chat: (title: string, body: string) => void,
 ): import("./presenter").CcListActions {
 	return {
 		install: async (ref) => {
@@ -413,10 +414,11 @@ function quickPickActions(
 					: "",
 			].filter((l) => l !== "");
 			const md = lines.join("\n");
+			// El detalle vive en el CHAT (bloque visible del webview); el doc
+			// markdown es un extra para copiar (editor temporal).
+			chat(`info ${ref}`, md);
 			if (presenter) {
 				await presenter.document(`cc-plugins: ${ref}`, md);
-			} else {
-				notify(md);
 			}
 			return "";
 		},
@@ -469,10 +471,11 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							// Persistencia multicapa (UX #49): transcript + output
 							// channel; interacción solo si hay presenter (VS Code).
 							chatBlock(`disponibles (${avail.length})`, body);
-							presenter?.append(
-								[`$ ccplugin list --available`, ...body.split("\n"), ""],
-								{ show: true },
-							);
+							presenter?.append([
+								`$ ccplugin list --available`,
+								...body.split("\n"),
+								"",
+							]);
 							if (presenter) {
 								await presenter.interactiveList(
 									avail.map((a) => ({
@@ -495,8 +498,9 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 										enabled: a.enabled,
 										ref: `${a.name}@${a.marketplace}`,
 									})),
-									quickPickActions(agentDir, workCwd, notifyCtx, presenter),
+									quickPickActions(agentDir, workCwd, notifyCtx, presenter, chatBlock),
 									`Disponibles (${avail.length})`,
+									ctx.ui, // diálogo del WEBVIEW de frida (UiDialog)
 								);
 							} else {
 								notifyCtx(body); // fallback: toast (tests/sin VS Code)
@@ -519,10 +523,11 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						}
 						const bodyList = formatList(agentDir, workCwd);
 						chatBlock("instalados", bodyList);
-						presenter?.append(
-							[`$ ccplugin list`, ...bodyList.split("\n"), ""],
-							{ show: true },
-						);
+						presenter?.append([
+							`$ ccplugin list`,
+							...bodyList.split("\n"),
+							"",
+						]);
 						if (presenter) {
 							const mergedL = mergeLayers(loadLayers(agentDir, workCwd));
 							await presenter.interactiveList(
@@ -546,8 +551,9 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									enabled: p.rec.enabled,
 									ref: `${p.name}@${p.rec.marketplace}`,
 								})),
-								quickPickActions(agentDir, workCwd, notifyCtx, presenter),
+								quickPickActions(agentDir, workCwd, notifyCtx, presenter, chatBlock),
 								`Instalados (${mergedL.plugins.length})`,
+								ctx.ui, // diálogo del WEBVIEW de frida (UiDialog)
 							);
 						} else {
 							notifyCtx(bodyList);
@@ -691,6 +697,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									workCwd,
 									notifyCtx,
 									presenter,
+									chatBlock,
 								);
 								await actions.detailDoc(rest[0]);
 							} catch (e: any) {
