@@ -1528,6 +1528,39 @@ body {
 	gap: 8px;
 }
 
+/* Switch pill de habilitado (fin de fila de recurso — web style). */
+.ccp-switch {
+	flex-shrink: 0;
+	width: 26px;
+	height: 14px;
+	padding: 0;
+	border: none;
+	border-radius: 7px;
+	background: var(--vscode-inputValidation-errorBorder, #f14c4c);
+	position: relative;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+.ccp-switch-on {
+	background: var(--vscode-inputValidation-infoBorder, #2ea043);
+}
+.ccp-switch-knob {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--vscode-editor-background, #fff);
+	transition: left 0.15s ease;
+}
+.ccp-switch-on .ccp-switch-knob {
+	left: 14px;
+}
+.ccp-switch:hover .ccp-switch-knob {
+	box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+}
+
 /* Instalados v3: recursos por tipo (skills/commands/MCP). */
 .ccp-res-section {
 	display: flex;

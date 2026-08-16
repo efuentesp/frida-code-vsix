@@ -51,8 +51,9 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    una): secciones *Skills / Commands / Servidores MCP*, y cada fila muestra tipo,
    plugin de origen, estado y costo real (`~N tok` del archivo). `⏎` (o click) abre
    la **vista del recurso**: descripción, origen, costo, path y selector de estado —
-   que alterna a TODO el plugin dueño; `Ctrl+Espacio` en la lista alterna el plugin
-   sin abrir nada. Desde el detalle, **Ver plugin →** abre la vista completa del
+   que alterna a TODO el plugin dueño; **Espacio** sobre la fila (o click en el
+   switch `⏺/⏹` del final) alterna el plugin sin abrir nada — los nombres no llevan
+   espacios, así que el filtro no se ve afectado (mismo truco que Claude). Desde el detalle, **Ver plugin →** abre la vista completa del
    plugin (desinstalar, costo total, componentes). Teclado: `Tab` cicla
    zonas (tabs → lista → botones), `←/→` o `1-4` cambia tab, `↑↓` mueve el foco (la
    ficha se actualiza en vivo), `⏎` ejecuta la acción primaria, `Esc` sube de nivel

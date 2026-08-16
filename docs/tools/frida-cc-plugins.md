@@ -103,8 +103,11 @@ solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
   (bootstrap/marketplace/install) con Reintentar. Instalados: lista de
   RECURSOS por tipo (Skills/Commands/Servidores MCP — paridad con Claude, que
   lista skills una por una): cada fila lleva kind, plugin dueño, estado
-  (heredado del plugin: el registry habilita por plugin) y costo real por
-  recurso (bytes/4 del SKILL.md/prompt); `Ctrl+Espacio` alterna el plugin;
+  (heredado del plugin: el registry habilita por plugin; switch pill
+  `⏺/⏹` clicable al final de la fila) y costo real por
+  recurso (bytes/4 del SKILL.md/prompt); **Espacio** sobre la fila enfocada
+  alterna el plugin (interceptado con preventDefault — los nombres no llevan
+  espacios, el filtro no se afecta; paridad del "Space to toggle" de Claude);
   `⏎`/click abre la vista del recurso (descripción del frontmatter, origen,
   path, selector de estado "afecta a TODO el plugin"); **Ver plugin →** llega a
   la vista del plugin (desinstalar, costo total — `description` y

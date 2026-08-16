@@ -402,10 +402,11 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			return;
 		}
 		if (addOpen) return; // el input del diálogo captura sus propias teclas
-		if (e.ctrlKey && e.key === " ") {
-			// Toggle rápido habilitado/deshabilitado (paridad del Space de
-			// Claude; Espacio simple sigue escribiendo en el filtro). En
-			// Instalados alterna el PLUGIN dueño del recurso enfocado.
+		if (e.key === " " && !e.ctrlKey && !e.metaKey && !e.altKey) {
+			// Espacio = toggle rápido (paridad Claude: "Space to toggle").
+			// Los nombres de recursos/plugins no llevan espacios → el filtro
+			// jamás necesita uno; el preventDefault evita que llegue al input.
+			// En Instalados alterna el PLUGIN dueño del recurso enfocado.
 			if (tab === "installed" && !inInstView && !inResView && resItem) {
 				e.preventDefault();
 				onAction(panel.id, {
@@ -550,7 +551,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						: tab === "errors"
 							? "↑↓ error · ⏎ reintentar"
 							: tab === "installed"
-								? "↑↓ recurso · Ctrl+Espacio alterna plugin · ⏎ detalle"
+								? "↑↓ recurso · Espacio alterna plugin · ⏎ detalle"
 								: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
 
 	const menuLabels = useMemo(() => {
@@ -986,12 +987,30 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 													<span className="ccp-row-label">{r.name}</span>
 													<span className="ccp-comp">{r.kind}</span>
 													<span className="ccp-res-plugin">de {r.plugin}</span>
-													<span className={`ccp-badge ${STATUS_CLS[r.status]}`}>
-														{STATUS_LABEL[r.status]}
-													</span>
 													{r.tokens ? (
 														<span className="ccp-row-tok">~{r.tokens} tok</span>
 													) : null}
+													<button
+														type="button"
+														tabIndex={-1}
+														className={`ccp-switch${r.status === "installed" ? " ccp-switch-on" : ""}`}
+														title={
+															r.status === "installed"
+																? "Habilitado — click para deshabilitar (afecta a todo el plugin)"
+																: "Deshabilitado — click para habilitar (afecta a todo el plugin)"
+														}
+														onClick={(ev) => {
+															// Mouse: toggle directo sin abrir el detalle.
+															ev.stopPropagation();
+															onAction(panel.id, {
+																kind:
+																	r.status === "disabled" ? "enable" : "disable",
+																ref: r.pluginRef,
+															});
+														}}
+													>
+														<span className="ccp-switch-knob" />
+													</button>
 												</button>
 											);
 										})}
