@@ -43,6 +43,10 @@ export interface PluginRecord {
 	rev: string;
 	enabled: boolean;
 	installedAt: string;
+	/** Descripción del catálogo (para la vista de detalle instalado). */
+	description?: string;
+	/** Costo de contexto estimado al instalar (tokens/turno). */
+	estimatedTokens?: number;
 	/** Nombres de invocación convertidos (para listar/auditar). */
 	skills: string[];
 	commands: string[];

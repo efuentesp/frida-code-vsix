@@ -469,6 +469,13 @@ export interface CcPanelRowWs {
 	homepage?: string;
 	/** Llega async vía ccplugins_row_meta (git log cacheado). */
 	lastUpdated?: string;
+	/** Solo instaladas: chips compactos (skill/cmd/mcp). */
+	components?: string[];
+	/** Costo de contexto estimado (tokens/turno). */
+	tokens?: number;
+	/** Dir real de instalación. */
+	path?: string;
+	description?: string;
 }
 
 /** Tarjeta de marketplace (tab Marketplaces). */

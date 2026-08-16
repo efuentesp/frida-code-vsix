@@ -31,6 +31,14 @@ export interface CcPanelRow {
 	homepage?: string;
 	/** Último commit del dir (async vía rowMeta — llega por patch). */
 	lastUpdated?: string;
+	/** Solo instalados: chips compactos de componentes (skill/cmd/mcp). */
+	components?: string[];
+	/** Costo de contexto estimado (tokens/turno), persistido al instalar. */
+	tokens?: number;
+	/** Dir real de instalación (~/.frida/cc-plugins/installs/<plugin>@<rev>). */
+	path?: string;
+	/** Descripción del catálogo (vista completa de instalado). */
+	description?: string;
 }
 
 /** Tarjeta de marketplace (tab Marketplaces). */

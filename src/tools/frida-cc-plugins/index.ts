@@ -27,6 +27,7 @@ import {
 	CC_PLUGINS_COMMAND,
 	CC_PLUGINS_FACTORY_NAME,
 	OFFICIAL_MARKETPLACE,
+	installedDir,
 	registryPath,
 	resourcesPromptsDir,
 	resourcesSkillsDir,
@@ -403,18 +404,24 @@ function catalogRowMarkdown(agentDir: string, ref: string): string {
 }
 
 /** Ficha markdown de un plugin INSTALADO (registry rec). */
-function installedRowMarkdown(p: ScopedPlugin): string {
+function installedRowMarkdown(p: ScopedPlugin, installPath: string): string {
 	const r = p.rec;
 	const lines = [
 		`## ${p.name}${r.version ? ` v${r.version}` : ""}`,
 		"",
 		`${r.marketplace} · scope ${p.scope}${r.enabled ? "" : " · deshabilitado"}`,
 		"",
-		`**instalado**: ${r.skills.length} skills · ${r.commands.length} commands · ${r.mcpServers.length} MCP`,
 	];
+	if (r.description) lines.push(r.description, "");
+	lines.push(
+		`**instalado**: ${r.skills.length} skills · ${r.commands.length} commands · ${r.mcpServers.length} MCP`,
+	);
+	if (r.estimatedTokens)
+		lines.push(`**contexto**: ~${fmtTokens(r.estimatedTokens)} tokens/turno`);
 	if (r.skills.length) lines.push(`skills: ${r.skills.join(", ")}`);
 	if (r.commands.length) lines.push(`commands: ${r.commands.join(", ")}`);
 	if (r.mcpServers.length) lines.push(`MCP: ${r.mcpServers.join(", ")}`);
+	lines.push(`path: ${installPath}`);
 	return lines.join("\n");
 }
 
@@ -472,13 +479,28 @@ function buildInstalledRows(
 	cwd: string,
 ): import("./panel").CcPanelRow[] {
 	return mergeLayers(loadLayers(agentDir, cwd)).plugins.map(
-		(p): import("./panel").CcPanelRow => ({
+		(p): import("./panel").CcPanelRow => {
+			const installPath = path.join(
+				installedDir(agentDir),
+				`${p.name}@${p.rec.rev}`,
+			);
+			return ({
 			ref: `${p.name}@${p.rec.marketplace}`,
 			label: p.scope !== "user" ? `${p.name} [${p.scope}]` : p.name,
 			version: p.rec.version,
 			status: p.rec.enabled ? "installed" : "disabled",
-			markdown: installedRowMarkdown(p),
-		}),
+			markdown: installedRowMarkdown(p, installPath),
+			// Datos para la fila y la vista completa (UX Instalados v3):
+			components: [
+				...(p.rec.skills.length ? ["skill"] : []),
+				...(p.rec.commands.length ? ["cmd"] : []),
+				...(p.rec.mcpServers.length ? ["mcp"] : []),
+			],
+			tokens: p.rec.estimatedTokens,
+			path: installPath,
+				description: p.rec.description,
+			});
+		},
 	);
 }
 

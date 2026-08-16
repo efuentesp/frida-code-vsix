@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Package, RefreshCw, Search, Store, X } from "lucide-react";
+import {
+	AlertTriangle,
+	Package,
+	RefreshCw,
+	Search,
+	Store,
+	X,
+} from "lucide-react";
 import { Markdown } from "./Markdown";
 import type { CcPanelErrorWs, CcPanelRowWs, CcPanelWs } from "../types";
 
@@ -74,38 +81,51 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	const [menuIdx, setMenuIdx] = useState(0);
 	const [confirmRemove, setConfirmRemove] = useState(false);
 	const [addOpen, setAddOpen] = useState(false);
+	// Vista completa de un plugin instalado (⏎ en Instalados) + selector de
+	// estado binario on/off (decisión: pantalla completa + Ctrl+Espacio).
+	const [instView, setInstView] = useState<string | null>(null);
+	const [stateIdx, setStateIdx] = useState(0);
 	const [addSpec, setAddSpec] = useState("");
 	const listRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const addInputRef = useRef<HTMLInputElement>(null);
 	const rootRef = useRef<HTMLDivElement>(null);
 
-	const tabs: { key: Tab; label: string; icon: typeof Search; count?: number }[] =
-		[
-			{ key: "discover", label: "Discover", icon: Search, count: panel.rows.length },
-			{
-				key: "installed",
-				label: "Instalados",
-				icon: Package,
-				count: panel.installed.length,
-			},
-			{
-				key: "marketplaces",
-				label: "Marketplaces",
-				icon: Store,
-				count: panel.marketplaces.length,
-			},
-			...(panel.errors.length
-				? [
-						{
-							key: "errors" as Tab,
-							label: "Errores",
-							icon: AlertTriangle,
-							count: panel.errors.length,
-						},
-					]
-				: []),
-		];
+	const tabs: {
+		key: Tab;
+		label: string;
+		icon: typeof Search;
+		count?: number;
+	}[] = [
+		{
+			key: "discover",
+			label: "Discover",
+			icon: Search,
+			count: panel.rows.length,
+		},
+		{
+			key: "installed",
+			label: "Instalados",
+			icon: Package,
+			count: panel.installed.length,
+		},
+		{
+			key: "marketplaces",
+			label: "Marketplaces",
+			icon: Store,
+			count: panel.marketplaces.length,
+		},
+		...(panel.errors.length
+			? [
+					{
+						key: "errors" as Tab,
+						label: "Errores",
+						icon: AlertTriangle,
+						count: panel.errors.length,
+					},
+				]
+			: []),
+	];
 
 	// Filas de la tab activa.
 	const activeRows = useMemo(
@@ -114,15 +134,20 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	);
 	const menuMkt = useMemo(
 		() =>
-			mktMenu
-				? panel.marketplaces.find((m) => m.name === mktMenu)
-				: undefined,
+			mktMenu ? panel.marketplaces.find((m) => m.name === mktMenu) : undefined,
 		[mktMenu, panel.marketplaces],
 	);
 	const inMktMenu = tab === "marketplaces" && !!mktMenu;
+	const inInstView = tab === "installed" && !!instView;
+	const viewRow = useMemo(
+		() =>
+			instView ? panel.installed.find((r) => r.ref === instView) : undefined,
+		[instView, panel.installed],
+	);
 	const showSearch =
 		(tab === "discover" || tab === "installed" || tab === "marketplaces") &&
-		!inMktMenu;
+		!inMktMenu &&
+		!inInstView;
 
 	const filteredRows = useMemo(() => {
 		if (tab === "marketplaces" || tab === "errors") return [];
@@ -134,7 +159,13 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			const m = q.slice(1);
 			return activeRows.filter((r) => {
 				const at = r.ref.lastIndexOf("@");
-				return at >= 0 && r.ref.slice(at + 1).toLowerCase().includes(m);
+				return (
+					at >= 0 &&
+					r.ref
+						.slice(at + 1)
+						.toLowerCase()
+						.includes(m)
+				);
 			});
 		}
 		return activeRows
@@ -221,21 +252,27 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	}, [row]);
 
 	const buttons =
-		tab === "marketplaces" ? [] : tab === "errors" ? [{ key: "retry", label: "Reintentar", primary: true }] : pluginButtons;
+		tab === "marketplaces"
+			? []
+			: tab === "errors"
+				? [{ key: "retry", label: "Reintentar", primary: true }]
+				: pluginButtons;
 
 	useEffect(() => {
 		setFocusBtn((i) => Math.min(i, Math.max(0, buttons.length - 1)));
 	}, [buttons.length, tab]);
 
-	const submitBtn = (key: string) => {
+	const submitBtn = (key: string, target?: CcPanelRowWs) => {
 		if (tab === "errors" && err) {
-			if (key === "retry") onAction(panel.id, { kind: "retry", source: err.source });
+			if (key === "retry")
+				onAction(panel.id, { kind: "retry", source: err.source });
 			return;
 		}
-		if (row)
+		const r = target ?? row;
+		if (r)
 			onAction(panel.id, {
 				kind: key as "install" | "uninstall" | "enable" | "disable",
-				ref: row.ref,
+				ref: r.ref,
 			});
 	};
 
@@ -247,6 +284,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		setMktMenu(null);
 		setConfirmRemove(false);
 		setAddOpen(false);
+		setInstView(null);
 	};
 
 	// "Explorar plugins": Discover con filtro por origen (@marketplace).
@@ -299,6 +337,10 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				else setMktMenu(null);
 				return;
 			}
+			if (inInstView) {
+				setInstView(null);
+				return;
+			}
 			if (zone !== "list") {
 				setZone("list");
 				return;
@@ -307,6 +349,18 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			return;
 		}
 		if (addOpen) return; // el input del diálogo captura sus propias teclas
+		if (e.ctrlKey && e.key === " ") {
+			// Toggle rápido habilitado/deshabilitado (paridad del Space de
+			// Claude; Espacio simple sigue escribiendo en el filtro).
+			if (tab === "installed" && !inInstView && row) {
+				e.preventDefault();
+				onAction(panel.id, {
+					kind: row.status === "disabled" ? "enable" : "disable",
+					ref: row.ref,
+				});
+			}
+			return;
+		}
 		if (e.key === "Tab") {
 			e.preventDefault();
 			const cycle: Zone[] = ["tabs", "list"];
@@ -328,6 +382,25 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				switchTab(tabs[digit - 1]!.key);
 				return;
 			}
+		}
+		// Vista completa de instalado: ↑↓/←→ estado · ⏎ fija si difiere.
+		if (inInstView && viewRow && zone === "list") {
+			if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+				e.preventDefault();
+				setStateIdx((i) => 1 - i);
+				return;
+			}
+			if (e.key === "Enter") {
+				e.preventDefault();
+				const cur = viewRow.status === "disabled" ? 1 : 0;
+				if (stateIdx !== cur)
+					onAction(panel.id, {
+						kind: stateIdx === 0 ? "enable" : "disable",
+						ref: viewRow.ref,
+					});
+				return;
+			}
+			return; // la vista captura el resto (nada de filtrar con teclas)
 		}
 		// Menú secuencial del marketplace: ↑↓ opciones · ⏎ ejecuta.
 		if (inMktMenu && zone === "list") {
@@ -374,6 +447,12 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				if (mkt) openMenu(mkt.name);
 				return;
 			}
+			if (tab === "installed" && zone === "list" && row) {
+				// ⏎ en Instalados abre la vista completa (Enter to view).
+				setInstView(row.ref);
+				setStateIdx(row.status === "disabled" ? 1 : 0);
+				return;
+			}
 			const b = zone === "buttons" ? buttons[focusBtn] : buttons[0];
 			if (b) submitBtn(b.key);
 		}
@@ -381,7 +460,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 
 	const footerHint = addOpen
 		? "⏎ agregar · Esc cancelar"
-		: inMktMenu
+		: inInstView
+			? "↑↓ estado · ⏎ fijar · Tab acciones · Esc volver"
+			: inMktMenu
 			? confirmRemove
 				? "⏎ confirmar quitar · Esc cancelar"
 				: "↑↓ opción · ⏎ seleccionar · Esc volver"
@@ -407,12 +488,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	}, [menuMkt, confirmRemove]);
 
 	return (
-		<div
-			className="ccp-panel"
-			ref={rootRef}
-			tabIndex={-1}
-			onKeyDown={onKeyDown}
-		>
+		<div className="ccp-panel" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
 			<div className="ccp-tabs" data-focused={zone === "tabs" ? "true" : "false"}>
 				{tabs.map((t) => (
 					<button
@@ -469,9 +545,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 									<span className="ccp-mkt-url">{menuMkt.url}</span>
 									<span className="ccp-mkt-stats">
 										{menuMkt.plugins} plugins disponibles
-										{menuMkt.refreshedAt
-											? ` · Actualizado ${menuMkt.refreshedAt}`
-											: ""}
+										{menuMkt.refreshedAt ? ` · Actualizado ${menuMkt.refreshedAt}` : ""}
 										{menuMkt.autoUpdate ? (
 											<>
 												{" · "}
@@ -532,9 +606,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								<button
 									type="button"
 									className="ccp-add-item"
-									data-focused={
-										focusIdx === filteredMkts.length ? "true" : "false"
-									}
+									data-focused={focusIdx === filteredMkts.length ? "true" : "false"}
 									tabIndex={-1}
 									onClick={() => {
 										setFocusIdx(filteredMkts.length);
@@ -572,6 +644,107 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							<div className="ccp-empty">Sin errores.</div>
 						)}
 					</div>
+				) : inInstView && viewRow ? (
+					<div className="ccp-mkt-full">
+						<div className="ccp-instview">
+							<div className="ccp-instview-head">
+								<span className="ccp-instview-name">
+									{viewRow.label}
+									{viewRow.version ? ` v${viewRow.version}` : ""}
+								</span>
+								<span className={`ccp-badge ${STATUS_CLS[viewRow.status]}`}>
+									{STATUS_LABEL[viewRow.status]}
+								</span>
+							</div>
+							{viewRow.description ? (
+								<div className="ccp-instview-desc">{viewRow.description}</div>
+							) : null}
+							<div className="ccp-instview-fields">
+								<div>
+									<span className="ccp-instview-k">Origen</span>
+									<span>{viewRow.ref.slice(viewRow.ref.lastIndexOf("@") + 1)}</span>
+								</div>
+								<div>
+									<span className="ccp-instview-k">Costo</span>
+									<span>
+										{viewRow.tokens
+											? `~${viewRow.tokens} tokens/turno`
+											: "—"}
+									</span>
+								</div>
+								<div>
+									<span className="ccp-instview-k">Componentes</span>
+									<span>{viewRow.components?.join(" · ") ?? "—"}</span>
+								</div>
+								<div>
+									<span className="ccp-instview-k">Path</span>
+									<span className="ccp-instview-path">{viewRow.path ?? "—"}</span>
+								</div>
+							</div>
+							<div className="ccp-instview-state">
+								<div className="ccp-instview-state-label">Estado:</div>
+								{(["habilitado", "deshabilitado"] as const).map((label, i) => (
+									<button
+										key={label}
+										type="button"
+										tabIndex={-1}
+										className="ccp-instview-opt"
+										data-focused={
+											zone === "list" && i === stateIdx ? "true" : "false"
+										}
+										onClick={() => {
+											setStateIdx(i);
+											const cur = viewRow.status === "disabled" ? 1 : 0;
+											if (i !== cur)
+												onAction(panel.id, {
+													kind: i === 0 ? "enable" : "disable",
+													ref: viewRow.ref,
+												});
+										}}
+									>
+										<span className="ccp-mkt-opt-cursor">
+											{zone === "list" && i === stateIdx ? "❯" : " "}
+										</span>
+										{i === 0 ? "◉" : "◯"} {label}
+									</button>
+								))}
+							</div>
+							{viewRow.description ? null : (
+								<div className="ccp-detail-md">
+									<Markdown>{viewRow.markdown}</Markdown>
+								</div>
+							)}
+							<div
+								className={`ccp-actions${zone === "buttons" ? " ccp-actions-focus" : ""}`}
+							>
+								{(
+									viewRow.status === "installed"
+										? [{ key: "disable", label: "Deshabilitar", primary: true }, { key: "uninstall", label: "Desinstalar", primary: false }]
+										: [{ key: "enable", label: "Habilitar", primary: true }, { key: "uninstall", label: "Desinstalar", primary: false }]
+								).map((b, i) => (
+									<button
+										key={b.key}
+										type="button"
+										tabIndex={-1}
+										className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
+											zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
+										}`}
+										onClick={() => submitBtn(b.key, viewRow)}
+									>
+										{b.label}
+									</button>
+								))}
+								<button
+									type="button"
+									tabIndex={-1}
+									className="ccp-btn"
+									onClick={() => onClose(panel.id)}
+								>
+									Cerrar
+								</button>
+							</div>
+						</div>
+					</div>
 				) : (
 					<div className="ccp-list" ref={listRef}>
 						{filteredRows.map((r, i) => (
@@ -584,8 +757,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							>
 								<span className="ccp-row-label">{r.label}</span>
 								{r.category ? <span className="ccp-cat">{r.category}</span> : null}
-								{r.version ? (
-									<span className="ccp-row-ver">v{r.version}</span>
+								{r.components?.map((c) => (
+									<span key={c} className="ccp-comp">
+										{c}
+									</span>
+								))}
+								{r.version ? <span className="ccp-row-ver">v{r.version}</span> : null}
+								{r.tokens ? (
+									<span className="ccp-row-tok">~{r.tokens} tok</span>
 								) : null}
 								{r.status === "available" ? null : (
 									<span className={`ccp-badge ${STATUS_CLS[r.status]}`}>
@@ -599,7 +778,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						)}
 					</div>
 				)}
-				{tab === "errors" || tab === "discover" || tab === "installed" ? (
+				{tab === "errors" || tab === "discover" || (tab === "installed" && !inInstView) ? (
 					<div className="ccp-detail">
 						{tab === "errors" ? (
 							<div className="ccp-detail-md">
@@ -613,9 +792,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							<>
 								<div className="ccp-meta">
 									{row.author ? <span>por {row.author}</span> : null}
-									{row.lastUpdated ? (
-										<span>· Actualizado {row.lastUpdated}</span>
-									) : null}
+									{row.lastUpdated ? <span>· Actualizado {row.lastUpdated}</span> : null}
 									{row.homepage ? (
 										<a href={row.homepage} target="_blank" rel="noreferrer">
 											↗ homepage

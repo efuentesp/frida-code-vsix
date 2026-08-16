@@ -501,18 +501,6 @@ export function pluginCatalogInfo(
 		const pluginDir = path.join(dir, found.source.path.slice(2));
 		if (!fs.existsSync(pluginDir)) return { ...base, remote: "path-ausente" };
 		const c = discoverComponents(pluginDir);
-		// Context cost aproximado (#50): contenido de skills+commands en bytes
-		// / 4 ≈ tokens por turno (paridad del "Context cost" de Discover).
-		const bytesOf = (p: string): number => {
-			try {
-				return fs.statSync(p).size;
-			} catch {
-				return 0;
-			}
-		};
-		const estBytes =
-			c.skills.reduce((a, s) => a + bytesOf(path.join(s, "SKILL.md")), 0) +
-			c.commands.reduce((a, cmd) => a + bytesOf(cmd), 0);
 		return {
 			...base,
 			components: {
@@ -520,7 +508,7 @@ export function pluginCatalogInfo(
 				commands: c.commands.map((s) => path.basename(s, ".md")),
 				mcpServers: Object.keys(c.mcpServers),
 				skipped: c.skipped.map((s) => ({ kind: s.kind, reason: s.reason })),
-				estimatedTokens: Math.ceil(estBytes / 4),
+				estimatedTokens: estimateContextTokens(c),
 			},
 		};
 	}
@@ -741,6 +729,8 @@ export async function installPlugin(
 		rev,
 		enabled: true,
 		installedAt: new Date().toISOString(),
+		description: entry?.entry?.description,
+		estimatedTokens: estimateContextTokens(components),
 		skills: converted.skills,
 		commands: converted.commands,
 		mcpServers: mcpWritten,
@@ -924,4 +914,26 @@ export async function pluginLastUpdated(
 	});
 	lastUpdatedCache.set(cacheKey, when);
 	return when;
+}
+
+/**
+ * Context cost aproximado (#50): contenido de skills+commands en bytes / 4 ≈
+ * tokens por turno (paridad del "Context cost" de Discover). Compartido por
+ * pluginCatalogInfo (Discover) y installPlugin (persistir en el record).
+ */
+export function estimateContextTokens(c: {
+	skills: string[];
+	commands: string[];
+}): number {
+	const bytesOf = (p: string): number => {
+		try {
+			return fs.statSync(p).size;
+		} catch {
+			return 0;
+		}
+	};
+	const estBytes =
+		c.skills.reduce((a, s) => a + bytesOf(path.join(s, "SKILL.md")), 0) +
+		c.commands.reduce((a, cmd) => a + bytesOf(cmd), 0);
+	return Math.ceil(estBytes / 4);
 }

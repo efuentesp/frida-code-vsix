@@ -96,11 +96,18 @@ solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
   chip de categoría por fila (no hay downloads públicos — la categoría+autor del
   catálogo son la señal) y "Actualizado"/autor/homepage en la ficha (el primero
   llega async: git log del dir en el clon, cacheado, vía `ccplugins_row_meta`).
-  Marketplaces: tarjetas (contador, refreshedAt relativo, auto-update) con
-  Actualizar/Quitar y campo Agregar (los 4 sources). Errores: avisos runtime
-  (bootstrap/marketplace/install) con Reintentar. Zonas de foco tabs/list/buttons/add
+  Marketplaces: tarjetas (contador, refreshedAt relativo, auto-update); `⏎`
+  abre el menú secuencial (Explorar plugins → Discover con filtro `@mkt` ·
+  Actualizar · Quitar con confirmación inline de doble-⏎); la fila final "＋
+  Agregar" abre un modal con los 4 sources. Errores: avisos runtime
+  (bootstrap/marketplace/install) con Reintentar. Instalados: filas con chips de
+  componentes, estado y costo (~N tok); `Ctrl+Espacio` toggle rápido;
+  `⏎` abre la vista completa (descripción, origen, costo, componentes, path,
+  selector de estado binario — `description` y `estimatedTokens` se persisten
+  en el record al instalar). Zonas de foco tabs/list/buttons
   (estilo QuestionsPanel): `Tab` cicla · `←/→`/`1-4` tabs · escribir filtra ·
-  `↑↓` mueve · `⏎` acción primaria · `Esc` sube de nivel hasta cerrar.
+  `↑↓` mueve · `⏎` acción primaria (en Instalados: abre vista) · `Esc` sube de
+  nivel hasta cerrar.
 - **Output channel** `Frida — cc-plugins` (`presenter.ts`): append silencioso
   de cada comando — log de consulta, nunca roba foco.
 
