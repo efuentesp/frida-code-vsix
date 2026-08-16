@@ -125,7 +125,10 @@ export function createVscodePresenter(): CcPluginsPresenter {
 				content: markdown,
 				language: "markdown",
 			});
-			await vscode.window.showTextDocument(doc, { preserveFocus: true, preview: true });
+			await vscode.window.showTextDocument(doc, {
+				preserveFocus: true,
+				preview: true,
+			});
 		},
 	};
 }

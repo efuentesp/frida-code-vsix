@@ -53,8 +53,14 @@ function writeFixture(): void {
 }
 
 function fakePi() {
-	const events = new Map<string, ((e: unknown, ctx: unknown) => Promise<unknown>)[]>();
-	const commands = new Map<string, { handler: (a: string, c: unknown) => Promise<void> }>();
+	const events = new Map<
+		string,
+		((e: unknown, ctx: unknown) => Promise<unknown>)[]
+	>();
+	const commands = new Map<
+		string,
+		{ handler: (a: string, c: unknown) => Promise<void> }
+	>();
 	const sent: { customType: string; content: string }[] = [];
 	return {
 		events,
@@ -70,8 +76,7 @@ function fakePi() {
 			events.set(ev, l);
 			return () => {};
 		},
-		sendMessage: (m: { customType: string; content: string }) =>
-			sent.push(m),
+		sendMessage: (m: { customType: string; content: string }) => sent.push(m),
 	};
 }
 function asApi(pi: ReturnType<typeof fakePi>): ExtensionAPI {
