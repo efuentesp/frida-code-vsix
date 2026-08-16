@@ -1822,8 +1822,10 @@ body {
 }
 
 /* Lista SOLA (sin ficha derecha): Instalados/Marketplaces usan todo el
-   ancho — antes heredaban el 46% del split y desperdiciaban la mitad. */
-.ccp-list-full {
+   ancho. Selector COMPUESTO (.ccp-list.ccp-list-full, especificidad 0,2,0):
+   inmune al orden de cascada — la primera versión (.ccp-list-full sola)
+   quedó ANTES de .ccp-list en el archivo y el width:46% siempre ganó. */
+.ccp-list.ccp-list-full {
 	width: 100%;
 	max-height: 380px;
 }
