@@ -118,9 +118,10 @@ function guideKbTool(guideText: string) {
 }
 
 /** Frontmatter mínimo: llaves clave: valor (para `type`/`title` OKF). */
-export function parseFrontmatter(
-	raw: string,
-): { fm: Record<string, string>; body: string } {
+export function parseFrontmatter(raw: string): {
+	fm: Record<string, string>;
+	body: string;
+} {
 	if (!raw.startsWith("---")) return { fm: {}, body: raw };
 	const end = raw.indexOf("\n---", 3);
 	if (end < 0) return { fm: {}, body: raw };
@@ -163,7 +164,8 @@ export function materializePackageSurface(
 			if (exists) {
 				const st = fs.lstatSync(dest);
 				if (st.isSymbolicLink()) fs.rmSync(dest);
-				else if (st.isFile()) return; // copia previa vigente — no pisar
+				else if (st.isFile())
+					return; // copia previa vigente — no pisar
 				else fs.rmSync(dest, { recursive: true, force: true });
 			}
 			fs.symlinkSync(target, dest, "file");
@@ -182,10 +184,7 @@ export function materializePackageSurface(
 	if (fs.existsSync(promptsSrc)) {
 		for (const f of fs.readdirSync(promptsSrc)) {
 			if (!f.endsWith(".md")) continue;
-			link(
-				path.join(promptsSrc, f),
-				path.join(agentDir, "prompts", "wiki", f),
-			);
+			link(path.join(promptsSrc, f), path.join(agentDir, "prompts", "wiki", f));
 			prompts++;
 		}
 	}
@@ -207,8 +206,7 @@ export function materializePackageSurface(
 			fs.mkdirSync(path.dirname(dest), { recursive: true });
 			if (skillExists) {
 				const st = fs.lstatSync(dest);
-				if (!st.isSymbolicLink())
-					fs.rmSync(dest, { recursive: true, force: true });
+				if (!st.isSymbolicLink()) fs.rmSync(dest, { recursive: true, force: true });
 				else if (fs.realpathSync(dest) === fs.realpathSync(skillSrc))
 					return { prompts, skill: true };
 				else fs.rmSync(dest);
@@ -320,9 +318,7 @@ function registerKbAliases(
 				};
 			} catch (e: any) {
 				return {
-					content: [
-						{ type: "text", text: `kb_search falló: ${e?.message ?? e}` },
-					],
+					content: [{ type: "text", text: `kb_search falló: ${e?.message ?? e}` }],
 					details: { failureCategory: "kb-search-error" },
 					isError: true,
 				};
@@ -343,10 +339,7 @@ function registerKbAliases(
 			},
 			required: ["page"],
 		},
-		async execute(
-			_args: string,
-			args: { page?: string },
-		): Promise<ToolResult> {
+		async execute(_args: string, args: { page?: string }): Promise<ToolResult> {
 			const page = args?.page?.trim()?.replace(/\.md$/, "");
 			if (!page) {
 				return {
@@ -402,9 +395,7 @@ function registerKbAliases(
 				const typeOf = (target: string): string => {
 					const tf =
 						all.find((f) => idOf(f) === target) ??
-						all.find(
-							(f) => path.basename(idOf(f)) === path.basename(target),
-						);
+						all.find((f) => path.basename(idOf(f)) === path.basename(target));
 					if (!tf) return "desconocido";
 					const { fm } = parseFrontmatter(fs.readFileSync(tf, "utf-8"));
 					return fm.type ?? "sin-type";
@@ -430,9 +421,7 @@ function registerKbAliases(
 					`Página: ${pageId} (${typeOf(pageId)})`,
 					"",
 					`Out-edges (${out.length}):`,
-					...(out.length
-						? out.map((o) => `  → ${o}`)
-						: ["  (sin links salientes)"]),
+					...(out.length ? out.map((o) => `  → ${o}`) : ["  (sin links salientes)"]),
 					"",
 					`In-edges (${inEdges.length}):`,
 					...(inEdges.length
@@ -521,9 +510,7 @@ export function createFridaKnowledgeBase(
 							`[knowledge-base] superficie materializada: ${m.prompts} prompts, skill=${m.skill}.`,
 						);
 					} catch (e: any) {
-						onLog?.(
-							`[knowledge-base] materialización falló: ${e?.message ?? e}`,
-						);
+						onLog?.(`[knowledge-base] materialización falló: ${e?.message ?? e}`);
 					}
 					onStateChange?.({ installed: true, version: KNOWLEDGE_BASE_PIN });
 					onLog?.(

@@ -29,7 +29,13 @@ afterEach(() => {
 
 /** Materializa el paquete fake al pin (solo package.json + entry TS). */
 function writeFakePackage(): void {
-	const pkgRoot = path.join(agentDir, "npm", "node_modules", "@zosmaai", "pi-llm-wiki");
+	const pkgRoot = path.join(
+		agentDir,
+		"npm",
+		"node_modules",
+		"@zosmaai",
+		"pi-llm-wiki",
+	);
 	fs.mkdirSync(path.join(pkgRoot, "extensions", "llm-wiki"), {
 		recursive: true,
 	});

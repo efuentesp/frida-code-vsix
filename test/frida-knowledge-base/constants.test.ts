@@ -19,7 +19,9 @@ import {
 
 describe("frida-knowledge-base / constants", () => {
 	it("el spec apunta al pin exacto del upstream", () => {
-		expect(KNOWLEDGE_BASE_SPEC).toBe(`@zosmaai/pi-llm-wiki@${KNOWLEDGE_BASE_PIN}`);
+		expect(KNOWLEDGE_BASE_SPEC).toBe(
+			`@zosmaai/pi-llm-wiki@${KNOWLEDGE_BASE_PIN}`,
+		);
 		expect(KNOWLEDGE_BASE_PIN).toMatch(/^\d+\.\d+\.\d+$/);
 	});
 

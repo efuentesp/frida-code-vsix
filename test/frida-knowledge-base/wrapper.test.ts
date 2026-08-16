@@ -154,7 +154,7 @@ function writeMiniVault(): void {
 	fs.mkdirSync(path.join(wiki, "concepts"), { recursive: true });
 	fs.writeFileSync(
 		path.join(wiki, "index.md"),
-		"---\nokf_version: \"0.2\"\ntype: index\n---\nÍndice.\n",
+		'---\nokf_version: "0.2"\ntype: index\n---\nÍndice.\n',
 	);
 	fs.writeFileSync(
 		path.join(wiki, "concepts", "rag.md"),

@@ -27,32 +27,28 @@ export const KNOWLEDGE_BASE_SPEC = `${KNOWLEDGE_BASE_PACKAGE}@${KNOWLEDGE_BASE_P
  * de pi, NO la factory) → frida-knowledge-base los registra desde la factory
  * (F1). Verificar contra el manifest en cada bump de pin.
  */
-const KNOWLEDGE_BASE_PI_ENTRY = path.join(
-	"extensions",
-	"llm-wiki",
-	"index.ts",
-);
+const KNOWLEDGE_BASE_PI_ENTRY = path.join("extensions", "llm-wiki", "index.ts");
 
 /** Path absoluto del entry dentro del agentDir de Frida (~/.frida/npm/node_modules/...). */
 export function upstreamEntryPath(agentDir: string): string {
-	return path.join(
-		agentDir,
-		"npm",
-		"node_modules",
-		KNOWLEDGE_BASE_PACKAGE,
-		KNOWLEDGE_BASE_PI_ENTRY,
-	);
+ return path.join(
+  agentDir,
+  "npm",
+  "node_modules",
+  KNOWLEDGE_BASE_PACKAGE,
+  KNOWLEDGE_BASE_PI_ENTRY,
+ );
 }
 
 /** Versión instalada del paquete en ~/.frida/npm (lee su package.json). */
 export function installedVersionPath(agentDir: string): string {
-	return path.join(
-		agentDir,
-		"npm",
-		"node_modules",
-		KNOWLEDGE_BASE_PACKAGE,
-		"package.json",
-	);
+ return path.join(
+  agentDir,
+  "npm",
+  "node_modules",
+  KNOWLEDGE_BASE_PACKAGE,
+  "package.json",
+ );
 }
 
 /** Nombre de la factory embebida en extensionFactories (src/pi-session.ts). */
@@ -78,20 +74,20 @@ export const KNOWLEDGE_BASE_FACTORY_NAME = "frida-knowledge-base";
  * runtime embebido, cero duplicación.
  */
 export function upstreamPeerAliases(distDir: string): Record<string, string> {
-	// distDir = directorio del bundle de frida (dist/) → node_modules es hermano.
-	const root = path.dirname(path.resolve(distDir));
-	const tb = path.join(root, "node_modules", "typebox", "build");
-	return {
-		"@mariozechner/pi-coding-agent": path.join(
-			root,
-			"node_modules",
-			"@earendil-works",
-			"pi-coding-agent",
-			"dist",
-			"index.js",
-		),
-		typebox: path.join(tb, "index.mjs"),
-		"typebox/compile": path.join(tb, "compile", "index.mjs"),
-		"typebox/value": path.join(tb, "value", "index.mjs"),
-	};
+ // distDir = directorio del bundle de frida (dist/) → node_modules es hermano.
+ const root = path.dirname(path.resolve(distDir));
+ const tb = path.join(root, "node_modules", "typebox", "build");
+ return {
+  "@mariozechner/pi-coding-agent": path.join(
+   root,
+   "node_modules",
+   "@earendil-works",
+   "pi-coding-agent",
+   "dist",
+   "index.js",
+  ),
+  typebox: path.join(tb, "index.mjs"),
+  "typebox/compile": path.join(tb, "compile", "index.mjs"),
+  "typebox/value": path.join(tb, "value", "index.mjs"),
+ };
 }
