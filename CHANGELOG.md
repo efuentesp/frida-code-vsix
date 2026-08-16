@@ -17,6 +17,15 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.21.0] - 2026-08-16
+### Añadido
+
+- **frida-sandboxes** — container Docker local por agente (Refs #35)
+
+### Interno
+
+- **frida-sandboxes** — how-to de usuario de la extensión (Refs #35)
+
 ## [0.20.0] - 2026-08-16
 ### Añadido
 

@@ -2,7 +2,7 @@
   "name": "frida-code",
   "displayName": "Frida Code",
   "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "publisher": "softtek",
   "license": "UNLICENSED",
   "private": true,
@@ -277,7 +277,9 @@
         },
         "frida.sandboxes.allowDomains": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Allowlist de dominios de red permitidos DENTRO del sandbox (patrones glob: `*.npmjs.org`). Vacía = sin restricción (el container es el boundary; esto es refinamiento, patrón pi-sandbox)."
         },
