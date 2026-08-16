@@ -633,10 +633,7 @@ body {
    limitada del cuerpo. */
 .card--thinking {
 	border: 1px solid var(--vscode-textLink-foreground, #4daafc);
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.06));
 	font-size: 12px;
 }
 .card--thinking .card-icon {
@@ -1034,10 +1031,7 @@ body {
 .card {
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 6px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.08)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08));
 	margin: 6px 0;
 	overflow: hidden;
 }
@@ -1268,10 +1262,7 @@ body {
 .subagent-live {
 	padding: 6px 8px;
 	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(255, 255, 255, 0.04)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(255, 255, 255, 0.04));
 	border-radius: 4px;
 	display: flex;
 	flex-direction: column;
@@ -1625,8 +1616,14 @@ body {
 	color: var(--vscode-foreground);
 }
 .ccp-res-caret {
-	width: 12px;
+	width: 16px;
 	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.ccp-res-header:hover .ccp-res-caret {
+	color: var(--vscode-foreground);
 }
 .ccp-res-count {
 	font-size: 0.85em;
@@ -1749,7 +1746,10 @@ body {
 	border-radius: 8px;
 }
 .ccp-modal {
-	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	background: var(
+		--vscode-editorWidget-background,
+		var(--vscode-editor-background)
+	);
 	border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder));
 	border-radius: 8px;
 	padding: 14px 16px;
@@ -1833,7 +1833,8 @@ body {
 /* ── CcPluginsPanel (/ccplugin — UX #49): lista filtrable + ficha lado a lado ── */
 .ccp-panel {
 	position: relative;
-	border: 1px solid var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+	border: 1px solid
+		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
 	border-radius: 8px;
 	padding: 10px;
 	margin: 8px 0;
@@ -3879,10 +3880,7 @@ button.danger:hover {
 	padding: 12px;
 	border: 1px solid var(--vscode-textLink-foreground, #4daafc);
 	border-radius: 8px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.08)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.08));
 	text-align: center;
 }
 .oauth-title {
@@ -4095,10 +4093,7 @@ button.danger:hover {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.12)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.12));
 	color: var(--vscode-descriptionForeground);
 }
 .res-item-pills .tag .tag-k {
@@ -4212,10 +4207,7 @@ kbd {
 	margin: 4px 12px;
 	padding: 8px 12px;
 	border-left: 3px solid var(--vscode-textLink-foreground, #4daafc);
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.06));
 	border-radius: 4px;
 	font-size: 12px;
 	line-height: 1.5;
@@ -4347,10 +4339,7 @@ kbd {
 	margin: 6px 12px;
 	border: 1px solid var(--vscode-panel-border);
 	border-radius: 8px;
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.06));
 	overflow: hidden;
 }
 .lens-head {
@@ -4560,10 +4549,7 @@ kbd {
    de la rama, como un árbol indentado. */
 .fbox.todo-rows {
 	border-left: 1px solid
-		var(
-			--vscode-editorWhitespace-foreground,
-			var(--vscode-descriptionForeground)
-		);
+		var(--vscode-editorWhitespace-foreground, var(--vscode-descriptionForeground));
 	padding-left: 10px;
 }
 /* Sub-línea de activeForm: indentada bajo el glyph para leerse como anidada.

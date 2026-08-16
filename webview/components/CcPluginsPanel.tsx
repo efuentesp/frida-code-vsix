@@ -4,6 +4,8 @@ import {
 	Package,
 	RefreshCw,
 	Search,
+	SquareMinus,
+	SquarePlus,
 	Store,
 	X,
 } from "lucide-react";
@@ -1050,7 +1052,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 												})
 											}
 										>
-											<span className="ccp-res-caret">{isCol ? "▸" : "▾"}</span>
+											<span className="ccp-res-caret">
+												{isCol ? <SquarePlus size={14} /> : <SquareMinus size={14} />}
+											</span>
 											{kind === "skill"
 												? "Skills"
 												: kind === "cmd"
