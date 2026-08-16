@@ -255,6 +255,11 @@
           "default": true,
           "markdownDescription": "Habilita **frida-codebase-index**: búsqueda semántica de código, grafo de llamadas y lookup de implementaciones (wrapper de `open-codebase-index`, instalado on-demand en `~/.frida/npm`). Si el paquete no está instalado, las tools responden con la guía de instalación."
         },
+        "frida.hermesMemory.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Habilita **frida-hermes-memory**: memoria persistente cross-session del agente — background learning, detección de correcciones, memoria de fallos e inyección de contexto relevante (wrapper de `pi-hermes-memory`, instalado on-demand en `~/.frida/npm`; storage en `~/.frida/`). El learning loop consume tokens del modelo: desactívalo si prefieres memoria manual vía las tools `memory_*`."
+        },
         "frida.codebaseIndex.keepOtherPlatforms": {
           "type": "boolean",
           "default": false,

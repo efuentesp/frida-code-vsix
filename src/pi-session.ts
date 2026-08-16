@@ -45,7 +45,14 @@ import {
 import { createAskUserQuestionWeb } from "./tools/ask-user-question-web";
 import { createFridaContext } from "./tools/frida-context";
 import { createFridaAgentBrowser } from "./tools/frida-agent-browser";
-import { createFridaCodebaseIndex, CODEBASE_INDEX_FACTORY_NAME } from "./tools/frida-codebase-index";
+import {
+	createFridaCodebaseIndex,
+	CODEBASE_INDEX_FACTORY_NAME,
+} from "./tools/frida-codebase-index";
+import {
+	createFridaHermesMemory,
+	HERMES_MEMORY_FACTORY_NAME,
+} from "./tools/frida-hermes-memory";
 import {
 	ensureGitignore,
 	syncOpenAiKeyToAuthJson,
@@ -196,6 +203,12 @@ export interface CreateFridaSessionOptions {
 	onCodebaseIndexState?: (
 		s: import("./tools/frida-codebase-index").CodebaseIndexState,
 	) => void;
+	/** ¿Está activo frida-hermes-memory? (frida.hermesMemory.enabled, default true). */
+	hermesMemoryEnabled?: () => boolean;
+	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
+	onHermesMemoryState?: (
+		s: import("./tools/frida-hermes-memory").HermesMemoryState,
+	) => void;
 }
 
 export async function createFridaSession(
@@ -230,10 +243,8 @@ export async function createFridaSession(
 	// (merge defensivo, la auth propia del usuario manda), y gitignore del
 	// storage del índice (.codebase-index/ dentro del workspace). Best-effort.
 	if (opts.codebaseIndexEnabled?.() ?? true) {
-		syncOpenAiKeyToAuthJson(
-			opts.agentDir,
-			keyHolders[OPENAI_PROVIDER],
-			(line) => console.warn(line),
+		syncOpenAiKeyToAuthJson(opts.agentDir, keyHolders[OPENAI_PROVIDER], (line) =>
+			console.warn(line),
 		);
 		ensureGitignore(opts.cwd, (line) => console.warn(line));
 	}
@@ -515,6 +526,30 @@ export async function createFridaSession(
 						? createFridaCodebaseIndex({
 								agentDir: opts.agentDir,
 								onStateChange: opts.onCodebaseIndexState,
+							})(pi)
+						: undefined,
+			},
+			// frida-hermes-memory (ADR-0032): loop de aprendizaje cross-session vía
+			// wrapper passthrough del paquete upstream pi-hermes-memory (MIT)
+			// instalado on-demand en ~/.frida/npm. A diferencia de codebase-index,
+			// corre la factory del upstream contra el ExtensionAPI REAL: el learning
+			// loop necesita los eventos del lifecycle (before_agent_start para
+			// inyección de contexto, turn_end para background learning,
+			// session_shutdown para flush+index) y registra además las tools
+			// memory_*/session_search y los comandos /memory-*. Factory async: el
+			// loader awaita el jiti import (sin race de registro). Gate manual
+			// (frida.hermesMemory.enabled, default true) porque el background
+			// learning consume tokens. Si falta el paquete: tool guía + instalación
+			// en background sin bloquear el arranque (D6). Main only — las hijas de
+			// workflow no inyectan memoria ni aprenden.
+			{
+				name: HERMES_MEMORY_FACTORY_NAME,
+				factory: (pi: any) =>
+					(opts.hermesMemoryEnabled?.() ?? true)
+						? createFridaHermesMemory({
+								agentDir: opts.agentDir,
+								distDir: __dirname,
+								onStateChange: opts.onHermesMemoryState,
 							})(pi)
 						: undefined,
 			},

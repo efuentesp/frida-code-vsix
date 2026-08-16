@@ -123,6 +123,7 @@ import {
 	isAskUserQuestionEnabled,
 	isCodebaseIndexEnabled,
 	isContextEnabled,
+	isHermesMemoryEnabled,
 	isTelemetryOptIn,
 	isTodoEnabled,
 	readCodebaseIndexConfig,
@@ -503,6 +504,34 @@ export async function activate(
 		});
 	}
 
+	// frida-hermes-memory (#21): estado del wrapper. La instalación background
+	// corre fire-and-forget desde la factory; cuando completa, el usuario debe
+	// /reload (o reiniciar la sesión) para que la memoria se active — sin la
+	// notificación el install queda invisible. Errores con warning visible:
+	// sin memoria cross-session el producto degrada silenciosamente.
+	let hermesMemoryWasInstalling = false;
+	function handleHermesMemoryState(
+		s: import("./tools/frida-hermes-memory").HermesMemoryState,
+	): void {
+		if (s.installing) {
+			hermesMemoryWasInstalling = true;
+			return;
+		}
+		if (s.installed && hermesMemoryWasInstalling) {
+			hermesMemoryWasInstalling = false;
+			void vscode.window.showInformationMessage(
+				"Memoria del agente instalada (pi-hermes-memory). Ejecuta /reload o reinicia la sesión para activarla.",
+			);
+			return;
+		}
+		if (s.error) {
+			hermesMemoryWasInstalling = false;
+			void vscode.window.showWarningMessage(
+				`frida-hermes-memory no se pudo activar: ${s.error}`,
+			);
+		}
+	}
+
 	/** Resume el resultado de un tool upstream (content[0].text, primeras líneas). */
 	function ciSummarize(res: any): string {
 		const t = res?.content?.[0]?.text;
@@ -847,6 +876,8 @@ export async function activate(
 					onProviderError,
 					requestDumpPath,
 					codebaseIndexEnabled: isCodebaseIndexEnabled,
+					hermesMemoryEnabled: isHermesMemoryEnabled,
+					onHermesMemoryState: handleHermesMemoryState,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -3807,6 +3838,8 @@ export async function activate(
 				onProviderError,
 				requestDumpPath,
 				codebaseIndexEnabled: isCodebaseIndexEnabled,
+				hermesMemoryEnabled: isHermesMemoryEnabled,
+				onHermesMemoryState: handleHermesMemoryState,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

@@ -201,21 +201,30 @@ export function isCodebaseIndexEnabled(): boolean {
 		.get<boolean>("codebaseIndex.enabled", true);
 }
 
+// === Hermes memory (frida-hermes-memory, ADR-0032 / issue #21) ===
+
+/**
+ * ¿Está activo frida-hermes-memory? Default: true. El learning loop consume
+ * tokens del modelo (background learning + review): este gate permite
+ * apagarlo sin desinstalar el paquete.
+ */
+export function isHermesMemoryEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("hermesMemory.enabled", true);
+}
+
 /** Snapshot de la config del índice de código. */
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	const provider = cfg.get<string>(
-		"codebaseIndex.embeddings.provider",
-		"auto",
-	);
+	const provider = cfg.get<string>("codebaseIndex.embeddings.provider", "auto");
 	return {
 		enabled: isCodebaseIndexEnabled(),
 		keepOtherPlatforms: cfg.get<boolean>(
 			"codebaseIndex.keepOtherPlatforms",
 			false,
 		),
-		provider:
-			provider === "ollama" || provider === "custom" ? provider : "auto",
+		provider: provider === "ollama" || provider === "custom" ? provider : "auto",
 		customBaseUrl: String(
 			cfg.get<string>("codebaseIndex.embeddings.custom.baseUrl", ""),
 		).trim(),
