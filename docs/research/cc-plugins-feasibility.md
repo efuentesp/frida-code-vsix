@@ -12,7 +12,7 @@ upstream · [docs de plugins de Claude Code](https://code.claude.com/docs/en/plu
 
 ## TL;DR — veredicto
 
-**Ambas rutas son factibles; se recomienda el porte nativo del diseño.** El probe
+**Tres rondas; se recomienda el porte nativo del diseño** (referencias: `@nklisch/pi-plugins` para readers + contrato, `pi-claude-marketplace` para arquitectura runtime — ver Ronda 3). El probe
 cargó el upstream completo con el mecanismo wrapper (jiti + aliases + fake
 ExtensionAPI), arrancó el Plugin Host (layout íntegro en `<agentDir>/plugin-host/`,
 sqlite operativo, `/plugins list` respondiendo) y hasta materializó un marketplace
@@ -140,6 +140,51 @@ terminal); superficie mínima (~readers + convertidores + installer, no 13 MB).
 **Pierde**: transaccionalidad pesada (innecesaria para install = clone + convertir +
 receipt JSON idempotente); costo de seguir la evolución del formato Claude (mitigado:
 readers chicos, formato estable, y el upstream como referencia viva de qué cambia).
+
+## Ronda 3 — `pi-claude-marketplace@0.15.0` (acolomba, MIT) — segunda referencia
+
+Detectada tras el ADR inicial; disección completa cambia varias decisiones.
+
+**Qué es**: exactamente el use case de #49, ya implementado para pi — instala plugins
+Claude (commands, skills, agents vía pi-subagents, hooks parcial, MCP vía
+pi-mcp-adapter) desde marketplaces GitHub/GitLab/locales, con `/claude:plugin`
+(install/update/reinstall/uninstall/list/info/fetch), bootstrap del oficial,
+`import` desde settings de Claude Code, scopes user/project, y config declarativa
+compartible. Muy activo (37 versiones; publish hace horas), CI+SonarCloud, código
+ superdocumentado (bridges/domain/orchestrators/persistence/platform/transaction).
+
+**Por qué es mejor referencia que nklisch para frida**: `node>=20.19` (sin sqlite,
+sin Node 24), 2.6 MB vs 13 MB, deps puras (`isomorphic-git` → **sin binario git**
++ Device Flow GitHub; `proper-lockfile`; `write-file-atomic`), peers en nuestro
+namespace `@earendil-works`.
+
+**Patrones clave adoptables** (ver ADR-0057 revisado):
+
+1. **`resources_discover` + root aislado**: materializan en su propio
+   `<agentDir>/pi-claude-marketplace/resources/{skills,prompts}/` y exponen
+   `skillPaths`/`promptPaths` vía el evento `resources_discover` del SDK — el
+   resource loader los carga como recursos de extensión. Cero contaminación de
+   dirs del usuario; enable/disable = no devolver paths; uninstall = borrar root.
+2. **Config declarativa**: `claude-plugins.json` (+ `.local.json` override) por
+   scope es la fuente de verdad; un *reconcile* al cargar la aplica
+   (instalaciones automáticas y repetibles; commit del archivo = equipo sincronizado).
+3. **Nombres**: elisión de prefijo (`acme` + `acme-foo` → `acme:foo`); skills en
+   forma hyphen `/skill:acme-foo` con **reescritura de frontmatter por manipulación
+   de strings** (sin eval YAML — mitigación de inyección de contenido no confiable).
+4. **MCP sin renombrar**: chequean colisión contra los 4 slots de config
+   (`~/.config/mcp/mcp.json`, agentDir `mcp.json`, `<cwd>/.mcp.json`,
+   `<cwd>/.pi/mcp.json`) ANTES de instalar; **fallan si el nombre ya existe** —
+   preserva las referencias por nombre que skills/commands hacen a los servers.
+5. **Atomicidad por staging + rename** (mismo FS), phase-ledger + rollback ligeros.
+6. Extras que validan fase 2: `--map-model` (sonnet/opus → modelos pi para agents),
+   PATH de `bin/` de plugins (`recomputePluginPath`), hooks con dispatcher propio
+   (7 eventos), fetch lazy de plugins remotos.
+
+**Por qué NO envolverlo directo**: materializa prompts como archivos con `:` literal
+en el nombre — *"POSIX targets allow this; **Windows is explicitly not targeted**"* —
+y frida sí soporta Windows (NTFS prohíbe `:` en filenames). Además su peer
+`pi-subagents` no es el que frida shipea (tenemos `frida-subagents` propio), y su
+UI es TUI. El porte nativo queda confirmado, ahora con su arquitectura como plano.
 
 ## Relación con #16 y el PRD del marketplace
 
