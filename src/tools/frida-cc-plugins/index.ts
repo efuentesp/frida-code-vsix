@@ -18,6 +18,7 @@
  * pi-session.ts: la extensión nunca instala nada por sí sola — todo install
  * requiere /ccplugin add explícito (D8). Sesión main only.
  */
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -78,8 +79,10 @@ export interface CreateCcPluginsOpts {
 	enabledPlugins?: Record<string, boolean>;
 	/** Delay inicial del auto-update background (default 5s; tests: 0). */
 	autoUpdateDelayMs?: number;
-	/** Presenter VS Code de resultados (output/quickpick/doc). Sin él, notify. */
+	/** Presenter VS Code de resultados (output channel). Sin él, notify. */
 	presenter?: import("./presenter").CcPluginsPresenter;
+	/** Sink del panel nativo del webview (null = cerrar). Sin él, notify. */
+	panel?: import("./panel").CcPanelSink;
 }
 
 /** Estado del wrapper para el host (notificaciones). */
@@ -367,83 +370,111 @@ async function autoUpdateTick(
 }
 
 /** Acciones del QuickPick (cierre sobre agentDir/workCwd). */
-function quickPickActions(
+/** ~1.2k / ~890 formato compacto de tokens. */
+function fmtTokens(n: number): string {
+	return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+/** Ficha markdown de un plugin DEL CATÁLOGO (disponible/pre-install). */
+function catalogRowMarkdown(agentDir: string, ref: string): string {
+	const cat = pluginCatalogInfo(agentDir, ref);
+	const c = cat.components;
+	const lines = [
+		`## ${cat.name}${cat.version ? ` v${cat.version}` : ""}`,
+		"",
+		`${cat.marketplace}${cat.remote ? " · source remoto" : ""}`,
+		"",
+	];
+	if (cat.description) lines.push(cat.description, "");
+	if (c) {
+		lines.push(
+			`**instalará**: ${c.skills.length} skills · ${c.commands.length} commands · ${c.mcpServers.length} MCP`,
+		);
+		if (c.estimatedTokens)
+			lines.push(`**contexto**: ~${fmtTokens(c.estimatedTokens)} tokens/turno`);
+		if (c.skills.length) lines.push(`skills: ${c.skills.join(", ")}`);
+		if (c.commands.length) lines.push(`commands: ${c.commands.join(", ")}`);
+		if (c.mcpServers.length) lines.push(`MCP: ${c.mcpServers.join(", ")}`);
+		if (c.skipped.length)
+			lines.push(`omitidos: ${c.skipped.map((s) => s.kind).join(", ")}`);
+	}
+	return lines.join("\n");
+}
+
+/** Ficha markdown de un plugin INSTALADO (registry rec). */
+function installedRowMarkdown(p: ScopedPlugin): string {
+	const r = p.rec;
+	const lines = [
+		`## ${p.name}${r.version ? ` v${r.version}` : ""}`,
+		"",
+		`${r.marketplace} · scope ${p.scope}${r.enabled ? "" : " · deshabilitado"}`,
+		"",
+		`**instalado**: ${r.skills.length} skills · ${r.commands.length} commands · ${r.mcpServers.length} MCP`,
+	];
+	if (r.skills.length) lines.push(`skills: ${r.skills.join(", ")}`);
+	if (r.commands.length) lines.push(`commands: ${r.commands.join(", ")}`);
+	if (r.mcpServers.length) lines.push(`MCP: ${r.mcpServers.join(", ")}`);
+	return lines.join("\n");
+}
+
+/**
+ * Acciones del panel (host-side; el webview las invoca por ref vía id).
+ * `refresh` re-emite el panel (mismo id → el webview conserva filtro/foco).
+ */
+function panelActions(
 	agentDir: string,
 	workCwd: string,
-	notify: Notify,
-	presenter: import("./presenter").CcPluginsPresenter | undefined,
-	chat: (title: string, body: string) => void,
-): import("./presenter").CcListActions {
+	refresh: () => void,
+): import("./panel").CcPanelActions {
 	return {
 		install: async (ref) => {
 			const res = await installPlugin(agentDir, ref, { cwd: workCwd });
+			refresh();
 			return `Plugin '${res.plugin}' instalado (${res.skills.length} skills, ${res.commands.length} commands, ${res.mcpServers.length} MCP). Ejecuta /reload para activarlo.`;
 		},
-		uninstall: async (name) => {
+		uninstall: async (ref) => {
+			const name = ref.split("@")[0]!;
 			await uninstallPlugin(agentDir, name, { cwd: workCwd });
+			refresh();
 			return `Plugin '${name}' desinstalado. Ejecuta /reload.`;
 		},
-		toggle: async (name, enable) => {
+		toggle: async (ref, enable) => {
+			const name = ref.split("@")[0]!;
 			setPluginEnabled(agentDir, name, enable, { cwd: workCwd });
+			refresh();
 			return `Plugin '${name}' ${enable ? "habilitado" : "deshabilitado"}. Ejecuta /reload.`;
 		},
-		detailDoc: async (ref) => {
-			const cat = pluginCatalogInfo(agentDir, ref);
-			const lines = [
-				`## ${cat.name}@${cat.marketplace}${cat.version ? ` v${cat.version}` : ""}`,
-				"",
-				cat.description ?? "",
-				cat.remote ? `- **source remoto**: ${cat.remote}` : "",
-				cat.components
-					? `- **instalará**: ${cat.components.skills.length} skills, ${cat.components.commands.length} commands, ${cat.components.mcpServers.length} MCP`
-					: "",
-				cat.components?.estimatedTokens
-					? `- **contexto**: ~${cat.components.estimatedTokens} tokens/turno aprox.`
-					: "",
-				cat.components?.skills.length
-					? `- skills: ${cat.components.skills.join(", ")}`
-					: "",
-				cat.components?.commands.length
-					? `- commands: ${cat.components.commands.join(", ")}`
-					: "",
-				cat.components?.mcpServers.length
-					? `- MCP: ${cat.components.mcpServers.join(", ")}`
-					: "",
-				cat.components?.skipped.length
-					? `- omitidos: ${cat.components.skipped.map((s) => s.kind).join(", ")}`
-					: "",
-			].filter((l) => l !== "");
-			const md = lines.join("\n");
-			// El detalle vive en el CHAT (bloque visible del webview); el doc
-			// markdown es un extra para copiar (editor temporal).
-			chat(`info ${ref}`, md);
-			if (presenter) {
-				await presenter.document(`cc-plugins: ${ref}`, md);
-			}
-			return "";
-		},
-		notify: (m, l) => notify(m, l),
 	};
+}
+
+/**
+ * Emite el panel nativo del webview. `buildRows` se re-invoca en cada refresh
+ * (tras una acción) para re-emitir filas frescas CON EL MISMO id — así el
+ * componente conserva filtro y foco. Devuelve false si no hay sink (tests/TUI)
+ * para que el caller caiga al fallback notify.
+ */
+function emitPanel(
+	sink: import("./panel").CcPanelSink | undefined,
+	agentDir: string,
+	cwd: string | undefined,
+	id: string,
+	title: string,
+	buildRows: () => import("./panel").CcPanelRow[],
+): boolean {
+	if (!sink) return false;
+	const refresh = () => emitPanel(sink, agentDir, cwd, id, title, buildRows);
+	sink({
+		id,
+		title,
+		rows: buildRows(),
+		actions: panelActions(agentDir, cwd ?? process.cwd(), refresh),
+	});
+	return true;
 }
 
 /** Registra el comando /ccplugin con sus subcomandos. */
 function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
-	const { agentDir, cwd, onLog, presenter } = opts;
-
-	/** Bloque persistente en el transcript (customType propio; display =
-	 *  fallback de texto plano — renderer bonito de la webview: follow-up). */
-	const chatBlock = (title: string, body: string): void => {
-		try {
-			pi.sendMessage({
-				customType: "frida.ccplugins",
-				content: `cc-plugins — ${title}\n${body}`,
-				display: true,
-				details: { title, body },
-			});
-		} catch {
-			/* transcript no disponible (RPC) — queda el output channel */
-		}
-	};
+	const { agentDir, cwd, onLog, presenter, panel } = opts;
 	pi.registerCommand(CC_PLUGINS_COMMAND, {
 		description:
 			"Gestiona marketplaces y plugins de Claude Code (add/remove/list/enable/disable/marketplace/bootstrap)",
@@ -468,41 +499,43 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 								avail.length
 									? avail.map(line).join("\n")
 									: "Sin plugins disponibles en los marketplaces registrados.";
-							// Persistencia multicapa (UX #49): transcript + output
-							// channel; interacción solo si hay presenter (VS Code).
-							chatBlock(`disponibles (${avail.length})`, body);
+							// UX #49 (rediseño e2e): panel nativo del webview — lista
+							// filtrable con teclado + ficha lado a lado. Output channel
+							// como log silencioso. Sin sink: notify (tests/TUI).
 							presenter?.append([
 								`$ ccplugin list --available`,
 								...body.split("\n"),
 								"",
 							]);
-							if (presenter) {
-								await presenter.interactiveList(
-									avail.map((a) => ({
-										label: `${a.name}@${a.marketplace}`,
-										description: a.version ? `v${a.version}` : undefined,
-										detail: [
-											a.displayName && a.displayName !== a.name
-												? a.displayName
-												: undefined,
-											a.installed
-												? a.enabled
-													? "instalado"
-													: "instalado, deshabilitado"
-												: undefined,
-											a.remote ? "source remoto" : undefined,
-										]
-											.filter(Boolean)
-											.join(" · "),
-										installed: a.installed,
-										enabled: a.enabled,
+							const mktFilter = positional[0];
+							const buildAvailRows = () =>
+								listAvailable(agentDir, { marketplace: mktFilter }).map(
+									(a): import("./panel").CcPanelRow => ({
 										ref: `${a.name}@${a.marketplace}`,
-									})),
-									quickPickActions(agentDir, workCwd, notifyCtx, presenter, chatBlock),
-									`Disponibles (${avail.length})`,
-									ctx.ui, // diálogo del WEBVIEW de frida (UiDialog)
+										label:
+											a.displayName && a.displayName !== a.name
+												? `${a.name} — ${a.displayName}`
+												: a.name,
+										version: a.version,
+										status: a.installed
+											? (a.enabled ? "installed" : "disabled")
+											: "available",
+										markdown: catalogRowMarkdown(
+											agentDir,
+											`${a.name}@${a.marketplace}`,
+										),
+									}),
 								);
-							} else {
+							if (
+								!emitPanel(
+									panel,
+									agentDir,
+									workCwd,
+									randomUUID(),
+									`Disponibles (${avail.length})`,
+									buildAvailRows,
+								)
+							) {
 								notifyCtx(body); // fallback: toast (tests/sin VS Code)
 							}
 							return;
@@ -522,40 +555,32 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							return;
 						}
 						const bodyList = formatList(agentDir, workCwd);
-						chatBlock("instalados", bodyList);
 						presenter?.append([
 							`$ ccplugin list`,
 							...bodyList.split("\n"),
 							"",
 						]);
-						if (presenter) {
-							const mergedL = mergeLayers(loadLayers(agentDir, workCwd));
-							await presenter.interactiveList(
-								mergedL.plugins.map((p) => ({
-									label: `${p.name}@${p.rec.marketplace}`,
-									description: [
-										p.rec.version ? `v${p.rec.version}` : undefined,
-										p.scope !== "user" ? `[${p.scope}]` : undefined,
-									]
-										.filter(Boolean)
-										.join(" "),
-									detail: [
-										`${p.rec.skills.length} skills`,
-										`${p.rec.commands.length} commands`,
-										`${p.rec.mcpServers.length} MCP`,
-										p.rec.enabled ? undefined : "deshabilitado",
-									]
-										.filter(Boolean)
-										.join(" · "),
-									installed: true,
-									enabled: p.rec.enabled,
+						const buildInstalledRows = () =>
+							mergeLayers(loadLayers(agentDir, workCwd)).plugins.map(
+								(p): import("./panel").CcPanelRow => ({
 									ref: `${p.name}@${p.rec.marketplace}`,
-								})),
-								quickPickActions(agentDir, workCwd, notifyCtx, presenter, chatBlock),
-								`Instalados (${mergedL.plugins.length})`,
-								ctx.ui, // diálogo del WEBVIEW de frida (UiDialog)
+									label:
+										p.scope !== "user" ? `${p.name} [${p.scope}]` : p.name,
+									version: p.rec.version,
+									status: p.rec.enabled ? "installed" : "disabled",
+									markdown: installedRowMarkdown(p),
+								}),
 							);
-						} else {
+						if (
+							!emitPanel(
+								panel,
+								agentDir,
+								workCwd,
+								randomUUID(),
+								`Instalados (${buildInstalledRows().length})`,
+								buildInstalledRows,
+							)
+						) {
 							notifyCtx(bodyList);
 						}
 						return;
@@ -689,17 +714,44 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						return;
 					}
 					case "info": {
-						// Con presenter: detalle completo en documento markdown.
-						if (presenter && rest[0] && !rest[0].includes("--")) {
+						// UX #49: ficha en el panel nativo (fila única — el detalle
+						// queda visible lado a lado, sin toasts).
+						if (rest[0] && !rest[0].includes("--") && panel) {
+							const arg = rest[0];
 							try {
-								const actions = quickPickActions(
+								// Ref explícito (name@marketplace) o búsqueda por
+								// nombre en TODOS los marketplaces registrados.
+								const hit = arg.includes("@")
+									? undefined
+									: listAvailable(agentDir, {}).find(
+											(a) => a.name === arg,
+										);
+								const ref = hit
+									? `${hit.name}@${hit.marketplace}`
+									: arg;
+								const cat = pluginCatalogInfo(agentDir, ref);
+								const status = hit
+									? hit.installed
+										? (hit.enabled ? "installed" : "disabled")
+										: "available"
+									: "available";
+								emitPanel(
+									panel,
 									agentDir,
 									workCwd,
-									notifyCtx,
-									presenter,
-									chatBlock,
+									randomUUID(),
+									`Info ${cat.name}`,
+									() => [
+										{
+											ref: `${cat.name}@${cat.marketplace}`,
+											label: cat.name,
+											version: cat.version,
+											status,
+											markdown: catalogRowMarkdown(agentDir, ref),
+										},
+									],
 								);
-								await actions.detailDoc(rest[0]);
+								return;
 							} catch (e: any) {
 								notifyCtx(`cc-plugins: ${e?.message ?? e}`, "error");
 							}

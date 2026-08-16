@@ -78,17 +78,28 @@ nada sola** — todo install requiere `/ccplugin add` explícito (gate D8:
 
 ## Presentación de resultados
 
-`ctx.ui.notify` es un toast efíreo — inadecuado para listas. `/ccplugin` enruta sus
-resultados por tres capas (interfaz `CcPluginsPresenter`, impl VS Code en
-`presenter.ts`, inyectada desde `extension.ts`):
+`ctx.ui.notify` es un toast efíreo — inadecuado para listas. Los widgets nativos
+de VS Code (showQuickPick) quedan fuera del webview, roban foco y se cierran
+solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
+#49). La UI es un **panel nativo del webview**:
 
-1. **Transcript**: `pi.sendMessage({customType: "frida.ccplugins", display: true})` —
-   bloque persistente en la conversación (renderer bonito de webview: follow-up).
-2. **Output channel** `Frida — cc-plugins`: append de cada comando + resultado.
-3. **QuickPick interactivo** para `list`/`list --available` (búsqueda + acciones
-   instalar/detalle/habilitar/deshabilitar) y **documento markdown** para `info`.
+- **Contrato** (`panel.ts`): el comando emite un `CcPanelRequest` (id, título,
+  filas serializables con ficha markdown + ejecutor de acciones host-side) vía
+  `opts.panel` (sink que `extension.ts` registra). El webview responde
+  `ccplugins_panel_action {id, action, ref}`; el host ejecuta, confirma con
+  toast corto y el comando re-emite filas frescas con el MISMO id (el componente
+  conserva filtro y foco).
+- **Componente** (`webview/components/CcPluginsPanel.tsx`): lista filtrable
+  fuzzy (subseqScore, como el autocompletado de `/`) a la izquierda, ficha
+  markdown (Markdown) + botones a la derecha. Zonas de foco list/buttons
+  (estilo QuestionsPanel): escribir filtra · `↑↓` mueve · `⏎` acción primaria ·
+  `Tab`/`←/→` cicla botones · `Esc` cierra.
+- **Output channel** `Frida — cc-plugins` (`presenter.ts`): append silencioso
+  de cada comando — log de consulta, nunca roba foco.
 
-Sin presenter (tests / TUI) degrada al notify actual.
+Sin sink (tests/TUI) degrada al notify clásico. `/ccplugin info <nombre>`
+resuelve el plugin en TODOS los marketplaces registrados y abre el panel con
+su ficha.
 
 ## Arranque no bloqueante
 

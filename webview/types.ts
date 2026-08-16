@@ -457,6 +457,22 @@ export interface LensStatus {
 	active: boolean;
 }
 
+/** Fila del panel /ccplugin (serializada del host — panel.ts). */
+export interface CcPanelRowWs {
+	ref: string;
+	label: string;
+	version?: string;
+	status: "available" | "installed" | "disabled";
+	markdown: string;
+}
+
+/** Panel /ccplugin abierto (null = cerrado). */
+export interface CcPanelWs {
+	id: string;
+	title: string;
+	rows: CcPanelRowWs[];
+}
+
 export interface State {
 	keyNeeded: boolean;
 	busy: boolean;
@@ -479,6 +495,9 @@ export interface State {
 	/** Cuestionario ask_user_question activo (ADR-0027): QuestionsPanel nativo.
 	 *  null = sin cuestionario pendiente. */
 	questionnaire?: { id: string; questions: WebQuestionSpec[] } | null;
+	/** Panel /ccplugin activo (UX #49): lista filtrable + ficha lado a lado.
+	 *  null = cerrado. */
+	ccPanel?: CcPanelWs | null;
 	/** Árbol Remote React actual (null = sin UI remota activa). */
 	/** Roots Remote React activos, keyados por rootId, cada uno con su zona
 	 *  ("overlay" = cuerpo/diálogo, "footer" = panel inferior). Coexisten. */
@@ -531,6 +550,7 @@ export interface State {
 
 // Host → webview
 export type InMessage =
+	| { type: "ccplugins_panel"; panel: CcPanelWs | null }
 	| { type: "need_key" }
 	| { type: "key_set" }
 	| { type: "session_ready" }
@@ -661,6 +681,13 @@ export type InMessage =
 // webview → host
 export type OutMessage =
 	| { type: "webview_ready" }
+	| {
+			type: "ccplugins_panel_action";
+			id: string;
+			action: "install" | "uninstall" | "enable" | "disable";
+			ref: string;
+	  }
+	| { type: "ccplugins_panel_close"; id: string }
 	| {
 			type: "submit";
 			text: string;

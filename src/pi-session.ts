@@ -224,8 +224,10 @@ export interface CreateFridaSessionOptions {
 	ccPluginsExtraMarketplaces?: () => string[];
 	/** enabledPlugins de settings (frida.ccPlugins.enabledPlugins). */
 	ccPluginsEnabledPlugins?: () => Record<string, boolean>;
-	/** Presenter VS Code de resultados de /ccplugin (output/quickpick/doc). */
+	/** Presenter VS Code de resultados de /ccplugin (output channel). */
 	ccPluginsPresenter?: import("./tools/frida-cc-plugins/presenter").CcPluginsPresenter;
+	/** Sink del panel nativo del webview para /ccplugin (null = cerrar). */
+	ccPluginsPanel?: import("./tools/frida-cc-plugins/panel").CcPanelSink;
 	onCcPluginsState?: (
 		s: import("./tools/frida-cc-plugins").CcPluginsState,
 	) => void;
@@ -620,6 +622,7 @@ export async function createFridaSession(
 									opts.ccPluginsExtraMarketplaces?.() ?? [],
 								enabledPlugins: opts.ccPluginsEnabledPlugins?.() ?? {},
 								presenter: opts.ccPluginsPresenter,
+								panel: opts.ccPluginsPanel,
 							})(pi)
 						: undefined,
 			},

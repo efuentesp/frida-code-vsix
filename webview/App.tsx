@@ -15,6 +15,7 @@ import { TurnView } from "./components/Turn";
 import { CompactionCard } from "./components/CompactionCard";
 import { BranchSummaryCard } from "./components/BranchSummaryCard";
 import { UiDialog } from "./components/UiDialog";
+import { CcPluginsPanel } from "./components/CcPluginsPanel";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
@@ -597,6 +598,15 @@ export function App() {
 							}
 						/>
 					))}
+					{state.ccPanel ? (
+						<CcPluginsPanel
+							panel={state.ccPanel}
+							onAction={(id, action, ref) =>
+								post({ type: "ccplugins_panel_action", id, action, ref })
+							}
+							onClose={(id) => post({ type: "ccplugins_panel_close", id })}
+						/>
+					) : null}
 					{Object.entries(state.webRoots ?? {})
 						.filter(([, r]) => r.placement === "overlay" && r.tree)
 						.map(([id, r]) => (

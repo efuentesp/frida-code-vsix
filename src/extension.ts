@@ -945,6 +945,7 @@ export async function activate(
 					ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
 					ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 					ccPluginsPresenter: createCcPluginsPresenter(),
+					ccPluginsPanel: handleCcPanel,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -1878,20 +1879,6 @@ export async function activate(
 					abortDiag(
 						`message_end — role=${event.message?.role ?? "?"} stopReason=${event.message?.stopReason ?? "?"}`,
 					);
-					// Mensajes custom de extensiones con render en el chat: hoy solo
-					// frida.ccplugins (bloque de resultados de /ccplugin — UX #49).
-					// El customType es el filtro: frida-pipeline también manda customs
-					// (git-context, guidance) que NO deben pintarse. display=false los
-					// excluye (metadata silenciosa).
-					if (
-						event.message?.role === "custom" &&
-						event.message.customType === "frida.ccplugins" &&
-						event.message.display &&
-						typeof event.message.content === "string" &&
-						event.message.content.trim()
-					) {
-						post({ type: "info", text: event.message.content });
-					}
 					if (
 						event.message?.role === "assistant" &&
 						event.message?.stopReason === "aborted"
@@ -2048,6 +2035,26 @@ export async function activate(
 		});
 	}
 
+	// ── Panel nativo de /ccplugin (UX #49): acciones host-side por id ──
+	const ccPanelActions = new Map<
+		string,
+		import("./tools/frida-cc-plugins/panel").CcPanelActions
+	>();
+	function handleCcPanel(
+		req: import("./tools/frida-cc-plugins/panel").CcPanelRequest | null,
+	): void {
+		if (!req) {
+			ccPanelActions.clear();
+			post({ type: "ccplugins_panel", panel: null });
+			return;
+		}
+		ccPanelActions.set(req.id, req.actions);
+		post({
+			type: "ccplugins_panel",
+			panel: { id: req.id, title: req.title, rows: req.rows },
+		});
+	}
+
 	async function handleWebviewMessage(msg: any): Promise<void> {
 		switch (msg?.type) {
 			case "webview_ready":
@@ -2107,6 +2114,45 @@ export async function activate(
 					value: typeof msg.value === "string" ? msg.value : undefined,
 					cancelled: !!msg.cancelled,
 				});
+				break;
+			case "ccplugins_panel_action": {
+				// Acción del panel /ccplugin: ejecutar host-side y confirmar con
+				// toast CORTO (confirmación de una línea — no listas).
+				const actions = ccPanelActions.get(String(msg.id ?? ""));
+				const ref = String(msg.ref ?? "");
+				if (!actions || !ref) break;
+				void (async () => {
+					try {
+						let result: string;
+						switch (msg.action) {
+							case "install":
+								result = await actions.install(ref);
+								break;
+							case "uninstall":
+								result = await actions.uninstall(ref);
+								break;
+							case "enable":
+								result = await actions.toggle(ref, true);
+								break;
+							case "disable":
+								result = await actions.toggle(ref, false);
+								break;
+							default:
+								return;
+						}
+						post({ type: "info", text: result });
+					} catch (e: any) {
+						post({
+							type: "info",
+							text: `cc-plugins: ${e?.message ?? e}`,
+							level: "error",
+						});
+					}
+				})();
+				break;
+			}
+			case "ccplugins_panel_close":
+				handleCcPanel(null);
 				break;
 			case "model_change_response":
 				// Respuesta del diálogo de confirmación de cambio de proveedor.
@@ -3915,6 +3961,7 @@ export async function activate(
 				ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
 				ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 				ccPluginsPresenter: createCcPluginsPresenter(),
+				ccPluginsPanel: handleCcPanel,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

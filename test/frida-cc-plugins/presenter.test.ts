@@ -1,7 +1,8 @@
 /**
- * frida-cc-plugins — tests del presenter de resultados (UX post-e2e #49):
- * routing multicapa (transcript + output + quickpick) con fallback a notify
- * cuando no hay presenter, y acciones del QuickPick (install/toggle/doc).
+ * frida-cc-plugins — tests del panel nativo del webview (UX #49, rediseño
+ * e2e): flujo emitPanel (filas + acciones host-side), refresh con id estable
+ * (conserva filtro/foco en el componente), acciones reales (install/toggle)
+ * y fallback a notify cuando no hay sink (tests/TUI).
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -9,14 +10,12 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createFridaCcPlugins } from "../../src/tools/frida-cc-plugins/index";
-import {
-	addMarketplace,
-	installPlugin,
-} from "../../src/tools/frida-cc-plugins/installer";
+import { addMarketplace, installPlugin } from "../../src/tools/frida-cc-plugins/installer";
 import type {
-	CcListRow,
-	CcPluginsPresenter,
-} from "../../src/tools/frida-cc-plugins/presenter";
+	CcPanelRequest,
+	CcPanelSink,
+} from "../../src/tools/frida-cc-plugins/panel";
+import type { CcPluginsPresenter } from "../../src/tools/frida-cc-plugins/presenter";
 
 let agentDir: string;
 let mktDir: string;
@@ -53,30 +52,21 @@ function writeFixture(): void {
 }
 
 function fakePi() {
-	const events = new Map<
-		string,
-		((e: unknown, ctx: unknown) => Promise<unknown>)[]
-	>();
-	const commands = new Map<
-		string,
-		{ handler: (a: string, c: unknown) => Promise<void> }
-	>();
-	const sent: { customType: string; content: string }[] = [];
+	const events = new Map<string, ((e: unknown, ctx: unknown) => Promise<unknown>)[]>();
+	const commands = new Map<string, { handler: (a: string, c: unknown) => Promise<void> }>();
 	return {
 		events,
 		commands,
-		sent,
 		registerCommand: (
 			n: string,
 			o: { handler: (a: string, c: unknown) => Promise<void> },
 		) => commands.set(n, o),
-		on: (ev: string, h: (e: unknown, c: unknown) => Promise<unknown>) => {
+		on: (ev: string, h: (e: unknown, ctx: unknown) => Promise<unknown>) => {
 			const l = events.get(ev) ?? [];
 			l.push(h);
 			events.set(ev, l);
 			return () => {};
 		},
-		sendMessage: (m: { customType: string; content: string }) => sent.push(m),
 	};
 }
 function asApi(pi: ReturnType<typeof fakePi>): ExtensionAPI {
@@ -96,51 +86,22 @@ function fakeCtx(cwd: string) {
 	};
 }
 
-/** Presenter fake que captura las llamadas y simula selección/acción. */
-function fakePresenter(pick: { label?: string; action?: string } = {}) {
-	const appended: string[][] = [];
-	const lists: { rows: CcListRow[]; title: string }[] = [];
-	const docs: { title: string; markdown: string }[] = [];
-	return {
-		appended,
-		lists,
-		docs,
-		presenter: {
-			append: (lines: string[]) => appended.push(lines),
-			interactiveList: async (
-				rows: CcListRow[],
-				actions: import("../../src/tools/frida-cc-plugins/presenter").CcListActions,
-				title: string,
-			) => {
-				lists.push({ rows, title });
-				const row = rows.find((r) => r.label === pick.label) ?? rows[0];
-				if (!row) return;
-				switch (pick.action ?? "Detalle (documento)") {
-					case "Instalar":
-						// Igual que el presenter real: notifica el resultado.
-						actions.notify(await actions.install(row.ref));
-						break;
-					case "Desinstalar":
-						actions.notify(await actions.uninstall(row.ref.split("@")[0]!));
-						break;
-					case "Habilitar":
-						actions.notify(await actions.toggle(row.ref.split("@")[0]!, true));
-						break;
-					case "Deshabilitar":
-						actions.notify(await actions.toggle(row.ref.split("@")[0]!, false));
-						break;
-					default:
-						await actions.detailDoc(row.ref);
-				}
-			},
-			document: async (title: string, markdown: string) =>
-				docs.push({ title, markdown }),
-		} satisfies CcPluginsPresenter,
+/** Captura las peticiones del panel (sink fake). */
+function fakeSink() {
+	const requests: CcPanelRequest[] = [];
+	const sink: CcPanelSink = (req) => {
+		if (!req) return;
+		requests.push(req);
 	};
+	return { requests, sink };
 }
 
+const fakePresenter = {
+	append: () => {},
+} satisfies CcPluginsPresenter;
+
 beforeEach(() => {
-	agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-ccp-pres-"));
+	agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-ccp-pan-"));
 	mktDir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-ccp-mkt-"));
 	workDir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-ccp-ws-"));
 	writeFixture();
@@ -152,52 +113,58 @@ afterEach(() => {
 	}
 });
 
-describe("frida-cc-plugins / presenter multicapa", () => {
-	it("list --available SIN presenter: fallback a notify (back-compat)", async () => {
+describe("frida-cc-plugins / panel nativo del webview", () => {
+	it("list --available SIN sink: fallback a notify (back-compat)", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		const pi = fakePi();
 		await createFridaCcPlugins({ agentDir, cwd: workDir })(asApi(pi));
 		const ctx = fakeCtx(workDir);
 		await pi.commands.get("ccplugin")?.handler("list --available", ctx);
 		expect(ctx.notifications.some(([m]) => /p1@m/.test(m))).toBe(true);
-		expect(pi.sent.length).toBeGreaterThanOrEqual(1); // chat block igual sale
-		expect(pi.sent[0]?.customType).toBe("frida.ccplugins");
 	});
 
-	it("list --available CON presenter: output + quickpick con filas", async () => {
+	it("list --available CON sink: panel con filas, versión y markdown", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
-		const fp = fakePresenter();
+		const { requests, sink } = fakeSink();
 		const pi = fakePi();
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
-			presenter: fp.presenter,
+			presenter: fakePresenter,
+			panel: sink,
 		})(asApi(pi));
 		await pi.commands
 			.get("ccplugin")
 			?.handler("list --available", fakeCtx(workDir));
 
-		expect(fp.appended.length).toBeGreaterThanOrEqual(1);
-		expect(fp.appended[0]?.[0]).toBe("$ ccplugin list --available");
-		expect(fp.lists).toHaveLength(1);
-		const row = fp.lists[0]?.rows[0];
-		expect(row?.label).toBe("p1@m");
-		expect(row?.installed).toBe(false);
-		expect(row?.ref).toBe("p1@m");
-		// Sin acción de instalación elegida → no registrado.
+		expect(requests).toHaveLength(1);
+		const req = requests[0]!;
+		expect(req.title).toMatch(/Disponibles \(1\)/);
+		expect(req.rows[0]?.ref).toBe("p1@m");
+		expect(req.rows[0]?.version).toBe("1.0.0");
+		expect(req.rows[0]?.status).toBe("available");
+		expect(req.rows[0]?.markdown).toContain("## p1 v1.0.0");
+		expect(req.rows[0]?.markdown).toContain("**instalará**: 1 skills");
 	});
 
-	it("QuickPick 'Instalar' instala de verdad y notifica", async () => {
+	it("acción install del panel instala de verdad y REFRESCA con el mismo id", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
-		const fp = fakePresenter({ action: "Instalar" });
+		const { requests, sink } = fakeSink();
 		const pi = fakePi();
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
-			presenter: fp.presenter,
+			presenter: fakePresenter,
+			panel: sink,
 		})(asApi(pi));
-		const ctx = fakeCtx(workDir);
-		await pi.commands.get("ccplugin")?.handler("list --available", ctx);
+		await pi.commands
+			.get("ccplugin")
+			?.handler("list --available", fakeCtx(workDir));
+
+		const req = requests[0]!;
+		const msg = await req.actions.install("p1@m");
+		expect(msg).toContain("instalado");
+		// Realmente instalado:
 		const reg = JSON.parse(
 			fs.readFileSync(
 				path.join(agentDir, "cc-plugins", "cc-plugins.json"),
@@ -205,62 +172,73 @@ describe("frida-cc-plugins / presenter multicapa", () => {
 			),
 		);
 		expect(reg.plugins["p1"]).toBeTruthy();
-		expect(ctx.notifications.some(([m]) => /instalado/.test(m))).toBe(true);
+		// Refresh: segunda petición con el MISMO id y estado actualizado.
+		expect(requests).toHaveLength(2);
+		expect(requests[1]?.id).toBe(req.id);
+		expect(requests[1]?.rows[0]?.status).toBe("installed");
 	});
 
-	it("QuickPick 'Detalle (documento)' abre markdown con inventario", async () => {
-		await addMarketplace(agentDir, mktDir, { cwd: workDir });
-		const fp = fakePresenter({ action: "Detalle (documento)" });
-		const pi = fakePi();
-		await createFridaCcPlugins({
-			agentDir,
-			cwd: workDir,
-			presenter: fp.presenter,
-		})(asApi(pi));
-		await pi.commands
-			.get("ccplugin")
-			?.handler("list --available", fakeCtx(workDir));
-		expect(fp.docs).toHaveLength(1);
-		expect(fp.docs[0]?.markdown).toContain("p1@m v1.0.0");
-		expect(fp.docs[0]?.markdown).toContain("instalará");
-	});
-
-	it("list instalados con presenter: filas con estado y acciones", async () => {
+	it("toggle/uninstall vía acciones del panel (refs con @)", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		await installPlugin(agentDir, "p1@m", { cwd: workDir });
-		const fp = fakePresenter({ label: "p1@m", action: "Deshabilitar" });
+		const { requests, sink } = fakeSink();
 		const pi = fakePi();
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
-			presenter: fp.presenter,
+			presenter: fakePresenter,
+			panel: sink,
 		})(asApi(pi));
-		const ctx = fakeCtx(workDir);
-		await pi.commands.get("ccplugin")?.handler("list", ctx);
-		const row = fp.lists[0]?.rows[0];
-		expect(row?.installed).toBe(true);
-		expect(row?.enabled).toBe(true);
-		// La acción deshabilitó el plugin real.
+		await pi.commands.get("ccplugin")?.handler("list", fakeCtx(workDir));
+
+		const req = requests[0]!;
+		expect(req.rows[0]?.status).toBe("installed");
+		await req.actions.toggle("p1@m", false);
+		expect(requests[1]?.rows[0]?.status).toBe("disabled");
+
+		await req.actions.uninstall("p1@m");
 		const reg = JSON.parse(
 			fs.readFileSync(
 				path.join(agentDir, "cc-plugins", "cc-plugins.json"),
 				"utf-8",
 			),
 		);
-		expect(reg.plugins["p1"]?.enabled).toBe(false);
+		expect(reg.plugins["p1"]).toBeUndefined();
 	});
 
-	it("info con presenter abre documento (pre-install)", async () => {
+	it("list instalados con sink: filas con scope y ficha markdown", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
-		const fp = fakePresenter();
+		await installPlugin(agentDir, "p1@m", { cwd: workDir });
+		const { requests, sink } = fakeSink();
 		const pi = fakePi();
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
-			presenter: fp.presenter,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		await pi.commands.get("ccplugin")?.handler("list", fakeCtx(workDir));
+
+		const req = requests[0]!;
+		expect(req.title).toMatch(/Instalados \(1\)/);
+		expect(req.rows[0]?.markdown).toContain("## p1 v1.0.0");
+		expect(req.rows[0]?.markdown).toContain("scope user");
+		expect(req.rows[0]?.markdown).toContain("**instalado**: 1 skills");
+	});
+
+	it("info <plugin> abre panel de fila única con la ficha", async () => {
+		await addMarketplace(agentDir, mktDir, { cwd: workDir });
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
 		})(asApi(pi));
 		await pi.commands.get("ccplugin")?.handler("info p1", fakeCtx(workDir));
-		expect(fp.docs).toHaveLength(1);
-		expect(fp.docs[0]?.markdown).toMatch(/instalará\*?\*?: 1 skills/);
+		expect(requests).toHaveLength(1);
+		expect(requests[0]?.rows).toHaveLength(1);
+		expect(requests[0]?.rows[0]?.markdown).toContain("**instalará**: 1 skills");
 	});
 });

@@ -222,6 +222,8 @@ export function reduce(state: State, msg: InMessage): State {
 	switch (msg.type) {
 		case "need_key":
 			return { ...state, keyNeeded: true };
+		case "ccplugins_panel":
+			return { ...state, ccPanel: msg.panel ?? null };
 		case "key_set":
 		case "session_ready":
 			return { ...state, keyNeeded: false };
