@@ -100,10 +100,7 @@ function fakePi() {
 			name: string,
 			opts: { handler: (args: string, ctx: unknown) => Promise<void> },
 		) => commands.set(name, opts),
-		on: (
-			ev: string,
-			h: (e: unknown, ctx: unknown) => Promise<unknown>,
-		) => {
+		on: (ev: string, h: (e: unknown, ctx: unknown) => Promise<unknown>) => {
 			const list = events.get(ev) ?? [];
 			list.push(h);
 			events.set(ev, list);
@@ -210,13 +207,13 @@ describe("frida-cc-plugins / paridad / list --available + info", () => {
 		const ctx = fakeCtx(workDir);
 		await pi.commands.get("ccplugin")?.handler("info pr-review", ctx);
 		expect(
-			ctx.notifications.some(
-				([m]) => /pr-review@fixture-market v1\.0\.0 \(no instalado\)/.test(m),
+			ctx.notifications.some(([m]) =>
+				/pr-review@fixture-market v1\.0\.0 \(no instalado\)/.test(m),
 			),
 		).toBe(true);
-		expect(
-			ctx.notifications.some(([m]) => /instalará: 1 skills/.test(m)),
-		).toBe(true);
+		expect(ctx.notifications.some(([m]) => /instalará: 1 skills/.test(m))).toBe(
+			true,
+		);
 	});
 
 	it("comando list --available lista plugins con marcadores", async () => {
@@ -227,8 +224,7 @@ describe("frida-cc-plugins / paridad / list --available + info", () => {
 		await pi.commands.get("ccplugin")?.handler("list --available", ctx);
 		expect(
 			ctx.notifications.some(
-				([m]) =>
-					/pr-review@fixture-market/.test(m) && /remoto/.test(m),
+				([m]) => /pr-review@fixture-market/.test(m) && /remoto/.test(m),
 			),
 		).toBe(true);
 	});
@@ -244,10 +240,7 @@ describe("frida-cc-plugins / paridad / bootstrap auto + refresh-lookup", () => {
 			deps: fake.deps,
 		})(asApi(pi));
 		const ctx = fakeCtx(workDir);
-		await (pi.events.get("resources_discover") ?? [])[0]?.(
-			{ cwd: workDir },
-			ctx,
-		);
+		await (pi.events.get("resources_discover") ?? [])[0]?.({ cwd: workDir }, ctx);
 		const reg = loadRegistry(agentDir);
 		expect(reg.marketplaces["fixture-market"]).toBeTruthy();
 		expect(reg.bootstrapped).toBe(true);

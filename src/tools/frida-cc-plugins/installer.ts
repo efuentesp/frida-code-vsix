@@ -118,7 +118,11 @@ export function resolveMarketplaceRef(input: string): MarketplaceRef {
 	const ref = hashIdx >= 0 ? raw.slice(hashIdx + 1).trim() : undefined;
 	const trimmed = (hashIdx >= 0 ? raw.slice(0, hashIdx) : raw).trim();
 	if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(trimmed)) {
-		return { kind: "git", url: `https://github.com/${trimmed}.git`, ...(ref ? { ref } : {}) };
+		return {
+			kind: "git",
+			url: `https://github.com/${trimmed}.git`,
+			...(ref ? { ref } : {}),
+		};
 	}
 	if (/^https:\/\/[^/]+\/.+(\.git)?$/.test(trimmed)) {
 		return {
