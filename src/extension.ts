@@ -2185,6 +2185,9 @@ export async function activate(
 							text: `cc-plugins: ${e?.message ?? e}`,
 							level: "error",
 						});
+						// Re-emitir igual: el ⏳ optimista del webview se limpia
+						// con el refresh (mismo id), éxito O error.
+						actions.refresh();
 					}
 				})();
 				break;

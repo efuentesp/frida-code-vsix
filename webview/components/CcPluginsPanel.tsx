@@ -88,6 +88,14 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	// tipo — paridad Claude: skills una por una, plugin = origen).
 	const [resView, setResView] = useState<string | null>(null);
 	const [stateIdx, setStateIdx] = useState(0);
+	// Acciones en vuelo (optimista): ref → etiqueta corta ("instalando…").
+	// Se limpia cuando llega el re-emit completo (éxito O error — el host
+	// refresca en ambos) + timeout de seguridad de 20s por acción.
+	const [pending, setPending] = useState<Map<string, string>>(new Map());
+	const [pendingMkt, setPendingMkt] = useState<string | null>(null);
+	const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+		new Map(),
+	);
 	const [addSpec, setAddSpec] = useState("");
 	const listRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -245,6 +253,28 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		else rootRef.current?.focus();
 	}, [showSearch, panel.id, tab]);
 
+	const markPending = (ref: string, label: string) => {
+		setPending((m) => new Map(m).set(ref, label));
+		const t = setTimeout(() => {
+			setPending((m) => {
+				const c = new Map(m);
+				c.delete(ref);
+				return c;
+			});
+			pendingTimers.current.delete(ref);
+		}, 20_000);
+		pendingTimers.current.set(ref, t);
+	};
+
+	// Re-emit COMPLETO (sin _patch) = toda acción terminó → limpiar ⏳.
+	useEffect(() => {
+		if (panel._patch) return;
+		for (const t of pendingTimers.current.values()) clearTimeout(t);
+		pendingTimers.current.clear();
+		setPending(new Map());
+		setPendingMkt(null);
+	}, [panel]);
+
 	// Scroll del ítem enfocado a la vista.
 	useEffect(() => {
 		listRef.current
@@ -317,11 +347,20 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			return;
 		}
 		const r = target ?? row;
-		if (r)
+		if (r) {
+			markPending(
+				r.ref,
+				key === "install"
+					? "instalando…"
+					: key === "uninstall"
+						? "desinstalando…"
+						: "alternando…",
+			);
 			onAction(panel.id, {
 				kind: key as "install" | "uninstall" | "enable" | "disable",
 				ref: r.ref,
 			});
+		}
 	};
 
 	const switchTab = (t: Tab) => {
@@ -362,6 +401,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			return;
 		}
 		if (i === 1) {
+			setPendingMkt("update");
 			onAction(panel.id, { kind: "mkt_update", name: m.name });
 			return;
 		}
@@ -371,6 +411,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		}
 		setConfirmRemove(false);
 		setMktMenu(null);
+		setPendingMkt("remove");
 		onAction(panel.id, { kind: "mkt_remove", name: m.name });
 	};
 
@@ -651,6 +692,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										key={label}
 										type="button"
 										tabIndex={-1}
+										disabled={pendingMkt !== null}
 										className={`ccp-mkt-opt${i === 2 && confirmRemove ? " ccp-mkt-opt-warn" : ""}`}
 										data-focused={i === menuIdx ? "true" : "false"}
 										onClick={() => {
@@ -661,7 +703,11 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										<span className="ccp-mkt-opt-cursor">
 											{i === menuIdx ? "❯" : " "}
 										</span>
-										{label}
+										{pendingMkt && i === 1 ? (
+											<span className="ccp-pend">⏳ actualizando…</span>
+										) : (
+											label
+										)}
 									</button>
 								))}
 							</div>
@@ -824,12 +870,15 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 											key={b.key}
 											type="button"
 											tabIndex={-1}
+											disabled={pending.has(resRow.pluginRef)}
 											className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
 												zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
 											}`}
 											onClick={() => submitBtn(b.key, { ref: resRow.pluginRef })}
 										>
-											{b.label}
+											{b.primary && pending.has(resRow.pluginRef)
+												? `⟳ ${pending.get(resRow.pluginRef)}`
+												: b.label}
 										</button>
 									))}
 									<button
@@ -933,12 +982,15 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										key={b.key}
 										type="button"
 										tabIndex={-1}
+										disabled={pending.has(viewRow.ref)}
 										className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
 											zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
 										}`}
 										onClick={() => submitBtn(b.key, viewRow)}
 									>
-										{b.label}
+										{b.primary && pending.has(viewRow.ref)
+											? `⟳ ${pending.get(viewRow.ref)}`
+											: b.label}
 									</button>
 								))}
 								<button
@@ -989,6 +1041,11 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 													<span className="ccp-res-plugin">de {r.plugin}</span>
 													{r.tokens ? (
 														<span className="ccp-row-tok">~{r.tokens} tok</span>
+													) : null}
+													{pending.has(r.pluginRef) ? (
+														<span className="ccp-pend">
+															⏳ {pending.get(r.pluginRef)}
+														</span>
 													) : null}
 													<button
 														type="button"
@@ -1045,6 +1102,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								{r.tokens ? (
 									<span className="ccp-row-tok">~{r.tokens} tok</span>
 								) : null}
+								{pending.has(r.ref) ? (
+									<span className="ccp-pend">⏳ {pending.get(r.ref)}</span>
+								) : null}
 								{r.status === "available" ? null : (
 									<span className={`ccp-badge ${STATUS_CLS[r.status]}`}>
 										{STATUS_LABEL[r.status]}
@@ -1094,12 +1154,15 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										key={b.key}
 										type="button"
 										tabIndex={-1}
+										disabled={row ? pending.has(row.ref) : false}
 										className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
 											zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
 										}`}
 										onClick={() => submitBtn(b.key)}
 									>
-										{b.label}
+										{b.primary && row && pending.has(row.ref)
+											? `⟳ ${pending.get(row.ref)}`
+											: b.label}
 									</button>
 								))}
 							</div>
@@ -1165,15 +1228,16 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								type="button"
 								tabIndex={-1}
 								className="ccp-btn ccp-btn-primary"
-								disabled={!addSpec.trim()}
+								disabled={!addSpec.trim() || pendingMkt === "add"}
 								onClick={() => {
 									if (!addSpec.trim()) return;
+									setPendingMkt("add");
 									onAction(panel.id, { kind: "mkt_add", value: addSpec.trim() });
 									setAddSpec("");
 									setAddOpen(false);
 								}}
 							>
-								Agregar
+								{pendingMkt === "add" ? "⟳ Agregando…" : "Agregar"}
 							</button>
 							<button
 								type="button"

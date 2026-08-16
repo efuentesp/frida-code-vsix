@@ -119,6 +119,8 @@ export interface CcPanelActions {
 	rowMeta(ref: string): Promise<string | undefined>;
 	/** Reintentar según el origen del error. */
 	retry(source: CcPanelError["source"]): Promise<string>;
+	/** Re-emite el panel (mismo id) — limpia ⏳ del webview tras error. */
+	refresh(): void;
 }
 
 /** Callback que el host registra (extension.ts): abre/cierra el panel. */

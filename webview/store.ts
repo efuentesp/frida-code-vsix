@@ -237,6 +237,7 @@ export function reduce(state: State, msg: InMessage): State {
 				...state,
 				ccPanel: {
 					...p,
+					_patch: true,
 					rows: patch(p.rows),
 					installed: patch(p.installed),
 				},

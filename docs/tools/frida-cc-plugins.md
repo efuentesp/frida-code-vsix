@@ -100,7 +100,12 @@ solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
   abre el menú secuencial (Explorar plugins → Discover con filtro `@mkt` ·
   Actualizar · Quitar con confirmación inline de doble-⏎); la fila final "＋
   Agregar" abre un modal con los 4 sources. Errores: avisos runtime
-  (bootstrap/marketplace/install) con Reintentar. Instalados: lista de
+  (bootstrap/marketplace/install) con Reintentar. Acciones en vuelo:
+  indicador optimista ⏳ pulsante en la fila + botón primario `⟳ …`
+  deshabilitado; se limpia con el re-emit completo (mismo id) que el host
+  emite tras éxito O error (actions.refresh expuesto en el contrato) +
+  timeout de seguridad 20s; los patches async (row_meta) van marcados
+  `_patch` para NO limpiar pendientes. Instalados: lista de
   RECURSOS por tipo (Skills/Commands/Servidores MCP — paridad con Claude, que
   lista skills una por una): cada fila lleva kind, plugin dueño, estado
   (heredado del plugin: el registry habilita por plugin; switch pill

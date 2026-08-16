@@ -649,6 +649,7 @@ function panelActions(
 			return `${targets.length} marketplace(s) actualizados.`;
 		},
 		rowMeta: (ref) => pluginLastUpdated(agentDir, ref, { cwd: workCwd }),
+		refresh,
 		retry: async (source) => {
 			if (source === "bootstrap") {
 				await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, { cwd: workCwd });

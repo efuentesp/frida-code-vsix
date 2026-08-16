@@ -510,6 +510,8 @@ export interface CcPanelErrorWs {
 /** Panel /ccplugin abierto (null = cerrado) — tabs completas. */
 export interface CcPanelWs {
 	id: string;
+	/** Interna: true = patch async (row_meta) — NO limpia pendientes. */
+	_patch?: true;
 	title: string;
 	rows: CcPanelRowWs[];
 	installed: CcPanelRowWs[];

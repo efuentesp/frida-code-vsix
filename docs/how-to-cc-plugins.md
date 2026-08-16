@@ -59,7 +59,11 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    plugin (desinstalar, costo total, componentes). Teclado: `Tab` cicla
    zonas (tabs → lista → botones), `←/→` o `1-4` cambia tab, `↑↓` mueve el foco (la
    ficha se actualiza en vivo), `⏎` ejecuta la acción primaria, `Esc` sube de nivel
-   hasta cerrar. Cada comando también queda en el panel **Output "Frida — cc-plugins"**
+   hasta cerrar. Mientras una acción está en curso, la fila muestra un indicador
+   pulsante `⏳ instalando…` y el botón primario cambia a `⟳ Instalando…`
+   (deshabilitado) hasta que llega el refresh del panel — emitido tras el éxito *o*
+   el error, así el indicador nunca se queda pegado. Cada comando también queda en el
+   panel **Output "Frida — cc-plugins"**
    (silencioso; ábrelo manualmente para el log copiable).
 
 3. Consulta el detalle ANTES de instalar (qué traerá y su costo):

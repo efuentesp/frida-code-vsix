@@ -205,6 +205,23 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 		expect(requests[1]?.rows[0]?.status).toBe("installed");
 	});
 
+	it("actions.refresh() re-emite con el mismo id (limpieza de ⏳ tras error)", async () => {
+		await addMarketplace(agentDir, mktDir, { cwd: workDir });
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		await pi.commands.get("ccplugin")?.handler("list --available", fakeCtx(workDir));
+		const req = requests[0]!;
+		req.actions.refresh();
+		expect(requests).toHaveLength(2);
+		expect(requests[1]?.id).toBe(req.id); // mismo id → webview conserva tab/filtro
+	});
+
 	it("'/ccplugin' SIN args abre panel con Discover lleno (fix regression)", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		const { requests, sink } = fakeSink();

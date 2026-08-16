@@ -1490,6 +1490,10 @@ body {
 .ccp-mkt-opt-warn {
 	color: var(--vscode-charts-red, #f14c4c);
 }
+.ccp-mkt-opt:disabled {
+	opacity: 0.55;
+	cursor: wait;
+}
 .ccp-add-item {
 	width: 100%;
 	text-align: left;
@@ -1526,6 +1530,27 @@ body {
 .ccp-modal-actions {
 	display: flex;
 	gap: 8px;
+}
+
+/* Acción en vuelo: chip ⏳ pulsante + botones deshabilitados. */
+.ccp-pend {
+	flex-shrink: 0;
+	font-size: 0.78em;
+	color: var(--vscode-charts-yellow, #e2b93d);
+	animation: ccp-pulse 1.1s ease-in-out infinite;
+}
+@keyframes ccp-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+.ccp-btn:disabled {
+	opacity: 0.55;
+	cursor: wait;
 }
 
 /* Switch pill de habilitado (fin de fila de recurso — web style). */
