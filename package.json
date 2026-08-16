@@ -336,6 +336,19 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Ruta (absoluta o relativa al workspace) a un archivo markdown que **reemplaza** el system prompt default del generador. Útil para reglas de equipo (ticket JIRA obligatorio, scope fijo, sin emoji, etc.). Soporta los placeholders `{language}`, `{maxSubjectLength}` y `{types}`. Vacío = prompt default de Conventional Commits; si existe `~/.frida/commit-message-prompt.md`, se usa ese."
+        },
+        "frida.ccPlugins.extraMarketplaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Marketplaces del equipo que frida instala automáticamente al cargar (paridad `extraKnownMarketplaces` de Claude Code). Cada entrada es una ref: shorthand GitHub `owner/repo[#ref]`, URL git https/ssh, o path local con `.claude-plugin/marketplace.json`."
+        },
+        "frida.ccPlugins.enabledPlugins": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Plugins que se instalan automáticamente al cargar si no lo están (paridad `enabledPlugins` de Claude Code). Claves `\"plugin@marketplace\"`, valor `true`. Con `--scope project` del comando o registro del workspace se comparten por repo."
         }
       }
     }

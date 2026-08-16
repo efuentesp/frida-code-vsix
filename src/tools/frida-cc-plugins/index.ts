@@ -42,11 +42,18 @@ import {
 } from "./installer";
 import { validateMarketplaceDir } from "./validate";
 import { readMarketplaceCatalog, type RenameMap } from "./readers";
-import { marketplaceDirOf, resolveRename } from "./installer";
 import {
+	marketplaceDirOf,
+	resolveRename,
+	setMarketplaceAutoUpdate,
+} from "./installer";
+import {
+	loadLayers,
 	loadRegistry,
+	mergeLayers,
 	saveRegistry,
 	type CcPluginsRegistry,
+	type ScopedPlugin,
 } from "./registry";
 
 export interface CreateCcPluginsOpts {
@@ -58,6 +65,19 @@ export interface CreateCcPluginsOpts {
 	onLog?: (line: string) => void;
 	/** Git inyectable para tests (bootstrap/reconcile). */
 	deps?: import("./installer").InstallerDeps;
+	/**
+	 * Team marketplaces (paridad extraKnownMarketplaces): refs que el
+	 * reconcile instala automáticamente al cargar (settings de frida).
+	 * Formato: "owner/repo[#ref]" o path local.
+	 */
+	extraMarketplaces?: string[];
+	/**
+	 * Plugins que el reconcile habilita/instala al cargar
+	 * (paridad enabledPlugins): "plugin@marketplace" → true.
+	 */
+	enabledPlugins?: Record<string, boolean>;
+	/** Delay inicial del auto-update background (default 5s; tests: 0). */
+	autoUpdateDelayMs?: number;
 }
 
 /** Estado del wrapper para el host (notificaciones). */
@@ -168,36 +188,90 @@ async function reconcile(
 	}
 }
 
-/** Formatea la lista para notify (texto plano, cross-UI). */
-function formatList(agentDir: string, reg: CcPluginsRegistry): string {
+/** Formatea la lista para notify (texto plano, cross-UI). Merge de scopes. */
+function formatList(agentDir: string, cwd: string): string {
+	const merged = mergeLayers(loadLayers(agentDir, cwd));
 	const lines: string[] = [];
-	const installed = listInstalled(agentDir, reg);
-	if (installed.length === 0) {
+	if (merged.plugins.length === 0) {
 		lines.push("Sin plugins instalados. Comienza con /ccplugin bootstrap.");
 	}
-	for (const p of installed) {
+	for (const p of merged.plugins) {
 		const parts = [
-			`${(p as unknown as { plugin: string }).plugin}@${p.marketplace}`,
-			p.version ? `v${p.version}` : undefined,
-			p.enabled ? undefined : "(deshabilitado)",
+			`${p.name}@${p.rec.marketplace}`,
+			p.rec.version ? `v${p.rec.version}` : undefined,
+			p.scope !== "user" ? `[${p.scope}]` : undefined,
+			p.rec.enabled ? undefined : "(deshabilitado)",
 		].filter(Boolean);
 		lines.push(`• ${parts.join(" ")}`);
 		const comps = [
-			p.skills.length ? `${p.skills.length} skills` : undefined,
-			p.commands.length ? `${p.commands.length} commands` : undefined,
-			p.mcpServers.length ? `${p.mcpServers.length} MCP` : undefined,
-			p.skipped.length ? `${p.skipped.length} omitidos` : undefined,
+			p.rec.skills.length ? `${p.rec.skills.length} skills` : undefined,
+			p.rec.commands.length ? `${p.rec.commands.length} commands` : undefined,
+			p.rec.mcpServers.length ? `${p.rec.mcpServers.length} MCP` : undefined,
+			p.rec.skipped.length ? `${p.rec.skipped.length} omitidos` : undefined,
 		].filter(Boolean);
 		if (comps.length) lines.push(`  ${comps.join(" · ")}`);
 	}
-	if (Object.keys(reg.marketplaces).length > 0) {
+	const mktNames = Object.keys(merged.marketplaces);
+	if (mktNames.length > 0) {
 		lines.push(
-			`Marketplaces: ${Object.keys(reg.marketplaces)
-				.map((m) => `${m}@${reg.marketplaces[m]?.rev}`)
+			`Marketplaces: ${mktNames
+				.map((m) => `${m}@${merged.marketplaces[m]?.rev}`)
 				.join(", ")}`,
 		);
 	}
 	return lines.join("\n");
+}
+
+/**
+ * Auto-update background (#50 F5): para cada marketplace con autoUpdate on,
+ * re-clone (idempotente) y compara revs; si cambió, re-instala los plugins
+ * instalados desde él + notifica /reload. Delay inicial (5s) para no
+ * competir con el arranque (paridad Claude: random ≤10min — aquí fijo).
+ */
+async function autoUpdateTick(
+	agentDir: string,
+	cwd: string,
+	notify: Notify,
+	onLog?: (line: string) => void,
+	deps?: import("./installer").InstallerDeps,
+	delayMs = 5_000,
+): Promise<void> {
+	await new Promise((r) => setTimeout(r, delayMs));
+	const layers = loadLayers(agentDir, cwd);
+	const merged = mergeLayers(layers);
+	for (const [name, m] of Object.entries(merged.marketplaces)) {
+		if (!m.autoUpdate || m.local) continue;
+		try {
+			const before = m.rev;
+			const res = await addMarketplace(agentDir, `${m.url}${m.ref ? `#${m.ref}` : ""}`, {
+				cwd,
+				deps,
+			});
+			if (res.rev === before) continue;
+			// Rev nueva: re-instalar los plugins de este marketplace.
+			let updated = 0;
+			for (const p of merged.plugins) {
+				if (p.rec.marketplace !== name) continue;
+				try {
+					await installPlugin(agentDir, `${p.name}@${name}`, {
+						cwd,
+						deps,
+						scope: p.scope,
+					});
+					updated++;
+				} catch (e: any) {
+					onLog?.(`[cc-plugins] auto-update '${p.name}' falló: ${e?.message ?? e}`);
+				}
+			}
+			if (updated > 0) {
+				notify(
+					`cc-plugins: '${name}' actualizado (${before} → ${res.rev}); ${updated} plugin(s) re-instalados. Ejecuta /reload para aplicar.`,
+				);
+			}
+		} catch (e: any) {
+			onLog?.(`[cc-plugins] auto-update '${name}' falló: ${e?.message ?? e}`);
+		}
+	}
 }
 
 /** Registra el comando /ccplugin con sus subcomandos. */
@@ -226,7 +300,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									? avail
 											.map(
 												(a) =>
-													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.displayName && a.displayName !== a.name ? ` — ${a.displayName}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [remoto: fase 2]" : ""}`,
+													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.displayName && a.displayName !== a.name ? ` — ${a.displayName}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [source remoto]" : ""}`,
 											)
 											.join("\n")
 									: "Sin plugins disponibles en los marketplaces registrados.",
@@ -235,31 +309,27 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						}
 						if (flags.includes("--enabled") || flags.includes("--disabled")) {
 							const wantEnabled = flags.includes("--enabled");
-							const reg = loadRegistry(agentDir);
-							const filtered = listInstalled(agentDir, reg).filter(
-								(p) =>
-									(p as unknown as { plugin: string; enabled: boolean }).enabled ===
-									wantEnabled,
-							);
+							const filtered = mergeLayers(
+								loadLayers(agentDir, workCwd),
+							).plugins.filter((p) => p.rec.enabled === wantEnabled);
 							notifyCtx(
 								filtered.length
 									? filtered
-											.map(
-													(p) =>
-														`• ${(p as unknown as { plugin: string }).plugin}@${p.marketplace}`,
-											)
+											.map((p) => `• ${p.name}@${p.rec.marketplace}`)
 											.join("\n")
 									: `Sin plugins ${wantEnabled ? "habilitados" : "deshabilitados"}.`,
 							);
 							return;
 						}
-						notifyCtx(formatList(agentDir, loadRegistry(agentDir)));
+						notifyCtx(formatList(agentDir, workCwd));
 						return;
 					}
 					case "bootstrap": {
 						const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
 							cwd: workCwd,
 						});
+						// El oficial auto-actualiza por default (paridad Claude).
+						setMarketplaceAutoUpdate(agentDir, res.name, true);
 						notifyCtx(
 							`Marketplace '${res.name}' agregado (${res.plugins} plugins). Instala con /ccplugin add <plugin>@${res.name}.`,
 						);
@@ -277,7 +347,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 						} else if (msub === "list" || msub === "ls") {
 							const reg = loadRegistry(agentDir);
 							const ms = Object.entries(reg.marketplaces)
-								.map(([n, m]) => `• ${n} @${m.rev} — ${m.url}`)
+								.map(([n, m]) => `• ${n} @${m.rev}${m.autoUpdate ? " (auto-update)" : ""} — ${m.url}`)
 								.join("\n");
 							notifyCtx(
 								ms || "Sin marketplaces. /ccplugin bootstrap para el oficial.",
@@ -286,6 +356,22 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							const n = await removeMarketplace(agentDir, mrest[0] ?? "");
 							notifyCtx(
 								`Marketplace eliminado (+${n} plugins desinstalados). Ejecuta /reload.`,
+							);
+						} else if (msub === "autoupdate" || msub === "noautoupdate") {
+							if (!mrest[0]) {
+								notifyCtx(
+									`Uso: /ccplugin marketplace ${msub} <nombre>`,
+									"warning",
+								);
+								return;
+							}
+							setMarketplaceAutoUpdate(
+								agentDir,
+								mrest[0],
+								msub === "autoupdate",
+							);
+							notifyCtx(
+								`Auto-update ${msub === "autoupdate" ? "habilitado" : "deshabilitado"} para '${mrest[0]}'.`,
 							);
 						} else if (msub === "update") {
 							// Re-add = clone fresco (los plugins instalados conservan su rev).
@@ -309,18 +395,36 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 					}
 					case "add":
 					case "install": {
-						if (!rest[0]) {
-							notifyCtx("Uso: /ccplugin add <plugin>@<marketplace>", "warning");
+						const aflags = rest.filter((a) => a.startsWith("--"));
+						const apos = rest.filter((a) => !a.startsWith("--"));
+						const scopeEq = aflags
+							.find((a) => a.startsWith("--scope="))
+							?.slice("--scope=".length);
+						const scopeIdx = rest.indexOf("--scope");
+						const scope =
+							scopeEq ?? (scopeIdx >= 0 ? rest[scopeIdx + 1] : undefined);
+						if (!apos[0]) {
+							notifyCtx(
+								"Uso: /ccplugin add <plugin>@<marketplace> [--scope user|project|local]",
+								"warning",
+							);
 							return;
 						}
-						const res = await installPlugin(agentDir, rest[0], {
+						if (scope && !["user", "project", "local"].includes(scope)) {
+							notifyCtx(`Scope inválido '${scope}' (user|project|local)`, "warning");
+							return;
+						}
+						const res = await installPlugin(agentDir, apos[0], {
 							cwd: workCwd,
+							...(scope
+								? { scope: scope as "user" | "project" | "local" }
+								: {}),
 						});
 						const skippedNote = res.skipped.length
 							? ` · omitidos: ${res.skipped.map((s) => s.kind).join(", ")}`
 							: "";
 						notifyCtx(
-							`Plugin '${res.plugin}' instalado: ${res.skills.length} skills, ${res.commands.length} commands, ${res.mcpServers.length} MCP${skippedNote}. Ejecuta /reload para activarlo.`,
+							`Plugin '${res.plugin}' instalado${scope ? ` (scope ${scope})` : ""}: ${res.skills.length} skills, ${res.commands.length} commands, ${res.mcpServers.length} MCP${skippedNote}. Ejecuta /reload para activarlo.`,
 						);
 						return;
 					}
@@ -330,7 +434,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							notifyCtx("Uso: /ccplugin remove <plugin>", "warning");
 							return;
 						}
-						await uninstallPlugin(agentDir, rest[0]);
+						await uninstallPlugin(agentDir, rest[0], { cwd: workCwd });
 						notifyCtx(`Plugin '${rest[0]}' desinstalado. Ejecuta /reload.`);
 						return;
 					}
@@ -340,17 +444,18 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							notifyCtx(`Uso: /ccplugin ${sub} <plugin>`, "warning");
 							return;
 						}
-						setPluginEnabled(agentDir, rest[0], sub === "enable");
+						setPluginEnabled(agentDir, rest[0], sub === "enable", {
+							cwd: workCwd,
+						});
 						notifyCtx(
 							`Plugin '${rest[0]}' ${sub === "enable" ? "habilitado" : "deshabilitado"}. Ejecuta /reload.`,
 						);
 						return;
 					}
 					case "info": {
-						const reg = loadRegistry(agentDir);
-						const p = Object.entries(reg.plugins).find(
-							([n]) => n === rest[0],
-						);
+						const p: ScopedPlugin | undefined = mergeLayers(
+							loadLayers(agentDir, workCwd),
+						).plugins.find((sp) => sp.name === rest[0]);
 						if (!p) {
 							// Paridad Discover: detalle PRE-INSTALL desde el catálogo.
 							const cat = pluginCatalogInfo(agentDir, rest[0] ?? "");
@@ -361,7 +466,7 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 									? `source remoto (${cat.remote}) — fetch en fase 2`
 									: undefined,
 								cat.components
-									? `instalará: ${cat.components.skills.length} skills, ${cat.components.commands.length} commands, ${cat.components.mcpServers.length} MCP`
+									? `instalará: ${cat.components.skills.length} skills, ${cat.components.commands.length} commands, ${cat.components.mcpServers.length} MCP${cat.components.estimatedTokens ? ` (~${cat.components.estimatedTokens} tokens/turno aprox.)` : ""}`
 									: undefined,
 								cat.components?.skipped.length
 									? `omitidos: ${cat.components.skipped.map((s) => s.kind).join(", ")}`
@@ -370,10 +475,10 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							notifyCtx(lines.join("\n"));
 							return;
 						}
-						const [n, r] = p;
+						const { name: n, rec: r, scope } = p;
 						notifyCtx(
 							[
-								`${n}@${r.marketplace} v${r.version ?? "?"} (rev ${r.rev})`,
+								`${n}@${r.marketplace} v${r.version ?? "?"} (rev ${r.rev}) [scope ${scope}]`,
 								`skills: ${r.skills.join(", ") || "—"}`,
 								`commands: ${r.commands.join(", ") || "—"}`,
 								`MCP: ${r.mcpServers.join(", ") || "—"}`,
@@ -474,12 +579,56 @@ export function createFridaCcPlugins(
 					saveRegistry(agentDir, reg); // solo marcar bootstrapped
 				}
 			}
+			// Team marketplaces (#50 F4): instalar refs de settings que falten.
+			for (const ref of opts.extraMarketplaces ?? []) {
+				try {
+					const res = await addMarketplace(agentDir, ref, {
+						cwd,
+						deps: opts.deps,
+					});
+					notify(
+						`cc-plugins: marketplace del equipo '${res.name}' agregado desde settings (${res.plugins} plugins).`,
+					);
+				} catch (e: any) {
+					onLog?.(`[cc-plugins] extraMarketplace '${ref}' falló: ${e?.message ?? e}`);
+				}
+			}
+			// enabledPlugins (#50 F4): instalar los que falten (merge de scopes).
+			for (const [ref, on] of Object.entries(opts.enabledPlugins ?? {})) {
+				if (!on) continue;
+				const mergedNow = mergeLayers(loadLayers(agentDir, cwd));
+				const [pn] = ref.split("@");
+				if (mergedNow.plugins.some((p) => p.name === pn)) continue;
+				try {
+					const res = await installPlugin(agentDir, ref, { cwd, deps: opts.deps });
+					notify(
+						`cc-plugins: '${res.plugin}' instalado automáticamente (enabledPlugins del equipo).`,
+					);
+				} catch (e: any) {
+					onLog?.(`[cc-plugins] enabledPlugin '${ref}' falló: ${e?.message ?? e}`);
+				}
+			}
+
 			// Reconcile self-healing (best-effort, nunca bloquea la carga).
 			await reconcile(agentDir, reg, cwd, notify, onLog, opts.deps);
 
+			// Auto-update (#50 F5): background fire-and-forget — refresca los
+			// marketplaces con autoUpdate on; si cambió la rev, re-instala sus
+			// plugins y notifica /reload. Nunca bloquea la sesión.
+			void autoUpdateTick(
+				agentDir,
+				cwd,
+				notify,
+				onLog,
+				opts.deps,
+				opts.autoUpdateDelayMs ?? 5_000,
+			);
+
+			// Plugins habilitados del MERGE de scopes (precedencia por nombre).
+			const mergedView = mergeLayers(loadLayers(agentDir, cwd));
 			const skillPaths: string[] = [];
 			const promptPaths: string[] = [];
-			for (const [name, rec] of Object.entries(reg.plugins)) {
+			for (const { name, rec } of mergedView.plugins) {
 				if (!rec.enabled) continue;
 				const skillsRoot = path.join(resourcesSkillsDir(agentDir), name);
 				if (fs.existsSync(skillsRoot)) {
@@ -492,9 +641,9 @@ export function createFridaCcPlugins(
 			// Prompts: TODOS los habilitados comparten el dir plano filtrado por
 			// prefijo — el loader acepta archivos sueltos; listamos los del plugin.
 			const promptsRoot = resourcesPromptsDir(agentDir);
-			const enabledPrefixes = Object.entries(reg.plugins)
-				.filter(([, r]) => r.enabled)
-				.map(([n]) => `${n}-`);
+			const enabledPrefixes = mergedView.plugins
+				.filter((p) => p.rec.enabled)
+				.map((p) => `${p.name}-`);
 			if (fs.existsSync(promptsRoot)) {
 				for (const f of fs.readdirSync(promptsRoot)) {
 					if (f.endsWith(".md") && enabledPrefixes.some((p) => f.startsWith(p))) {
@@ -504,8 +653,8 @@ export function createFridaCcPlugins(
 			}
 			onStateChange?.({
 				ready: true,
-				marketplaces: Object.keys(reg.marketplaces).length,
-				plugins: Object.keys(reg.plugins).length,
+				marketplaces: Object.keys(mergedView.marketplaces).length,
+				plugins: mergedView.plugins.length,
 			});
 			return { skillPaths, promptPaths };
 		});

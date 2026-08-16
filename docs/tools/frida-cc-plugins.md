@@ -71,8 +71,9 @@ nada sola** — todo install requiere `/ccplugin add` explícito (gate D8:
 | Source del catálogo | Estado |
 | --- | --- |
 | `"./path"` (relativo al marketplace) | ✅ Instala |
-| `{source:"github", repo, ref}` | Fase 2 (fetch remoto) — reportado |
-| `{source:"url"/"git", url, ref, sha, path}` | Fase 2 — reportado |
+| `{source:"github"/"url"/"git-subdir", ..., ref, sha}` | ✅ **Fase 2 (#50)**: clone al instalar; `sha` (40 hex) = pin exacto verificado; `ref` → `--branch` |
+| `{source:"npm", package, version, registry}` | ✅ `npm install` (registry https privado) |
+| `{source:"archive", url, sha256}` | ✅ zip https ≤256 MiB + digest verificado + unzip propio (zlib, cero deps nuevas) |
 | Marketplace local (path del FS) | ✅ Vía `marketplace add <path>` |
 
 ## Git
@@ -99,6 +100,22 @@ presente en prácticamente todo host con VS Code). Alternativa sin git binario:
   de la entrada.
 - Metadata de descubrimiento — `displayName` (en `list --available`), `owner`
   como objeto, `category`/`tags` parseados.
+
+**Fase 2 (#50) — scopes, equipo, auto-update**:
+
+- **Scopes**: `--scope user|project|local` al instalar. `project` escribe
+  `<repo>/.frida/cc-plugins.json` (commit-eable); `local` escribe
+  `.frida/cc-plugins.local.json` (no versionar). Lectura merged con precedencia
+  local > project > user; uninstall/enable operan en el scope donde vive el plugin.
+- **Team settings** (paridad `extraKnownMarketplaces`/`enabledPlugins`):
+  `frida.ccPlugins.extraMarketplaces` (refs de marketplaces) y
+  `frida.ccPlugins.enabledPlugins` (`"plugin@marketplace": true`) — el
+  reconcile los instala al cargar.
+- **Auto-update**: `/ccplugin marketplace autoupdate|noautoupdate <mkt>` —
+  refresh background tras el arranque; rev nueva → re-install de sus plugins +
+  notifica `/reload`. El oficial lo trae on (bootstrap).
+- **Context cost**: `/ccplugin info` pre-install estima tokens/turno (bytes de
+  skills+commands / 4).
 
 **Paridad con `/plugin` de Claude Code** (mini-batch): bootstrap automático del
 oficial en el primer arranque (intento único, offline no bloquea), `list --available`

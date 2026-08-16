@@ -20,11 +20,13 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+	ccPluginsRoot,
 	installedDir,
 	marketplacesDir,
 	mcpCollisionSlots,
 	fridaMcpConfigPath,
 } from "./constants";
+import { materializeSource, type FetchDeps } from "./fetch";
 import {
 	discoverComponents,
 	readMarketplaceCatalog,
@@ -42,10 +44,17 @@ import {
 	unmergeMcpServers,
 } from "./convert";
 import {
+	loadLayers,
 	loadRegistry,
+	loadRegistryAt,
+	mergeLayers,
 	saveRegistry,
+	saveRegistryAt,
+	scopeRegistryPath,
 	type CcPluginsRegistry,
 	type PluginRecord,
+	type PluginScope,
+	type ScopedPlugin,
 } from "./registry";
 
 /** Error de instalación con guía accionable. */
@@ -58,9 +67,10 @@ export class CcPluginsInstallError extends Error {
 	}
 }
 
-/** Deps inyectables para tests. */
+/** Deps inyectables para tests. `fetch` cubre git/npm/zip de PLUGINS. */
 export interface InstallerDeps {
 	gitBin?: string;
+	fetch?: FetchDeps;
 	run?: (
 		bin: string,
 		args: string[],
@@ -241,10 +251,12 @@ export async function addMarketplace(
 	);
 	const catalog: MarketplaceCatalog = readMarketplaceCatalog(dir);
 	const rev = await cloneRev(opts.deps, dir);
+	const prevAuto = reg.marketplaces[catalog.name]?.autoUpdate;
 	reg.marketplaces[catalog.name] = {
 		url,
 		rev,
 		...(resolved.ref ? { ref: resolved.ref } : {}),
+		...(prevAuto !== undefined ? { autoUpdate: prevAuto } : {}),
 		refreshedAt: new Date().toISOString(),
 		addedAt: new Date().toISOString(),
 	};
@@ -255,6 +267,24 @@ export async function addMarketplace(
 		dir,
 		plugins: catalog.plugins.length,
 	};
+}
+
+/** Toggle de auto-update por marketplace (#50 F5). */
+export function setMarketplaceAutoUpdate(
+	agentDir: string,
+	name: string,
+	on: boolean,
+): void {
+	const reg = loadRegistry(agentDir);
+	const rec = reg.marketplaces[name];
+	if (!rec) {
+		throw new CcPluginsInstallError(
+			`Marketplace '${name}' no registrado`,
+			"Usa /ccplugin marketplace list para ver los registrados.",
+		);
+	}
+	rec.autoUpdate = on;
+	saveRegistry(agentDir, reg);
 }
 
 /** Elimina un marketplace y TODOS los plugins instalados desde él. */
@@ -320,33 +350,6 @@ export function resolveRename(
 	);
 }
 
-/** Resuelve el directorio fuente de un plugin dentro del marketplace. */
-function resolvePluginSourceDir(
-	source: PluginSource,
-	marketplaceDir: string,
-): { dir: string; remote: true } | { dir: string; remote: false } | null {
-	if (source.kind === "path") {
-		const rel = source.path.slice(2); // "./x" → "x"
-		return { dir: path.join(marketplaceDir, rel), remote: false };
-	}
-	if (source.kind === "github") {
-		return {
-			dir: `github:${source.repo}${source.ref ? `#${source.ref}` : ""}`,
-			remote: true,
-		};
-	}
-	if (source.kind === "url") {
-		return {
-			dir: `git:${source.url}${source.ref ? `#${source.ref}` : ""}`,
-			remote: true,
-		};
-	}
-	if (source.kind === "git-subdir") {
-		return { dir: `git:${source.url}#${source.path}`, remote: true };
-	}
-	return null;
-}
-
 export interface AvailablePlugin {
 	/** Nombre de entrada en el catálogo. */
 	name: string;
@@ -399,6 +402,24 @@ export function listAvailable(
 	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Describe un source no-path para info/list (npm/archive/remotos). */
+function describePluginSource(s: PluginSource): string {
+	switch (s.kind) {
+		case "github":
+			return `github:${s.repo}`;
+		case "url":
+			return `git:${s.url}`;
+		case "git-subdir":
+			return `git:${s.url}#${s.path}`;
+		case "npm":
+			return `npm:${s.package}${s.version ? `@${s.version}` : ""}`;
+		case "archive":
+			return `zip:${s.url}`;
+		default:
+			return s.kind;
+	}
+}
+
 export interface CatalogPluginInfo {
 	name: string;
 	marketplace: string;
@@ -410,6 +431,8 @@ export interface CatalogPluginInfo {
 		commands: string[];
 		mcpServers: string[];
 		skipped: { kind: string; reason: string }[];
+		/** Estimación de tokens/turno (#50): bytes de skills+prompts / 4. */
+		estimatedTokens?: number;
 	};
 	remote?: string;
 }
@@ -450,15 +473,24 @@ export function pluginCatalogInfo(
 		if (found.source.kind !== "path") {
 			return {
 				...base,
-				remote:
-					found.source.kind === "github"
-						? `github:${found.source.repo}`
-						: `git:${found.source.url}`,
+				remote: describePluginSource(found.source),
 			};
 		}
 		const pluginDir = path.join(dir, found.source.path.slice(2));
 		if (!fs.existsSync(pluginDir)) return { ...base, remote: "path-ausente" };
 		const c = discoverComponents(pluginDir);
+		// Context cost aproximado (#50): contenido de skills+commands en bytes
+		// / 4 ≈ tokens por turno (paridad del "Context cost" de Discover).
+		const bytesOf = (p: string): number => {
+			try {
+				return fs.statSync(p).size;
+			} catch {
+				return 0;
+			}
+		};
+		const estBytes =
+			c.skills.reduce((a, s) => a + bytesOf(path.join(s, "SKILL.md")), 0) +
+			c.commands.reduce((a, cmd) => a + bytesOf(cmd), 0);
 		return {
 			...base,
 			components: {
@@ -466,6 +498,7 @@ export function pluginCatalogInfo(
 				commands: c.commands.map((s) => path.basename(s, ".md")),
 				mcpServers: Object.keys(c.mcpServers),
 				skipped: c.skipped.map((s) => ({ kind: s.kind, reason: s.reason })),
+				estimatedTokens: Math.ceil(estBytes / 4),
 			},
 		};
 	}
@@ -495,9 +528,19 @@ export async function installPlugin(
 		deps?: InstallerDeps;
 		cwd?: string;
 		reg?: CcPluginsRegistry;
+		/** Scope destino del record (default user). #50 */
+		scope?: PluginScope;
 	} = {},
 ): Promise<PluginInstallResult> {
+	const scope = opts.scope ?? "user";
+	const workCwd = opts.cwd ?? process.cwd();
+	// Registro DESTINO (donde vive el record) + marketplaces MERGEADOS:
+	// project puede instalar desde marketplaces del user (paridad acolomba).
 	const reg = opts.reg ?? loadRegistry(agentDir);
+	const layers = loadLayers(agentDir, workCwd);
+	const mkts = mergeLayers(layers).marketplaces;
+	const findScoped = (n: string): ScopedPlugin | undefined =>
+		mergeLayers(layers).plugins.find((p) => p.name === n);
 	// Formato: <plugin>@<marketplace> (o <plugin> si es único).
 	const at = pluginRef.lastIndexOf("@");
 	const [pluginName, marketplaceName] =
@@ -509,7 +552,7 @@ export async function installPlugin(
 	// antes de resolver <plugin>@<marketplace> — throttle 30s por registro.
 	// Fallo (offline) NO bloquea: se busca en el catálogo cacheado.
 	if (marketplaceName) {
-		const m = reg.marketplaces[marketplaceName];
+		const m = mkts[marketplaceName];
 		const age = m?.refreshedAt
 			? Date.now() - Date.parse(m.refreshedAt)
 			: Number.POSITIVE_INFINITY;
@@ -535,7 +578,7 @@ export async function installPlugin(
 		entry?: MarketplacePluginEntry;
 		renames?: RenameMap;
 	} | null = null;
-	const candidates = Object.entries(reg.marketplaces).filter(
+	const candidates = Object.entries(mkts).filter(
 		([name]) => !marketplaceName || name === marketplaceName,
 	);
 	for (const [name, m] of candidates) {
@@ -577,26 +620,43 @@ export async function installPlugin(
 		);
 	}
 
-	// Resolver el source a directorio local del marketplace.
-	const mDir = marketplaceDirOf(agentDir, reg.marketplaces[entry.marketplace]);
-	const resolved = resolvePluginSourceDir(entry.source, mDir);
-	if (!resolved || resolved.remote) {
-		throw new CcPluginsInstallError(
-			`El source del plugin '${pluginName}' es remoto (${resolved?.dir ?? "desconocido"}); fetch remoto llega en fase 2.`,
-			"Mientras tanto, clona el repo del plugin dentro del marketplace y cambia su entrada a './<dir>', o espera el fetch remoto (fase 2).",
+	// Resolver el source: path relativo al marketplace dir IN SITU; sources
+	// remotos (github/url/git-subdir/npm/archive) se MATERIALIZAN por fetch
+	// a staging (#50) y de ahí fluyen igual (discover → installed).
+	const mDir = marketplaceDirOf(agentDir, mkts[entry.marketplace]);
+	let sourceDir: string;
+	let sourceRev: string | undefined;
+	if (entry.source.kind === "path") {
+		sourceDir = path.join(mDir, entry.source.path.slice(2));
+		if (!fs.existsSync(sourceDir)) {
+			throw new CcPluginsInstallError(
+				`El directorio del plugin no existe en el marketplace: ${path.relative(mDir, sourceDir)}`,
+				"Actualiza el marketplace (/ccplugin marketplace update) y reintenta.",
+			);
+		}
+	} else {
+		// Staging efímero bajo cc-plugins; el contenido final vive en installed/.
+		const staging = path.join(
+			ccPluginsRoot(agentDir),
+			"staging-sources",
+			`${pluginName ?? "plugin"}-${Date.now().toString(36)}`,
 		);
-	}
-	if (!fs.existsSync(resolved.dir)) {
-		throw new CcPluginsInstallError(
-			`El directorio del plugin no existe en el marketplace: ${path.relative(mDir, resolved.dir)}`,
-			"Actualiza el marketplace (/ccplugin marketplace update) y reintenta.",
-		);
+		try {
+			const m = await materializeSource(staging, entry.source, opts.deps?.fetch);
+			sourceDir = m.dir;
+			sourceRev = m.rev;
+		} catch (e: any) {
+			throw new CcPluginsInstallError(
+				`Fetch del source '${entry.source.kind}' de '${pluginName}' falló: ${e?.message ?? e}`,
+				`Verifica conectividad/credenciales (git/npm) o el digest sha256 del zip. Detalle: ${e?.message ?? e}`,
+			);
+		}
 	}
 
 	// Descubrir componentes ANTES de escribir nada. La entrada del catálogo
 	// viaja para strict:false/pluginRoot/componentes declarados (#51).
-	const components = discoverComponents(resolved.dir, entry?.entry);
-	const manifestName = path.basename(resolved.dir);
+	const components = discoverComponents(sourceDir, entry?.entry);
+	const manifestName = path.basename(sourceDir);
 	// El nombre vigente es el de la ENTRADA resuelta (renames: instalar
 	// "p-viejo" registra "p-nuevo" — paridad Claude).
 	const plugin = entry?.entry?.name ?? pluginName ?? manifestName;
@@ -604,7 +664,7 @@ export async function installPlugin(
 	// Colisiones MCP: TODOS los slots deben tener las llaves libres (D5) —
 	// salvo las PROPIAS del plugin (record previo): un re-install/reconcile
 	// debe poder sobreescribir sus llaves, no colisionar consigo mismo.
-	const ownMcpKeys = reg.plugins[plugin]?.mcpServers ?? [];
+	const ownMcpKeys = findScoped(plugin)?.rec.mcpServers ?? [];
 	const cwd = opts.cwd ?? process.cwd();
 	const { homedir } = await import("node:os");
 	const taken = new Set<string>();
@@ -621,13 +681,15 @@ export async function installPlugin(
 		);
 	}
 
-	// Copiar contenido inmutable a installed/<plugin>@<rev>.
-	const rev = reg.marketplaces[entry.marketplace].rev;
+	// Copiar contenido inmutable a installed/<plugin>@<rev>. Remotos: la rev
+	// resuelta del SOURCE (sha/versión/digest) — más granular que la del
+	// marketplace; path-relativos: la del marketplace (comportamiento previo).
+	const rev = sourceRev ?? mkts[entry.marketplace].rev;
 	const installDir = path.join(installedDir(agentDir), `${plugin}@${rev}`);
 	if (fs.existsSync(installDir))
 		fs.rmSync(installDir, { recursive: true, force: true });
 	fs.mkdirSync(installDir, { recursive: true });
-	fs.cpSync(resolved.dir, installDir, { recursive: true });
+	fs.cpSync(sourceDir, installDir, { recursive: true });
 
 	// Convertir recursos (skills reescritas + prompts planos).
 	const converted = convertPluginResources(agentDir, plugin, components);
@@ -662,7 +724,7 @@ export async function installPlugin(
 		mcpServers: mcpWritten,
 		skipped,
 	};
-	saveRegistry(agentDir, reg);
+	saveRegistryAt(scopeRegistryPath(agentDir, workCwd, scope), reg);
 	return {
 		plugin,
 		version: entry.version,
@@ -677,63 +739,117 @@ export async function installPlugin(
 export async function uninstallPlugin(
 	agentDir: string,
 	plugin: string,
-	opts: { reg?: CcPluginsRegistry; keepData?: boolean } = {},
+	opts: {
+		reg?: CcPluginsRegistry;
+		keepData?: boolean;
+		cwd?: string;
+		/** Scope explícito; sin él se busca en todos (local>project>user). */
+		scope?: PluginScope;
+	} = {},
 ): Promise<void> {
-	const reg = opts.reg ?? loadRegistry(agentDir);
-	const rec = reg.plugins[plugin];
-	if (!rec) {
+	if (opts.reg) {
+		// Modo legacy (reconcile/renames con reg propio en memoria).
+		const rec0 = opts.reg.plugins[plugin];
+		if (!rec0) {
+			throw new CcPluginsInstallError(
+				`Plugin '${plugin}' no instalado`,
+				"Usa /ccplugin list para ver los instalados.",
+			);
+		}
+		removePluginResources(agentDir, plugin);
+		unmergeMcpServers(fridaMcpConfigPath(agentDir), rec0.mcpServers ?? []);
+		const d0 = path.join(installedDir(agentDir), `${plugin}@${rec0.rev}`);
+		if (fs.existsSync(d0)) fs.rmSync(d0, { recursive: true, force: true });
+		delete opts.reg.plugins[plugin];
+		return;
+	}
+	const workCwd = opts.cwd ?? process.cwd();
+	const layers = loadLayers(agentDir, workCwd);
+	const found = opts.scope
+		? (() => {
+				const rec = layers[opts.scope].plugins[plugin];
+				return rec ? ({ name: plugin, rec, scope: opts.scope } as ScopedPlugin) : undefined;
+			})()
+		: mergeLayers(layers).plugins.find((p) => p.name === plugin);
+	if (!found) {
 		throw new CcPluginsInstallError(
 			`Plugin '${plugin}' no instalado`,
 			"Usa /ccplugin list para ver los instalados.",
 		);
 	}
 	removePluginResources(agentDir, plugin);
-	unmergeMcpServers(fridaMcpConfigPath(agentDir), rec.mcpServers ?? []);
-	const installDir = path.join(installedDir(agentDir), `${plugin}@${rec.rev}`);
+	unmergeMcpServers(fridaMcpConfigPath(agentDir), found.rec.mcpServers ?? []);
+	const installDir = path.join(installedDir(agentDir), `${plugin}@${found.rec.rev}`);
 	if (fs.existsSync(installDir)) {
 		fs.rmSync(installDir, { recursive: true, force: true });
 	}
+	const file = scopeRegistryPath(agentDir, workCwd, found.scope);
+	const reg = loadRegistryAt(file);
 	delete reg.plugins[plugin];
-	if (!opts.reg) saveRegistry(agentDir, reg); // caller con reg propio lo guarda
+	saveRegistryAt(file, reg);
 }
 
-/** Enable/disable: el resources_discover filtra por enabled. */
+/** Enable/disable: opera en el scope donde vive el plugin. */
 export function setPluginEnabled(
 	agentDir: string,
 	plugin: string,
 	enabled: boolean,
-	opts: { reg?: CcPluginsRegistry } = {},
+	opts: { reg?: CcPluginsRegistry; cwd?: string; scope?: PluginScope } = {},
 ): CcPluginsRegistry {
-	const reg = opts.reg ?? loadRegistry(agentDir);
-	const rec = reg.plugins[plugin];
-	if (!rec) {
+	const workCwd = opts.cwd ?? process.cwd();
+	if (opts.reg) {
+		const rec = opts.reg.plugins[plugin];
+		if (!rec) throw new CcPluginsInstallError(
+			`Plugin '${plugin}' no instalado`,
+			"Usa /ccplugin list para ver los instalados.",
+		);
+		rec.enabled = enabled;
+		return opts.reg;
+	}
+	const layers = loadLayers(agentDir, workCwd);
+	const found = opts.scope
+		? (() => {
+				const rec = layers[opts.scope].plugins[plugin];
+				return rec ? ({ name: plugin, rec, scope: opts.scope } as ScopedPlugin) : undefined;
+			})()
+		: mergeLayers(layers).plugins.find((p) => p.name === plugin);
+	if (!found) {
 		throw new CcPluginsInstallError(
 			`Plugin '${plugin}' no instalado`,
 			"Usa /ccplugin list para ver los instalados.",
 		);
 	}
-	rec.enabled = enabled;
-	if (!opts.reg) saveRegistry(agentDir, reg);
+	found.rec.enabled = enabled;
+	const file = scopeRegistryPath(agentDir, workCwd, found.scope);
+	const reg = loadRegistryAt(file);
+	if (reg.plugins[plugin]) reg.plugins[plugin].enabled = enabled;
+	saveRegistryAt(file, reg);
 	return reg;
 }
 
-/** Lista plugins instalados (con estado enabled/skipped). */
+/**
+ * Lista plugins instalados. Con `cwd` devuelve el MERGE de scopes con el
+ * campo `scope`; sin él (o con `reg`), el registro user (back-compat).
+ */
 export function listInstalled(
 	agentDir: string,
 	reg?: CcPluginsRegistry,
-): PluginRecord[] {
+	cwd?: string,
+): (PluginRecord & { plugin: string; scope?: PluginScope })[] {
+	if (cwd && !reg) {
+		const merged = mergeLayers(loadLayers(agentDir, cwd));
+		return merged.plugins.map((p) => ({
+			...p.rec,
+			plugin: p.name,
+			scope: p.scope,
+		}));
+	}
 	const r = reg ?? loadRegistry(agentDir);
 	return Object.entries(r.plugins).map(
 		([name, p]) =>
 			({
 				...p,
-				marketplace: p.marketplace,
-				// el nombre vive en la llave; se agrega como campo para listar
 				plugin: name,
-				skills: p.skills,
-				commands: p.commands,
-				mcpServers: p.mcpServers,
-				skipped: p.skipped,
-			}) as PluginRecord & { plugin: string },
+			}) as PluginRecord & { plugin: string; scope?: PluginScope },
 	);
 }

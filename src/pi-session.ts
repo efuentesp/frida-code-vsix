@@ -220,6 +220,10 @@ export interface CreateFridaSessionOptions {
 	) => void;
 	/** ¿Está activo frida-cc-plugins? (frida.ccPlugins.enabled, default true). */
 	ccPluginsEnabled?: () => boolean;
+	/** Team marketplaces de settings (frida.ccPlugins.extraMarketplaces). */
+	ccPluginsExtraMarketplaces?: () => string[];
+	/** enabledPlugins de settings (frida.ccPlugins.enabledPlugins). */
+	ccPluginsEnabledPlugins?: () => Record<string, boolean>;
 	onCcPluginsState?: (
 		s: import("./tools/frida-cc-plugins").CcPluginsState,
 	) => void;
@@ -610,6 +614,9 @@ export async function createFridaSession(
 								agentDir: opts.agentDir,
 								cwd: opts.cwd,
 								onStateChange: opts.onCcPluginsState,
+								extraMarketplaces:
+									opts.ccPluginsExtraMarketplaces?.() ?? [],
+								enabledPlugins: opts.ccPluginsEnabledPlugins?.() ?? {},
 							})(pi)
 						: undefined,
 			},

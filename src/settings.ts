@@ -240,6 +240,21 @@ export function isCcPluginsEnabled(): boolean {
 		.get<boolean>("ccPlugins.enabled", true);
 }
 
+/** Team marketplaces (paridad extraKnownMarketplaces): refs a auto-instalar. */
+export function readCcPluginsExtraMarketplaces(): string[] {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string[]>("ccPlugins.extraMarketplaces", []);
+}
+
+/** enabledPlugins del equipo: "plugin@marketplace" → true. */
+export function readCcPluginsEnabledPlugins(): Record<string, boolean> {
+	const raw = vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<Record<string, boolean>>("ccPlugins.enabledPlugins", {});
+	return raw ?? {};
+}
+
 /** Snapshot de la config del índice de código. */
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);

@@ -126,6 +126,8 @@ import {
 	isHermesMemoryEnabled,
 	isKnowledgeBaseEnabled,
 	isCcPluginsEnabled,
+	readCcPluginsExtraMarketplaces,
+	readCcPluginsEnabledPlugins,
 	isTelemetryOptIn,
 	isTodoEnabled,
 	readCodebaseIndexConfig,
@@ -909,6 +911,8 @@ export async function activate(
 					onKnowledgeBaseState: handleKnowledgeBaseState,
 					ccPluginsEnabled: isCcPluginsEnabled,
 					onCcPluginsState: handleCcPluginsState,
+					ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
+					ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -3844,6 +3848,8 @@ export async function activate(
 				onKnowledgeBaseState: handleKnowledgeBaseState,
 				ccPluginsEnabled: isCcPluginsEnabled,
 				onCcPluginsState: handleCcPluginsState,
+				ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
+				ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();

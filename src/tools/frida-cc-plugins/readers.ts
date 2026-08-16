@@ -64,9 +64,11 @@ export type RenameMap = Record<string, string | null>;
 /** Source de un plugin (formas del catálogo Claude). */
 export type PluginSource =
 	| { kind: "path"; path: string }
-	| { kind: "github"; repo: string; ref?: string }
+	| { kind: "github"; repo: string; ref?: string; sha?: string }
 	| { kind: "url"; url: string; ref?: string; sha?: string }
-	| { kind: "git-subdir"; url: string; path: string; ref?: string };
+	| { kind: "git-subdir"; url: string; path: string; ref?: string; sha?: string }
+	| { kind: "npm"; package: string; version?: string; registry?: string }
+	| { kind: "archive"; url: string; sha256?: string };
 
 /** Catálogo .claude-plugin/marketplace.json. */
 export interface MarketplaceCatalog {
@@ -260,6 +262,7 @@ function parseEntrySource(
 				kind: "github",
 				repo: validateGithubRepo(String(s.repo)),
 				ref: typeof s.ref === "string" ? s.ref : undefined,
+				sha: typeof s.sha === "string" ? s.sha : undefined,
 			};
 		case "url":
 		case "git": {
@@ -276,6 +279,7 @@ function parseEntrySource(
 					url,
 					path: s.path.replace(/^\.\//, ""),
 					ref: typeof s.ref === "string" ? s.ref : undefined,
+					sha: typeof s.sha === "string" ? s.sha : undefined,
 				};
 			}
 			return {
@@ -284,6 +288,47 @@ function parseEntrySource(
 				ref: typeof s.ref === "string" ? s.ref : undefined,
 				sha: typeof s.sha === "string" ? s.sha : undefined,
 			};
+		}
+		case "npm": {
+			const pkg = String(s.package ?? "");
+			if (!/^[A-Za-z0-9@/._-]+$/.test(pkg)) {
+				throw new ReaderError(
+					`source.package npm inválido: ${JSON.stringify(pkg)}`,
+					"El campo 'package' debe ser un nombre npm (scoped permitido: @org/pkg).",
+				);
+			}
+			const registry =
+				typeof s.registry === "string" ? String(s.registry) : undefined;
+			if (registry && !/^https:\/\//.test(registry)) {
+				throw new ReaderError(
+					`source.registry debe ser HTTPS: ${JSON.stringify(registry)}`,
+					"Solo se aceptan registries npm https:// (sin credenciales embebidas).",
+				);
+			}
+			return {
+				kind: "npm",
+				package: pkg,
+				version: typeof s.version === "string" ? s.version : undefined,
+				registry,
+			};
+		}
+		case "archive": {
+			const url = String(s.url ?? "");
+			if (!/^https:\/\//.test(url)) {
+				throw new ReaderError(
+					`source.url de archive debe ser HTTPS: ${JSON.stringify(url)}`,
+					"Los zips de plugins solo se descargan por https://.",
+				);
+			}
+			const sha256 =
+				typeof s.sha256 === "string" ? s.sha256.toLowerCase() : undefined;
+			if (sha256 && !/^[0-9a-f]{64}$/.test(sha256)) {
+				throw new ReaderError(
+					`source.sha256 inválido (se esperaban 64 hex): ${JSON.stringify(s.sha256)}`,
+					"El digest sha256 del zip son 64 caracteres hexadecimales.",
+				);
+			}
+			return { kind: "archive", url, sha256 };
 		}
 		default:
 			return null;

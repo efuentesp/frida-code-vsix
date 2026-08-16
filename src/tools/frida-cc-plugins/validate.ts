@@ -126,10 +126,18 @@ function validateMarketplace(
 			}
 			validatePlugin(label, pluginDir, p, r);
 		} else {
-			const where = p.source.kind === "github" ? p.source.repo : p.source.url;
+			const s = p.source;
+			const where =
+				s.kind === "github"
+					? s.repo
+					: s.kind === "npm"
+						? s.package
+						: s.kind === "archive"
+							? s.url
+							: s.url;
 			r.line(
 				"info",
-				`${label}: source ${p.source.kind} (${where}) — fetch remoto: fase 2 (#50).`,
+				`${label}: source ${s.kind} (${where}) — source remoto (fetch al instalar).`,
 			);
 		}
 	}
