@@ -944,7 +944,7 @@ export async function activate(
 					onCcPluginsState: handleCcPluginsState,
 					ccPluginsExtraMarketplaces: readCcPluginsExtraMarketplaces,
 					ccPluginsEnabledPlugins: readCcPluginsEnabledPlugins,
-				ccPluginsPresenter: createCcPluginsPresenter(),
+					ccPluginsPresenter: createCcPluginsPresenter(),
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -3409,6 +3409,21 @@ export async function activate(
 			session = await ensureSession();
 		} catch (e: any) {
 			post({ type: "error", text: String(e?.message ?? e) });
+			return;
+		}
+		// Comandos de EXTENSIÓN (/ccplugin, /wiki-*, /memory-*): no requieren
+		// modelo ni auth — el SDK los despacha ANTES de su propio gate de auth
+		// (diseño deliberado: "Extension commands manage their own LLM interaction").
+		// Sin esto, /ccplugin list --available moriría en need_key sin salida
+		// alguna si no hay key configurada (reporte e2e #49: "no hizo nada").
+		const extCmd = trimmed.match(/^\/[\w-]+/)?.[0]?.slice(1);
+		if (
+			extCmd &&
+			session.extensionApi
+				?.getCommands?.()
+				.some((c: { name: string }) => c.name === extCmd)
+		) {
+			await session.session.prompt(trimmed);
 			return;
 		}
 		// Auth global: API key de Softtek o login de suscripción (Copilot).
