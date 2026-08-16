@@ -104,20 +104,35 @@ async function git(
 
 // ─── Marketplaces ────────────────────────────────────────────────────────
 
-/** Normaliza la entrada de marketplace a URL git https o path local. */
+/**
+ * Normaliza la entrada de marketplace a URL git (https/ssh) o path local.
+ * El sufijo `#ref` pinea branch/tag del clone (paridad Claude Code).
+ */
 export type MarketplaceRef =
-	| { kind: "git"; url: string }
+	| { kind: "git"; url: string; ref?: string }
 	| { kind: "local"; path: string };
 
 export function resolveMarketplaceRef(input: string): MarketplaceRef {
-	const trimmed = input.trim().replace(/#.*$/, "");
+	const raw = input.trim();
+	const hashIdx = raw.indexOf("#");
+	const ref = hashIdx >= 0 ? raw.slice(hashIdx + 1).trim() : undefined;
+	const trimmed = (hashIdx >= 0 ? raw.slice(0, hashIdx) : raw).trim();
 	if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(trimmed)) {
-		return { kind: "git", url: `https://github.com/${trimmed}.git` };
+		return { kind: "git", url: `https://github.com/${trimmed}.git`, ...(ref ? { ref } : {}) };
 	}
 	if (/^https:\/\/[^/]+\/.+(\.git)?$/.test(trimmed)) {
 		return {
 			kind: "git",
 			url: trimmed.endsWith(".git") ? trimmed : `${trimmed}.git`,
+			...(ref ? { ref } : {}),
+		};
+	}
+	// SSH (paridad Claude): git@host:path[.git]
+	if (/^git@[A-Za-z0-9_.-]+:[^\s]+(\.git)?$/.test(trimmed)) {
+		return {
+			kind: "git",
+			url: trimmed.endsWith(".git") ? trimmed : `${trimmed}.git`,
+			...(ref ? { ref } : {}),
 		};
 	}
 	// Local (paridad con acolomba): directorio con .claude-plugin/
@@ -188,6 +203,7 @@ export async function addMarketplace(
 			url: resolved.path,
 			rev: "local",
 			local: true,
+			refreshedAt: new Date().toISOString(),
 			addedAt: new Date().toISOString(),
 		};
 		saveRegistry(agentDir, reg);
@@ -206,7 +222,15 @@ export async function addMarketplace(
 	if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 	await git(
 		opts.deps,
-		["clone", "--depth", "1", "--filter=blob:none", url, dir],
+		[
+			"clone",
+			"--depth",
+			"1",
+			"--filter=blob:none",
+			...(resolved.ref ? ["--branch", resolved.ref] : []),
+			url,
+			dir,
+		],
 		process.cwd(),
 	);
 	const catalog: MarketplaceCatalog = readMarketplaceCatalog(dir);
@@ -214,6 +238,8 @@ export async function addMarketplace(
 	reg.marketplaces[catalog.name] = {
 		url,
 		rev,
+		...(resolved.ref ? { ref: resolved.ref } : {}),
+		refreshedAt: new Date().toISOString(),
 		addedAt: new Date().toISOString(),
 	};
 	saveRegistry(agentDir, reg);
@@ -284,6 +310,131 @@ function resolvePluginSourceDir(
 	return null;
 }
 
+export interface AvailablePlugin {
+	/** Nombre de entrada en el catálogo. */
+	name: string;
+	marketplace: string;
+	version?: string;
+	description?: string;
+	/** ¿Ya instalado (y habilitado) desde ese marketplace? */
+	installed: boolean;
+	enabled: boolean;
+	/** Source remoto aún no instalable en el MVP. */
+	remote: boolean;
+}
+
+/**
+ * Lista los plugins DISPONIBLES en los catálogos de los marketplaces
+ * registrados (paridad `list --available` de Claude Code), marcando los ya
+ * instalados. Marketplaces ilegibles se omiten (degradación suave).
+ */
+export function listAvailable(
+	agentDir: string,
+	opts: { reg?: CcPluginsRegistry; marketplace?: string } = {},
+): AvailablePlugin[] {
+	const reg = opts.reg ?? loadRegistry(agentDir);
+	const out: AvailablePlugin[] = [];
+	for (const [name, m] of Object.entries(reg.marketplaces)) {
+		if (opts.marketplace && name !== opts.marketplace) continue;
+		const dir = marketplaceDirOf(agentDir, m);
+		let catalog: MarketplaceCatalog;
+		try {
+			catalog = readMarketplaceCatalog(dir);
+		} catch {
+			continue;
+		}
+		for (const p of catalog.plugins) {
+			const rec = reg.plugins[p.name];
+			out.push({
+				name: p.name,
+				marketplace: name,
+				version: p.version,
+				description: p.description,
+				installed: !!rec && rec.marketplace === name,
+				enabled: !!rec && rec.marketplace === name && rec.enabled,
+				remote: p.source.kind !== "path",
+			});
+		}
+	}
+	return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export interface CatalogPluginInfo {
+	name: string;
+	marketplace: string;
+	version?: string;
+	description?: string;
+	/** Inventario in situ (solo sources de path). */
+	components?: {
+		skills: string[];
+		commands: string[];
+		mcpServers: string[];
+		skipped: { kind: string; reason: string }[];
+	};
+	remote?: string;
+}
+
+/**
+ * Info PRE-INSTALL de un plugin del catálogo (paridad del detalle de
+ * Discover): inventario de componentes leído in situ para sources de path;
+ * los remotos se describen por su source (fetch: fase 2).
+ */
+export function pluginCatalogInfo(
+	agentDir: string,
+	pluginRef: string,
+	opts: { reg?: CcPluginsRegistry } = {},
+): CatalogPluginInfo {
+	const reg = opts.reg ?? loadRegistry(agentDir);
+	const at = pluginRef.lastIndexOf("@");
+	const [pluginName, marketplaceName] =
+		at > 0
+			? [pluginRef.slice(0, at), pluginRef.slice(at + 1)]
+			: [pluginRef, undefined];
+	for (const [name, m] of Object.entries(reg.marketplaces)) {
+		if (marketplaceName && name !== marketplaceName) continue;
+		const dir = marketplaceDirOf(agentDir, m);
+		let catalog: MarketplaceCatalog;
+		try {
+			catalog = readMarketplaceCatalog(dir);
+		} catch {
+			continue;
+		}
+		const found = catalog.plugins.find((p) => p.name === pluginName);
+		if (!found) continue;
+		const base: CatalogPluginInfo = {
+			name: found.name,
+			marketplace: name,
+			version: found.version,
+			description: found.description,
+		};
+		if (found.source.kind !== "path") {
+			return {
+				...base,
+				remote:
+					found.source.kind === "github"
+						? `github:${found.source.repo}`
+						: `git:${found.source.url}`,
+			};
+		}
+		const pluginDir = path.join(dir, found.source.path.slice(2));
+		if (!fs.existsSync(pluginDir)) return { ...base, remote: "path-ausente" };
+		const c = discoverComponents(pluginDir);
+		return {
+			...base,
+			components: {
+				skills: c.skills.map((s) => path.basename(s)),
+				commands: c.commands.map((s) => path.basename(s, ".md")),
+				mcpServers: Object.keys(c.mcpServers),
+				skipped: c.skipped.map((s) => ({ kind: s.kind, reason: s.reason })),
+			},
+		};
+	}
+	throw new CcPluginsInstallError(
+		`Plugin '${pluginName}' no encontrado${marketplaceName ? ` en '${marketplaceName}'` : " en ningún marketplace registrado"}`,
+		"Usa /ccplugin list --available para ver plugins instalables.",
+	);
+}
+
 export interface PluginInstallResult {
 	plugin: string;
 	version?: string;
@@ -313,6 +464,27 @@ export async function installPlugin(
 		at > 0
 			? [pluginRef.slice(0, at), pluginRef.slice(at + 1)]
 			: [pluginRef, undefined];
+
+	// Refresh-before-lookup (paridad Claude): refrescar el catálogo destino
+	// antes de resolver <plugin>@<marketplace> — throttle 30s por registro.
+	// Fallo (offline) NO bloquea: se busca en el catálogo cacheado.
+	if (marketplaceName) {
+		const m = reg.marketplaces[marketplaceName];
+		const age = m?.refreshedAt
+			? Date.now() - Date.parse(m.refreshedAt)
+			: Number.POSITIVE_INFINITY;
+		if (m && !m.local && age > 30_000) {
+			try {
+				await addMarketplace(agentDir, `${m.url}${m.ref ? `#${m.ref}` : ""}`, {
+					deps: opts.deps,
+					cwd: opts.cwd,
+					reg,
+				});
+			} catch {
+				// Offline: catálogo cacheado sigue siendo utilizable.
+			}
+		}
+	}
 
 	// Localizar la entrada en los marketplaces registrados.
 	let entry: {

@@ -47,11 +47,15 @@ staging atómico + colisiones MCP) de `pi-claude-marketplace` (acolomba).
 ## Uso
 
 ```text
-/ccplugin bootstrap                        # agrega anthropics/claude-plugins-official
-/ccplugin marketplace add owner/repo       # o https://...git o ~/mi-marketplace
+# (auto) el primer arranque agrega el oficial solo (intento único)
+/ccplugin bootstrap                        # manual: agrega anthropics/claude-plugins-official
+/ccplugin marketplace add owner/repo       # https://...git, git@host:path.git, o ~/mi-marketplace
+/ccplugin marketplace add owner/repo#v1.2  # `#ref` pinea branch/tag del clone
 /ccplugin marketplace add ~/mi-marketplace # marketplace LOCAL (sin git)
-/ccplugin add <plugin>@<marketplace>       # instala (skills+commands+MCP)
-/ccplugin list | info <plugin>             # estado + componentes omitidos
+/ccplugin list --available [mkt]           # catálogo instalable (remotos marcados)
+/ccplugin info <plugin>[@mkt]              # inventario PRE-install desde el catálogo
+/ccplugin add <plugin>@<marketplace>       # instala (refresca el catálogo si >30s)
+/ccplugin list [--enabled|--disabled]      # estado + componentes omitidos
 /ccplugin enable|disable <plugin>          # filtra resources_discover
 /ccplugin remove <plugin>                  # limpia recursos + MCP + registro
 /ccplugin marketplace list|update|remove   # ciclo de vida de marketplaces
@@ -75,7 +79,16 @@ nada sola** — todo install requiere `/ccplugin add` explícito (gate D8:
 
 Marketplaces remotos usan `git clone --depth 1 --filter=blob:none` (spawn; git está
 presente en prácticamente todo host con VS Code). Alternativa sin git binario:
-`isomorphic-git` (documentado como fase 2). `#ref` en la referencia pinea branch/tag.
+`isomorphic-git` (documentado como fase 2). `#ref` en la referencia pinea branch/tag
+(`--branch`). URLs SSH (`git@host:path.git`) soportadas.
+
+**Paridad con `/plugin` de Claude Code** (mini-batch): bootstrap automático del
+oficial en el primer arranque (intento único, offline no bloquea), `list --available`
+con marcadores de instalado/remoto, `info` pre-install con inventario "instalará:",
+refresh-before-lookup con throttle de 30s (offline degrada al catálogo cacheado) y
+filtros `--enabled/--disabled`. Diferencias deliberadas: nombres MCP originales (no
+`mcp__plugin_*`), prompts con `-` (Windows) y fuentes remotas de plugin (github/url)
+quedan en fase 2.
 
 ## Tests
 

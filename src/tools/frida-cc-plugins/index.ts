@@ -33,12 +33,18 @@ import {
 import {
 	addMarketplace,
 	installPlugin,
+	listAvailable,
 	listInstalled,
+	pluginCatalogInfo,
 	removeMarketplace,
 	setPluginEnabled,
 	uninstallPlugin,
 } from "./installer";
-import { loadRegistry, type CcPluginsRegistry } from "./registry";
+import {
+	loadRegistry,
+	saveRegistry,
+	type CcPluginsRegistry,
+} from "./registry";
 
 export interface CreateCcPluginsOpts {
 	/** Agent dir de Frida (~/.frida). */
@@ -47,6 +53,8 @@ export interface CreateCcPluginsOpts {
 	cwd?: string;
 	/** Log de diagnóstico. */
 	onLog?: (line: string) => void;
+	/** Git inyectable para tests (bootstrap/reconcile). */
+	deps?: import("./installer").InstallerDeps;
 }
 
 /** Estado del wrapper para el host (notificaciones). */
@@ -71,6 +79,7 @@ async function reconcile(
 	cwd: string,
 	notify: Notify,
 	onLog?: (line: string) => void,
+	deps?: import("./installer").InstallerDeps,
 ): Promise<void> {
 	for (const [name, rec] of Object.entries(reg.plugins)) {
 		if (!rec.enabled) continue;
@@ -83,10 +92,7 @@ async function reconcile(
 		const skillsRoot = path.join(resourcesSkillsDir(agentDir), name);
 		const hasSkills = (() => {
 			try {
-				return (
-					fs.existsSync(skillsRoot) &&
-					fs.readdirSync(skillsRoot).length > 0
-				);
+				return fs.existsSync(skillsRoot) && fs.readdirSync(skillsRoot).length > 0;
 			} catch {
 				return false;
 			}
@@ -95,18 +101,14 @@ async function reconcile(
 			try {
 				return fs
 					.readdirSync(resourcesPromptsDir(agentDir))
-					.some(
-						(f) =>
-							f.startsWith(`${name}-`) &&
-							f.endsWith(".md"),
-					);
+					.some((f) => f.startsWith(`${name}-`) && f.endsWith(".md"));
 			} catch {
 				return false; // dir inexistente
 			}
 		})();
 		if (hasSkills || hasPrompts) continue;
 		try {
-			await installPlugin(agentDir, `${name}@${rec.marketplace}`, { cwd });
+			await installPlugin(agentDir, `${name}@${rec.marketplace}`, { cwd, deps });
 			notify(
 				`cc-plugins: '${name}' re-instalado desde ${rec.marketplace} (reconcile).`,
 				"info",
@@ -164,21 +166,56 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 			const workCwd = cwd ?? ctx.cwd;
 			const raw = (args ?? "").trim();
 			const [sub, ...rest] = raw.split(/\s+/);
-			const notifyCtx: Notify = (m, l) =>
-				ctx.ui.notify(m, l ?? "info");
+			const notifyCtx: Notify = (m, l) => ctx.ui.notify(m, l ?? "info");
 			try {
 				switch (sub) {
 					case "":
 					case "list": {
+						const flags = rest.filter((a) => a.startsWith("--"));
+						const positional = rest.filter((a) => !a.startsWith("--"));
+						if (flags.includes("--available")) {
+							const avail = listAvailable(agentDir, {
+								marketplace: positional[0],
+							});
+							notifyCtx(
+								avail.length
+									? avail
+											.map(
+												(a) =>
+													`• ${a.name}@${a.marketplace}${a.version ? ` v${a.version}` : ""}${a.installed ? (a.enabled ? " (instalado)" : " (instalado, deshabilitado)") : ""}${a.remote ? " [remoto: fase 2]" : ""}`,
+											)
+											.join("\n")
+									: "Sin plugins disponibles en los marketplaces registrados.",
+							);
+							return;
+						}
+						if (flags.includes("--enabled") || flags.includes("--disabled")) {
+							const wantEnabled = flags.includes("--enabled");
+							const reg = loadRegistry(agentDir);
+							const filtered = listInstalled(agentDir, reg).filter(
+								(p) =>
+									(p as unknown as { plugin: string; enabled: boolean }).enabled ===
+									wantEnabled,
+							);
+							notifyCtx(
+								filtered.length
+									? filtered
+											.map(
+													(p) =>
+														`• ${(p as unknown as { plugin: string }).plugin}@${p.marketplace}`,
+											)
+											.join("\n")
+									: `Sin plugins ${wantEnabled ? "habilitados" : "deshabilitados"}.`,
+							);
+							return;
+						}
 						notifyCtx(formatList(agentDir, loadRegistry(agentDir)));
 						return;
 					}
 					case "bootstrap": {
-						const res = await addMarketplace(
-							agentDir,
-							OFFICIAL_MARKETPLACE,
-							{ cwd: workCwd },
-						);
+						const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
+							cwd: workCwd,
+						});
 						notifyCtx(
 							`Marketplace '${res.name}' agregado (${res.plugins} plugins). Instala con /ccplugin add <plugin>@${res.name}.`,
 						);
@@ -198,7 +235,9 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							const ms = Object.entries(reg.marketplaces)
 								.map(([n, m]) => `• ${n} @${m.rev} — ${m.url}`)
 								.join("\n");
-							notifyCtx(ms || "Sin marketplaces. /ccplugin bootstrap para el oficial.");
+							notifyCtx(
+								ms || "Sin marketplaces. /ccplugin bootstrap para el oficial.",
+							);
 						} else if (msub === "remove" || msub === "rm") {
 							const n = await removeMarketplace(agentDir, mrest[0] ?? "");
 							notifyCtx(
@@ -269,7 +308,22 @@ function registerCommand(pi: ExtensionAPI, opts: CreateCcPluginsOpts): void {
 							([n]) => n === rest[0],
 						);
 						if (!p) {
-							notifyCtx(`Plugin '${rest[0]}' no instalado.`, "warning");
+							// Paridad Discover: detalle PRE-INSTALL desde el catálogo.
+							const cat = pluginCatalogInfo(agentDir, rest[0] ?? "");
+							const lines = [
+								`${cat.name}@${cat.marketplace}${cat.version ? ` v${cat.version}` : ""} (no instalado)`,
+								cat.description,
+								cat.remote
+									? `source remoto (${cat.remote}) — fetch en fase 2`
+									: undefined,
+								cat.components
+									? `instalará: ${cat.components.skills.length} skills, ${cat.components.commands.length} commands, ${cat.components.mcpServers.length} MCP`
+									: undefined,
+								cat.components?.skipped.length
+									? `omitidos: ${cat.components.skipped.map((s) => s.kind).join(", ")}`
+									: undefined,
+							].filter(Boolean);
+							notifyCtx(lines.join("\n"));
 							return;
 						}
 						const [n, r] = p;
@@ -329,9 +383,36 @@ export function createFridaCcPlugins(
 					/* UI no disponible (RPC) — el estado queda en el log */
 				}
 			};
-			const reg = loadRegistry(agentDir);
+			let reg = loadRegistry(agentDir);
+			// Bootstrap auto (paridad Claude: el oficial se agrega en el primer
+			// arranque). Intento ÚNICO (bootstrapped), best-effort: offline no
+			// bloquea la carga — el usuario puede /ccplugin bootstrap manual.
+			if (!reg.bootstrapped) {
+				reg.bootstrapped = true;
+				if (Object.keys(reg.marketplaces).length === 0) {
+					try {
+						// reg (bootstrapped=true ya mutado) viaja al save interno:
+						// persiste marketplace + flag en una sola escritura.
+						const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
+							cwd,
+							deps: opts.deps,
+							reg,
+						});
+						reg = loadRegistry(agentDir); // re-leer tras el save
+						notify(
+							`cc-plugins: marketplace oficial '${res.name}' agregado automáticamente (${res.plugins} plugins). /ccplugin list --available para explorar; /ccplugin marketplace remove ${res.name} si no lo quieres.`,
+						);
+					} catch (e: any) {
+						onLog?.(
+							`[cc-plugins] bootstrap auto falló: ${e?.message ?? e}`,
+						);
+					}
+				} else {
+					saveRegistry(agentDir, reg); // solo marcar bootstrapped
+				}
+			}
 			// Reconcile self-healing (best-effort, nunca bloquea la carga).
-			await reconcile(agentDir, reg, cwd, notify, onLog);
+			await reconcile(agentDir, reg, cwd, notify, onLog, opts.deps);
 
 			const skillPaths: string[] = [];
 			const promptPaths: string[] = [];

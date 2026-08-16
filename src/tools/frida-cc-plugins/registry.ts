@@ -14,12 +14,16 @@ import * as path from "node:path";
 import { registryPath } from "./constants";
 
 export interface MarketplaceRecord {
-	/** URL git clonada (https) — o path absoluto si local. */
+	/** URL git clonada (https/ssh) — o path absoluto si local. */
 	url: string;
 	/** HEAD short sha del clone (identidad del marketplace). */
 	rev: string;
 	/** Marketplace local del filesystem: sin clone, contenido del usuario. */
 	local?: boolean;
+	/** `#ref` con el que se clonó (branch/tag) — se reusa en updates. */
+	ref?: string;
+	/** Último refresh del catálogo (throttle de 30s del refresh-before-lookup). */
+	refreshedAt?: string;
 	addedAt: string;
 }
 
@@ -47,6 +51,8 @@ export interface PluginRecord {
 
 export interface CcPluginsRegistry {
 	schemaVersion: 1;
+	/** Bootstrap auto del oficial ya intentado (paridad Claude, una sola vez). */
+	bootstrapped?: boolean;
 	marketplaces: Record<string, MarketplaceRecord>;
 	plugins: Record<string, PluginRecord>;
 }
@@ -62,6 +68,7 @@ export function loadRegistry(agentDir: string): CcPluginsRegistry {
 		if (raw && typeof raw === "object" && raw.schemaVersion === 1) {
 			return {
 				schemaVersion: 1,
+				bootstrapped: raw.bootstrapped === true,
 				marketplaces: raw.marketplaces ?? {},
 				plugins: raw.plugins ?? {},
 			};
