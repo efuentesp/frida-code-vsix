@@ -214,6 +214,19 @@ export function isHermesMemoryEnabled(): boolean {
 		.get<boolean>("hermesMemory.enabled", true);
 }
 
+// === Knowledge base (frida-knowledge-base, ADR-0040 / issue #29) ===
+
+/**
+ * ¿Está activa frida-knowledge-base? Default: true. La KB OKF del proyecto
+ * (wrapper de @zosmaai/pi-llm-wiki): el gate permite apagarla sin
+ * desinstalar el paquete (p. ej. proyectos sin vault ni ingest).
+ */
+export function isKnowledgeBaseEnabled(): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<boolean>("knowledgeBase.enabled", true);
+}
+
 /** Snapshot de la config del índice de código. */
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);

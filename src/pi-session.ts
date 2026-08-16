@@ -54,6 +54,10 @@ import {
 	HERMES_MEMORY_FACTORY_NAME,
 } from "./tools/frida-hermes-memory";
 import {
+	createFridaKnowledgeBase,
+	KNOWLEDGE_BASE_FACTORY_NAME,
+} from "./tools/frida-knowledge-base";
+import {
 	ensureGitignore,
 	syncOpenAiKeyToAuthJson,
 } from "./tools/frida-codebase-index/host-setup";
@@ -205,6 +209,11 @@ export interface CreateFridaSessionOptions {
 	) => void;
 	/** ¿Está activo frida-hermes-memory? (frida.hermesMemory.enabled, default true). */
 	hermesMemoryEnabled?: () => boolean;
+	/** ¿Está activa frida-knowledge-base? (frida.knowledgeBase.enabled, default true). */
+	knowledgeBaseEnabled?: () => boolean;
+	onKnowledgeBaseState?: (
+		s: import("./tools/frida-knowledge-base").KnowledgeBaseState,
+	) => void;
 	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
 	onHermesMemoryState?: (
 		s: import("./tools/frida-hermes-memory").HermesMemoryState,
@@ -550,6 +559,29 @@ export async function createFridaSession(
 								agentDir: opts.agentDir,
 								distDir: __dirname,
 								onStateChange: opts.onHermesMemoryState,
+							})(pi)
+						: undefined,
+			},
+			// frida-knowledge-base (ADR-0040): KB OKF v0.2 del proyecto vía wrapper
+			// passthrough del paquete upstream @zosmaai/pi-llm-wiki (MIT) instalado
+			// on-demand en ~/.frida/npm. Igual que hermes-memory corre la factory del
+			// upstream contra el ExtensionAPI REAL (11 tools wiki_*, guardrails,
+			// recall layering en before_agent_start) y añade la superficie que el
+			// package loader de pi aportaría: prompts /wiki-* + skill llm-wiki
+			// materializados como symlinks en ~/.frida, y los aliases frida
+			// kb_search/kb_neighbors. Factory async: el loader awaita el jiti import
+			// (sin race de registro). Gate (frida.knowledgeBase.enabled, default true).
+			// Si falta el paquete: tool guía + instalación en background sin bloquear
+			// el arranque (D6). Main only — la KB es del proyecto de la sesión main.
+			{
+				name: KNOWLEDGE_BASE_FACTORY_NAME,
+				factory: (pi: any) =>
+					(opts.knowledgeBaseEnabled?.() ?? true)
+						? createFridaKnowledgeBase({
+								agentDir: opts.agentDir,
+								distDir: __dirname,
+								cwd: opts.cwd,
+								onStateChange: opts.onKnowledgeBaseState,
 							})(pi)
 						: undefined,
 			},

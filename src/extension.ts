@@ -124,6 +124,7 @@ import {
 	isCodebaseIndexEnabled,
 	isContextEnabled,
 	isHermesMemoryEnabled,
+	isKnowledgeBaseEnabled,
 	isTelemetryOptIn,
 	isTodoEnabled,
 	readCodebaseIndexConfig,
@@ -527,6 +528,32 @@ export async function activate(
 		}
 	}
 
+	// frida-knowledge-base (#29): estado del wrapper (mismo patrón que
+	// hermes-memory): instalación background → notificar + sugerir /reload
+	// (los /wiki-* se materializan en el agentDir y aparecen tras recargar).
+	let knowledgeBaseWasInstalling = false;
+	function handleKnowledgeBaseState(
+		s: import("./tools/frida-knowledge-base").KnowledgeBaseState,
+	): void {
+		if (s.installing) {
+			knowledgeBaseWasInstalling = true;
+			return;
+		}
+		if (s.installed && knowledgeBaseWasInstalling) {
+			knowledgeBaseWasInstalling = false;
+			void vscode.window.showInformationMessage(
+				"Base de conocimiento instalada (pi-llm-wiki). Ejecuta /reload o reinicia la sesión para activarla (/wiki-init para empezar).",
+			);
+			return;
+		}
+		if (s.error) {
+			knowledgeBaseWasInstalling = false;
+			void vscode.window.showWarningMessage(
+				`frida-knowledge-base no se pudo activar: ${s.error}`,
+			);
+		}
+	}
+
 	/** Resume el resultado de un tool upstream (content[0].text, primeras líneas). */
 	function ciSummarize(res: any): string {
 		const t = res?.content?.[0]?.text;
@@ -867,6 +894,8 @@ export async function activate(
 					codebaseIndexEnabled: isCodebaseIndexEnabled,
 					hermesMemoryEnabled: isHermesMemoryEnabled,
 					onHermesMemoryState: handleHermesMemoryState,
+					knowledgeBaseEnabled: isKnowledgeBaseEnabled,
+					onKnowledgeBaseState: handleKnowledgeBaseState,
 					onCodebaseIndexState: (s) => {
 						ciUi = s;
 						postCodebaseIndexState();
@@ -2237,8 +2266,11 @@ export async function activate(
 						const toolName = action === "status" ? "index_status" : "index_codebase";
 						const t = tools.get(toolName);
 						if (!t) throw new Error(`${toolName} no disponible en el paquete`);
+						// toolCallId (etiqueta del registro de la llamada), no una query:
+						// acción validada por la unión de tipos del mensaje.
+						const toolCallId = "host-" + action;
 						const res = await t.execute(
-							`host-${action}`,
+							toolCallId,
 							{ force: action === "rebuild" },
 							undefined,
 							undefined,
@@ -3795,6 +3827,8 @@ export async function activate(
 				codebaseIndexEnabled: isCodebaseIndexEnabled,
 				hermesMemoryEnabled: isHermesMemoryEnabled,
 				onHermesMemoryState: handleHermesMemoryState,
+				knowledgeBaseEnabled: isKnowledgeBaseEnabled,
+				onKnowledgeBaseState: handleKnowledgeBaseState,
 				onCodebaseIndexState: (s) => {
 					ciUi = s;
 					postCodebaseIndexState();
