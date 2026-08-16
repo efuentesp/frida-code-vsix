@@ -58,13 +58,25 @@ export const HERMES_MEMORY_FACTORY_NAME = "frida-hermes-memory";
 
 /**
  * Aliases de jiti para los peer-deps del upstream que NO se instalan con
- * --legacy-peer-deps: pi-ai (StringEnum) y pi-ai/compat (completeSimple, la
- * llamada LLM del background learning) y pi-coding-agent (keyHint). Apuntan a
- * la copia del SDK que frida ya shipea en su VSIX — misma versión que el
- * runtime embebido, cero duplicación. pi-ai suele vivir NESTED bajo
- * pi-coding-agent (así lo instala npm al ser dependencia transitiva), pero si
- * una instalación futura la hoistea al top-level, cae al fallback (misma
- * lógica que esbuild.js con su nodePaths).
+ * --legacy-peer-deps: pi-ai (StringEnum), pi-ai/compat (completeSimple, la
+ * llamada LLM del background learning), pi-coding-agent (keyHint) y pi-tui
+ * (Text, truncateToWidth… — imports de VALOR del upstream). Apuntan a la
+ * copia del SDK que frida ya shipea en su VSIX — misma versión que el
+ * runtime embebido, cero duplicación. pi-ai y pi-tui suelen vivir NESTED
+ * bajo pi-coding-agent (así lo instala npm al ser dependencias transitivas),
+ * pero si una instalación futura las hoistea al top-level, caen al fallback
+ * (misma lógica que esbuild.js con su nodePaths).
+ *
+ * SUBPATHS EXACTOS (Refs #21, hallazgo e2e): una vez que el upstream toca
+ * pi-coding-agent (alias → SDK dist/index.js), TODO el SDK dist se carga
+ * BAJO jiti y sus requires internos pasan por este map. jiti hace
+ * PREFIX-match de las keys: la key "@earendil-works/pi-ai" + specifier
+ * "…/pi-ai/oauth" → dist/index.js/oauth → "Cannot find module". Por eso cada
+ * subpath que el SDK dist requiere (oauth, providers/all, bedrock-provider,
+ * bun-oauth) necesita su key EXACTA — mismo patrón que typebox en
+ * frida-knowledge-base. El test de contrato (wrapper.test.ts) escanea el SDK
+ * dist real y exige alias para cada specifier: si un bump del SDK añade un
+ * subpath nuevo, el test se pone rojo ANTES que el usuario.
  */
 export function upstreamPeerAliases(distDir: string): Record<string, string> {
 	// distDir = directorio del bundle de frida (dist/) → node_modules es hermano.
@@ -76,20 +88,24 @@ export function upstreamPeerAliases(distDir: string): Record<string, string> {
 		"node_modules",
 		"@earendil-works",
 	);
-	const piAiRoot = existsSync(path.join(nested, "pi-ai")) ? nested : topLevel;
+	const scopeRoot = existsSync(path.join(nested, "pi-ai"))
+		? nested
+		: topLevel;
+	const piAi = (sub: string) =>
+		path.join(scopeRoot, "pi-ai", "dist", sub);
 	return {
-		"@earendil-works/pi-ai": path.join(piAiRoot, "pi-ai", "dist", "index.js"),
-		"@earendil-works/pi-ai/compat": path.join(
-			piAiRoot,
-			"pi-ai",
-			"dist",
-			"compat.js",
-		),
+		"@earendil-works/pi-ai": piAi("index.js"),
+		"@earendil-works/pi-ai/compat": piAi("compat.js"),
+		"@earendil-works/pi-ai/oauth": piAi("oauth.js"),
+		"@earendil-works/pi-ai/providers/all": piAi(path.join("providers", "all.js")),
+		"@earendil-works/pi-ai/bedrock-provider": piAi("bedrock-provider.js"),
+		"@earendil-works/pi-ai/bun-oauth": piAi("bun-oauth.js"),
 		"@earendil-works/pi-coding-agent": path.join(
 			topLevel,
 			"pi-coding-agent",
 			"dist",
 			"index.js",
 		),
+		"@earendil-works/pi-tui": path.join(scopeRoot, "pi-tui", "dist", "index.js"),
 	};
 }
