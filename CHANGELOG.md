@@ -17,6 +17,81 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.20.0] - 2026-08-16
+### Añadido
+
+- **cc-plugins** — secciones colapsables en Instalados (Refs #49)
+- **cc-plugins** — indicador ⏳ de acción en curso en el panel (Refs #49)
+- **cc-plugins** — Espacio + switch pill para toggle rápido (Refs #49)
+- **cc-plugins** — Instalados lista recursos por tipo, como Claude (Refs #49)
+- **cc-plugins** — paridad de mouse en el panel (Refs #49)
+- **cc-plugins** — Instalados con vista completa y toggle rápido (Refs #49)
+- **cc-plugins** — menú secuencial de marketplace + diálogo modal de origen (Refs #49)
+- **cc-plugins** — panel con tabs Discover/Instalados/Marketplaces/Errores (Refs #49)
+- **cc-plugins** — panel nativo del webview — lista filtrable + ficha lado a lado (Refs #49)
+- **cc-plugins** — presenter multicapa para resultados de /ccplugin (Refs #49)
+- **cc-plugins** — fase 2 — fetch remoto/npm/zip, scopes, team settings, auto-update (Refs #50)
+- **cc-plugins** — lado autor — validate, pluginRoot, renames, strict:false, metadata (Refs #51)
+- **cc-plugins** — mini-batch de paridad con /plugin de Claude Code (Refs #49)
+- **cc-plugins** — porte nativo para plugins de Claude Code (Refs #49)
+- **knowledge-base** — KB OKF del proyecto con Foam como capa humana (Refs #29)
+- **hermes-memory** — loop de aprendizaje cross-session vía wrapper de pi-hermes-memory (Refs #21)
+- **queue** — panel de cola con quitar/editar/reordenar (Refs #45)
+- **codebase-index** — búsqueda semántica + call graph vía wrapper de open-codebase-index
+- **providers** — expone los modelos gpt-5.6-luna/sol/terra de DevEngine
+
+### Cambiado
+
+- **ui** — quitar no-op ctx.ui.custom — upstreams sin TUI degradan a texto (Refs #21)
+- **cc-plugins** — elimina listMarketplaces muerto (knip)
+- **knowledge-base** — quita export de helpers internos sin uso externo
+
+### Corregido
+
+- **cc-plugins** — ancho completo de Instalados/Marketplaces no aplicaba (Refs #49)
+- **cc-plugins** — '/ccplugin' sin args dejaba Discover vacío (Refs #49)
+- **cc-plugins** — salida de /ccplugin dentro del webview — nada de paletas VS Code (Refs #49)
+- **host** — despachar comandos de extensión sin pasar por el gate de auth (Refs #49)
+- **knowledge-base** — gate del aviso de Foam al setting de la KB (Refs #29)
+- **hermes** — aliases por subpath exacto de pi-ai + pi-tui (Refs #21)
+- **knowledge-base** — instalar @mariozechner/pi-agent-core, runtime-dep fantasma del upstream (Refs #29)
+- **build** — copiar jiti dist/babel.cjs junto al bundle (Refs #29)
+- frida no activa/guarda cargando — 3 bloqueos de arranque (Refs #29, #49)
+- **knowledge-base** — materializa prompts PLANOS en <agentDir>/prompts (Refs #29)
+- **diag** — instrumentación de abort con tag de sesión y agent_settled (Refs #2)
+- **codebase-index** — respeta el flush de arranque frío del comando frida.codebaseIndex
+
+### Interno
+
+- **webview** — guía canónica de estilos de tabs y botones (Refs #49)
+- **webview** — q-tab al patrón unificado de tabs (Refs #49)
+- **webview** — intercambio cruzado de estilos de tabs (Refs #49)
+- **webview** — hover legible en 6 botones con clase única (Refs #49)
+- **cc-plugins** — hover legible en botones ccp-btn (Ver plugin, etc.) (Refs #49)
+- **cc-plugins** — hover con par completo del tema en tabs y filas (Refs #49)
+- **cc-plugins** — iconos lucide SquarePlus/Minus en secciones (Refs #49)
+- **cc-plugins** — quitar botones Cerrar redundantes (la X cierra) (Refs #49)
+- **cc-plugins** — listas solas a ancho completo (Instalados/Marketplaces) (Refs #49)
+- **cc-plugins** — icono ⟳ girando en botones de acción en curso (Refs #49)
+- **how-to** — describir el panel nativo de cc-plugins (Refs #49)
+- **cc-plugins** — reformato biome de presenter (Refs #49)
+- **how-to** — manual paso a paso de frida-cc-plugins (Refs #49)
+- **cc-plugins** — reformato biome autogenerado
+- **cc-plugins** — reformato biome autogenerado (wrapping)
+- **tests** — reformato biome autogenerado
+- **cc-plugins** — reformato biome autogenerado (joins y wrapping)
+- **adr** — ADR-0057 porte nativo cc-plugins + ronda 3 research (Refs #49)
+- **research** — factibilidad cc-plugins — probe wrapper vs porte nativo del diseño (Refs #49)
+- **learn** — how-to de la pila de aprendizaje (codebase-index + hermes-memory + knowledge-base)
+- **knowledge-base** — reformato biome autogenerado (joins y wrapping)
+- **worktree** — renombra tutorial-frida-worktrees → how-to-frida-worktrees
+- **extension** — reformato biome autogenerado (ternarios y wrapping)
+- **prd** — PRD del marketplace curado de extensiones para agentes (Refs #16)
+- **deps** — bump de pi-coding-agent 0.81.1 → 0.84.2 (Refs #46)
+- **queue** — normaliza indentación de encadenados .catch() en handlers de cola
+- **worktree** — tutorial de worktrees para requerimientos paralelos (Refs #13)
+- **providers** — normalización de formato (biome) tras build
+
 ## [0.19.0] - 2026-08-13
 ### Añadido
 
