@@ -118,7 +118,7 @@ function guideKbTool(guideText: string) {
 }
 
 /** Frontmatter mínimo: llaves clave: valor (para `type`/`title` OKF). */
-export function parseFrontmatter(raw: string): {
+function parseFrontmatter(raw: string): {
 	fm: Record<string, string>;
 	body: string;
 } {
@@ -145,7 +145,7 @@ export function parseFrontmatter(raw: string): {
  * soporta symlink (permisos en win32).
  * Devuelve { prompts, skill } con la cantidad materializada de cada uno.
  */
-export function materializePackageSurface(
+function materializePackageSurface(
 	agentDir: string,
 	pkgRoot: string,
 ): { prompts: number; skill: boolean } {
