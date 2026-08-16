@@ -80,7 +80,10 @@ export function validateMarketplaceDir(dir: string): ValidateReport {
 	return r.finish();
 }
 
-function validateMarketplace(dir: string, r: ReturnType<typeof report>): ValidateReport {
+function validateMarketplace(
+	dir: string,
+	r: ReturnType<typeof report>,
+): ValidateReport {
 	let catalog;
 	try {
 		catalog = readMarketplaceCatalog(dir);
@@ -123,10 +126,7 @@ function validateMarketplace(dir: string, r: ReturnType<typeof report>): Validat
 			}
 			validatePlugin(label, pluginDir, p, r);
 		} else {
-			const where =
-				p.source.kind === "github"
-					? p.source.repo
-					: p.source.url;
+			const where = p.source.kind === "github" ? p.source.repo : p.source.url;
 			r.line(
 				"info",
 				`${label}: source ${p.source.kind} (${where}) — fetch remoto: fase 2 (#50).`,
@@ -147,7 +147,8 @@ function validatePlugin(
 	let manifest;
 	try {
 		manifest = readPluginManifest(pluginDir);
-		if (manifest) r.line("info", `${label}: plugin.json OK ('${manifest.name}').`);
+		if (manifest)
+			r.line("info", `${label}: plugin.json OK ('${manifest.name}').`);
 	} catch (e: any) {
 		r.line("error", `${label}: plugin.json: ${e?.message ?? e}`);
 		return r.finish();
@@ -160,7 +161,11 @@ function validatePlugin(
 		);
 	}
 	// Versión entry ↔ plugin.json (warning de consistencia, como Claude).
-	if (entry?.version && manifest?.version && entry.version !== manifest.version) {
+	if (
+		entry?.version &&
+		manifest?.version &&
+		entry.version !== manifest.version
+	) {
 		r.line(
 			"warning",
 			`${label}: version entry '${entry.version}' ≠ plugin.json '${manifest.version}'.`,
@@ -177,7 +182,10 @@ function validatePlugin(
 		const c = discoverComponents(pluginDir, entry);
 		const counts = `${c.skills.length} skills, ${c.commands.length} commands, ${Object.keys(c.mcpServers).length} MCP`;
 		r.line("info", `${label}: ${counts}.`);
-		if (c.skills.length + c.commands.length + Object.keys(c.mcpServers).length === 0) {
+		if (
+			c.skills.length + c.commands.length + Object.keys(c.mcpServers).length ===
+			0
+		) {
 			r.line("warning", `${label}: sin componentes convertibles.`);
 		}
 		for (const s of c.skipped) {

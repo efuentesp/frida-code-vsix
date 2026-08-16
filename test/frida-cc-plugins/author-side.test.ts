@@ -30,7 +30,10 @@ function writeMarketplace(cat: unknown): void {
 	);
 }
 
-function writePlugin(rel: string, opts: { version?: string; withManifest?: boolean } = {}): void {
+function writePlugin(
+	rel: string,
+	opts: { version?: string; withManifest?: boolean } = {},
+): void {
 	const p = path.join(mktDir, rel);
 	fs.mkdirSync(path.join(p, ".claude-plugin"), { recursive: true });
 	if (opts.withManifest !== false) {
@@ -45,17 +48,28 @@ function writePlugin(rel: string, opts: { version?: string; withManifest?: boole
 		`---\nname: ${path.basename(rel)}\ndescription: d\n---\nC.\n`,
 	);
 	fs.mkdirSync(path.join(p, "commands"), { recursive: true });
-	fs.writeFileSync(path.join(p, "commands", `${path.basename(rel)}.md`), "# C\n");
+	fs.writeFileSync(
+		path.join(p, "commands", `${path.basename(rel)}.md`),
+		"# C\n",
+	);
 }
 
 function fakePi() {
-	const events = new Map<string, ((e: unknown, ctx: unknown) => Promise<unknown>)[]>();
-	const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
+	const events = new Map<
+		string,
+		((e: unknown, ctx: unknown) => Promise<unknown>)[]
+	>();
+	const commands = new Map<
+		string,
+		{ handler: (args: string, ctx: unknown) => Promise<void> }
+	>();
 	return {
 		events,
 		commands,
-		registerCommand: (name: string, opts: { handler: (a: string, c: unknown) => Promise<void> }) =>
-			commands.set(name, opts),
+		registerCommand: (
+			name: string,
+			opts: { handler: (a: string, c: unknown) => Promise<void> },
+		) => commands.set(name, opts),
 		on: (ev: string, h: (e: unknown, c: unknown) => Promise<unknown>) => {
 			const list = events.get(ev) ?? [];
 			list.push(h);
@@ -126,7 +140,9 @@ describe("#51 / validate", () => {
 		const r2 = validateMarketplaceDir(mktDir);
 		expect(r2.ok).toBe(true);
 		expect(
-			r2.lines.some((l) => /version entry '2\.0\.0' ≠ plugin\.json '1\.0\.0'/.test(l.text)),
+			r2.lines.some((l) =>
+				/version entry '2\.0\.0' ≠ plugin\.json '1\.0\.0'/.test(l.text),
+			),
 		).toBe(true);
 	});
 
@@ -162,7 +178,10 @@ describe("#51 / metadata.pluginRoot", () => {
 		});
 		writePlugin("plugins/p1");
 		const cat = readMarketplaceCatalog(mktDir);
-		expect(cat.plugins[0]?.source).toEqual({ kind: "path", path: "./plugins/p1" });
+		expect(cat.plugins[0]?.source).toEqual({
+			kind: "path",
+			path: "./plugins/p1",
+		});
 		// Instala de verdad con el source corto.
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		const res = await installPlugin(agentDir, "p1@m", { cwd: workDir });
@@ -223,7 +242,9 @@ describe("#51 / renames", () => {
 		await (pi.events.get("resources_discover") ?? [])[0]?.({ cwd: workDir }, ctx);
 		expect(loadRegistry(agentDir).plugins["p-viejo"]).toBeUndefined();
 		expect(loadRegistry(agentDir).plugins["p-nuevo"]).toBeTruthy();
-		expect(ctx.notifications.some(([m]) => /renombrado a 'p-nuevo'/.test(m))).toBe(true);
+		expect(
+			ctx.notifications.some(([m]) => /renombrado a 'p-nuevo'/.test(m)),
+		).toBe(true);
 	});
 });
 
@@ -303,7 +324,9 @@ describe("#51 / strict:false + metadata", () => {
 		await pi.commands.get("ccplugin")?.handler(`validate ${mktDir}`, ctx);
 		expect(ctx.notifications.some(([m]) => m.startsWith("✔"))).toBe(true);
 		expect(
-			ctx.notifications.some(([m, l]) => l === "info" && /Validación sin errores/.test(m)),
+			ctx.notifications.some(
+				([m, l]) => l === "info" && /Validación sin errores/.test(m),
+			),
 		).toBe(true);
 	});
 });
