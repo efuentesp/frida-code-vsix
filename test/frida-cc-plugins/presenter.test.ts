@@ -205,6 +205,26 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 		expect(requests[1]?.rows[0]?.status).toBe("installed");
 	});
 
+	it("'/ccplugin' SIN args abre panel con Discover lleno (fix regression)", async () => {
+		await addMarketplace(agentDir, mktDir, { cwd: workDir });
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		// Sin subcomando (el repro del usuario): rows = catálogo completo,
+		// no solo instalados (panel multitab — Discover siempre lleno).
+		await pi.commands.get("ccplugin")?.handler("", fakeCtx(workDir));
+		const req = requests[0]!;
+		expect(req.rows).toHaveLength(1); // p1 disponible del fixture
+		expect(req.rows[0]?.status).toBe("available");
+		expect(req.installed).toHaveLength(0);
+		expect(req.marketplaces[0]?.name).toBe("m");
+	});
+
 	it("Instalados lista RECURSOS por tipo (skill del plugin, con costo+path)", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		await installPlugin(agentDir, "p1@m", { cwd: workDir });
@@ -279,9 +299,13 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 
 		const req = requests[0]!;
 		expect(req.title).toMatch(/Instalados \(1\)/);
-		expect(req.rows[0]?.markdown).toContain("## p1 v1.0.0");
-		expect(req.rows[0]?.markdown).toContain("scope user");
-		expect(req.rows[0]?.markdown).toContain("**instalado**: 1 skills");
+		// Fix e6ce141: rows = catálogo completo (Discover), ya NO de
+		// instalados — la vista de instalados viaja en installed/resources.
+		expect(req.rows[0]?.status).toBe("installed"); // p1 sí instalado
+		expect(req.rows[0]?.markdown).toContain("**instalará**: 1 skills");
+		expect(req.installed[0]?.markdown).toContain("scope user");
+		expect(req.installed[0]?.markdown).toContain("**instalado**: 1 skills");
+		expect(req.resources).toHaveLength(1); // skill p1-p1
 	});
 
 	it("acción marketplaceAdd agrega y refresca con el mismo id", async () => {

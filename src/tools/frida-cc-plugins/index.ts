@@ -676,6 +676,32 @@ function panelActions(
  * filas frescas CON EL MISMO id — el componente conserva tab y filtro.
  * Devuelve false si no hay sink (tests/TUI) → fallback notify.
  */
+/** Filas de Discover: TODO el catálogo (opcionalmente de un marketplace). */
+function availableRows(
+	agentDir: string,
+	marketplace?: string,
+): import("./panel").CcPanelRow[] {
+	return listAvailable(agentDir, { marketplace }).map(
+		(a): import("./panel").CcPanelRow => ({
+			ref: `${a.name}@${a.marketplace}`,
+			label:
+				a.displayName && a.displayName !== a.name
+					? `${a.name} — ${a.displayName}`
+					: a.name,
+			version: a.version,
+			status: a.installed
+				? a.enabled
+					? "installed"
+					: "disabled"
+				: "available",
+			markdown: catalogRowMarkdown(agentDir, `${a.name}@${a.marketplace}`),
+			category: a.category,
+			author: a.author,
+			homepage: a.homepage,
+		}),
+	);
+}
+
 function emitPanel(
 	sink: import("./panel").CcPanelSink | undefined,
 	agentDir: string,
@@ -755,26 +781,7 @@ function registerCommand(
 							]);
 							const mktFilter = positional[0];
 							const buildAvailRows = () =>
-								listAvailable(agentDir, { marketplace: mktFilter }).map(
-									(a): import("./panel").CcPanelRow => ({
-										ref: `${a.name}@${a.marketplace}`,
-										label:
-											a.displayName && a.displayName !== a.name
-												? `${a.name} — ${a.displayName}`
-												: a.name,
-										version: a.version,
-										status: a.installed
-											? (a.enabled ? "installed" : "disabled")
-											: "available",
-										markdown: catalogRowMarkdown(
-											agentDir,
-											`${a.name}@${a.marketplace}`,
-										),
-										category: a.category,
-										author: a.author,
-										homepage: a.homepage,
-									}),
-								);
+								availableRows(agentDir, mktFilter);
 							if (
 								!emitPanel(
 									panel,
@@ -810,16 +817,19 @@ function registerCommand(
 							...bodyList.split("\n"),
 							"",
 						]);
-						const installedRows = () =>
-							buildInstalledRows(agentDir, workCwd);
+						// Panel multitab: Discover siempre muestra TODO el
+						// catálogo (rows), independiente del subcomando de
+						// origen — la vista de instalados viaja aparte
+						// (installed/resources). Fix: '/ccplugin' a secas
+						// dejaba Discover vacío al no haber plugins instalados.
 						if (
 							!emitPanel(
 								panel,
 								agentDir,
 								workCwd,
 								randomUUID(),
-								`Instalados (${installedRows().length})`,
-								installedRows,
+								`Instalados (${mergeLayers(loadLayers(agentDir, workCwd)).plugins.length})`,
+								() => availableRows(agentDir),
 								errs,
 							)
 						) {

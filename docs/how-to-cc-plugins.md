@@ -40,7 +40,9 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    /ccplugin list --available
    ```
 
-   Se abre el **panel de cc-plugins dentro de la ventana de frida**, con tabs al estilo
+   Se abre el **panel de cc-plugins dentro de la ventana de frida** con las cuatro tabs
+   completas — Discover muestra *todo* el catálogo aunque no tengas nada instalado
+   (`list --available` aplica solo el filtro opcional por marketplace). Con tabs al estilo
    de `/plugins` de Claude Code: **Discover** (lista filtrable escribiendo — como el
    autocompletado de `/` — con chip de categoría y ficha lado a lado: qué instalará,
    costo en contexto, skills/MCP, autor, actualizado, homepage), **Instalados**,
