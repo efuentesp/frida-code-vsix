@@ -127,9 +127,7 @@ export function resolveMarketplaceRef(input: string): MarketplaceRef {
 		resolved.endsWith("marketplace.json") && fs.existsSync(resolved)
 			? path.dirname(path.dirname(resolved))
 			: resolved;
-	if (
-		fs.existsSync(path.join(direct, ".claude-plugin", "marketplace.json"))
-	) {
+	if (fs.existsSync(path.join(direct, ".claude-plugin", "marketplace.json"))) {
 		return { kind: "local", path: direct };
 	}
 	throw new CcPluginsInstallError(
@@ -206,17 +204,18 @@ export async function addMarketplace(
 	// Clone fresco idempotente: quitar el previo y clonar de nuevo (el
 	// marketplace cambia; la identidad de plugins vive en installed/).
 	if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
-	await git(opts.deps, [
-		"clone",
-		"--depth",
-		"1",
-		"--filter=blob:none",
-		url,
-		dir,
-	], process.cwd());
+	await git(
+		opts.deps,
+		["clone", "--depth", "1", "--filter=blob:none", url, dir],
+		process.cwd(),
+	);
 	const catalog: MarketplaceCatalog = readMarketplaceCatalog(dir);
 	const rev = await cloneRev(opts.deps, dir);
-	reg.marketplaces[catalog.name] = { url, rev, addedAt: new Date().toISOString() };
+	reg.marketplaces[catalog.name] = {
+		url,
+		rev,
+		addedAt: new Date().toISOString(),
+	};
 	saveRegistry(agentDir, reg);
 	return {
 		name: catalog.name,
@@ -224,20 +223,6 @@ export async function addMarketplace(
 		dir,
 		plugins: catalog.plugins.length,
 	};
-}
-
-/** Lista los marketplaces registrados con sus plugins disponibles. */
-export function listMarketplaces(
-	agentDir: string,
-	reg?: CcPluginsRegistry,
-): { name: string; url: string; rev: string; plugins: number }[] {
-	const r = reg ?? loadRegistry(agentDir);
-	return Object.entries(r.marketplaces).map(([name, m]) => ({
-		name,
-		url: m.url,
-		rev: m.rev,
-		plugins: 0,
-	}));
 }
 
 /** Elimina un marketplace y TODOS los plugins instalados desde él. */
@@ -282,10 +267,16 @@ function resolvePluginSourceDir(
 		return { dir: path.join(marketplaceDir, rel), remote: false };
 	}
 	if (source.kind === "github") {
-		return { dir: `github:${source.repo}${source.ref ? `#${source.ref}` : ""}`, remote: true };
+		return {
+			dir: `github:${source.repo}${source.ref ? `#${source.ref}` : ""}`,
+			remote: true,
+		};
 	}
 	if (source.kind === "url") {
-		return { dir: `git:${source.url}${source.ref ? `#${source.ref}` : ""}`, remote: true };
+		return {
+			dir: `git:${source.url}${source.ref ? `#${source.ref}` : ""}`,
+			remote: true,
+		};
 	}
 	if (source.kind === "git-subdir") {
 		return { dir: `git:${source.url}#${source.path}`, remote: true };
@@ -324,8 +315,11 @@ export async function installPlugin(
 			: [pluginRef, undefined];
 
 	// Localizar la entrada en los marketplaces registrados.
-	let entry: { marketplace: string; source: PluginSource; version?: string } | null =
-		null;
+	let entry: {
+		marketplace: string;
+		source: PluginSource;
+		version?: string;
+	} | null = null;
 	const candidates = Object.entries(reg.marketplaces).filter(
 		([name]) => !marketplaceName || name === marketplaceName,
 	);
@@ -394,7 +388,8 @@ export async function installPlugin(
 	// Copiar contenido inmutable a installed/<plugin>@<rev>.
 	const rev = reg.marketplaces[entry.marketplace].rev;
 	const installDir = path.join(installedDir(agentDir), `${plugin}@${rev}`);
-	if (fs.existsSync(installDir)) fs.rmSync(installDir, { recursive: true, force: true });
+	if (fs.existsSync(installDir))
+		fs.rmSync(installDir, { recursive: true, force: true });
 	fs.mkdirSync(installDir, { recursive: true });
 	fs.cpSync(resolved.dir, installDir, { recursive: true });
 
@@ -492,14 +487,17 @@ export function listInstalled(
 	reg?: CcPluginsRegistry,
 ): PluginRecord[] {
 	const r = reg ?? loadRegistry(agentDir);
-	return Object.entries(r.plugins).map(([name, p]) => ({
-		...p,
-		marketplace: p.marketplace,
-		// el nombre vive en la llave; se agrega como campo para listar
-		plugin: name,
-		skills: p.skills,
-		commands: p.commands,
-		mcpServers: p.mcpServers,
-		skipped: p.skipped,
-	}) as PluginRecord & { plugin: string });
+	return Object.entries(r.plugins).map(
+		([name, p]) =>
+			({
+				...p,
+				marketplace: p.marketplace,
+				// el nombre vive en la llave; se agrega como campo para listar
+				plugin: name,
+				skills: p.skills,
+				commands: p.commands,
+				mcpServers: p.mcpServers,
+				skipped: p.skipped,
+			}) as PluginRecord & { plugin: string },
+	);
 }
