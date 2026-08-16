@@ -40,12 +40,13 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    /ccplugin list --available
    ```
 
-   El resultado llega por **tres canales a la vez**: un bloque en la conversación
-   (persistente, queda en el historial), el **panel Output "Frida — cc-plugins"**
-   (log de cada comando, copiable) y un **selector interactivo** — lista con búsqueda;
-   `Enter` sobre un plugin abre sus acciones: *Detalle (documento markdown con
-   inventario y costo)*, *Instalar*, *Deshabilitar/Habilitar*, *Desinstalar*. Todo se
-   puede hacer desde ahí sin escribir más comandos.
+   Se abre el **panel de cc-plugins dentro de la ventana de frida**: a la izquierda la
+   lista de plugins (filtra escribiendo — como el autocompletado de `/` o `@`), a la
+   derecha la ficha del plugin enfocado (qué instalará, costo en contexto, skills/MCP)
+   con sus botones. Todo por teclado: `↑↓` mueve el foco (la ficha se actualiza en
+   vivo), `⏎` ejecuta la acción primaria (*Instalar*, *Habilitar*/*Deshabilitar*),
+   `Tab` salta a los botones, `Esc` cierra. Cada comando también queda en el panel
+   **Output "Frida — cc-plugins"** (silencioso; ábrelo manualmente para el log copiable).
 
 3. Consulta el detalle ANTES de instalar (qué traerá y su costo):
 
@@ -259,15 +260,14 @@ En `marketplace.json`, cada entrada declara de dónde baja el plugin:
 
 Todo vive **dentro del webview de frida** (nada de paletas de VS Code):
 
-- **Conversación**: cada `list`/`info` deja un bloque propio en el transcript —
-  visible y persistente.
-- **Diálogo de selección** (`list`, `list --available`): el mismo diálogo que usan
-  las extensiones; elegir plugin → acción (instalar/detalle/habilitar/deshabilitar).
+- **Panel nativo** (`list`, `list --available`, `info`): lista filtrable (fuzzy,
+  como el autocompletado de `/`) + ficha markdown lado a lado con botones
+  *Instalar* / *Habilitar* / *Deshabilitar* / *Desinstalar*. Teclado: escribir
+  filtra · `↑↓` mueve (ficha en vivo) · `⏎` acción primaria · `Tab`/`←/→` botones ·
+  `Esc` cierra. Tras cada acción el panel se refresca conservando tu filtro y foco.
 - **Output channel** `Frida — cc-plugins`: log silencioso de todos los comandos
   (`$ ccplugin …`); ábrelo desde el panel Output cuando lo necesites.
-- **Documento markdown** (`info`, "Detalle"): ficha del plugin (componentes, costo
-  estimado, omitidos) — también queda como bloque en el chat; el editor temporal es
-  un extra para copiar.
+- Confirmaciones de una línea ("Plugin instalado…") sí van por toast corto.
 
 ## 10. Dónde vive todo (y limpieza manual)
 
