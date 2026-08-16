@@ -205,6 +205,37 @@ describe("frida-cc-plugins / panel nativo del webview", () => {
 		expect(requests[1]?.rows[0]?.status).toBe("installed");
 	});
 
+	it("Instalados lista RECURSOS por tipo (skill del plugin, con costo+path)", async () => {
+		await addMarketplace(agentDir, mktDir, { cwd: workDir });
+		await installPlugin(agentDir, "p1@m", { cwd: workDir });
+		const { requests, sink } = fakeSink();
+		const pi = fakePi();
+		await createFridaCcPlugins({
+			agentDir,
+			cwd: workDir,
+			presenter: fakePresenter,
+			panel: sink,
+		})(asApi(pi));
+		await pi.commands.get("ccplugin")?.handler("list", fakeCtx(workDir));
+
+		const req = requests[0]!;
+		// El plugin sigue viajando (vista de plugin desde el detalle)…
+		expect(req.installed).toHaveLength(1);
+		// …pero la LISTA de instalados son recursos: p1 instala 1 skill.
+		expect(req.resources).toHaveLength(1);
+		const res = req.resources[0]!;
+		expect(res.kind).toBe("skill");
+		expect(res.pluginRef).toBe("p1@m");
+		expect(res.name).toBe("p1-p1"); // <plugin>-<source> namespacing
+		expect(res.status).toBe("installed");
+		expect(res.tokens).toBeGreaterThan(0);
+		expect(res.path).toContain(path.join("skills", "p1", "p1", "SKILL.md"));
+		expect(res.description).toBe("d"); // frontmatter de la skill
+		// Toggle hereda del plugin (registro deshabilitado → recurso off):
+		await req.actions.toggle("p1@m", false);
+		expect(requests[1]?.resources[0]?.status).toBe("disabled");
+	});
+
 	it("toggle/uninstall vía acciones del panel (refs con @)", async () => {
 		await addMarketplace(agentDir, mktDir, { cwd: workDir });
 		await installPlugin(agentDir, "p1@m", { cwd: workDir });

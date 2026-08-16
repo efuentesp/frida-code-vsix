@@ -100,11 +100,16 @@ solos; y el UiDialog de 203 filas sin filtro era inoperable (hallazgos e2e
   abre el menú secuencial (Explorar plugins → Discover con filtro `@mkt` ·
   Actualizar · Quitar con confirmación inline de doble-⏎); la fila final "＋
   Agregar" abre un modal con los 4 sources. Errores: avisos runtime
-  (bootstrap/marketplace/install) con Reintentar. Instalados: filas con chips de
-  componentes, estado y costo (~N tok); `Ctrl+Espacio` toggle rápido;
-  `⏎` abre la vista completa (descripción, origen, costo, componentes, path,
-  selector de estado binario — `description` y `estimatedTokens` se persisten
-  en el record al instalar). Zonas de foco tabs/list/buttons
+  (bootstrap/marketplace/install) con Reintentar. Instalados: lista de
+  RECURSOS por tipo (Skills/Commands/Servidores MCP — paridad con Claude, que
+  lista skills una por una): cada fila lleva kind, plugin dueño, estado
+  (heredado del plugin: el registry habilita por plugin) y costo real por
+  recurso (bytes/4 del SKILL.md/prompt); `Ctrl+Espacio` alterna el plugin;
+  `⏎`/click abre la vista del recurso (descripción del frontmatter, origen,
+  path, selector de estado "afecta a TODO el plugin"); **Ver plugin →** llega a
+  la vista del plugin (desinstalar, costo total — `description` y
+  `estimatedTokens` se persisten en el record al instalar). Sin "never used"
+  ni favoritos: frida no rastrea uso. Zonas de foco tabs/list/buttons
   (estilo QuestionsPanel): `Tab` cicla · `←/→`/`1-4` tabs · escribir filtra ·
   `↑↓` mueve · `⏎` acción primaria (en Instalados: abre vista) · `Esc` sube de
   nivel hasta cerrar.

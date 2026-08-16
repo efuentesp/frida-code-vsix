@@ -84,6 +84,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	// Vista completa de un plugin instalado (⏎ en Instalados) + selector de
 	// estado binario on/off (decisión: pantalla completa + Ctrl+Espacio).
 	const [instView, setInstView] = useState<string | null>(null);
+	// Recurso enfocado en la vista completa (Instalados lista RECURSOS por
+	// tipo — paridad Claude: skills una por una, plugin = origen).
+	const [resView, setResView] = useState<string | null>(null);
 	const [stateIdx, setStateIdx] = useState(0);
 	const [addSpec, setAddSpec] = useState("");
 	const listRef = useRef<HTMLDivElement>(null);
@@ -107,7 +110,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			key: "installed",
 			label: "Instalados",
 			icon: Package,
-			count: panel.installed.length,
+			count: panel.resources.length,
 		},
 		{
 			key: "marketplaces",
@@ -127,11 +130,8 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			: []),
 	];
 
-	// Filas de la tab activa.
-	const activeRows = useMemo(
-		() => (tab === "installed" ? panel.installed : panel.rows),
-		[tab, panel],
-	);
+	// Discover lista plugins disponibles; Instalados lista RECURSOS.
+	const activeRows = useMemo(() => panel.rows, [panel]);
 	const menuMkt = useMemo(
 		() =>
 			mktMenu ? panel.marketplaces.find((m) => m.name === mktMenu) : undefined,
@@ -139,6 +139,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	);
 	const inMktMenu = tab === "marketplaces" && !!mktMenu;
 	const inInstView = tab === "installed" && !!instView;
+	const inResView = tab === "installed" && !!resView && !instView;
 	const viewRow = useMemo(
 		() =>
 			instView ? panel.installed.find((r) => r.ref === instView) : undefined,
@@ -147,10 +148,24 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	const showSearch =
 		(tab === "discover" || tab === "installed" || tab === "marketplaces") &&
 		!inMktMenu &&
-		!inInstView;
+		!inInstView &&
+		!inResView;
+
+	const filteredResources = useMemo(() => {
+		if (tab !== "installed" || inInstView || inResView) return [];
+		const q = query.trim().toLowerCase();
+		if (!q) return panel.resources;
+		if (q.startsWith("@"))
+			return panel.resources.filter((r) =>
+				r.pluginRef.toLowerCase().includes(q.slice(1)),
+			);
+		return panel.resources.filter((r) =>
+			`${r.name} ${r.plugin} ${r.kind}`.toLowerCase().includes(q),
+		);
+	}, [tab, panel.resources, query, inInstView, inResView]);
 
 	const filteredRows = useMemo(() => {
-		if (tab === "marketplaces" || tab === "errors") return [];
+		if (tab !== "discover") return [];
 		const q = query.trim().toLowerCase();
 		if (!q) return activeRows;
 		// "@nombre" filtra por marketplace de origen (ref = plugin@mkt) —
@@ -195,19 +210,29 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			? filteredMkts.length + 1 // + la fila final "＋ Agregar marketplace"
 			: tab === "errors"
 				? panel.errors.length
-				: filteredRows.length;
+				: tab === "installed"
+					? filteredResources.length
+					: filteredRows.length;
 
 	useEffect(() => {
 		setFocusIdx((i) => Math.min(i, Math.max(0, itemCount - 1)));
 	}, [itemCount]);
 
 	const row = filteredRows[focusIdx];
+	const resRow = useMemo(
+		() =>
+			resView
+				? panel.resources.find((r) => r.name === resView)
+				: undefined,
+		[resView, panel.resources],
+	);
+	const resItem = filteredResources[focusIdx];
 	const mkt = inMktMenu ? menuMkt : filteredMkts[focusIdx];
 	const err = panel.errors[focusIdx];
 
 	// "Last updated" async de la fila enfocada (debounce).
 	useEffect(() => {
-		if (tab !== "discover" && tab !== "installed") return;
+		if (tab !== "discover") return;
 		if (!row || row.lastUpdated !== undefined) return;
 		const t = setTimeout(() => onRowMeta(panel.id, row.ref), 250);
 		return () => clearTimeout(t);
@@ -251,21 +276,44 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		}
 	}, [row]);
 
-	const buttons =
-		tab === "marketplaces"
-			? []
-			: tab === "errors"
-				? [{ key: "retry", label: "Reintentar", primary: true }]
-				: pluginButtons;
+	const buttons = inResView
+		? [
+				{ key: "res_plugin", label: "Ver plugin →", primary: false },
+				{
+					key: stateIdx === 0 ? "disable" : "enable",
+					label: stateIdx === 0 ? "Deshabilitar" : "Habilitar",
+					primary: true,
+				},
+			]
+		: inInstView
+			? [
+					{
+						key: "disable",
+						label: "Deshabilitar",
+						primary: true,
+					},
+					{ key: "uninstall", label: "Desinstalar", primary: false },
+				]
+			: tab === "marketplaces" || tab === "installed"
+				? []
+				: tab === "errors"
+					? [{ key: "retry", label: "Reintentar", primary: true }]
+					: pluginButtons;
 
 	useEffect(() => {
 		setFocusBtn((i) => Math.min(i, Math.max(0, buttons.length - 1)));
 	}, [buttons.length, tab]);
 
-	const submitBtn = (key: string, target?: CcPanelRowWs) => {
+	const submitBtn = (key: string, target?: { ref: string }) => {
 		if (tab === "errors" && err) {
 			if (key === "retry")
 				onAction(panel.id, { kind: "retry", source: err.source });
+			return;
+		}
+		if (key === "res_plugin" && resRow) {
+			// Vista de recurso → vista del plugin dueño (desinstalar, costo…).
+			setInstView(resRow.pluginRef);
+			setStateIdx(resRow.status === "disabled" ? 1 : 0);
 			return;
 		}
 		const r = target ?? row;
@@ -285,6 +333,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		setConfirmRemove(false);
 		setAddOpen(false);
 		setInstView(null);
+		setResView(null);
 	};
 
 	// "Explorar plugins": Discover con filtro por origen (@marketplace).
@@ -341,6 +390,10 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				setInstView(null);
 				return;
 			}
+			if (inResView) {
+				setResView(null);
+				return;
+			}
 			if (zone !== "list") {
 				setZone("list");
 				return;
@@ -351,12 +404,13 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		if (addOpen) return; // el input del diálogo captura sus propias teclas
 		if (e.ctrlKey && e.key === " ") {
 			// Toggle rápido habilitado/deshabilitado (paridad del Space de
-			// Claude; Espacio simple sigue escribiendo en el filtro).
-			if (tab === "installed" && !inInstView && row) {
+			// Claude; Espacio simple sigue escribiendo en el filtro). En
+			// Instalados alterna el PLUGIN dueño del recurso enfocado.
+			if (tab === "installed" && !inInstView && !inResView && resItem) {
 				e.preventDefault();
 				onAction(panel.id, {
-					kind: row.status === "disabled" ? "enable" : "disable",
-					ref: row.ref,
+					kind: resItem.status === "disabled" ? "enable" : "disable",
+					ref: resItem.pluginRef,
 				});
 			}
 			return;
@@ -382,6 +436,25 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				switchTab(tabs[digit - 1]!.key);
 				return;
 			}
+		}
+		// Vista de recurso: ↑↓/←→ estado · ⏎ fija si difiere.
+		if (inResView && resRow && zone === "list") {
+			if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+				e.preventDefault();
+				setStateIdx((i) => 1 - i);
+				return;
+			}
+			if (e.key === "Enter") {
+				e.preventDefault();
+				const cur = resRow.status === "disabled" ? 1 : 0;
+				if (stateIdx !== cur)
+					onAction(panel.id, {
+						kind: stateIdx === 0 ? "enable" : "disable",
+						ref: resRow.pluginRef,
+					});
+				return;
+			}
+			return; // la vista captura el resto
 		}
 		// Vista completa de instalado: ↑↓/←→ estado · ⏎ fija si difiere.
 		if (inInstView && viewRow && zone === "list") {
@@ -447,10 +520,10 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 				if (mkt) openMenu(mkt.name);
 				return;
 			}
-			if (tab === "installed" && zone === "list" && row) {
-				// ⏎ en Instalados abre la vista completa (Enter to view).
-				setInstView(row.ref);
-				setStateIdx(row.status === "disabled" ? 1 : 0);
+			if (tab === "installed" && zone === "list" && resItem) {
+				// ⏎ en Instalados abre la vista del RECURSO (Enter to view).
+				setResView(resItem.name);
+				setStateIdx(resItem.status === "disabled" ? 1 : 0);
 				return;
 			}
 			const b = zone === "buttons" ? buttons[focusBtn] : buttons[0];
@@ -462,6 +535,8 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 		? "⏎ agregar · Esc cancelar"
 		: inInstView
 			? "↑↓ estado · ⏎ fijar · Tab acciones · Esc volver"
+			: inResView
+				? "↑↓ estado del plugin · ⏎ fijar · Tab acciones · Esc volver"
 			: inMktMenu
 			? confirmRemove
 				? "⏎ confirmar quitar · Esc cancelar"
@@ -474,7 +549,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						? "↑↓ marketplace · ⏎ menú · “＋ Agregar” abre diálogo"
 						: tab === "errors"
 							? "↑↓ error · ⏎ reintentar"
-							: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
+							: tab === "installed"
+								? "↑↓ recurso · Ctrl+Espacio alterna plugin · ⏎ detalle"
+								: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
 
 	const menuLabels = useMemo(() => {
 		if (!menuMkt) return [] as string[];
@@ -526,7 +603,9 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						placeholder={
 							tab === "marketplaces"
 								? "Filtrar marketplaces · ↑↓ mover · ⏎ menú"
-								: "Filtrar (escribe; @marketplace por origen) · ↑↓ mover · Tab zonas"
+								: tab === "installed"
+									? "Filtrar recursos (skills · commands · MCP)"
+									: "Filtrar (escribe; @marketplace por origen) · ↑↓ mover · Tab zonas"
 						}
 						onChange={(e) => {
 							setQuery(e.target.value);
@@ -655,7 +734,115 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							<div className="ccp-empty">Sin errores.</div>
 						)}
 					</div>
-				) : inInstView && viewRow ? (
+				) : tab === "installed" ? (
+					inResView && resRow ? (
+						<div className="ccp-mkt-full">
+							<div className="ccp-instview">
+								<div className="ccp-instview-head">
+									<button
+										type="button"
+										tabIndex={-1}
+										className="ccp-back"
+										onClick={() => setResView(null)}
+									>
+										← Volver
+									</button>
+									<span className="ccp-instview-name">{resRow.name}</span>
+									<span className={`ccp-badge ${STATUS_CLS[resRow.status]}`}>
+										{STATUS_LABEL[resRow.status]}
+									</span>
+									<span className="ccp-comp">{resRow.kind}</span>
+								</div>
+								{resRow.description ? (
+									<div className="ccp-instview-desc">{resRow.description}</div>
+								) : null}
+								<div className="ccp-instview-fields">
+									<div>
+										<span className="ccp-instview-k">Tipo</span>
+										<span>
+											{resRow.kind === "skill"
+												? "skill"
+												: resRow.kind === "cmd"
+													? "command (prompt)"
+													: "servidor MCP"}
+										</span>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Origen</span>
+										<span>
+											{resRow.plugin} ·{" "}
+											{resRow.pluginRef.slice(
+												resRow.pluginRef.lastIndexOf("@") + 1,
+											)}
+										</span>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Costo</span>
+										<span>
+											{resRow.tokens ? `~${resRow.tokens} tokens/turno` : "—"}
+										</span>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Path</span>
+										<span className="ccp-instview-path">{resRow.path ?? "—"}</span>
+									</div>
+								</div>
+								<div className="ccp-instview-state">
+									<div className="ccp-instview-state-label">
+										Estado (afecta a TODO el plugin {resRow.plugin}):
+									</div>
+									{(["habilitado", "deshabilitado"] as const).map((label, i) => (
+										<button
+											key={label}
+											type="button"
+											tabIndex={-1}
+											className="ccp-instview-opt"
+											data-focused={zone === "list" && i === stateIdx ? "true" : "false"}
+											onClick={() => {
+												setStateIdx(i);
+												const cur = resRow.status === "disabled" ? 1 : 0;
+												if (i !== cur)
+													onAction(panel.id, {
+														kind: i === 0 ? "enable" : "disable",
+														ref: resRow.pluginRef,
+													});
+											}}
+										>
+											<span className="ccp-mkt-opt-cursor">
+												{zone === "list" && i === stateIdx ? "❯" : " "}
+											</span>
+											{i === 0 ? "◉" : "◯"} {label}
+										</button>
+									))}
+								</div>
+								<div
+									className={`ccp-actions${zone === "buttons" ? " ccp-actions-focus" : ""}`}
+								>
+									{buttons.map((b, i) => (
+										<button
+											key={b.key}
+											type="button"
+											tabIndex={-1}
+											className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
+												zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
+											}`}
+											onClick={() => submitBtn(b.key, { ref: resRow.pluginRef })}
+										>
+											{b.label}
+										</button>
+									))}
+									<button
+										type="button"
+										tabIndex={-1}
+										className="ccp-btn"
+										onClick={() => onClose(panel.id)}
+									>
+										Cerrar
+									</button>
+								</div>
+							</div>
+						</div>
+					) : inInstView && viewRow ? (
 					<div className="ccp-mkt-full">
 						<div className="ccp-instview">
 							<div className="ccp-instview-head">
@@ -764,6 +951,60 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							</div>
 						</div>
 					</div>
+					) : (
+						<div className="ccp-list" ref={listRef}>
+							{(["skill", "cmd", "mcp"] as const).map((kind) => {
+								const items = filteredResources.filter((r) => r.kind === kind);
+								if (!items.length) return null;
+								return (
+									<div key={kind} className="ccp-res-section">
+										<div className="ccp-res-header">
+											{kind === "skill"
+												? "Skills"
+												: kind === "cmd"
+													? "Commands"
+													: "Servidores MCP"}
+										</div>
+										{items.map((r) => {
+											const i = filteredResources.indexOf(r);
+											return (
+												<button
+													key={r.name}
+													type="button"
+													tabIndex={-1}
+													className={`ccp-res-row${i === focusIdx ? " ccp-row-focus" : ""}`}
+													data-focused={i === focusIdx ? "true" : "false"}
+													onClick={() => {
+														setFocusIdx(i);
+														setResView(r.name);
+														setStateIdx(r.status === "disabled" ? 1 : 0);
+													}}
+												>
+													<span className="ccp-mkt-opt-cursor">
+														{i === focusIdx ? "❯" : " "}
+													</span>
+													<span className="ccp-row-label">{r.name}</span>
+													<span className="ccp-comp">{r.kind}</span>
+													<span className="ccp-res-plugin">de {r.plugin}</span>
+													<span className={`ccp-badge ${STATUS_CLS[r.status]}`}>
+														{STATUS_LABEL[r.status]}
+													</span>
+													{r.tokens ? (
+														<span className="ccp-row-tok">~{r.tokens} tok</span>
+													) : null}
+												</button>
+											);
+										})}
+									</div>
+								);
+							})}
+							{filteredResources.length ? null : (
+								<div className="ccp-empty">
+									Sin recursos instalados{query ? ` para “${query}”` : ""}.
+								</div>
+							)}
+						</div>
+					)
 				) : (
 					<div className="ccp-list" ref={listRef}>
 						{filteredRows.map((r, i) => (
@@ -771,21 +1012,8 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 								key={r.ref}
 								className={`ccp-row${i === focusIdx ? " ccp-row-focus" : ""}`}
 								data-focused={i === focusIdx ? "true" : "false"}
-								onClick={() => {
-									setFocusIdx(i);
-									// Mouse: un click abre la vista completa en Instalados
-									// (misma acción que ⏎ — usuarios de mouse y teclado
-									// llegan al mismo lugar).
-									if (tab === "installed") {
-										setInstView(r.ref);
-										setStateIdx(r.status === "disabled" ? 1 : 0);
-									}
-								}}
-								onDoubleClick={
-									tab === "installed"
-										? undefined
-										: () => buttons[0] && submitBtn(buttons[0].key)
-								}
+								onClick={() => setFocusIdx(i)}
+								onDoubleClick={() => buttons[0] && submitBtn(buttons[0].key)}
 							>
 								<span className="ccp-row-label">{r.label}</span>
 								{r.category ? <span className="ccp-cat">{r.category}</span> : null}
@@ -810,7 +1038,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						)}
 					</div>
 				)}
-				{tab === "errors" || tab === "discover" || (tab === "installed" && !inInstView) ? (
+				{tab === "errors" || tab === "discover" ? (
 					<div className="ccp-detail">
 						{tab === "errors" ? (
 							<div className="ccp-detail-md">

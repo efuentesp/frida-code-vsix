@@ -28,6 +28,7 @@ import {
 	CC_PLUGINS_FACTORY_NAME,
 	OFFICIAL_MARKETPLACE,
 	installedDir,
+	fridaMcpConfigPath,
 	registryPath,
 	resourcesPromptsDir,
 	resourcesSkillsDir,
@@ -505,6 +506,99 @@ function buildInstalledRows(
 }
 
 /**
+ * Recursos instalados por tipo (lista de la tab Instalados — paridad con el
+ * Installed de /plugins de Claude Code, que lista skills una por una):
+ * el plugin es el ORIGEN; estado/toggle son del plugin completo.
+ */
+function buildInstalledResources(
+	agentDir: string,
+	cwd: string,
+): import("./panel").CcInstalledResource[] {
+	const out: import("./panel").CcInstalledResource[] = [];
+	for (const p of mergeLayers(loadLayers(agentDir, cwd)).plugins) {
+		const status: "installed" | "disabled" = p.rec.enabled
+			? "installed"
+			: "disabled";
+		const pluginRef = `${p.name}@${p.rec.marketplace}`;
+		for (const name of p.rec.skills) {
+			const source = name.slice(p.name.length + 1);
+			const md = path.join(
+				resourcesSkillsDir(agentDir),
+				p.name,
+				source,
+				"SKILL.md",
+			);
+			out.push({
+				pluginRef,
+				plugin: p.name,
+				name,
+				kind: "skill",
+				status,
+				tokens: fileTokens(md),
+				path: md,
+				description: resourceDescription(md),
+			});
+		}
+		for (const name of p.rec.commands) {
+			const md = path.join(resourcesPromptsDir(agentDir), `${name}.md`);
+			out.push({
+				pluginRef,
+				plugin: p.name,
+				name,
+				kind: "cmd",
+				status,
+				tokens: fileTokens(md),
+				path: md,
+				description: resourceDescription(md),
+			});
+		}
+		for (const name of p.rec.mcpServers) {
+			out.push({
+				pluginRef,
+				plugin: p.name,
+				name,
+				kind: "mcp",
+				status,
+				path: fridaMcpConfigPath(agentDir),
+			});
+		}
+	}
+	return out;
+}
+
+/** bytes/4 ≈ tokens (best-effort: archivo ausente → undefined). */
+function fileTokens(p: string): number | undefined {
+	try {
+		return Math.ceil(fs.statSync(p).size / 4);
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Descripción del recurso: frontmatter `description:` (skills) o primer
+ * párrafo no-heading (commands). Best-effort.
+ */
+function resourceDescription(p: string): string | undefined {
+	try {
+		const raw = fs.readFileSync(p, "utf-8");
+		const fm = raw.match(/^---\n([\s\S]*?)\n---/);
+		if (fm) {
+			const d = fm[1]!.match(/^description:\s*(.+)$/m);
+			if (d) return d[1]!.trim().replace(/^["']|["']$/g, "");
+		}
+		const body = raw.replace(/^---[\s\S]*?\n---\n?/, "");
+		const first = body
+			.split("\n")
+			.map((l) => l.trim())
+			.find((l) => l && !l.startsWith("#") && !l.startsWith("---"));
+		return first?.replace(/^#+\s*/, "");
+	} catch {
+		return undefined;
+	}
+}
+
+/**
  * Acciones del panel (host-side; el webview las invoca por id/ref).
  * `refresh` re-emite el panel (mismo id → el webview conserva tab/filtro).
  */
@@ -612,6 +706,7 @@ function emitPanel(
 		title,
 		rows: buildRows(),
 		installed: buildInstalledRows(agentDir, workCwd),
+		resources: buildInstalledResources(agentDir, workCwd),
 		marketplaces,
 		errors: errs.list(),
 		actions: panelActions(agentDir, workCwd, refresh, errs),

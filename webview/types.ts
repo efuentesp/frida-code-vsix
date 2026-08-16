@@ -478,6 +478,18 @@ export interface CcPanelRowWs {
 	description?: string;
 }
 
+/** Recurso instalado (skill/command/MCP — unidad de la tab Instalados). */
+export interface CcInstalledResourceWs {
+	pluginRef: string;
+	plugin: string;
+	name: string;
+	kind: "skill" | "cmd" | "mcp";
+	status: "installed" | "disabled";
+	tokens?: number;
+	path?: string;
+	description?: string;
+}
+
 /** Tarjeta de marketplace (tab Marketplaces). */
 export interface CcMarketplaceWs {
 	name: string;
@@ -501,6 +513,7 @@ export interface CcPanelWs {
 	title: string;
 	rows: CcPanelRowWs[];
 	installed: CcPanelRowWs[];
+	resources: CcInstalledResourceWs[];
 	marketplaces: CcMarketplaceWs[];
 	errors: CcPanelErrorWs[];
 }

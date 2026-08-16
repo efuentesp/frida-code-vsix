@@ -41,6 +41,25 @@ export interface CcPanelRow {
 	description?: string;
 }
 
+/** Recurso instalado (skill/command/MCP — unidad de la tab Instalados). */
+export interface CcInstalledResource {
+	/** Ref del plugin dueño "plugin@marketplace" (para acciones). */
+	pluginRef: string;
+	/** Nombre corto del plugin dueño. */
+	plugin: string;
+	/** Nombre convertido de invocación (<plugin>-<source>). */
+	name: string;
+	kind: "skill" | "cmd" | "mcp";
+	/** Estado heredado del plugin (el registry habilita por plugin). */
+	status: "installed" | "disabled";
+	/** Costo del recurso (bytes/4; MCP no consume → undefined). */
+	tokens?: number;
+	/** Path real (SKILL.md / prompt .md / mcp.json). */
+	path?: string;
+	/** Descripción (frontmatter de la skill / primer párrafo del command). */
+	description?: string;
+}
+
 /** Tarjeta de marketplace (tab Marketplaces). */
 export interface CcMarketplaceInfo {
 	/** Nombre registrado (slug del registro). */
@@ -73,6 +92,8 @@ export interface CcPanelRequest {
 	rows: CcPanelRow[];
 	/** Tab Instalados. */
 	installed: CcPanelRow[];
+	/** Recursos instalados por tipo (lista de la tab Instalados). */
+	resources: CcInstalledResource[];
 	/** Tab Marketplaces. */
 	marketplaces: CcMarketplaceInfo[];
 	/** Tab Errores (vacía = tab oculto). */

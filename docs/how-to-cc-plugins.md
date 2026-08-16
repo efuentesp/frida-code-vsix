@@ -46,12 +46,14 @@ como prompts `/<plugin>-<command>` (con `$ARGUMENTS`), y los servers MCP se regi
    costo en contexto, skills/MCP, autor, actualizado, homepage), **Instalados**,
    **Marketplaces** (tarjetas con contador y "actualizado hace…", botones
    Actualizar/Quitar y campo para **agregar** con `owner/repo`, URL git, npm o zip) y
-   **Errores** (avisos con Reintentar; se oculta si no hay). En **Instalados** cada
-   fila muestra sus componentes (`skill`/`cmd`/`mcp`), estado y costo (`~N tok`);
-   `Ctrl+Espacio` alterna habilitado/deshabilitado sin abrir nada y `⏎` abre la
-   **vista completa**: descripción, origen, costo, componentes, path de instalación y
-   selector de estado (`◉ habilitado / ◯ deshabilitado` — `↑↓` mueve, `⏎` fija,
-   `Esc` vuelve). Teclado: `Tab` cicla
+   **Errores** (avisos con Reintentar; se oculta si no hay). En **Instalados** la lista
+   es de **recursos** (como el Installed de Claude Code, que lista skills una por
+   una): secciones *Skills / Commands / Servidores MCP*, y cada fila muestra tipo,
+   plugin de origen, estado y costo real (`~N tok` del archivo). `⏎` (o click) abre
+   la **vista del recurso**: descripción, origen, costo, path y selector de estado —
+   que alterna a TODO el plugin dueño; `Ctrl+Espacio` en la lista alterna el plugin
+   sin abrir nada. Desde el detalle, **Ver plugin →** abre la vista completa del
+   plugin (desinstalar, costo total, componentes). Teclado: `Tab` cicla
    zonas (tabs → lista → botones), `←/→` o `1-4` cambia tab, `↑↓` mueve el foco (la
    ficha se actualiza en vivo), `⏎` ejecuta la acción primaria, `Esc` sube de nivel
    hasta cerrar. Cada comando también queda en el panel **Output "Frida — cc-plugins"**

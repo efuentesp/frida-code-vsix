@@ -2056,6 +2056,7 @@ export async function activate(
 				title: req.title,
 				rows: req.rows,
 				installed: req.installed,
+				resources: req.resources,
 				marketplaces: req.marketplaces,
 				errors: req.errors,
 			},
