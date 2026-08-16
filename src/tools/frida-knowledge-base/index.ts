@@ -184,7 +184,11 @@ function materializePackageSurface(
 	if (fs.existsSync(promptsSrc)) {
 		for (const f of fs.readdirSync(promptsSrc)) {
 			if (!f.endsWith(".md")) continue;
-			link(path.join(promptsSrc, f), path.join(agentDir, "prompts", "wiki", f));
+			// PLANO en <agentDir>/prompts: el loader de prompts de pi es
+			// NO-recursivo (loadTemplatesFromDir solo escanea *.md del primer
+			// nivel — hallazgo ADR-0057 D4). Los archivos upstream ya traen
+			// el prefijo wiki-*, sin riesgo de colisión con prompts del usuario.
+			link(path.join(promptsSrc, f), path.join(agentDir, "prompts", f));
 			prompts++;
 		}
 	}

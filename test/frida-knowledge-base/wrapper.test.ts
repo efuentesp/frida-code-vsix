@@ -249,12 +249,12 @@ describe("frida-knowledge-base / wrapper", () => {
 			agentDir,
 			distDir: path.resolve("dist"),
 		})(asApi(pi));
-		// Prompts en <agentDir>/prompts/wiki/ (los escanea el resource loader).
-		const p1 = path.join(agentDir, "prompts", "wiki", "wiki-init.md");
+		// Prompts PLANOS en <agentDir>/prompts (el loader de pi es no-recursivo).
+		const p1 = path.join(agentDir, "prompts", "wiki-init.md");
 		expect(fs.existsSync(p1)).toBe(true);
 		expect(fs.readFileSync(p1, "utf-8")).toContain("$ARGUMENTS");
 		expect(
-			fs.existsSync(path.join(agentDir, "prompts", "wiki", "wiki-query.md")),
+			fs.existsSync(path.join(agentDir, "prompts", "wiki-query.md")),
 		).toBe(true);
 		// Skill en <agentDir>/skills/llm-wiki (symlink al paquete o copia).
 		const sk = path.join(agentDir, "skills", "llm-wiki", "SKILL.md");
