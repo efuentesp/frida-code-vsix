@@ -80,6 +80,8 @@ import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaExtensibleWorkflows } from "./tools/frida-extensible-workflows";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
+import { createFridaGoal } from "./tools/frida-goal";
+import type { GoalStateSnapshot } from "./tools/frida-goal/state";
 import { createFridaWorktree } from "./worktree";
 import { createTodoWeb } from "./tools/todo-web";
 import { UiBridge, type UiRequest } from "./ui-bridge";
@@ -220,6 +222,10 @@ export interface CreateFridaSessionOptions {
 	 *  (cuando pi-lens recalcula diagnósticos). El host acumula por turno y publica
 	 *  un resumen al webview. Es opt-in: si pi-lens no cargó, nunca se invoca. */
 	onLensDiagnostics: (payload: LensDiagnosticsPayload) => void;
+	/** #20 — snapshot del goal activo (chip 🎯 del footer). undefined = sin goal. */
+	onGoalState?: (goal: GoalStateSnapshot | undefined) => void;
+	/** #20 — avisos del runtime de frida-goal (guards, complete, blocked). */
+	onGoalNotify?: (level: "info" | "warning" | "error", text: string) => void;
 	/** API key de Context7 (frida-supi-web): cache síncrono que el host carga del
 	 *  SecretStorage (`frida.context7Key`) al arrancar, con fallback a
 	 *  `process.env.CONTEXT7_API_KEY`. Se inyecta en las tools web_docs_* para que
@@ -786,6 +792,18 @@ export async function createFridaSession(
 			{
 				name: "lens-diagnostics-bridge",
 				factory: createLensDiagnosticsBridge(opts.onLensDiagnostics),
+			},
+			// #20 — frida-goal: agente autónomo orientado a objetivos (ADR-0031).
+			// Extensión REACTIVA del lifecycle (no workflow): inyecta continuaciones
+			// en ESTA sesión principal desde agent_settled. NO se registra en las
+			// sesiones hijas de workflows (createChildSession usa lista curada sin
+			// esto — una hija no debe auto-continuarse).
+			{
+				name: "frida-goal",
+				factory: createFridaGoal({
+					onState: (snap) => opts.onGoalState?.(snap),
+					notify: (level, text) => opts.onGoalNotify?.(level, text),
+				}),
 			},
 		],
 	});

@@ -398,6 +398,30 @@ body {
 .ws-bar .ws-worktree svg {
 	flex: none;
 }
+/* #20 — chip 🎯 del goal activo (frida-goal). Tinte por estado: azul mientras
+   trabaja, dim al pausar/bloquear, verde al completar. */
+.ws-bar .ws-goal {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	white-space: nowrap;
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: 11px;
+}
+.ws-bar .ws-goal svg {
+	flex: none;
+}
+.ws-bar .ws-goal-active {
+	color: var(--vscode-textLinkForeground, #58a6ff);
+}
+.ws-bar .ws-goal-stopped {
+	color: var(--vscode-charts-yellow, #d29922);
+}
+.ws-bar .ws-goal-complete {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
 /* Badge de versión vX.Y.Z en el header pegado al título (click → /update).
    Pegado al badge de frida-lens, no margin-left:auto (que lo empujaría a la derecha). */
 .sub-version {

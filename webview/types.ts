@@ -503,6 +503,23 @@ export interface LensStatus {
 	active: boolean;
 }
 
+// #20 — snapshot del goal activo publicado por frida-goal (chip 🎯 del footer).
+// undefined = sin goal; status complete llega una vez (con resumen) y luego se
+// limpia desde el host.
+export interface GoalState {
+	id: string;
+	text: string;
+	status: "active" | "paused" | "blocked" | "complete";
+	iteration: number;
+	automaticTurns: number;
+	tokensUsed: number;
+	tokenBudget?: number;
+	pausedReason?: string;
+	blockedReason?: string;
+	completionSummary?: string;
+	updatedAt: number;
+}
+
 /** Fila del panel /ccplugin (serializada del host — panel.ts). */
 export interface CcPanelRowWs {
 	ref: string;
@@ -663,6 +680,8 @@ export interface State {
 		refreshing?: boolean;
 		refreshErrors?: string[];
 	};
+	/** #20 — snapshot del goal activo (chip 🎯 del footer); undefined = sin goal. */
+	goal?: GoalState;
 	forkPoints?: { entryId: string; text: string }[];
 	oauthDeviceCode?: { userCode: string; verificationUri: string };
 	queued: QueueItem[];
@@ -811,10 +830,11 @@ export type InMessage =
 			items: HistoryItem[];
 			branchSummaries?: BranchSummaryEntry[];
 	  }
-	| { type: "mode"; mode: ApprovalMode }
-	| { type: "gate_stats"; stats: GateStats }
-	| { type: "version"; version: string }
-	| { type: "model_info"; provider?: string; model: string; thinking: string }
+| { type: "mode"; mode: ApprovalMode }
+| { type: "gate_stats"; stats: GateStats }
+| { type: "version"; version: string }
+| { type: "goal_state"; goal: GoalState | null }
+| { type: "model_info"; provider?: string; model: string; thinking: string }
 	| { type: "tool_toggles";
 			values: ToolToggles;
 			defs: ToolToggleDescriptor[];

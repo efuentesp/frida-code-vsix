@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { WorkspaceInfo } from "../types";
+import type { GoalState, WorkspaceInfo } from "../types";
 import { Tooltip } from "./Tooltip";
-import { CircleDot, Folder, GitBranch, GitFork } from "lucide-react";
+import { CircleDot, Folder, GitBranch, GitFork, Target } from "lucide-react";
 
 // Pinta la carpeta de trabajo y el branch git (con sync ↑↓ y conteo de cambios
 // +N ~N -N). Siempre visible en el footer, para saber exactamente dónde opera el
@@ -40,9 +40,12 @@ function branchTooltip(ws: WorkspaceInfo): string {
 
 export function WorkspaceBar({
 	ws,
+	goal,
 	onRename,
 }: {
 	ws?: WorkspaceInfo;
+	/** #20 — goal activo de frida-goal (chip 🎯 junto a los datos de git). */
+	goal?: GoalState;
 	onRename?: (name: string) => void;
 }) {
 	const [editing, setEditing] = useState(false);
@@ -152,6 +155,49 @@ export function WorkspaceBar({
 				</span>
 				</Tooltip>
 			)}
+			{/* #20 — goal activo: chip 🎯 con estado y avance. Tooltip = objetivo
+			    completo + guards. Los estados parados indican cómo retomarlo. */}
+			{goal && goalChip(goal)}
 		</div>
 	);
+}
+
+/** Chip del goal: texto corto + tooltip completo. */
+function goalChip(goal: GoalState) {
+	const tooltipLines: string[] = [goal.text];
+	tooltipLines.push(`estado: ${goal.status} · continuaciones: ${goal.iteration} · auto ${goal.automaticTurns}/25`);
+	if (goal.tokenBudget !== undefined)
+		tooltipLines.push(`tokens: ${goal.tokensUsed}/${goal.tokenBudget}`);
+	if (goal.pausedReason) tooltipLines.push(`pausado: ${goal.pausedReason}`);
+	if (goal.blockedReason) tooltipLines.push(`bloqueado: ${goal.blockedReason}`);
+	if (goal.completionSummary) tooltipLines.push(`resumen: ${goal.completionSummary}`);
+	if (goal.status === "paused" || goal.status === "blocked")
+		tooltipLines.push("/goal resume para retomarlo");
+	const cls =
+		goal.status === "active"
+				? "ws-goal ws-goal-active"
+				: goal.status === "complete"
+					? "ws-goal ws-goal-complete"
+					: "ws-goal ws-goal-stopped";
+	return (
+			<Tooltip label={tooltipLines.join("\n")} side="top">
+				<span className={cls}>
+					<Target size={13} /> {goalLabel(goal)}
+				</span>
+			</Tooltip>
+	);
+}
+
+function goalLabel(goal: GoalState): string {
+	const short = goal.text.length > 24 ? `${goal.text.slice(0, 24)}…` : goal.text;
+	switch (goal.status) {
+		case "active":
+				return `${short} · ${goal.automaticTurns}/25`;
+		case "paused":
+				return "paused";
+		case "blocked":
+				return "blocked";
+		case "complete":
+			return "complete ✓";
+	}
 }

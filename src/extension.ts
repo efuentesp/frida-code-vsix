@@ -802,6 +802,14 @@ export async function activate(
 		post({ type: "lens_status", loaded: isLensLoaded(), active: lensActive });
 	}
 
+	// #20 — publica el snapshot del goal (chip 🎯) y lo cachea para re-enviar
+	// en webview_ready (si el webview monta tras el último evento del runtime).
+	let lastGoalState: unknown;
+	function postGoalState(goal: unknown): void {
+		lastGoalState = goal;
+		post({ type: "goal_state", goal: goal ?? null });
+	}
+
 	function mergeLens(payload: LensDiagnosticsPayload): void {
 		const cwd = payload.cwd || workspaceCwd();
 		for (const f of payload.files ?? []) {
@@ -970,6 +978,9 @@ export async function activate(
 					contextEnabled: isContextEnabled,
 					getGatePatterns: readGatePatterns,
 					onLensDiagnostics: mergeLens,
+					// #20 — chip 🎯 del footer + avisos del runtime de frida-goal.
+					onGoalState: (goal) => postGoalState(goal),
+					onGoalNotify: (_level, text) => post({ type: "info", text }),
 					getContext7Key,
 					onProviderError,
 					requestDumpPath,
@@ -2252,13 +2263,18 @@ export async function activate(
 
 	async function handleWebviewMessage(msg: any): Promise<void> {
 		switch (msg?.type) {
-			case "webview_ready":
-				webviewReady = true;
-				post({ type: "mode", mode: approvalMode });
-				post({ type: "version", version: fridaVersion });
-				postToolToggles();
-				postPermissionsConfig();
-				postCodebaseIndexState();
+            case "webview_ready":
+                webviewReady = true;
+                post({ type: "mode", mode: approvalMode });
+                post({ type: "version", version: fridaVersion });
+                postToolToggles();
+                postPermissionsConfig();
+                postCodebaseIndexState();
+                // #20 — re-envía el último snapshot del goal si el webview montó
+                // después del evento (cacheado en postGoalState).
+                if (lastGoalState !== undefined) {
+                    post({ type: "goal_state", goal: lastGoalState ?? null });
+                }
 				if (pendingSettingsTab) {
 					post({ type: "open_settings", tab: pendingSettingsTab });
 					pendingSettingsTab = undefined;
@@ -4335,6 +4351,8 @@ export async function activate(
 				contextEnabled: isContextEnabled,
 				getGatePatterns: readGatePatterns,
 				onLensDiagnostics: mergeLens,
+				onGoalState: (goal) => postGoalState(goal),
+				onGoalNotify: (_level, text) => post({ type: "info", text }),
 				onProviderError,
 				requestDumpPath,
 				codebaseIndexEnabled: isCodebaseIndexEnabled,

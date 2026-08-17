@@ -859,6 +859,7 @@ export function App() {
 				)}
 				<WorkspaceBar
 					ws={state.workspace}
+					goal={state.goal}
 					onRename={(name) =>
 						state.workspace?.sessionPath &&
 						post({

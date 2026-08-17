@@ -622,6 +622,10 @@ export function reduce(state: State, msg: InMessage): State {
 				lensStatus: { loaded: msg.loaded, active: msg.active },
 			};
 
+		// #20 — chip 🎯 del footer: null limpia el goal.
+		case "goal_state":
+			return { ...state, goal: msg.goal ?? undefined };
+
 		case "history": {
 			const { turns, nextId } = buildHistoryTurns(msg.items);
 			return {
