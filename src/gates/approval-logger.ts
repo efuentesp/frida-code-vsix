@@ -67,10 +67,19 @@ export interface ApprovalLogEntry {
 export class ApprovalLogger {
 	private dirEnsured = false;
 
-	constructor(private readonly logPath: string) {}
+	/**
+	 * #55: knob `auditLog` (paridad permissionReviewLog de pi-permission-system).
+	 * Se consulta en cada log() — el toggle del panel de auto-aprobación aplica en
+	 * vivo. Ausente → siempre auditar (behavior default).
+	 */
+	constructor(
+		private readonly logPath: string,
+		private readonly enabled?: () => boolean,
+	) {}
 
 	/** Escribe una entrada. No lanza: un fallo de IO nunca rompe el gate. */
 	log(entry: ApprovalLogEntry): void {
+		if (this.enabled && !this.enabled()) return;
 		try {
 			this.ensureDir();
 			// ¿Es la primera escritura (archivo nuevo)? El chmod 0600 debe ir DESPUÉS

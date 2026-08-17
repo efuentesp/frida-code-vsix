@@ -432,6 +432,29 @@ export interface ToolToggleDescriptor {
 }
 export type ToolToggles = Record<string, boolean>;
 
+// ── Panel de auto-aprobación (#55): snapshot publicado por el host ──
+// Espejo del config-store (fuente de verdad en el host); el gate lee esa misma
+// política en cada tool_call, así que lo que ves acá es lo que aplica YA.
+
+/** Tri-state de permiso (paridad con el motor declarativo). */
+export type PermState = "allow" | "ask" | "deny";
+
+/** Snapshot de `~/.frida/permission.json` + modo vivo, para el panel. */
+export interface PermissionsConfigUi {
+	mode: ApprovalMode;
+	auditLog: boolean;
+	tool: Record<string, PermState>;
+	path: Record<string, PermState>;
+	bash: Record<string, PermState>;
+	externalDirectory: PermState;
+}
+
+/** Patrón aprobado en la sesión (en memoria, revocable desde el panel). */
+export interface SessionPatternUi {
+	kind: "tool" | "diff" | "bash";
+	pattern: string;
+}
+
 /** Estado publicado por el host para el tab "Index" del SettingsHub. */
 export interface CodebaseIndexUiState {
 	/** Paquete upstream instalado al pin (y tools capturadas). */
@@ -650,6 +673,9 @@ export interface State {
 	toolToggles?: ToolToggles;
 	/** Descriptores de toggles (título/desc) publicados por el host (#53). */
 	toolToggleDefs?: ToolToggleDescriptor[];
+	/** Snapshot del panel de auto-aprobación (#55). */
+	permissions?: PermissionsConfigUi;
+	sessionPatterns?: SessionPatternUi[];
 	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
 	codebaseIndex?: CodebaseIndexUiState;
 	lens?: LensSummary | null;
@@ -789,11 +815,15 @@ export type InMessage =
 	| { type: "gate_stats"; stats: GateStats }
 	| { type: "version"; version: string }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
-	| {
-			type: "tool_toggles";
+	| { type: "tool_toggles";
 			values: ToolToggles;
 			defs: ToolToggleDescriptor[];
-		}
+	  }
+	| {
+			type: "permissions_config";
+			config: PermissionsConfigUi;
+			sessionPatterns: SessionPatternUi[];
+	  }
 	| { type: "lens_diagnostics"; summary: LensSummary | null }
 	| {
 			type: "retry_start";
@@ -833,12 +863,7 @@ export type OutMessage =
 	| {
 			type: "sandbox_panel_action";
 			id: string;
-			action:
-				| "refresh"
-				| "pause"
-				| "resume"
-				| "destroy"
-				| "reprobe";
+			action: "refresh" | "pause" | "resume" | "destroy" | "reprobe";
 			name?: string;
 	  }
 	| { type: "sandbox_panel_changes"; id: string; name: string }
@@ -850,7 +875,7 @@ export type OutMessage =
 			id: string;
 			action: "refresh" | "stop";
 			runId?: string;
-		  }
+	  }
 	| { type: "detached_panel_close"; id: string }
 	| { type: "ccplugins_row_meta"; id: string; ref: string }
 	| {
@@ -923,7 +948,18 @@ export type OutMessage =
 			type: "set_tool_toggle";
 			key: string;
 			enabled: boolean;
-		}
+	  }
+	// ── Panel de auto-aprobación (#55): mismos setters que el puente del host ──
+	| { type: "get_permissions_config" }
+	| { type: "perm_set_tool"; tool: string; state: PermState }
+	| { type: "perm_set_path"; pattern: string; state: PermState }
+	| { type: "perm_remove_path"; pattern: string }
+	| { type: "perm_set_bash"; pattern: string; state: PermState }
+	| { type: "perm_remove_bash"; pattern: string }
+	| { type: "perm_set_external"; state: PermState }
+	| { type: "perm_set_audit"; enabled: boolean }
+	| { type: "perm_reset" }
+	| { type: "perm_revoke_session_pattern"; kind: SessionPatternUi["kind"]; pattern: string }
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status";

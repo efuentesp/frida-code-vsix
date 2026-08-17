@@ -262,7 +262,7 @@ por qué — no es un "no" seco.
 
 ## Qué NO es frida-sandboxes
 
-- **No es un reemplazo de los permisos** (`/gates-config`): permissions dicen
+- **No es un reemplazo de los permisos** (Configuración → Auto-Aprobación): permissions dicen
   QUÉ puede hacer; el sandbox DA dónde hacerlo. Complementarios.
 - **No es cloud**: Docker local — sin costo por uso, sin vendor-lock, funciona
   en el avión.

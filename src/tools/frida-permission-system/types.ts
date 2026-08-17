@@ -55,6 +55,11 @@ export interface PermissionConfig {
 	version: number;
 	mode: PermissionMode;
 	policy: PermissionPolicy;
+	/**
+	 * Log de auditoría `approvals.jsonl` (paridad permissionReviewLog de
+	 * pi-permission-system). Default `true` = behavior actual. Ausente → true.
+	 */
+	auditLog?: boolean;
 }
 
 /**

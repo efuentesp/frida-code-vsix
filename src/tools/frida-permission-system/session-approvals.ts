@@ -33,6 +33,18 @@ export class SessionApprovals {
 		);
 	}
 
+	/** Snapshot de los patrones activos (para el panel de auto-aprobación). */
+	list(): readonly SessionPattern[] {
+		return [...this.patterns];
+	}
+
+	/** Revoca un patrón aprobado (acción inmediata, #55). */
+	remove(kind: ToolKind, pattern: string): void {
+		this.patterns = this.patterns.filter(
+			(p) => !(p.kind === kind && p.pattern === pattern),
+		);
+	}
+
 	/** Resetea los patrones (sesión nueva). */
 	clear(): void {
 		this.patterns = [];

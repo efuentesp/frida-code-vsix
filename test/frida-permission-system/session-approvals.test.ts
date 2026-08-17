@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+	type SessionPattern,
 	SessionApprovals,
 	matchesWildcard,
 	suggestPattern,
@@ -91,5 +92,39 @@ describe("SessionApprovals", () => {
 		expect(s.matches("bash", "npm test")).toBe(true);
 		s.clear();
 		expect(s.matches("bash", "npm test")).toBe(false);
+	});
+
+	// ── #55: list()/remove() para el panel de auto-aprobación (revocación) ──
+
+	it("list() expone los patrones activos con su kind", () => {
+		const s = new SessionApprovals();
+		s.add("bash", "npm *");
+		s.add("diff", "src/*");
+		expect(s.list()).toEqual([
+			{ kind: "bash", pattern: "npm *" },
+			{ kind: "diff", pattern: "src/*" },
+		]);
+		// Snapshot: el array retornado es una copia — mutarla no afecta el interno.
+		const snap = s.list() as SessionPattern[];
+		snap.pop();
+		expect(s.list()).toHaveLength(2);
+	});
+
+	it("remove() revoca UN patrón: vuelve a preguntar de inmediato", () => {
+		const s = new SessionApprovals();
+		s.add("bash", "npm *");
+		s.add("bash", "git *");
+		s.remove("bash", "npm *");
+		expect(s.matches("bash", "npm test")).toBe(false);
+		expect(s.matches("bash", "git status")).toBe(true); // el otro sobrevive
+	});
+
+	it("remove() es específico por kind y tolera patrones inexistentes", () => {
+		const s = new SessionApprovals();
+		s.add("diff", "src/*");
+		s.remove("bash", "src/*"); // kind equivocado → no borra
+		expect(s.matches("diff", "src/app.ts")).toBe(true);
+		s.remove("diff", "no-existe"); // inexistente → no lanza
+		expect(s.list()).toHaveLength(1);
 	});
 });

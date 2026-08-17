@@ -103,4 +103,30 @@ describe("ApprovalLogger", () => {
 		// El mtime avanzó (se escribió de nuevo).
 		expect(statSync(logPath).mtimeMs).toBeGreaterThanOrEqual(before.mtimeMs);
 	});
+
+	// ── #55: knob `auditLog` (paridad permissionReviewLog de pi-permission-system) ──
+
+	it("enabled() en false OMITE las escrituras (toggle de auditoría en vivo)", () => {
+		// Sin knob: escribe (behavior default, retrocompatible).
+		new ApprovalLogger(logPath).log(entry({ tool: "on" }));
+		expect(existsSync(logPath)).toBe(true);
+		// Con knob apagado: no escribe nada nuevo.
+		const logger = new ApprovalLogger(logPath, () => false);
+		logger.log(entry({ tool: "off" }));
+		const lines = readFileSync(logPath, "utf8").trim().split("\n");
+		expect(lines).toHaveLength(1); // solo la entrada "on"
+		expect(JSON.parse(lines[0]).tool).toBe("on");
+	});
+
+	it("enabled() se consulta POR entrada: reactivar vuelve a auditar", () => {
+		let audit = false;
+		const logger = new ApprovalLogger(logPath, () => audit);
+		logger.log(entry({ tool: "skip" }));
+		expect(existsSync(logPath)).toBe(false);
+		audit = true; // el toggle del panel aplica en vivo
+		logger.log(entry({ tool: "keep" }));
+		const lines = readFileSync(logPath, "utf8").trim().split("\n");
+		expect(lines).toHaveLength(1);
+		expect(JSON.parse(lines[0]).tool).toBe("keep");
+	});
 });

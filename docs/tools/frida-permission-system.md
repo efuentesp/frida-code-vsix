@@ -30,7 +30,10 @@ El componente que materializa el **perímetro disuasivo** de Frida (ver
 - **Botón de modo** del panel, o **Frida: Cambiar modo de aprobación** → conmuta
   `manual` / `auto-edit` / `auto`.
 - **`/gates`** → auditoría navegable (overlay) del historial de aprobaciones.
-- **`/gates-config`** → configuración actual de gates.
+- **Configuración → Auto-Aprobación** (engrane ⚙ del webview) → editor visual de
+  la política: tri-states por tool, patrones path/bash, límite del workspace,
+  patrones aprobados por sesión (revocables) y toggle de auditoría (#55;
+  reemplazó al overlay `/gates-config`, retirado).
 - Settings `frida.gates.*` (extensiones/nombres sensibles, substrings peligrosos) —
   aplican **en vivo**, sin recargar.
 

@@ -40,8 +40,9 @@ export function createPermissionSystem(
 	let acceptAllEdits = false; // per-session; solo edit/write; bash NUNCA
 
 	// Política declarativa: se lee del config-store (config-store.ts) en cada
-	// tool_call, así los cambios del ConfigPanel (/gates-config) aplican al instante
-	// tras Guardar (sin recargar la sesión). El store cachea; no lee el archivo acá.
+	// tool_call, así los cambios del panel de Auto-Aprobación (webview, #55)
+	// aplican al instante tras persistir (sin recargar la sesión). El store cachea;
+	// no lee el archivo acá.
 	// Loguea en auditoría (JSONL persistente) Y cuenta en los stats de la sesión
 	// (✓N/✗M/⚡Z del footer). Un solo punto para que logger y stats no se desincronicen.
 	const record = (entry: ApprovalLogEntry): void => {
@@ -68,7 +69,8 @@ export function createPermissionSystem(
 		// Fase 7 — hide-tools deny: oculta del catálogo del LLM los tools con `deny`
 		// explícito en la política. Doble defensa: si el agente alucina un tool oculto,
 		// el gate `tool_call` lo bloquea igual. Se re-aplica cada turno
-		// (before_agent_start) así los cambios del ConfigPanel aplican al instante.
+		// (before_agent_start) así los cambios del panel de Auto-Aprobación aplican
+		// al instante.
 		pi.on("before_agent_start", () => {
 			try {
 				const denied = computeDeniedTools(getPermissionPolicy());

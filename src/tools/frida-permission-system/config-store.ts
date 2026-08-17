@@ -1,13 +1,10 @@
-// Store reactivo de la política declarativa para el ConfigPanel (ADR-0016, Fase 5).
+// Store reactivo de la política declarativa de frida-permission-system (ADR-0016).
 //
-// El ConfigPanel (/gates-config) edita la política allow/ask/deny por superficie.
-// Como Remote React serializa los handlers (handlerId) y el host NO ve el useState
-// del webview, el estado editable vive AQUÍ (host): el panel es "controlado" por
-// este store vía useSyncExternalStore. Cada control dispara setTool/setMode → el
-// store emite → el panel re-renderiza con el nuevo snapshot.
-//
-// Doble rol del store:
-//  1. Mantiene el snapshot editable (current) que el ConfigPanel lee.
+// #55: la UI de edición es la pestaña Configuración > Auto-aprobación del
+// webview (el overlay /gates-config fue retirado). El puente de mensajes de
+// extension.ts llama a estos setters y el panel se re-renderiza desde el
+// snapshot publicado (postPermissionsConfig). Doble rol del store:
+//  1. Mantiene el snapshot editable (current) que el panel lee vía el puente.
 //  2. Cachea la policy que el GATE lee en cada tool_call (getPermissionPolicy).
 //     Tras save(), el cache se actualiza con la nueva policy → el gate la ve al
 //     instante sin recargar la sesión (sin leer el archivo en cada tool_call).
@@ -28,13 +25,8 @@ import type {
 let current: PermissionConfig = loadPermissionConfig(
 	defaultPermissionConfigPath(),
 );
-const listeners = new Set<() => void>();
 
-function emit(): void {
-	for (const l of [...listeners]) l();
-}
-
-/** Snapshot editable (para useSyncExternalStore en el ConfigPanel). */
+/** Snapshot editable (para el puente del panel de auto-aprobación, #55). */
 export function getConfig(): PermissionConfig {
 	return current;
 }
@@ -53,13 +45,19 @@ export function setTool(tool: string, state: PermissionState): void {
 			tool: { ...current.policy.tool, [tool]: state },
 		},
 	};
-	emit();
 }
 
 /** Cambia el modo (manual/auto-edit/auto). */
 export function setMode(mode: PermissionMode): void {
 	current = { ...current, mode };
-	emit();
+}
+
+/**
+ * Toggle del log de auditoría approvals.jsonl (knob `auditLog`, #55).
+ * Paridad permissionReviewLog de pi-permission-system.
+ */
+export function setAuditLog(enabled: boolean): void {
+	current = { ...current, auditLog: enabled };
 }
 
 // --- Superficies path / bash (Fase 5b): patrones wildcard declarativos ---
@@ -79,7 +77,6 @@ function setSurfacePattern(
 			[surface]: { ...current.policy[surface], [p]: state },
 		},
 	};
-	emit();
 }
 
 /** Quita un patrón de la superficie indicada. */
@@ -90,7 +87,6 @@ function removeSurfacePattern(surface: "path" | "bash", pattern: string): void {
 		...current,
 		policy: { ...current.policy, [surface]: next },
 	};
-	emit();
 }
 
 /** Crea/cambia un patrón de path (ej. `*.env`: deny). */
@@ -110,11 +106,11 @@ export function removeBashPattern(pattern: string): void {
 	removeSurfacePattern("bash", pattern);
 }
 
-/** Suscripción para useSyncExternalStore. Devuelve cleanup. */
-export function subscribeConfig(listener: () => void): () => void {
-	listeners.add(listener);
-	return () => {
-		listeners.delete(listener);
+/** Cambia el estado de la superficie external_directory (CWD boundary, #55). */
+export function setExternalDirectory(state: PermissionState): void {
+	current = {
+		...current,
+		policy: { ...current.policy, external_directory: state },
 	};
 }
 
@@ -126,11 +122,14 @@ export function saveConfig(): void {
 	savePermissionConfig(current);
 }
 
-/** Restaura la default (sin guardar; el usuario debe pulsar Guardar para persistir). */
+/**
+ * Restaura la default (quedan en el store; el puente persiste tras el reset, #55).
+ */
 export function resetConfig(): void {
 	current = {
 		version: 1,
 		mode: "manual",
+		auditLog: true,
 		policy: {
 			tool: { ...DEFAULT_POLICY.tool },
 			path: { ...DEFAULT_POLICY.path },
@@ -138,5 +137,4 @@ export function resetConfig(): void {
 			external_directory: DEFAULT_POLICY.external_directory,
 		},
 	};
-	emit();
 }

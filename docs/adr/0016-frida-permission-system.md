@@ -125,7 +125,7 @@ Aplicación del **modo** (override):
 | **AuditPanel** | `/gates` | overlay persistente | JSONL navegable: filtros (tool/decisión/source), colores (✓allow ✗block ⚡auto), detalle expandible | 2 |
 | **Stats footer** | siempre | footer | modo + `✓N ✗M ⚡Z` (aprobadas/bloqueadas/auto-allow de la sesión) | 3 |
 | ~~ApprovalDialog~~ | ~~`tool_call` ask~~ | ~~diálogo efímero~~ | **REVERTIDO**: el overlay Remote React no se materializaba de forma fiable (banner sin tarjeta); se vuelve a la ApprovalCard nativa del webview (canal `approval_response`) | 6 |
-| **ConfigPanel** | `/gates-config` | overlay persistente | editor visual allow/ask/deny por superficie (escribe permission.json) | 5 |
+| **ConfigPanel** | Configuración → Auto-Aprobación (webview) | pestaña del SettingsHub | editor visual allow/ask/deny por superficie (escribe permission.json) | 5 → reemplazado por webview (#55) |
 
 ### Plan por fases
 
@@ -162,12 +162,13 @@ Aplicación del **modo** (override):
  El diálogo sugiere un patrón (`suggestPattern`: bash → `npm *`, diff → `src/*`) y
  ofrece un botón «Aprobar `<patrón>` (esta sesión)». Force-ask (bash compuesto /
  path externo) siempre pide, aunque el prefijo esté aprobado. Clear al `/new`.
-- **Fase 5 — ConfigPanel** (`/gates-config`): editor visual de la política declarativa.
-  Estado "controlado" en el host (`config-store.ts` reactivo vía `useSyncExternalStore`;
-  el panel NO usa `useState` porque Remote React serializa los handlers y el host no
-  vería los cambios). Cada tool tiene 3 botones (Permitir ✓/Preguntar ?/Bloquear ✗);
-  clic → `setTool` → re-render. **Guardar** persiste (`savePermissionConfig`) y
-  actualiza el cache que el gate lee en cada tool_call → aplica al instante.
+- **Fase 5 — ConfigPanel** (originalmente `/gates-config`; desde #55 es la pestaña
+  **Configuración → Auto-Aprobación** del webview): editor visual de la política
+  declarativa. Estado "controlado" en el host (`config-store.ts`; el puente de
+  mensajes de extension.ts llama a los setters y republica el snapshot con
+  `postPermissionsConfig`). Cada tool tiene un tri-state segmentado
+  (Permitir ✓ / Preguntar ● / Bloquear ✕); clic → `setTool` → persiste → el
+  cache que el gate lee en cada tool_call se actualiza → aplica al instante.
 - **Fase 6 — ApprovalDialog (REVERTIDO):** se migró la ApprovalCard nativa a un
   componente Remote React (`ApprovalDialog.tsx`) montado como overlay por el host
   (`syncApprovalDialogs`). **Revertido** porque el overlay no se materializaba de

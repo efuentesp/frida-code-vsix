@@ -31,6 +31,7 @@ import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
 import { GateStatsStore } from "./tools/frida-permission-system/session-store";
 import { SessionApprovals } from "./tools/frida-permission-system/session-approvals";
+import { getConfig } from "./tools/frida-permission-system/config-store";
 import type {
 	GateStats,
 	PermissionMode,
@@ -258,7 +259,9 @@ export interface CreateFridaSessionOptions {
 	onSandboxesState?: (s: { ready: boolean; sandboxes: number }) => void;
 	/** frida-subagents #26: sink del panel /detached (null = cerrar). */
 	detachedPanel?: (
-		panel: import("./tools/frida-subagents/detached-panel").DetachedPanelData | null,
+		panel:
+			| import("./tools/frida-subagents/detached-panel").DetachedPanelData
+			| null,
 	) => void;
 	/** Estado del wrapper hermes (installed/installing/error) para notificar /reload. */
 	onHermesMemoryState?: (
@@ -404,7 +407,13 @@ export async function createFridaSession(
 	);
 	// Logger de auditoría del gate (Prioridad 2). Una instancia por sesión;
 	// escribe JSONL append-only con chmod 0600/0700 y nunca lanza.
-	const approvalLogger = new ApprovalLogger(opts.approvalLogPath);
+	// #55: knob `auditLog` de permission.json (paridad permissionReviewLog de
+	// pi-permission-system) — se consulta EN CADA entrada, así el toggle del panel
+	// aplica en vivo. Ausente → true (behavior default: siempre auditar).
+	const approvalLogger = new ApprovalLogger(
+		opts.approvalLogPath,
+		() => getConfig().auditLog !== false,
+	);
 	// Fase 3 — contadores de la sesión para el Stats footer (en memoria, se resetea
 	// por sesión). El gate los alimenta vía stats.record() en cada decisión.
 	const gateStats = new GateStatsStore(opts.onGateStats ?? (() => {}));
@@ -671,8 +680,7 @@ export async function createFridaSession(
 								agentDir: opts.agentDir,
 								cwd: opts.cwd,
 								onStateChange: opts.onCcPluginsState,
-								extraMarketplaces:
-									opts.ccPluginsExtraMarketplaces?.() ?? [],
+								extraMarketplaces: opts.ccPluginsExtraMarketplaces?.() ?? [],
 								enabledPlugins: opts.ccPluginsEnabledPlugins?.() ?? {},
 								presenter: opts.ccPluginsPresenter,
 								panel: opts.ccPluginsPanel,
@@ -715,9 +723,7 @@ export async function createFridaSession(
 					(opts.subagentsEnabled?.() ?? true)
 						? createFridaSubagents({
 								agentDir: opts.agentDir,
-								apiKey: activeProvider
-									? keyHolders[activeProvider]
-									: undefined,
+								apiKey: activeProvider ? keyHolders[activeProvider] : undefined,
 								provider: activeProvider,
 								onDetachedPanel: (p) => {
 									if (typeof opts.detachedPanel === "function") {
@@ -758,9 +764,7 @@ export async function createFridaSession(
 				name: "frida-git-sync",
 				// Gate #53 (frida.gitSync.enabled, default true).
 				factory: (pi: any) =>
-					(opts.gitSyncEnabled?.() ?? true)
-						? createFridaGitSync()(pi)
-						: undefined,
+					(opts.gitSyncEnabled?.() ?? true) ? createFridaGitSync()(pi) : undefined,
 			},
 			// frida-worktree (issue #13): porte nativo de @narumitw/pi-worktree.
 			// Registra /worktree (slash command del chat, UI vía ctx.ui). El comando
@@ -770,9 +774,7 @@ export async function createFridaSession(
 				// Gate #53 (frida.worktree.enabled, default true). El comando VS Code
 				// frida.worktree (botón SCM) se avisa aparte en extension.ts.
 				factory: (pi: any) =>
-					(opts.worktreeEnabled?.() ?? true)
-						? createFridaWorktree()(pi)
-						: undefined,
+					(opts.worktreeEnabled?.() ?? true) ? createFridaWorktree()(pi) : undefined,
 			},
 			// D16 — puente de diagnósticos de pi-lens al webview (resumen por turno,
 			//  no squiggles del editor). Siempre activo: solo escucha el bus; si pi-lens

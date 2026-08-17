@@ -528,6 +528,13 @@ export function reduce(state: State, msg: InMessage): State {
 		case "resources":
 			return { ...state, resources: msg.data };
 
+		case "permissions_config":
+			return {
+				...state,
+				permissions: msg.config,
+				sessionPatterns: msg.sessionPatterns,
+			};
+
 		case "queued":
 			return { ...state, queued: msg.items };
 

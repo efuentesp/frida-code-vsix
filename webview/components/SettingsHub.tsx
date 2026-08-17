@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { ModuleResources, OutMessage, State } from "../types";
 import { Icon } from "./Icon";
+import { ApprovalPanel } from "./ApprovalPanel";
 import { IndexTab } from "./IndexTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
@@ -56,8 +57,10 @@ export function SettingsHub({
 	// Al abrir la pestaña Recursos, refrescar la lista desde el host (el botón
 	// Library ya no está en el header; lo dispara esto al entrar a la pestaña).
 	// #54: Herramientas también consume resources (módulos del acordeón).
+	// #55: Auto-Aprobación consume el snapshot del config-store.
 	useEffect(() => {
 		if (tab === "resources" || tab === "tools") post({ type: "list_resources" });
+		if (tab === "approval") post({ type: "get_permissions_config" });
 	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	return (
@@ -100,13 +103,7 @@ export function SettingsHub({
 					</div>
 				)}
 
-				{tab === "approval" && (
-					<div className="cfg-stub">
-						Los modos de aprobación (manual / auto-edit / auto) están en la
-						barra inferior. Próximamente: toggles granulares (leer, escribir,
-						bash) estilo Roo Auto-Approve.
-					</div>
-				)}
+				{tab === "approval" && <ApprovalPanel state={state} post={post} />}
 
 				{tab === "resources" && (
 					<div className="cfg-resources">

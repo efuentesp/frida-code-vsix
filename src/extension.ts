@@ -31,9 +31,22 @@ import { runWorktreeCommand } from "./worktree";
 import type { ApprovalRequest } from "./approval-bridge";
 import { ModelChangeBridge } from "./model-change-bridge";
 import type { PermissionMode } from "./tools/frida-permission-system";
+import type { PermissionState } from "./tools/frida-permission-system/types";
 import { readAuditLog } from "./tools/frida-permission-system/audit-log";
 import { createAuditPanelElement } from "./tools/frida-permission-system/AuditPanel";
-import { createConfigPanelElement } from "./tools/frida-permission-system/ConfigPanel";
+import {
+	getConfig,
+	removeBashPattern,
+	removePathPattern,
+	resetConfig,
+	saveConfig,
+	setAuditLog,
+	setBashPattern,
+	setExternalDirectory,
+	setMode as setStoredMode,
+	setPathPattern,
+	setTool,
+} from "./tools/frida-permission-system/config-store";
 import {
 	DEVENGINE_BASE_URL,
 	SOFTTEK_PROVIDER,
@@ -153,11 +166,12 @@ import {
 	setTelemetryOptIn,
 	writeToolToggle,
 } from "./settings";
-import { TOOL_TOGGLES, TOOL_TOGGLE_BASES, TOOL_TOGGLE_KEY_BY_FACTORY } from "./tool-toggles";
 import {
-	attributeResources,
-	type AttribSkill,
-} from "./module-attribution";
+	TOOL_TOGGLES,
+	TOOL_TOGGLE_BASES,
+	TOOL_TOGGLE_KEY_BY_FACTORY,
+} from "./tool-toggles";
+import { attributeResources, type AttribSkill } from "./module-attribution";
 import { loadRegistry } from "./tools/frida-cc-plugins/registry";
 import {
 	classifySeverity,
@@ -615,10 +629,7 @@ export async function activate(
 			)
 			.then((choice) => {
 				if (choice === "Instalar Foam") {
-					void vscode.commands.executeCommand(
-						"extension.open",
-						"foam.foam-vscode",
-					);
+					void vscode.commands.executeCommand("extension.open", "foam.foam-vscode");
 				}
 			});
 	}
@@ -629,7 +640,9 @@ export async function activate(
 		if (typeof t === "string") return t.split("\n").slice(0, 12).join("\n");
 		return JSON.stringify(res).slice(0, 400);
 	}
-	let approvalMode: PermissionMode = "manual";
+	// Modo vivo del gate. Se inicializa del permission.json persistido (#55): el
+	// modo configurado en Configuración > Auto-aprobación sobrevive recargas.
+	let approvalMode: PermissionMode = getConfig().mode;
 	let frida: FridaSession | undefined;
 	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
 	// onboarding al arrancar), sin esto ambas ven `!frida` y crean sesiones
@@ -1554,24 +1567,22 @@ export async function activate(
 		// general (extensiones externas, skills globales/proyecto, built-ins).
 		const attribution = attributeResources({
 			extensions: extensionsData,
-			skills: (skills.skills ?? []).map(
-					(s: any): AttribSkill => {
-						const p = String(s.filePath ?? "");
-						let realPath = p;
-						try {
-							realPath = realpathSync(p);
-						} catch {
-							/* sin realpath (archivo normal o ausente) → path */
-						}
-						return {
-							name: String(s.name),
-							path: p,
-							realPath,
-							description: String(s.description ?? ""),
-							source: String(s?.sourceInfo?.scope ?? "path"),
-						};
-					},
-			),
+			skills: (skills.skills ?? []).map((s: any): AttribSkill => {
+				const p = String(s.filePath ?? "");
+				let realPath = p;
+				try {
+					realPath = realpathSync(p);
+				} catch {
+					/* sin realpath (archivo normal o ausente) → path */
+				}
+				return {
+					name: String(s.name),
+					path: p,
+					realPath,
+					description: String(s.description ?? ""),
+					source: String(s?.sourceInfo?.scope ?? "path"),
+				};
+			}),
 			prompts: (prompts.prompts ?? []).map((p: any) => ({
 				name: String(p.name),
 				description: String(p.description ?? ""),
@@ -1631,7 +1642,12 @@ export async function activate(
 			skills: attribution.general.skills.map((s) => ({
 				name: s.name,
 				description: s.description,
-				source: s.source === "project" ? "project" : s.source === "user" ? "global" : "path",
+				source:
+					s.source === "project"
+						? "project"
+						: s.source === "user"
+							? "global"
+							: "path",
 				path: s.path,
 			})),
 			prompts: attribution.general.prompts,
@@ -1674,6 +1690,30 @@ export async function activate(
 			values: readToolToggles(),
 			defs: TOOL_TOGGLES.map(({ key, title, desc }) => ({ key, title, desc })),
 		});
+	}
+
+	// Snapshot del panel de auto-aprobación (#55): política declarativa (el mismo
+	// config-store que lee el gate en cada tool_call — cambios aplican en vivo) +
+	// patrones aprobados en la sesión. Refresca el panel sin recargar nada.
+	function postPermissionsConfig(): void {
+		const c = getConfig();
+		post({
+			type: "permissions_config",
+			config: {
+				mode: approvalMode, // modo VIVO (el del footer), siempre sincronizado
+				auditLog: c.auditLog !== false,
+				tool: { ...c.policy.tool },
+				path: { ...c.policy.path },
+				bash: { ...c.policy.bash },
+				externalDirectory: c.policy.external_directory,
+			},
+			sessionPatterns: frida?.sessionApprovals.list() ?? [],
+		});
+	}
+
+	/** Coerce el estado que llega del webview a allow/ask/deny (default ask). */
+	function permState(v: unknown): PermissionState {
+		return v === "allow" || v === "deny" ? v : "ask";
 	}
 
 	// Info del workspace: carpeta de trabajo + branch git, conteo de cambios
@@ -2212,6 +2252,7 @@ export async function activate(
 				post({ type: "mode", mode: approvalMode });
 				post({ type: "version", version: fridaVersion });
 				postToolToggles();
+				postPermissionsConfig();
 				postCodebaseIndexState();
 				if (pendingSettingsTab) {
 					post({ type: "open_settings", tab: pendingSettingsTab });
@@ -2292,14 +2333,10 @@ export async function activate(
 								result = await actions.toggle(ref, false);
 								break;
 							case "mkt_add":
-								result = await actions.marketplaceAdd(
-									String(msg.value ?? ""),
-								);
+								result = await actions.marketplaceAdd(String(msg.value ?? ""));
 								break;
 							case "mkt_remove":
-								result = await actions.marketplaceRemove(
-									String(msg.name ?? ""),
-								);
+								result = await actions.marketplaceRemove(String(msg.name ?? ""));
 								break;
 							case "mkt_update":
 								result = await actions.marketplaceUpdate(
@@ -2308,12 +2345,7 @@ export async function activate(
 								break;
 							case "retry": {
 								const s = String(msg.source ?? "");
-								if (
-									s !== "bootstrap" &&
-									s !== "marketplace" &&
-									s !== "install"
-								)
-									return;
+								if (s !== "bootstrap" && s !== "marketplace" && s !== "install") return;
 								result = await actions.retry(s);
 								break;
 							}
@@ -2371,11 +2403,11 @@ export async function activate(
 								type: "info",
 								text: ok
 									? `⏹ Detached ${dtRun} detenido (SIGTERM al grupo)`
-										: `Detached ${dtRun} no existe o ya terminó`,
+									: `Detached ${dtRun} no existe o ya terminó`,
 							});
 						}
 					} finally {
-					// refresh siempre (la acción ya mutó el registry).
+						// refresh siempre (la acción ya mutó el registry).
 						handleDetachedPanel(buildDetachedPanel());
 					}
 				})();
@@ -2647,7 +2679,12 @@ export async function activate(
 					}
 				}
 				approvalMode = next;
+				// Persiste en permission.json (#55): el modo elegido en el panel de
+				// auto-aprobación (o el footer) sobrevive recargas de ventana.
+				setStoredMode(next);
+				saveConfig();
 				post({ type: "mode", mode: approvalMode });
+				postPermissionsConfig();
 				break;
 			}
 			case "set_tool_toggle":
@@ -2657,6 +2694,60 @@ export async function activate(
 				// (frida.askUserQuestion.enabled / frida.todo.enabled). Igual que /reload,
 				// no pierde el historial; el estado de `todo` se recupera por replay.
 				await reloadResources();
+				break;
+			// ── Panel de auto-aprobación (#55): puente webview → config-store ──
+			// Cada cambio persiste de inmediato y el gate lee el cache fresco en el
+			// próximo tool_call. Los tools con deny se ocultan del catálogo al inicio
+			// del próximo turno (before_agent_start), sin recargar la sesión.
+			case "get_permissions_config":
+				postPermissionsConfig();
+				break;
+			case "perm_set_tool":
+				setTool(String(msg.tool ?? ""), permState(msg.state));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_set_path":
+				setPathPattern(String(msg.pattern ?? ""), permState(msg.state));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_remove_path":
+				removePathPattern(String(msg.pattern ?? ""));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_set_bash":
+				setBashPattern(String(msg.pattern ?? ""), permState(msg.state));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_remove_bash":
+				removeBashPattern(String(msg.pattern ?? ""));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_set_external":
+				setExternalDirectory(permState(msg.state));
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_set_audit":
+				setAuditLog(msg.enabled !== false);
+				saveConfig();
+				postPermissionsConfig();
+				break;
+			case "perm_reset":
+				resetConfig();
+				setStoredMode("manual");
+				approvalMode = "manual"; // el reset vuelve a manual también en vivo
+				saveConfig();
+				post({ type: "mode", mode: approvalMode });
+				postPermissionsConfig();
+				break;
+			case "perm_revoke_session_pattern":
+				frida?.sessionApprovals.remove(msg.kind, String(msg.pattern ?? ""));
+				postPermissionsConfig();
 				break;
 			case "codebase_index_action": {
 				const action = msg.action as "install" | "index" | "rebuild" | "status";
@@ -2779,10 +2870,6 @@ export async function activate(
 			description: "Auditoría de permisos (decisiones allow/block del gate)",
 		},
 		{
-			name: "gates-config",
-			description: "Editor de permisos (allow/ask/deny por tool)",
-		},
-		{
 			name: "wf",
 			description: "Lanzar o reanudar un workflow",
 			argumentHint: '<nombre> "<input>" | @<ref>',
@@ -2896,9 +2983,6 @@ export async function activate(
 				break;
 			case "gates":
 				postGatesCommand();
-				break;
-			case "gates-config":
-				postGatesConfigCommand();
 				break;
 			case "wf":
 				postWfCommand(arg);
@@ -3675,24 +3759,8 @@ export async function activate(
 		}
 	}
 
-	// /gates-config: editor visual de permisos (overlay Remote React, ADR-0016 Fase 5).
-	// El panel edita la política allow/ask/deny por tool y guarda en permission.json;
-	// el gate lee la policy fresca del config-store en el próximo tool_call.
-	let configPanelHandle: { unmount: () => void } | undefined;
-	function postGatesConfigCommand(): void {
-		if (!frida) {
-			post({
-				type: "info",
-				text: "No hay sesión activa para editar permisos.",
-			});
-			return;
-		}
-		configPanelHandle?.unmount();
-		configPanelHandle = frida.webBridge.mountPersistent(
-			() => createConfigPanelElement(() => configPanelHandle?.unmount()),
-			"overlay",
-		);
-	}
+	// /gates-config fue retirado (#55): su reemplazo es Configuración >
+	// Auto-aprobación en el webview (mismo config-store como fuente de verdad).
 
 	// Duplica la sesión actual en un nuevo archivo y la abre (createBranchedSession
 	// en la hoja actual = copia completa). Equivalente al /clone de la TUI.
@@ -4144,6 +4212,7 @@ export async function activate(
 			// de soltar la referencia, y resetear la Promise anti-race.
 			frida.gateStats.reset(); // Fase 3: contadores a cero en el webview.
 			frida.sessionApprovals.clear(); // Fase 4: olvida patrones aprobados.
+			postPermissionsConfig(); // #55: panel de auto-aprobación sincronizado.
 			frida.webBridge.dispose();
 			// Desmonta el widget de agentes (para re-montarlo con el nuevo webBridge al
 			// recrear la sesión) y suelta el listener del conteo de subagentes.

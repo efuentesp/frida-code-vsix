@@ -5587,3 +5587,173 @@ kbd {
 .tool-res-err span {
 	opacity: 0.8;
 }
+
+/* ── Panel de Auto-Aprobación (#55): tri-states por superficie ── */
+.perm-body {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 4px 0 16px;
+}
+.perm-note {
+	font-size: 11px;
+	opacity: 0.75;
+	line-height: 1.5;
+}
+.perm-note.muted {
+	text-align: left;
+	font-style: italic;
+}
+.perm-mode-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.perm-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 4px 0;
+}
+.perm-row-name {
+	font-size: 12px;
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+/* Select/inputs: estilo de formulario del hub (variables VS Code). */
+.perm-select,
+.perm-input {
+	background: var(--vscode-dropdown-background);
+	color: var(--vscode-dropdown-foreground);
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 3px;
+	font-size: 12px;
+	padding: 3px 6px;
+}
+.perm-input {
+	flex: 1;
+	min-width: 120px;
+}
+.perm-add {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 2px 0 8px;
+}
+/* El botón es <button>: button:hover global inyecta el violeta PRIMARIO (lección
+   del acordeón #54 y tabs). Especificidad 0,2,0 > 0,1,1 con hover sutil. */
+.perm-add-btn:hover,
+.perm-chip .rm:hover,
+.perm-chip.session:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-list-hoverForeground);
+}
+/* Segmented tri-state: 3 botones compactos ✓/●/✕. */
+.perm-seg {
+	display: inline-flex;
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 4px;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+.perm-seg-btn {
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	border: none;
+	border-radius: 0;
+	padding: 2px 9px;
+	font-size: 12px;
+	cursor: pointer;
+	opacity: 0.55;
+}
+.perm-seg-btn + .perm-seg-btn {
+	border-left: 1px solid var(--vscode-dropdown-border);
+}
+/* Mismo fix anti-violeta que .perm-add-btn para los segmentos. */
+.perm-seg-btn:hover {
+	background: var(--vscode-list-hoverBackground);
+	opacity: 0.9;
+}
+.perm-seg-btn.is-allow.active {
+	color: var(--vscode-gitDecoration-addedResourceForeground);
+	background: color-mix(
+		in srgb,
+		var(--vscode-gitDecoration-addedResourceForeground) 14%,
+		transparent
+	);
+	opacity: 1;
+}
+.perm-seg-btn.is-ask.active {
+	color: var(--vscode-editorWarning-foreground);
+	background: color-mix(
+		in srgb,
+		var(--vscode-editorWarning-foreground) 14%,
+		transparent
+	);
+	opacity: 1;
+}
+.perm-seg-btn.is-deny.active {
+	color: var(--vscode-editorError-foreground);
+	background: color-mix(
+		in srgb,
+		var(--vscode-editorError-foreground) 14%,
+		transparent
+	);
+	opacity: 1;
+}
+/* Chips de patrones declarativos + patrones de sesión. */
+.perm-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 4px 0;
+}
+.perm-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--vscode-dropdown-border);
+	border-radius: 10px;
+	padding: 2px 6px 2px 8px;
+	font-size: 11px;
+	background: var(--vscode-editor-background);
+}
+.perm-chip .rm {
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	padding: 0 2px;
+	cursor: pointer;
+	font-size: 13px;
+	line-height: 1;
+	border-radius: 3px;
+}
+.perm-chip.session {
+	cursor: pointer;
+	border-color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+.perm-chip-kind {
+	font-size: 9px;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+	opacity: 0.7;
+}
+.perm-glyph.is-allow {
+	color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+.perm-glyph.is-ask {
+	color: var(--vscode-editorWarning-foreground);
+}
+.perm-glyph.is-deny {
+	color: var(--vscode-editorError-foreground);
+}
+.perm-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	cursor: pointer;
+}
+.perm-check input {
+	accent-color: var(--vscode-button-background);
+}
