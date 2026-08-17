@@ -68,7 +68,7 @@ return await agent(prompt("Resume y prioriza:\n\n{reviews}", { reviews }));
 
 Lanza una run. Parámetros: `name` (req), `script` | `scriptPath` (exactamente uno) **o el `name` de un patrón curado** (sin script; ver abajo), `args`, `foreground`, `budget`, `concurrency`. Background por defecto → devuelve `runId` y entrega el resultado como follow-up.
 
-#### Patrones curados (#19 Lote 1)
+#### Patrones curados (#19, Lotes 1 y 2)
 
 `name` sin `script`/`scriptPath` resuelve al patrón builtin si coincide (un script explícito siempre gana). Puertos de `pi-dynamic-workflows` (MIT), ejecutan sobre este runtime sin código nuevo de orquestación:
 
@@ -76,13 +76,31 @@ Lanza una run. Parámetros: `name` (req), `script` | `scriptPath` (exactamente u
 | --- | --- | --- |
 | `multi-perspective` | `{ topic, perspectives? }` | Un agente por perspectiva (5 por defecto: técnica, producto, seguridad, UX, mantenibilidad) en paralelo → síntesis balanceada. `<2` perspectivas cae a las defaults. |
 | `codebase-audit` | `{ scope, checks: string[] }` | Un agente por check en paralelo → cross-validation contra el código citado → reporte priorizado. |
+| `adversarial-review` | `{ task, reviewers?: 1-5, threshold?: 0-1 }` | Investiga hallazgos → cada uno lo juzgan N revisores escépticos en paralelo (outputSchema `{real, reason}`) → sólo sobreviven los que superan el umbral de acuerdo (default 0.5). |
+| `code-review` | `{ diff, diffSource? }` | 7 finders especializados (correctness ×3, cleanup ×3, altitude) con outputSchema + verify CONFIRMED/PLAUSIBLE/REFUTED por candidato → dedup → ranking → top 10. Diff truncado a 200k chars con aviso. |
 
 ```text
 workflow({ name: "multi-perspective", args: { topic: "¿React 19 o quedarnos en 18?" } })
 workflow({ name: "codebase-audit", args: { scope: "src/tools/", checks: ["imports circulares", "exports muertos"] } })
+workflow({ name: "adversarial-review", args: { task: "revisar el fix de permisos" } })
+workflow({ name: "code-review", args: { diff: "<git diff>", diffSource: "git diff HEAD" } })
 ```
 
 Los scripts son estáticos (leen `args` en runtime → identidad de journaling estable) y los valida eager antes de lanzar. `workflow_catalog` los lista bajo `builtinPatterns`.
+
+#### Salida estructurada: `agent({ outputSchema })` (#19 G1)
+
+Cualquier llamada `agent()` (patrón curado o script propio) puede pedir salida JSON: el host aumenta el prompt con el contrato del schema, parsea la respuesta (tolerante a fences y prosa), valida (type/required/properties/items/enum) y **repara acotadamente** (1 reintento con los errores concretos) antes de fallar. El accounting de los intentos de reparación se suma al del agente (#18). Sin `outputSchema` el paso es passthrough exacto.
+
+#### Ruteo por tier: `agent({ tier })` (#19 G2)
+
+`tier: "small" | "medium" | "big"` resuelve el modelo vía `modelAliases` de settings (`~/.frida/extensible-workflows/settings.json` o `.pi/extensible-workflows/settings.json` del proyecto):
+
+```json
+{ "modelAliases": { "small": "zai/glm-4.6-flash", "medium": "zai/glm-4.6", "big": "zai/glm-5.3" } }
+```
+
+Precedencia: `model` explícito > `role.model` > `tier`. Sin alias configurado el tier **degrada al modelo de la sesión** (es una pista de ruteo, no un requerimiento). `code-review` usa tiers: A/B/C medium, D/E/F small, G y síntesis big.
 
 ### `workflow_status({ runId })`
 

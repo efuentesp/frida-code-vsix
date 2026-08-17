@@ -43,19 +43,23 @@ function runPattern(
 }
 
 describe("frida-extensible-workflows · builtin-patterns (#19 Lote 1)", () => {
-	it("registry: multi-perspective y codebase-audit registrados con metadata", () => {
+	it("registry: los 4 patrones (Lotes 1+2) registrados con metadata", () => {
 		expect(BUILTIN_PATTERNS.map((p) => p.name)).toEqual([
 			"multi-perspective",
 			"codebase-audit",
+			"adversarial-review",
+			"code-review",
 		]);
 		const catalog = builtinPatternsCatalog();
-		expect(catalog).toHaveLength(2);
+		expect(catalog).toHaveLength(4);
 		expect(catalog[0]).toMatchObject({
 			name: "multi-perspective",
 		});
 		expect(catalog[1]).toMatchObject({
 			name: "codebase-audit",
 		});
+		expect(catalog[2]).toMatchObject({ name: "adversarial-review" });
+		expect(catalog[3]).toMatchObject({ name: "code-review" });
 		expect(findBuiltinPattern("multi-perspective")?.description).toBeTruthy();
 		expect(findBuiltinPattern("no-existe")).toBeUndefined();
 	});

@@ -107,7 +107,7 @@ export function resolveWorkflowSettings(cwd: string, projectTrusted: boolean, gl
   const projectSettingsPath = workflowProjectSettingsPath(cwd);
   const global = loadSettings(globalSettingsPath);
   const project: Readonly<WorkflowSettingsOverrides> = projectTrusted ? loadSettingsOverrides(projectSettingsPath) : Object.freeze({});
-  const projectHas = (key: keyof WorkflowSettingsOverrides): boolean => Object.prototype.hasOwnProperty.call(project, key);
+  const projectHas = (key: keyof WorkflowSettingsOverrides): boolean => Object.hasOwn(project, key);
   const sources: WorkflowSettingsSources = {
     concurrency: projectHas("concurrency") ? projectSettingsPath : globalSettingsPath,
     modelAliases: projectHas("modelAliases") ? projectSettingsPath : globalSettingsPath,
@@ -474,7 +474,7 @@ export function workflowPrompt(template: string, values: Readonly<Record<string,
   const placeholders = [...template.matchAll(/{{|}}|{([A-Za-z_$][\w$]*)}/g)].flatMap((match) => match[1] === undefined ? [] : [match[1]]);
   const used = new Set(placeholders);
   const keys = Object.keys(values);
-  const missing = placeholders.find((key) => !Object.prototype.hasOwnProperty.call(values, key));
+  const missing = placeholders.find((key) => !Object.hasOwn(values, key));
   if (missing) fail("INVALID_METADATA", `Missing prompt value "${missing}"`);
   const unused = keys.find((key) => !used.has(key));
   if (unused !== undefined) fail("INVALID_METADATA", `Unused prompt value "${unused}"`);
@@ -488,7 +488,7 @@ export function validateSchema(schema: unknown, at = "schema"): asserts schema i
   if (schema.properties !== undefined && !object(schema.properties)) fail("INVALID_SCHEMA", `${at}.properties must be an object`);
 }
 
-const AGENT_OPTION_KEYS = new Set(["label", "model", "thinking", "tools", "role", "outputSchema", "retries", "timeoutMs"]);
+const AGENT_OPTION_KEYS = new Set(["label", "model", "thinking", "tools", "role", "outputSchema", "retries", "timeoutMs", "tier"]);
 const ROLE_OVERRIDE_KEYS = new Set(["name", "model", "thinking", "tools", "description", "overrideSystemPrompt", "contextFiles", "disabledAgentResources"]);
 export function validateRoleOverride(value: unknown, aliases?: Readonly<Record<string, string>>, knownModels?: ReadonlySet<string>, settingsPath?: string): RoleOverride {
   if (!object(value) || Array.isArray(value)) fail("INVALID_METADATA", "agent role must be a string or an object with a non-empty name and optional frontmatter overrides");
@@ -536,12 +536,15 @@ function validateAgentOption(key: string, value: unknown, aliases?: Readonly<Rec
     case "timeoutMs":
       if (value !== null && !positiveInteger(value)) fail("INVALID_METADATA", "agent timeoutMs must be null or a positive integer");
       break;
+    case "tier":
+      if (typeof value !== "string" || !["small", "medium", "big"].includes(value)) fail("INVALID_METADATA", "agent tier must be small, medium, or big");
+      break;
   }
 }
 export function validateAgentOptions(value: unknown): Readonly<Record<string, JsonValue>> {
   if (!object(value) || !jsonValue(value)) fail("INVALID_METADATA", "agent options must be a JSON object");
   for (const [key, option] of Object.entries(value)) if (AGENT_OPTION_KEYS.has(key)) validateAgentOption(key, option);
-  if (value.role !== undefined && ["model", "thinking", "tools"].some((key) => Object.prototype.hasOwnProperty.call(value, key))) fail("INVALID_METADATA", "Role agents must not specify model, thinking, or tools");
+  if (value.role !== undefined && ["model", "thinking", "tools"].some((key) => Object.hasOwn(value, key))) fail("INVALID_METADATA", "Role agents must not specify model, thinking, or tools");
   return value;
 }
 const SHELL_OPTION_KEYS = new Set(["timeoutMs", "env"]);
@@ -635,7 +638,7 @@ export function inspectWorkflowScript(script: string): StaticWorkflowCall[] {
 function validateStaticAgentOptions(node: acorn.AnyNode | undefined, aliases: Readonly<Record<string, string>> = {}, knownModels?: ReadonlySet<string>, settingsPath?: string): void {
   if (node?.type !== "ObjectExpression") return;
   const options = staticValue(node);
-  if (options.known && object(options.value) && options.value.role !== undefined && ["model", "thinking", "tools"].some((key) => Object.prototype.hasOwnProperty.call(options.value as Record<string, unknown>, key))) fail("INVALID_METADATA", "Role agents must not specify model, thinking, or tools");
+  if (options.known && object(options.value) && options.value.role !== undefined && ["model", "thinking", "tools"].some((key) => Object.hasOwn(options.value as Record<string, unknown>, key))) fail("INVALID_METADATA", "Role agents must not specify model, thinking, or tools");
   for (const key of AGENT_OPTION_KEYS) {
     const value = staticValue(propertyNode(node, key));
     if (value.known) validateAgentOption(key, value.value, aliases, knownModels, settingsPath);
@@ -726,7 +729,7 @@ export function validateWorkflowLaunch(params: WorkflowValidationParameters, con
   return validateWorkflowLaunchWithRegistry(params, context, registry);
 }
 export function validateWorkflowLaunchWithRegistry(params: WorkflowValidationParameters, context: WorkflowValidationContext, registry?: WorkflowRegistryApi): ValidatedWorkflowLaunch {
-  if (Object.prototype.hasOwnProperty.call(params, "maxAgentLaunches")) fail("INVALID_METADATA", "maxAgentLaunches has been removed; use budget.agentLaunches");
+  if (Object.hasOwn(params, "maxAgentLaunches")) fail("INVALID_METADATA", "maxAgentLaunches has been removed; use budget.agentLaunches");
   const hasScript = params.script !== undefined;
   const hasScriptPath = params.scriptPath !== undefined;
   if (hasScript && hasScriptPath) fail("INVALID_METADATA", "Provide either script or scriptPath, not more than one");

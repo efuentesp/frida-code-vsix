@@ -29,7 +29,10 @@ import {
 	type SessionStats,
 } from "@earendil-works/pi-coding-agent";
 import { executeShellCommand } from "./core/execution";
-import { loadAgentDefinitions } from "./core/validation";
+import {
+	loadAgentDefinitions,
+	resolveWorkflowSettings,
+} from "./core/validation";
 import type {
 	AgentAccounting,
 	AgentDefinition,
@@ -82,9 +85,9 @@ export function spawnResult(
 		[SPAWN_RESULT]: true,
 		value,
 		...(extra?.accounting ? { accounting: extra.accounting } : {}),
-		...(extra?.durationMs !== undefined
-			? { durationMs: extra.durationMs }
-			: {}),
+		...(extra?.durationMs === undefined
+			? {}
+			: { durationMs: extra.durationMs }),
 	};
 }
 
@@ -111,7 +114,7 @@ export function unpackSpawnResult(raw: JsonValue | AgentSpawnResult): {
 		return {
 			value: raw.value,
 			...(raw.accounting ? { accounting: raw.accounting } : {}),
-			...(raw.durationMs !== undefined ? { durationMs: raw.durationMs } : {}),
+			...(raw.durationMs === undefined ? {} : { durationMs: raw.durationMs }),
 		};
 	}
 	return { value: raw };
@@ -148,10 +151,16 @@ export type SpawnAgentFn = (
  * Resuelve los overrides de modelo/thinking/tools para una llamada agent(),
  * considerando `options.role` (string | {name, ...overrides}) y las definiciones
  * de rol cargadas. Función pura (testeable sin SDK). Sin rol, usa options directas.
+ *
+ * #19 Lote 2 — tier: `options.tier` ("small"|"medium"|"big") resuelve vía el
+ * mapa de aliases de settings (misma fuente que `model`): tier sin alias
+ * configurado cae al modelo del padre (degradación silenciosa, el tier es una
+ * pista de ruteo, no un requerimiento). Precedencia: model > role.model > tier.
  */
 export function resolveRoleOverrides(
 	options: Readonly<Record<string, JsonValue>>,
 	roles: Readonly<Record<string, AgentDefinition>>,
+	modelAliases?: Readonly<Record<string, string>>,
 ): { model?: string; thinking?: string; tools?: readonly string[] } {
 	const roleOption = options.role as
 		| string
@@ -160,8 +169,16 @@ export function resolveRoleOverrides(
 	const roleName =
 		typeof roleOption === "string" ? roleOption : roleOption?.name;
 	if (!roleName) {
+		const tier =
+			typeof options.tier === "string" ? options.tier : undefined;
+		const tierModel =
+			tier && modelAliases ? modelAliases[tier] : undefined;
 		return {
-			...(typeof options.model === "string" ? { model: options.model } : {}),
+			...(typeof options.model === "string"
+				? { model: options.model }
+				: tierModel
+					? { model: tierModel }
+					: {}),
 			...(typeof options.thinking === "string"
 				? { thinking: options.thinking }
 				: {}),
@@ -269,7 +286,14 @@ export function createFridaAgentSpawner(
 		const parentModelRuntime = (
 			ctx.modelRegistry as unknown as { runtime?: ModelRuntime }
 		).runtime;
-		const overrides = resolveRoleOverrides(options, roles);
+		// #19 Lote 2: aliases efectivos de settings (tier → modelo). Se leen por
+		// spawn (lectura barata de settings resueltos) para que un cambio en el
+		// archivo aplique sin recargar la sesión.
+		const modelAliases = resolveWorkflowSettings(
+			ctx.cwd,
+			true,
+		).effective.modelAliases;
+		const overrides = resolveRoleOverrides(options, roles, modelAliases);
 		const sessionModel = overrides.model ?? ctx.model;
 
 		const { session } = await createAgentSession({

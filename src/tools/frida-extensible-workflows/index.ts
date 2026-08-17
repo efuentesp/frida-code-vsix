@@ -19,6 +19,7 @@ import {
 	builtinPatternsCatalog,
 	findBuiltinPattern,
 } from "./builtin-patterns";
+import { withStructuredOutput } from "./structured-output";
 import {
 	runWorkflowInStore,
 	retryWorkflow,
@@ -289,10 +290,12 @@ export function createFridaExtensibleWorkflows() {
 					const budget = validateBudget((p as { budget?: unknown }).budget);
 
 					const sessionId = ctx.sessionManager.getSessionId();
-					const spawnAgent = createFridaAgentSpawner(ctx);
-					// Fase 6: permite que los agentes de un withWorktree corran en el path del worktree.
-					const createSpawnerForCwd = (worktreeCwd: string) =>
-						createFridaAgentSpawner({ ...ctx, cwd: worktreeCwd });
+				const spawnAgent = withStructuredOutput(createFridaAgentSpawner(ctx));
+				// Fase 6: permite que los agentes de un withWorktree corran en el path del worktree.
+				const createSpawnerForCwd = (worktreeCwd: string) =>
+					withStructuredOutput(
+						createFridaAgentSpawner({ ...ctx, cwd: worktreeCwd }),
+					);
 
 					// Fase 5: notificador de checkpoints (entrega follow-up pidiendo aprobación).
 					const onCheckpoint: CheckpointNotifier = (cp) => {
@@ -624,8 +627,8 @@ export function createFridaExtensibleWorkflows() {
 					const { runId: childRunId, result } = await retryWorkflow(runId, {
 						cwd: ctx.cwd,
 						sessionId,
-						spawnAgent: createFridaAgentSpawner(ctx),
-					});
+					spawnAgent: withStructuredOutput(createFridaAgentSpawner(ctx)),
+				});
 					return toolResult(
 						`Workflow retry: run hija ${childRunId} (source ${runId}) completada.\n\n${renderWorkflowResult(result)}`,
 					);
@@ -669,7 +672,7 @@ export function createFridaExtensibleWorkflows() {
 						const { result } = await resumeWorkflow(runId, {
 							cwd: ctx.cwd,
 							sessionId,
-							spawnAgent: createFridaAgentSpawner(ctx),
+							spawnAgent: withStructuredOutput(createFridaAgentSpawner(ctx)),
 							...(budgetPatch === undefined ? {} : { budgetPatch }),
 							onProgress: (event) =>
 								applyWorkflowProgress({ runId, progress: event }),
