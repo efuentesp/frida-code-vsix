@@ -66,7 +66,23 @@ return await agent(prompt("Resume y prioriza:\n\n{reviews}", { reviews }));
 
 ### `workflow`
 
-Lanza una run. Parámetros: `name` (req), `script` | `scriptPath` (exactamente uno), `args`, `foreground`, `budget`, `concurrency`. Background por defecto → devuelve `runId` y entrega el resultado como follow-up.
+Lanza una run. Parámetros: `name` (req), `script` | `scriptPath` (exactamente uno) **o el `name` de un patrón curado** (sin script; ver abajo), `args`, `foreground`, `budget`, `concurrency`. Background por defecto → devuelve `runId` y entrega el resultado como follow-up.
+
+#### Patrones curados (#19 Lote 1)
+
+`name` sin `script`/`scriptPath` resuelve al patrón builtin si coincide (un script explícito siempre gana). Puertos de `pi-dynamic-workflows` (MIT), ejecutan sobre este runtime sin código nuevo de orquestación:
+
+| Patrón | Args | Qué hace |
+| --- | --- | --- |
+| `multi-perspective` | `{ topic, perspectives? }` | Un agente por perspectiva (5 por defecto: técnica, producto, seguridad, UX, mantenibilidad) en paralelo → síntesis balanceada. `<2` perspectivas cae a las defaults. |
+| `codebase-audit` | `{ scope, checks: string[] }` | Un agente por check en paralelo → cross-validation contra el código citado → reporte priorizado. |
+
+```text
+workflow({ name: "multi-perspective", args: { topic: "¿React 19 o quedarnos en 18?" } })
+workflow({ name: "codebase-audit", args: { scope: "src/tools/", checks: ["imports circulares", "exports muertos"] } })
+```
+
+Los scripts son estáticos (leen `args` en runtime → identidad de journaling estable) y los valida eager antes de lanzar. `workflow_catalog` los lista bajo `builtinPatterns`.
 
 ### `workflow_status({ runId })`
 
@@ -74,7 +90,7 @@ Resumen autoritativo de una run: estado, agentes, error. Llámalo **antes** de r
 
 ### `workflow_catalog({ name? })`
 
-Inspecciona funciones/aliases/settings disponibles como globales en los scripts. Sin `name` → índice compacto; con `name` → detalle completo.
+Inspecciona funciones/aliases/settings disponibles como globales en los scripts, y los **patrones curados** bajo `builtinPatterns`. Sin `name` → índice compacto; con `name` → detalle completo (patrón builtin o función registrada).
 
 ### `workflow_stop({ runId })`
 
@@ -147,4 +163,5 @@ Cada run escribe bajo `~/.frida/workflows/projects/<cwd-hash>/sessions/<sessionI
 ## Más
 
 - [ADR-0028](../adr/0028-frida-extensible-workflows-porter-pi-extensible-workflows.md) — diseño y fases.
+- [ADR-0030](../adr/0030-frida-dynamic-workflows-patrones-sobre-extensible.md) — patrones curados de `pi-dynamic-workflows` (#19).
 - [pi-extensible-workflows (upstream)](https://vekexasia.github.io/pi-extensible-workflows/) — referencia canónica.

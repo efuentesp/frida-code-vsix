@@ -16,6 +16,10 @@ import { encoded } from "./core/execution";
 import { workflowCatalogIndex, workflowCatalogDetail } from "./core/registry";
 import { validateBudget } from "./core/budget";
 import {
+	builtinPatternsCatalog,
+	findBuiltinPattern,
+} from "./builtin-patterns";
+import {
 	runWorkflowInStore,
 	retryWorkflow,
 	resumeWorkflow,
@@ -140,9 +144,9 @@ export { fridaDefaultAgentDir, fridaHome } from "./frida-paths";
 
 const WORKFLOW_TOOL_LABEL = "Workflow";
 const WORKFLOW_TOOL_DESCRIPTION =
-	"Run a deterministic JavaScript workflow with a named inline or file-backed parallel-to-summary path by default";
+	"Run a deterministic JavaScript workflow with a named inline or file-backed parallel-to-summary path by default, or launch a curated builtin pattern (multi-perspective, codebase-audit) by name alone with args";
 const WORKFLOW_TOOL_PROMPT_SNIPPET =
-	"Run a deterministic JavaScript workflow. Prefer a named inline script that fans out independent work with parallel(...), awaits the keyed results before interpolating them into one summarizing agent(...), and returns. Provide exactly one of script or scriptPath and a non-empty name. Set foreground: true to wait for the final value.";
+	"Run a deterministic JavaScript workflow. Prefer a named inline script that fans out independent work with parallel(...), awaits the keyed results before interpolating them into one summarizing agent(...), and returns. Provide exactly one of script or scriptPath and a non-empty name, or launch a curated builtin pattern by name alone with args (see workflow_catalog builtinPatterns; e.g. workflow({ name: 'multi-perspective', args: { topic } }) or workflow({ name: 'codebase-audit', args: { scope, checks } })). Set foreground: true to wait for the final value.";
 
 const WORKFLOW_TOOL_PARAMETERS = Type.Object({
 	name: Type.String({ description: "Required non-empty workflow name" }),
@@ -269,9 +273,19 @@ export function createFridaExtensibleWorkflows() {
 					if (!name)
 						throw new Error("workflow: name is required and must be non-empty");
 
-					const script = readLaunchScript(p);
 					const args = (p.args ?? null) as JsonValue;
 					encoded(args); // valida frontera JSON (≤10 MB)
+					// Patrones curados (#19 Lote 1): name de un patrón builtin sin
+					// script/scriptPath resuelve al script generado (valida args eager).
+					// Un script explícito siempre gana sobre el patrón del mismo nombre.
+					const hasExplicit =
+						(typeof p.script === "string" && p.script.trim()) ||
+						(typeof p.scriptPath === "string" && p.scriptPath.trim());
+					const builtin = name ? findBuiltinPattern(name) : undefined;
+					const script =
+						!hasExplicit && builtin
+							? builtin.resolve(args)
+							: readLaunchScript(p);
 					const budget = validateBudget((p as { budget?: unknown }).budget);
 
 					const sessionId = ctx.sessionManager.getSessionId();
@@ -457,6 +471,25 @@ export function createFridaExtensibleWorkflows() {
 					const catalogCtx = { cwd: ctx.cwd, projectTrusted: true };
 					const requested = (params as { name?: unknown }).name;
 					if (typeof requested === "string" && requested.trim()) {
+						// Patrones curados (#19): detalle del patrón antes que el catálogo de
+						// funciones registradas (namespace distinto, misma puerta de consulta).
+						const pattern = findBuiltinPattern(requested.trim());
+						if (pattern) {
+							return toolResult(
+								JSON.stringify(
+									{
+										kind: "builtinPattern",
+										name: pattern.name,
+										description: pattern.description,
+										args: pattern.args,
+										launch:
+											`workflow({ name: "${pattern.name}", args: { ... } }) — sin script; se resuelve al patrón.`,
+									},
+									null,
+									2,
+								),
+							);
+						}
 						return toolResult(
 							JSON.stringify(
 								workflowCatalogDetail(requested, catalogCtx),
@@ -466,7 +499,14 @@ export function createFridaExtensibleWorkflows() {
 						);
 					}
 					return toolResult(
-						JSON.stringify(workflowCatalogIndex(catalogCtx), null, 2),
+						JSON.stringify(
+							{
+								...workflowCatalogIndex(catalogCtx),
+								builtinPatterns: builtinPatternsCatalog(),
+							},
+							null,
+							2,
+						),
 					);
 				},
 			}),
@@ -630,7 +670,7 @@ export function createFridaExtensibleWorkflows() {
 							cwd: ctx.cwd,
 							sessionId,
 							spawnAgent: createFridaAgentSpawner(ctx),
-							...(budgetPatch !== undefined ? { budgetPatch } : {}),
+							...(budgetPatch === undefined ? {} : { budgetPatch }),
 							onProgress: (event) =>
 								applyWorkflowProgress({ runId, progress: event }),
 						});
