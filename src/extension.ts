@@ -1719,19 +1719,24 @@ export async function activate(
 	// Info del workspace: carpeta de trabajo + branch git, conteo de cambios
 	// (added/modified/deleted) y commits ahead/behind vs origin. Una sola llamada
 	// `git status --porcelain -b` da los tres. La ejecuta el HOST directamente
-	// Detecta si cwd es un worktree vinculado (no el checkout principal). El
-	// git-dir de un worktree vinculado vive bajo <common>/.git/worktrees/<name>;
-	// el del principal es <repo>/.git. Issue #13.
-	async function detectWorktree(cwd: string): Promise<boolean> {
+	// Detecta si cwd es un worktree vinculado (no el checkout principal) y
+	// devuelve su NOMBRE (el badge del footer lo muestra). El git-dir de un
+	// worktree vinculado vive bajo <common>/.git/worktrees/<name>; el del
+	// principal es <repo>/.git. El nombre sale gratis del mismo rev-parse que
+	// ya corría la detección booleana. Issue #13.
+	async function detectWorktreeName(
+		cwd: string,
+	): Promise<string | undefined> {
 		try {
 			const { stdout } = await execFileP(
 				"git",
 				["rev-parse", "--absolute-git-dir"],
 				{ cwd, timeout: 3000 },
 			);
-			return /[/\\]\.git[/\\]worktrees[/\\]/.test(stdout.trim());
+			const m = stdout.trim().match(/[/\\]\.git[/\\]worktrees[/\\]([^/\\]+)/);
+			return m?.[1];
 		} catch {
-			return false;
+			return undefined;
 		}
 	}
 
@@ -1746,7 +1751,7 @@ export async function activate(
 		ahead?: number;
 		behind?: number;
 		sessionPath?: string;
-		isWorktree?: boolean;
+		worktreeName?: string;
 	}> {
 		const cwd = workspaceCwd();
 		const sessionName = frida?.sessionManager?.getSessionName?.() || undefined;
@@ -1758,9 +1763,10 @@ export async function activate(
 			const lines = stdout.split("\n");
 			// 1ª línea "## branch...up [ahead N, behind M]" (o "## HEAD (no branch)").
 			const head = parseStatusHead(lines[0] ?? "");
-			// Resto: líneas porcelain XY path → conteo added/modified/deleted.
+				// Resto: líneas porcelain XY path → conteo added/modified/deleted.
 			const diff = parseGitDiff(lines.slice(1).join("\n"));
 			const dirty = diff.added + diff.modified + diff.deleted > 0;
+			const wtName = await detectWorktreeName(cwd);
 			return {
 				cwd,
 				branch: head.branch,
@@ -1770,14 +1776,13 @@ export async function activate(
 				diff,
 				ahead: head.ahead,
 				behind: head.behind,
-				isWorktree: await detectWorktree(cwd),
+				worktreeName: wtName,
 			};
 		} catch {
 			return {
 				cwd,
 				sessionName,
 				sessionPath: frida?.session?.sessionFile,
-				isWorktree: false,
 			}; // no es repo o git no disponible
 		}
 	}

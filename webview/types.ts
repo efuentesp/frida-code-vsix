@@ -390,8 +390,8 @@ export interface WorkspaceInfo {
 	/** Commits adelantados / atrasados vs upstream (origin). */
 	ahead?: number;
 	behind?: number;
-	/** true si el cwd es un worktree vinculado (no el checkout principal). Issue #13. */
-	isWorktree?: boolean;
+	/** Nombre del worktree vinculado si el cwd es uno (undefined en el checkout principal). Issue #13. */
+	worktreeName?: string;
 }
 
 // Selector de proveedor/modelo (fase 2: multi-proveedor + GitHub Copilot).

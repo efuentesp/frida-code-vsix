@@ -383,20 +383,20 @@ body {
 	color: var(--vscode-testing-iconPassed, #3fb950);
 	border-color: var(--vscode-testing-iconPassed, #3fb950);
 }
-/* Badge 🌳 de worktree en el header: muestra la rama cuando la sesión corre en un
-   worktree vinculado (no el checkout principal). Issue #13. Tinte azul para
-   distinguirlo del badge verde de frida-lens. */
-.worktree-badge {
+/* Chip «⎍ wt: nombre» en el WorkspaceBar del footer: aparece cuando la
+   sesión corre en un worktree vinculado (no el checkout principal). Issue #13.
+   Reemplazó al badge del header (una sola fuente, junto a los datos de git).
+   Tinte azul que lo distingue del branch verde; misma caja que los chips de
+   sync/diff. En el checkout principal no se renderiza. */
+.ws-bar .ws-worktree {
 	display: inline-flex;
 	align-items: center;
 	gap: 3px;
-	margin-left: 6px;
-	padding: 1px 7px;
-	font-size: 10px;
-	border-radius: 9px;
+	white-space: nowrap;
 	color: var(--vscode-textLinkForeground, #58a6ff);
-	background: var(--vscode-badge-background, rgba(127, 127, 127, 0.12));
-	border: 1px solid var(--vscode-textLinkForeground, #58a6ff);
+}
+.ws-bar .ws-worktree svg {
+	flex: none;
 }
 /* Badge de versión vX.Y.Z en el header pegado al título (click → /update).
    Pegado al badge de frida-lens, no margin-left:auto (que lo empujaría a la derecha). */

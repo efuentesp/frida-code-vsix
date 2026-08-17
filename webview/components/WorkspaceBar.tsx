@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { WorkspaceInfo } from "../types";
 import { Tooltip } from "./Tooltip";
-import { CircleDot, Folder, GitBranch } from "lucide-react";
+import { CircleDot, Folder, GitBranch, GitFork } from "lucide-react";
 
 // Pinta la carpeta de trabajo y el branch git (con sync ↑↓ y conteo de cambios
 // +N ~N -N). Siempre visible en el footer, para saber exactamente dónde opera el
@@ -130,12 +130,26 @@ export function WorkspaceBar({
 								)}
 							</span>
 						)}
-						{ws.dirty && (
-							<span className="ws-dirty">
-								<CircleDot size={12} />
-							</span>
-						)}
-					</span>
+					{ws.dirty && (
+						<span className="ws-dirty">
+							<CircleDot size={12} />
+						</span>
+					)}
+				</span>
+				</Tooltip>
+			)}
+			{/* Worktree vinculado: chip «wt: nombre» — única fuente del indicador
+			    (el badge del header se consolidó aquí, junto al resto de los datos de
+			    git). Solo existe cuando el cwd ES un worktree; en el checkout
+			    principal no aparece (cero ruido). Issue #13. */}
+			{ws?.worktreeName && (
+				<Tooltip
+					label={`Worktree · ${ws.cwd} · checkout vinculado del repo principal`}
+					side="top"
+				>
+				<span className="ws-worktree">
+					<GitFork size={13} /> wt: {ws.worktreeName}
+				</span>
 				</Tooltip>
 			)}
 		</div>

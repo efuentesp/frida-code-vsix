@@ -31,7 +31,6 @@ import {
 	CircleAlert,
 	CircleCheck,
 	CircleStop,
-	GitBranch,
 	History,
 	Info,
 	ListChevronsDownUp,
@@ -352,13 +351,6 @@ export function App() {
 					</span>{" "}
 					Frida Code
 				</span>
-				{state.workspace?.isWorktree && state.workspace?.branch && (
-					<Tooltip label={`Worktree · ${state.workspace.cwd}`} side="bottom">
-						<span className="worktree-badge">
-							<GitBranch size={12} /> {state.workspace.branch}
-						</span>
-					</Tooltip>
-				)}
 				{state.lensStatus?.loaded && (
 					<Tooltip
 						label={
