@@ -94,7 +94,7 @@ Cualquier llamada `agent()` (patrón curado o script propio) puede pedir salida 
 
 #### Ruteo por tier: `agent({ tier })` (#19 G2)
 
-`tier: "small" | "medium" | "big"` resuelve el modelo vía `modelAliases` de settings (`~/.frida/extensible-workflows/settings.json` o `.pi/extensible-workflows/settings.json` del proyecto):
+`tier: "small" | "medium" | "big"` resuelve el modelo vía `modelAliases` de settings (`~/.frida/pi-extensible-workflows/settings.json` o `.pi/pi-extensible-workflows/settings.json` del proyecto):
 
 ```json
 { "modelAliases": { "small": "zai/glm-4.6-flash", "medium": "zai/glm-4.6", "big": "zai/glm-5.3" } }
