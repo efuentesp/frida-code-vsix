@@ -119,8 +119,9 @@ export function ApprovalPanel({
 			{/* ── Paths ── */}
 			<div className="cfg-section">Paths (wildcards)</div>
 			<div className="perm-note">
-				Cross-cutting: aplica a cualquier tool que toque el archivo. El patrón
-				más específico gana (`*.env.example` tras `*.env`). Ej. `*.env`, `~/.ssh/*`.
+				Cross-cutting: aplica a cualquier tool que toque el archivo. Si varios
+				patrones matchean, gana el MÁS RESTRICTIVO (`*.env: allow` + `*.env.example:
+				deny` → deny). Ej. `*.env`, `~/.ssh/*`.
 			</div>
 			<PatternChips
 				map={cfg.path}
