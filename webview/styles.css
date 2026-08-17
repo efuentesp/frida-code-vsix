@@ -5757,3 +5757,49 @@ kbd {
 .perm-check input {
 	accent-color: var(--vscode-button-background);
 }
+
+/* ── Tab Index: indicador de acción en curso (instalación/indexación) ── */
+/* Spinner (lucide Loader2 con la clase .spin; paridad thinking). */
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.spin {
+	animation: spin 1s linear infinite;
+}
+/* Barra indeterminada: npm no imprime progreso intermedio (descarga de ~256 MB
+   silenciosa minutos) — la barra SIEMPRE animada + reloj son la señal de vida. */
+.ci-busy {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 8px 0 4px;
+}
+.ci-busy-bar {
+	position: relative;
+	height: 3px;
+	border-radius: 2px;
+	overflow: hidden;
+	background: var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+}
+.ci-busy-bar span {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 30%;
+	border-radius: 2px;
+	background: var(--vscode-button-background);
+	animation: ci-busy-slide 1.4s ease-in-out infinite;
+}
+@keyframes ci-busy-slide {
+	0% {
+		left: -30%;
+	}
+	60% {
+		left: 100%;
+	}
+	100% {
+		left: 100%;
+	}
+}
