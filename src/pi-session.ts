@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { listProjectExtensionFiles } from "./extension-paths";
 import {
 	createAgentSession,
@@ -434,8 +435,11 @@ export async function createFridaSession(
 	);
 	if (fs.existsSync(fridaLensEntry)) {
 		try {
-			const fridaLensEntryPath = fridaLensEntry;
-			const mod = await import(fridaLensEntryPath);
+			// #57: import() dinámico EXIGE URL en ESM — un path crudo de Windows
+			// ("C:\\Users\\…") lanza ERR_UNSUPPORTED_ESM_URL_SCHEME y el catch lo
+			// tragaría. pathToFileURL normaliza ambas plataformas (patrón de
+			// frida-codebase-index/shim.ts).
+			const mod = await import(pathToFileURL(fridaLensEntry).href);
 			fridaLensFactory = (mod as any).default ?? (mod as any);
 		} catch (e: any) {
 			console.warn("[frida-lens] No se pudo cargar:", e?.message ?? e);
