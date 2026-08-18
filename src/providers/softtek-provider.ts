@@ -192,6 +192,130 @@ export interface SofttekProviderDeps {
 	 *  disponible cuando el gateway responde 500 (after_provider_response no se
 	 *  dispara para 500, así que se dumpea ANTES de enviar). Ver ADR-0009. */
 	requestDumpPath?: string;
+	/** H-2/H-3 (HALLAZGOS-GATEWAY): path donde escribir el diagnóstico del
+	 *  último 500 opaco decodificado vía re-probe con stream:false. */
+	diagnosticDumpPath?: string;
+	/** Resultado del diagnóstico de un 5xx opaco (mensaje accionable para el
+	 *  usuario). El host lo muestra en el panel de errores. */
+	onGatewayDiagnosis?: (diagnosis: GatewayDiagnosis) => void;
+	/** Inyectable para pruebas (default: fetch global). */
+	fetchImpl?: typeof fetch;
+}
+
+// ─── H-2/H-3: diagnóstico de errores opacos del gateway ─────────────────────
+
+/** H-2: el gateway rechaza tools declaradas no registradas en el proyecto
+ *  (registro vacío) cuando su clasificador vincula la intención del texto
+ *  del usuario con la tool. Ejemplo real (2026-08-17):
+ *  "No existe una tool activa con nombre 'steer_subagent' para el proyecto 22" */
+export const DEVENGINE_INACTIVE_TOOL_RE =
+	/No existe una tool activa con nombre '([^']+)' para el proyecto \d+/i;
+
+export type GatewayErrorKind =
+	| "inactive-tool-validation"
+	| "invalid-request"
+	| "server-error"
+	| "unknown";
+
+export interface GatewayDiagnosis {
+	/** Status del stream original (p. ej. 500, el opaco). */
+	requestStatus: number;
+	/** Status del re-probe con stream:false (el REAL; null si el probe falló). */
+	probeStatus: number | null;
+	/** Body crudo del re-probe (evidencia). */
+	probeBodyText: string | null;
+	kind: GatewayErrorKind;
+	toolName?: string;
+	/** Mensaje listo para mostrar al usuario. */
+	actionableMessage: string;
+	probedAt: string;
+}
+
+/** Clasifica el body de un error del gateway DevEngine. Pura. */
+export function classifyGatewayError(
+	status: number,
+	bodyText: string | null | undefined,
+): Omit<
+	GatewayDiagnosis,
+	"requestStatus" | "probeStatus" | "probeBodyText" | "probedAt"
+> {
+	const text = String(bodyText ?? "");
+	const m = DEVENGINE_INACTIVE_TOOL_RE.exec(text);
+	if (status === 400 && m) {
+		const toolName = m[1];
+		return {
+			kind: "inactive-tool-validation",
+			toolName,
+			actionableMessage:
+				`DevEngine rechazó el mensaje: el gateway vinculó la intención con la tool '${toolName}', ` +
+				`que no está registrada como "activa" en el proyecto (validación H-2 del gateway, no de la extensión). ` +
+				`Reintenta con otra redacción o reporta a DevEngine con el dump adjunto.`,
+		};
+	}
+	if (status >= 500)
+		return {
+			kind: "server-error",
+			actionableMessage: `DevEngine respondió ${status} (error del servidor; reintentar más tarde).`,
+		};
+	if (status >= 400)
+		return {
+			kind: "invalid-request",
+			actionableMessage: `DevEngine rechazó la petición (${status}): ${text.slice(0, 200) || "sin body"}`,
+		};
+	return {
+		kind: "unknown",
+		actionableMessage: `Respuesta inesperada del gateway (${status}).`,
+	};
+}
+
+/** H-3: en streaming, un 400 del gateway llega como 500 SIN body. Este probe
+ *  reenvía el MISMO payload con stream:false para capturar el error real y
+ *  clasificarlo. NUNCA lanza. Un solo intento — el rechazo es determinista. */
+export async function diagnoseOpaque500(
+	payload: unknown,
+	opts: {
+		key: string;
+		baseUrl?: string;
+		fetchImpl?: typeof fetch;
+		requestStatus?: number;
+	},
+): Promise<GatewayDiagnosis> {
+	const base = (opts.baseUrl ?? DEVENGINE_BASE_URL).replace(/\/$/, "");
+	const fetchFn = opts.fetchImpl ?? fetch;
+	const probeStatus = opts.requestStatus ?? 500;
+	const probedAt = new Date().toISOString();
+	try {
+		const body =
+			payload && typeof payload === "object"
+				? JSON.stringify({ ...(payload as object), stream: false })
+				: null;
+		if (!body) throw new Error("payload ausente (sin dump del request)");
+		const res = await fetchFn(`${base}/chat/completions`, {
+			method: "POST",
+			headers: {
+				"X-Api-Key": opts.key,
+				"Content-Type": "application/json",
+			},
+			body,
+		});
+		const bodyText = await res.text().catch(() => null);
+		return {
+			requestStatus: probeStatus,
+			probeStatus: res.status,
+			probeBodyText: bodyText,
+			probedAt,
+			...classifyGatewayError(res.status, bodyText),
+		};
+	} catch (e: any) {
+		return {
+			requestStatus: probeStatus,
+			probeStatus: null,
+			probeBodyText: String(e?.message ?? e),
+			kind: "unknown",
+			actionableMessage: `DevEngine respondió ${probeStatus} y el diagnóstico falló: ${String(e?.message ?? e).slice(0, 120)}`,
+			probedAt,
+		};
+	}
 }
 /**
  * Factory de la extensión de Pi con SOLO los hooks. NO registra el provider
@@ -234,6 +358,50 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 			if (event.status === 401 || event.status === 403) deps.onUnauthorized();
 			if (event.status >= 400)
 				deps.onProviderError?.(lastPayload, event.status);
+		});
+		// H-2/H-3 (HALLAZGOS-GATEWAY): el SDK lanza ANTES de onResponse en 4xx/5xx,
+		// así que el 500 opaco NUNCA llega a after_provider_response. El error
+		// termina en un mensaje assistant con stopReason "error". Al verlo con
+		// status 5xx, disparamos UN re-probe del último payload con stream:false
+		// (el rechazo es determinista) para decodificar el error real y notificar
+		// un mensaje ACCIONABLE (H-2: "tool activa"; H-3: 500 opaco).
+		let diagnosing = false;
+		pi.on("message_end", (event: any) => {
+			try {
+				const msg = event?.message;
+				if (!msg || msg.role !== "assistant" || msg.stopReason !== "error")
+					return;
+				const errText = String(msg.errorMessage ?? msg.error ?? "");
+				const m = /\b(5\d\d)\b/.exec(errText);
+				if (!m || diagnosing || !lastPayload) return;
+				const key = deps.getKey();
+				if (!key) return;
+				diagnosing = true; // un probe a la vez (fire-and-forget)
+				diagnoseOpaque500(lastPayload, {
+						key,
+						fetchImpl: deps.fetchImpl,
+						requestStatus: Number(m[1]),
+					})
+						.then((diagnosis) => {
+							if (deps.diagnosticDumpPath) {
+								try {
+									writeFileSync(
+										deps.diagnosticDumpPath,
+										JSON.stringify(diagnosis, null, 2),
+									);
+								} catch {
+									/* noop */
+								}
+							}
+							deps.onGatewayDiagnosis?.(diagnosis);
+						})
+						.catch(() => {})
+						.finally(() => {
+							diagnosing = false;
+						});
+			} catch {
+				/* Errata-6: getters hostiles — nunca romper el flujo */
+			}
 		});
 	};
 }

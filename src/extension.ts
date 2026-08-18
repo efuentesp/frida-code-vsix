@@ -521,6 +521,11 @@ export async function activate(
 		context.globalStorageUri.fsPath,
 		"devengine-last-request.json",
 	);
+	// H-2/H-3: diagnóstico del último 500 opaco decodificado (re-probe stream:false).
+	const diagnosticDumpPath = path.join(
+		context.globalStorageUri.fsPath,
+		"devengine-gateway-diagnosis.json",
+	);
 	// Estado de frida-codebase-index para el tab Index del webview (ADR-0036).
 	// Se alimenta del onCodebaseIndexState de la sesión (factory del wrapper) y
 	// de las acciones del host (install/index/rebuild/status).
@@ -919,6 +924,20 @@ export async function activate(
 		return `(${parts.join(" · ")}). `;
 	}
 
+	// H-2/H-3 (HALLAZGOS-GATEWAY): el 500 opaco del gateway se decodifica con un
+	// re-probe stream:false desde el provider (message_end con stopReason error).
+	// Aquí solo publicamos el mensaje ACCIONABLE al panel; la evidencia completa
+	// queda en diagnosticDumpPath.
+	function onGatewayDiagnosis(diagnosis: {
+		actionableMessage: string;
+		probeStatus: number | null;
+	}): void {
+		post({
+			type: "provider_error",
+			text: `${diagnosis.actionableMessage} Diagnóstico: ${diagnosticDumpPath}`,
+		});
+	}
+
 	// Copia el último dump (devengine-last-request.json) a
 	// devengine-errors/<fecha-hora>__<sesión>.json para conservar los requests que
 	// fallaron, identificables por cuándo y qué sesión. Ver ADR-0009.
@@ -993,6 +1012,8 @@ export async function activate(
 					getContext7Key,
 					onProviderError,
 					requestDumpPath,
+					diagnosticDumpPath,
+					onGatewayDiagnosis,
 					codebaseIndexEnabled: isCodebaseIndexEnabled,
 					hermesMemoryEnabled: isHermesMemoryEnabled,
 					onHermesMemoryState: handleHermesMemoryState,
@@ -4534,6 +4555,8 @@ export async function activate(
 				onGoalNotify: (_level, text) => post({ type: "info", text }),
 				onProviderError,
 				requestDumpPath,
+				diagnosticDumpPath,
+				onGatewayDiagnosis,
 				codebaseIndexEnabled: isCodebaseIndexEnabled,
 				hermesMemoryEnabled: isHermesMemoryEnabled,
 				onHermesMemoryState: handleHermesMemoryState,

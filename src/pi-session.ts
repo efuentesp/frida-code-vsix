@@ -181,6 +181,13 @@ export interface CreateFridaSessionOptions {
 	onProviderError?: (payload: unknown, status: number) => void;
 	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
 	requestDumpPath?: string;
+	/** H-2/H-3 (HALLAZGOS-GATEWAY): path del diagnóstico del último 500 opaco
+	 *  (re-probe stream:false) y callback con el mensaje accionable. */
+	diagnosticDumpPath?: string;
+	onGatewayDiagnosis?: (diagnosis: {
+		actionableMessage: string;
+		probeStatus: number | null;
+	}) => void;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
 	/** Stats footer (Fase 3): el gate cuenta decisiones de la sesión y las publica
 	 *  aquí para el webview (✓N aprobadas / ✗M bloqueadas / ⚡Z auto-allow). */
@@ -521,6 +528,8 @@ export async function createFridaSession(
 					onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
 					onProviderError: opts.onProviderError,
 					requestDumpPath: opts.requestDumpPath,
+					diagnosticDumpPath: opts.diagnosticDumpPath,
+					onGatewayDiagnosis: opts.onGatewayDiagnosis,
 				}),
 			},
 			{
@@ -963,6 +972,8 @@ export async function createFridaSession(
 							onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
 							onProviderError: opts.onProviderError,
 							requestDumpPath: opts.requestDumpPath,
+							diagnosticDumpPath: opts.diagnosticDumpPath,
+							onGatewayDiagnosis: opts.onGatewayDiagnosis,
 						}),
 					},
 					{
