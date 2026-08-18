@@ -103,6 +103,12 @@ const ART = ${JSON.stringify(artMap)}
 
 log("aidd-plan: " + project + " — " + STAGES.join(" → ") + " → spec(fan-out) [review=" + review + "]")
 
+// #70: el directorio de artefactos es infraestructura del WORKFLOW — se
+// garantiza ANTES de lanzar cualquier agente (el redirect de bash no
+// auto-crea directorios padre; la tool write de pi sí, pero depender de eso
+// hace la cadena no determinista según cómo escriba cada agente).
+const prep = await shell("mkdir -p ${planningDir}")
+
 function ctxFor(stage, prompt, previous, artifact) {
 	const art = artifact || (stage === "spec" ? ART["spec"] : ART[stage])
 	return "## OUTPUT CONTRACT — READ FIRST\\n" +
