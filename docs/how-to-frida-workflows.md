@@ -1,4 +1,4 @@
-# How-to: workflows con patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review, aidd-plan)
+# How-to: workflows con patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review, aidd-plan, aidd-ship)
 
 > Frida puede convertir **una petición tuya en una flota de sub-agentes paralelos** que se
 > revisan entre sí y te devuelven una sola respuesta sintetizada. El catálogo de
@@ -117,6 +117,28 @@ aprobar cada checkpoint. Referencia completa y customización 3-capas de los pro
 | `project` | string | `"project"` |
 | `language` | string | el idioma de la idea |
 | `review` | `"manual" \| "auto"` | `"manual"` (checkpoints) |
+
+### `aidd-ship` — sprint autónomo historia por historia (frida-aidd)
+
+La otra mitad de AiDD: ya tienes los specs de `aidd-plan`, ahora el **loop de ejecución
+determinista**. Por cada historia: un dev desechable implementa → el orquestador
+**verifica el diff real contra lo que el dev reclama** (lie-detector) → review
+adversarial acotado → comandos de verify del spec → **commit del orquestador**
+(no del LLM). Sin specs previos hace bootstrap desde los artefactos de aidd-plan.
+
+> *"Corre aidd-ship con review auto: ejecuta el sprint 1"*
+
+Todo el estado vive en `docs/aidd/sprint-status.yaml` (único writer, estados
+never-regress) + `deferred-ledger.json` (impedimentos no bloqueantes que el sweep
+re-empaqueta al final). Con `review: "manual"` (default) cada commit pide tu
+aprobación por checkpoint; un dev que "afirma sin hacer" queda `blocked` con la
+razón. Requiere repo git. Referencia: [docs/tools/frida-aidd.md](tools/frida-aidd.md).
+
+| Arg | Tipo | Default |
+| --- | --- | --- |
+| `sprint` | string | `"1"` (sólo bootstrap) |
+| `review` | `"manual" \| "auto"` | `"manual"` (checkpoint pre-commit) |
+| `maxSweeps` | 0-5 | 2 |
 
 ## Ruteo por tier (barato lo simple, caro lo difícil)
 

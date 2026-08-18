@@ -1,7 +1,7 @@
 # frida-aidd — metodología AiDD (BMAD) como skill pack + patrón de workflow
 
-> **Estado:** Lote 1 implementado — **fase plan** (issue #38, ADR-0050 piezas 1,
-> 2 y 8-parcial). Para el uso diario ver
+> **Estado:** Lotes 1+2 implementados — **fase plan** (`aidd-plan`) y **fase
+> ship** (`aidd-ship`) (issue #38, ADR-0050 piezas 1-8). Para el uso diario ver
 > [how-to-frida-workflows.md](../how-to-frida-workflows.md) (patrón
 > `aidd-plan`).
 
@@ -98,30 +98,75 @@ medias sin saberlo.
 { "stages": { "prd": "# PRD — variante del equipo\n..." } }
 ```
 
-## Fase 2 (Lote 2 pendiente)
+## Lote 2 — fase ship (aidd-ship)
 
-Las piezas 3-7 del ADR: `aidd-ship` (loop determinista por historia: dev →
-verify → review acotado → commit orquestador), `sprint-status.yaml` con writer
-único never-regress, **lie-detector** (diff real vs. claims contra commit
-baseline), **frozen-spec** (bloqueo del spec aprobado vía permission system),
-**deferred-work** y **sweep**. TEA (#41) y CIS (#40) se montan como fases
-inyectadas sobre este mismo meta-workflow (patrón del plugin `tea` de
-bmad-loop, verificado en la investigación).
+`workflow({ name: "aidd-ship", args: { review: "auto" } })` corre el **loop
+determinista por historia** (el corazón de AiDD — el motor de bmad-loop
+adaptado al sandbox de workflows):
+
+```text
+bootstrap → por cada historia pending:
+  dev desechable (escribe código, reclama filesTouched)
+  → lie-detector: diff REAL vs claims (commit baseline)
+  → frozen-spec: hash del spec no puede moverse
+  → review acotado (1 fix round) → verify determinista (comandos del spec)
+  → commit del ORQUESTADOR → sprint-status: done
+→ sweep del deferred ledger (empaqueta lo resolvible → mini-stories)
+```
+
+| Pieza ADR | Implementación |
+| --- | --- |
+| **5. sprint-status** | `docs/aidd/sprint-status.yaml` con **único writer** (el script orquestador) y transiciones **never-regress** (`done` terminal; `blocked`/`deferred` sólo re-entran como `pending` explícito). Los agentes LLM jamás lo escriben (el prompt del dev lo prohíbe) |
+| **7. lie-detector** | Registra `git rev-parse HEAD` al iniciar la historia; tras el dev, contrasta `filesTouched` reclamados contra `git diff --name-only` + untracked — un claim sin diff dispara rework y, si persiste, `blocked` |
+| **6. frozen-spec** | El hash (`git hash-object`) del spec se captura al iniciar y se re-verifica antes del commit: si el dev lo editó, la historia se bloquea (detección determinista; el bloqueo preventivo vía permission-system queda como hardening futuro) |
+| **3. deferred-work** | El dev reporta impedimentos no bloqueantes (`deferred[]` en su salida estructurada) → el orquestador los apunta en `docs/aidd/deferred-ledger.json` y la historia continúa |
+| **4. sweep** | Al cerrar el sprint, un agente de triage lee el ledger y empaqueta lo resolvible en mini-stories (`SW1-1…`) con spec propio; el loop las ejecuta igual (máx. `maxSweeps`, default 2) y cierra las entradas resueltas |
+| **8. commit del orquestador** | El commit lo hace el **script** (`git add -A && git commit -m "feat(aidd): E1-S1 — …"`), nunca el LLM; con `review: "manual"` (default) hay un checkpoint antes de cada commit |
+
+| Arg | Tipo | Default |
+| --- | --- | --- |
+| `sprint` | string | `"1"` (sólo en bootstrap) |
+| `review` | `"manual" \| "auto"` | `"manual"` (checkpoint pre-commit) |
+| `maxSweeps` | 0-5 | 2 |
+
+**Sin `sprint-status.yaml`**, hace bootstrap: un extractor lee los artefactos
+de `aidd-plan` (epics-and-stories + specs) y siembra el estado inicial. Con
+`review: "manual"`, cada commit pide aprobación vía checkpoint; `held`
+(checkpoint rechazado) deja la historia `blocked` con razón explícita para que
+el usuario decida. Reintentar una historia bloqueada: corrige y re-ejecuta
+(`blocked → pending` es la única re-entrada). TEA (#41) y CIS (#40) se montan
+como fases inyectadas sobre este mismo meta-workflow (patrón del plugin `tea`
+de bmad-loop, verificado en la investigación).
+
+**Requisito**: repositorio git (baseline/diff/commit). Los archivos de estado
+(`sprint-status.yaml`, `deferred-ledger.json`, `verify-commands.json`) viajan
+commiteados — el estado del sprint es auditable en la historia del repo.
 
 ## Pruebas
 
-`test/frida-aidd/` — 18 tests:
+`test/frida-aidd/` — 35 tests:
 
 - `resolver.test.ts` (5): precedencia 3-capas, ignorar stages desconocidos,
   JSON inválido aborta.
 - `pattern.test.ts` (9): validación de args, script generado (cadena, 3
   checkpoints, fan-out, prompts interpolados), registro runtime sobre el motor
   (find/catálogo/idempotencia/pisado de estático).
-- `e2e.test.ts` (3): workflow completo sobre el motor real con spawner mock —
-  cadena + checkpoints aprobados, checkpoint rechazado detiene, `review=auto`
-  sin checkpoints. Anclas únicas por encabezado de skill (el prompt de
-  architecture menciona "PRD" — mismas colisiones de matching que los bridges
-  del lote2 de #19).
+- `e2e.test.ts` (3): workflow plan completo sobre el motor real con spawner
+  mock — cadena + checkpoints aprobados, checkpoint rechazado detiene,
+  `review=auto` sin checkpoints. Anclas únicas por encabezado de skill (el
+  prompt de architecture menciona "PRD" — mismas colisiones de matching que
+  los bridges del lote2 de #19).
+- `sprint-status.test.ts` (9): la lib corre en un **vm real** (mismo régimen
+  que el sandbox) — parse/round-trip, rechazos (status ilegal, sin title/spec,
+  indentación, vacío, `#` inicial, saltos), tabla never-regress EXACTA (36
+  pares), applyTransition inmutable + resets, compila sin codeGeneration.
+- `ship.test.ts` (8): validación args + registro por factory (ambos patrones)
+  - **e2e con git real** en tmpdir — happy path (dev escribe archivo real →
+  lie-detector ok → review → verify → checkpoint → commit real del
+  orquestador en `git log`), dev mentiroso reclama archivo sin diff →
+  `blocked` con razón lie-detector y **sin commit** (HEAD no se movió),
+  bootstrap idempotente (segunda corrida sin historias no llama agentes) y
+  parse-guard del script generado en el parser del motor.
 
 ## Atribución
 

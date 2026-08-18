@@ -21,6 +21,10 @@ import {
 	DEFAULT_ARTIFACT_LANGUAGE,
 } from "./skills";
 import { generateAiddPlanWorkflow, type AiddPlanArgs } from "./workflow";
+import {
+	generateAiddShipWorkflow,
+	validateAiddShipArgs,
+} from "./ship";
 
 /** Valida los args del patrón aidd-plan (eager, antes de lanzar). */
 export function validateAiddPlanArgs(args: unknown): AiddPlanArgs {
@@ -76,6 +80,22 @@ export const AIDD_PLAN_PATTERN: BuiltinPattern = {
 	},
 };
 
+/**
+ * Patrón aidd-ship: loop determinista por historia (Lote 2, piezas 3-7). El
+ * cwd no se necesita en resolve() — el script opera con rutas relativas al
+ * cwd de la sesión (shell() corre en el cwd del workflow).
+ */
+export const AIDD_SHIP_PATTERN: BuiltinPattern = {
+	name: "aidd-ship",
+	description:
+		"AiDD shipping phase (BMAD adapted): deterministic per-story loop — disposable dev agent, lie-detector (diff vs baseline commit), bounded review, deterministic verify commands, orchestrator commit. sprint-status.yaml is the single source of truth (never-regress). Deferred-work ledger + sweep at the end.",
+	args: '{ sprint?: string, review?: "manual"|"auto", maxSweeps?: number (0-5, default 2) } — sin sprint-status.yaml hace bootstrap desde los artefactos de aidd-plan',
+	resolve(args: unknown) {
+		validateAiddShipArgs(args);
+		return generateAiddShipWorkflow();
+	},
+};
+
 /** Factory de la extensión frida-aidd. */
 export function createFridaAidd() {
 	return (_pi: ExtensionAPI): void => {
@@ -83,5 +103,6 @@ export function createFridaAidd() {
 		// consume REGISTERED_PATTERNS vía findBuiltinPattern/builtinPatternsCatalog.
 		// Idempotente por nombre; el cwd se resuelve lazy en resolve().
 		registerBuiltinPattern(AIDD_PLAN_PATTERN);
+		registerBuiltinPattern(AIDD_SHIP_PATTERN);
 	};
 }
