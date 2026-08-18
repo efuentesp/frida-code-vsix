@@ -80,6 +80,7 @@ import { createFridaSubagents } from "./tools/frida-subagents";
 import { createFridaExtensibleWorkflows } from "./tools/frida-extensible-workflows";
 import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
+import { createFridaAidd } from "./tools/frida-aidd";
 import { createFridaGoal } from "./tools/frida-goal";
 import type { GoalStateSnapshot } from "./tools/frida-goal/state";
 import { createFridaWorktree } from "./worktree";
@@ -512,6 +513,10 @@ export async function createFridaSession(
 				factory: createZaiProviderHooks({
 					onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
 				}),
+			},
+			{
+				name: "frida-aidd",
+				factory: createFridaAidd(),
 			},
 			{
 				name: "frida-permission-system",

@@ -346,8 +346,12 @@ export interface BuiltinPattern {
 	description: string;
 	/** Documentación de args para el catálogo. */
 	args: string;
-	/** Valida args (eager) y devuelve el script del patrón. */
-	resolve(args: unknown): string;
+	/**
+	 * Valida args (eager) y devuelve el script del patrón. El cwd de la sesión
+	 * permite a patrones registrados (#38 frida-aidd) resolver recursos del
+	 * proyecto (overrides del equipo) al momento de generar el script.
+	 */
+	resolve(args: unknown, ctx?: { cwd: string }): string;
 }
 
 /** Patrones curados de #19 (Lotes 1 y 2), en orden de registro. */
@@ -424,7 +428,32 @@ export const BUILTIN_PATTERNS: readonly BuiltinPattern[] = [
 
 /** Busca un patrón por nombre exacto (estable, sin normalización). */
 export function findBuiltinPattern(name: string): BuiltinPattern | undefined {
-	return BUILTIN_PATTERNS.find((p) => p.name === name);
+	return allPatterns().find((p) => p.name === name);
+}
+
+/**
+ * Patrones registrados en runtime por otras extensiones (#38): frida-aidd
+ * (y futuros skill packs) inyectan sus patrones aquí en vez de que el motor
+ * dependa de ellos. La dirección de dependencia queda consumidor → motor.
+ */
+const REGISTERED_PATTERNS: BuiltinPattern[] = [];
+
+/** Registra un patrón en runtime (idempotente por nombre; gana el último). */
+export function registerBuiltinPattern(pattern: BuiltinPattern): void {
+	const i = REGISTERED_PATTERNS.findIndex((p) => p.name === pattern.name);
+	if (i >= 0) REGISTERED_PATTERNS.splice(i, 1);
+	REGISTERED_PATTERNS.push(pattern);
+}
+
+/** Sólo tests: vacía los patrones registrados en runtime. */
+export function clearRegisteredBuiltinPatterns(): void {
+	REGISTERED_PATTERNS.length = 0;
+}
+
+function allPatterns(): readonly BuiltinPattern[] {
+	// Los registrados van primero: si un patrón runtime pisa el nombre de uno
+	// estático, gana el de la extensión (find devuelve el primero).
+	return [...REGISTERED_PATTERNS, ...BUILTIN_PATTERNS];
 }
 
 /** Listado de patrones para la salida de workflow_catalog. */
@@ -433,7 +462,7 @@ export function builtinPatternsCatalog(): Array<{
 	description: string;
 	args: string;
 }> {
-	return BUILTIN_PATTERNS.map(({ name, description, args }) => ({
+	return allPatterns().map(({ name, description, args }) => ({
 		name,
 		description,
 		args,

@@ -1,9 +1,10 @@
-# How-to: workflows con patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review)
+# How-to: workflows con patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review, aidd-plan)
 
 > Frida puede convertir **una petición tuya en una flota de sub-agentes paralelos** que se
 > revisan entre sí y te devuelven una sola respuesta sintetizada. El catálogo de
 > **`frida-extensible-workflows`** trae 4 **patrones curados** (porte de
-> `pi-dynamic-workflows`, issue #19): los pides en lenguaje natural, el agente arma
+> `pi-dynamic-workflows`, issue #19) más **`aidd-plan`** registrado en runtime por
+> `frida-aidd` (issue #38): los pides en lenguaje natural, el agente arma
 > `workflow({ name, args })` y el panel del footer muestra el progreso mientras el
 > resultado llega a la conversación.
 >
@@ -95,6 +96,27 @@ con salida estructurada `{file, line, summary, failure_scenario}`. Luego: dedup 
 
 El diff se trunca a 200k caracteres (con aviso en el log) — los hallazgos del prefijo
 siguen teniendo valor.
+
+### `aidd-plan` — de una idea a un plan ejecutable (frida-aidd)
+
+Cuando tienes una idea de producto y quieres **especificaciones buenas antes de
+codificar** (metodología AiDD/BMAD adaptada): el workflow corre la cadena
+brief → prd → architecture → epics-and-stories y luego fan-out de una spec por
+historia — cada stage la escribe un agente desechable **a disco**
+(`docs/aidd/planning/*.md`), con checkpoints para que revises cada artefacto.
+
+> *"Corre aidd-plan: módulo de reportes exportables para el panel"*
+
+Los artefactos quedan en tu repo — auditables, versionados, editables a mano antes de
+aprobar cada checkpoint. Referencia completa y customización 3-capas de los prompts:
+[docs/tools/frida-aidd.md](tools/frida-aidd.md).
+
+| Arg | Tipo | Default |
+| --- | --- | --- |
+| `idea` | string (req) | — |
+| `project` | string | `"project"` |
+| `language` | string | el idioma de la idea |
+| `review` | `"manual" \| "auto"` | `"manual"` (checkpoints) |
 
 ## Ruteo por tier (barato lo simple, caro lo difícil)
 

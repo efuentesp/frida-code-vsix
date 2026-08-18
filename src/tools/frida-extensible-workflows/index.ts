@@ -285,7 +285,7 @@ export function createFridaExtensibleWorkflows() {
 					const builtin = name ? findBuiltinPattern(name) : undefined;
 					const script =
 						!hasExplicit && builtin
-							? builtin.resolve(args)
+							? builtin.resolve(args, { cwd: ctx.cwd })
 							: readLaunchScript(p);
 					const budget = validateBudget((p as { budget?: unknown }).budget);
 
