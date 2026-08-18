@@ -26,6 +26,8 @@ export interface BoxProps {
 	flex?: number;
 	gap?: number;
 	padding?: number;
+	/** Sangría izquierda (#79: agentes anidados del timeline vertical). */
+	paddingLeft?: number;
 	margin?: number;
 	alignItems?: "flex-start" | "center" | "flex-end" | "stretch";
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";

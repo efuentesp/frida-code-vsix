@@ -12,6 +12,7 @@ import {
 	type AgentProgressView,
 	type GroupProgressView,
 	type WorkflowRunState,
+	type WorkflowRunView,
 } from "./store";
 
 /** Fondo del segmento de barra por estado (GitHub-like). */
@@ -156,4 +157,81 @@ export function phaseChips(phases: readonly string[], current: string | undefine
 			? { ...chip, state: "pending" }
 			: chip,
 	);
+}
+
+// ── #79: timeline vertical + label humano ─────────────────────────────────────
+
+/** Agente anidado bajo su fase en el timeline (#79): el AgentProgressView
+ * con label humano y duración ya computados (plano, para consumo directo). */
+export interface TimelineAgentRow extends AgentProgressView {
+	label: string;
+	durationMs: number;
+}
+
+/** Fila del timeline vertical: una por fase vista, en orden (#79). */
+export interface TimelineRow {
+	name: string;
+	state: "done" | "current" | "pending";
+	startedAt?: number;
+	endedAt?: number;
+	durationMs: number;
+	agents: readonly TimelineAgentRow[];
+}
+
+/** Label humano de un agente (#79): label de options > último tramo del
+ * path > role > "agent". Es lo que muestra el panel en vez de "agent #2". */
+export function agentDisplayName(a: AgentProgressView): string {
+	if (a.label && a.label.trim()) return a.label;
+	const last = a.structuralPath[a.structuralPath.length - 1];
+	const base = last ?? a.role ?? "agent";
+	return a.occurrence && a.occurrence > 1 ? `${base} #${a.occurrence}` : base;
+}
+
+/** ¿El agente cuelga de un grupo parallel/pipeline? (su path lo extiende) */
+function hangsFromGroup(
+	a: AgentProgressView,
+	groups: readonly GroupProgressView[],
+): boolean {
+	const ap = pathKey(a.structuralPath);
+	return groups.some(
+		(g) => ap.length > 0 && ap.startsWith(`${pathKey(g.structuralPath)}/`),
+	);
+}
+
+/** Rows del timeline vertical (#79): una por fase vista en orden; la activa
+ * lleva anidados sus agentes libres (los de grupos quedan en su sección). */
+export function timelineRows(
+	run: Pick<
+		WorkflowRunView,
+		"phases" | "phase" | "phaseTimes" | "agents" | "groups"
+	>,
+	now: number,
+): readonly TimelineRow[] {
+	return run.phases.map((name) => {
+		const timing = run.phaseTimes[name];
+		const isCurrent = run.phase === name;
+		const startedAt = timing?.startedAt;
+		const endedAt = timing?.endedAt;
+		const state: TimelineRow["state"] = isCurrent
+			? "current"
+			: startedAt === undefined
+				? "pending"
+				: "done";
+		const agents: readonly TimelineAgentRow[] = run.agents
+			.filter((a) => a.phase === name && !hangsFromGroup(a, run.groups))
+			.sort((x, y) => x.startedAt - y.startedAt)
+			.map((a) => ({
+				...a,
+				label: agentDisplayName(a),
+				durationMs: (a.endedAt ?? now) - a.startedAt,
+			}));
+		return {
+			name,
+			state,
+			startedAt,
+			endedAt,
+			durationMs: startedAt === undefined ? 0 : (endedAt ?? now) - startedAt,
+			agents,
+		};
+	});
 }

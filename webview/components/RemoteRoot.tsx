@@ -136,6 +136,8 @@ function flexStyle(props: Record<string, unknown>): CSSProperties {
 	if (typeof props.flex === "number") s.flex = props.flex;
 	if (typeof props.gap === "number") s.gap = props.gap;
 	if (typeof props.padding === "number") s.padding = props.padding;
+	if (typeof props.paddingLeft === "number")
+		s.paddingLeft = props.paddingLeft;
 	if (typeof props.margin === "number") s.margin = props.margin;
 	if (typeof props.alignItems === "string")
 		s.alignItems = props.alignItems as any;

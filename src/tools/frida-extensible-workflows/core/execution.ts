@@ -152,7 +152,7 @@ const internalAgent = (...values) => {
   const identity = { structuralPath: [...inherited], callSite, occurrence, ...(worktreeOwner ? { worktreeOwner } : {}) };
   const wfRole = typeof options.role === "string" ? options.role : (options.role && typeof options.role === "object" && typeof options.role.role === "string" ? options.role.role : undefined);
   const agentId = "a" + (++agentSeq);
-  send({ type: "progress", kind: "agent_start", agentId: agentId, structuralPath: identity.structuralPath, occurrence: occurrence, ...(wfRole ? { role: wfRole } : {}) });
+  send({ type: "progress", kind: "agent_start", agentId: agentId, structuralPath: identity.structuralPath, occurrence: occurrence, ...(wfRole ? { role: wfRole } : {}), ...(typeof options.label === "string" && options.label.trim() ? { label: options.label } : {}) });
   let result;
   try {
     result = rpc("agent", [values[0], options, identity]).then((v) => { const value = unwrap(v); send({ type: "progress", kind: "agent_end", agentId: agentId, ok: true }); return value; }, (e) => { send({ type: "progress", kind: "agent_end", agentId: agentId, ok: false, ...(errorCode(e) ? { code: errorCode(e) } : {}) }); throw e; });

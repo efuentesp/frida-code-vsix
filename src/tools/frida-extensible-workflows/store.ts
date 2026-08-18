@@ -26,6 +26,10 @@ export interface AgentProgressView {
 	agentId: string;
 	structuralPath: readonly string[];
 	role?: string;
+	/** Label humano de las options del agent() (#79) — p.ej. "stage prd". */
+	label?: string;
+	/** Fase activa del run al momento del agent_start (#79) — anida en el timeline. */
+	phase?: string;
 	occurrence?: number;
 	state: AgentProgressState;
 	startedAt: number;
@@ -48,11 +52,19 @@ export interface WorkflowProgressEvent {
 	agentId?: string;
 	structuralPath?: string[];
 	role?: string;
+	/** Label de las options del agent() (#79). */
+	label?: string;
 	occurrence?: number;
 	ok?: boolean;
 	code?: string;
 	name?: string;
 	taskNames?: string[];
+}
+
+/** Tiempo abierto/cerrado de una fase (#79) — duración del timeline vertical. */
+export interface PhaseTiming {
+	startedAt: number;
+	endedAt?: number;
 }
 
 export interface WorkflowRunView {
@@ -64,6 +76,8 @@ export interface WorkflowRunView {
 	phase?: string;
 	/** Historial de fases vistas por el run (#71) — chips ✓/● del panel v2. */
 	phases: readonly string[];
+	/** startedAt/endedAt por fase (#79) — duración en el timeline vertical. */
+	phaseTimes: Readonly<Record<string, PhaseTiming>>;
 	/** Checkpoint pendiente de aprobación cuando state === "awaiting" (#64). */
 	checkpointName?: string;
 	/** Agentes en vivo (issue #7). */
@@ -182,6 +196,8 @@ export function upsertWorkflowRun(
 			// #71: el historial de fases sólo lo muta applyWorkflowProgress;
 			// un upsert de transición (running → awaiting) lo conserva.
 			phases: prev.phases,
+			// #79: ídem para los tiempos por fase.
+			phaseTimes: prev.phaseTimes,
 		};
 		const next = current.slice();
 		next[idx] = merged;
@@ -201,6 +217,7 @@ export function upsertWorkflowRun(
 				agents: view.agents ?? [],
 				groups: view.groups ?? [],
 				phases: [],
+				phaseTimes: {},
 			},
 		];
 	}
@@ -232,21 +249,41 @@ export function applyWorkflowProgress(opts: {
 		agentId,
 		structuralPath,
 		role,
+		label,
 		occurrence,
 		ok,
 		code,
 		taskNames,
 	} = progress;
+	const now = Date.now();
 	let phase = run.phase;
 	let agents = run.agents;
 	let groups = run.groups;
 	let phases = run.phases;
+	let phaseTimes = run.phaseTimes;
 
 	if (kind === "phase") {
 		if (name) {
 			phase = name;
 			// #71: acumula el historial (sin duplicados consecutivos).
 			if (phases[phases.length - 1] !== name) phases = [...phases, name];
+			// #79: cierra la fase previa (si es distinta) y abre la nueva.
+			// Reaparición (resume) reabre conservando el startedAt original.
+			if (run.phase && run.phase !== name) {
+				phaseTimes = {
+					...phaseTimes,
+					[run.phase]: {
+						...(phaseTimes[run.phase] ?? { startedAt: now }),
+						endedAt: now,
+					},
+				};
+			}
+			if (!phaseTimes[name]) {
+				phaseTimes = { ...phaseTimes, [name]: { startedAt: now } };
+			} else if (phaseTimes[name].endedAt !== undefined) {
+				const { startedAt: reopened } = phaseTimes[name];
+				phaseTimes = { ...phaseTimes, [name]: { startedAt: reopened } };
+			}
 		}
 	} else if (kind === "agent_start") {
 		if (agentId) {
@@ -254,21 +291,23 @@ export function applyWorkflowProgress(opts: {
 				agentId,
 				structuralPath: structuralPath ?? [],
 				...(role ? { role } : {}),
+				...(label ? { label } : {}),
+				// #79: fase activa al nacer — anida en el timeline vertical.
+				...(phase ? { phase } : {}),
 				...(occurrence === undefined ? {} : { occurrence }),
 				state: "running",
-				startedAt: Date.now(),
+				startedAt: now,
 			};
 			agents = [...run.agents.filter((a) => a.agentId !== agentId), started];
 		}
 	} else if (kind === "agent_end") {
 		if (agentId) {
-			const endedAt = Date.now();
 			agents = run.agents.map((a) =>
 				a.agentId === agentId
 					? {
 							...a,
 							state: ok ? "completed" : "failed",
-							endedAt,
+							endedAt: now,
 							...(code && !ok ? { code } : {}),
 						}
 					: a,
@@ -299,11 +338,12 @@ export function applyWorkflowProgress(opts: {
 		phase === run.phase &&
 		agents === run.agents &&
 		groups === run.groups &&
-		phases === run.phases
+		phases === run.phases &&
+		phaseTimes === run.phaseTimes
 	)
 		return;
 	const next = current.slice();
-	next[idx] = { ...run, phase, agents, groups, phases };
+	next[idx] = { ...run, phase, agents, groups, phases, phaseTimes };
 	current = next;
 	emit();
 }

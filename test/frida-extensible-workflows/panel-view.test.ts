@@ -12,6 +12,8 @@ import {
 	groupBar,
 	phaseChips,
 	AGENT_ICON,
+	timelineRows,
+	agentDisplayName,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -164,5 +166,179 @@ describe("frida-extensible-workflows · fases acumuladas por run (#71)", () => {
 		// upsert de transición (running → awaiting) NO borra el historial.
 		upsertWorkflowRun({ runId: "r1", workflowName: "wf", state: "awaiting" });
 		expect(getWorkflowRuns()[0].phases).toEqual(["brief"]);
+	});
+});
+
+describe("frida-extensible-workflows · timeline vertical + label real (#79)", () => {
+	const ev = applyWorkflowProgress;
+
+	function seedRun(runId: string): void {
+		upsertWorkflowRun({
+			runId,
+			workflowName: "aidd-ship-demo",
+			state: "running",
+			phases: [],
+			agents: [],
+			groups: [],
+		} as Parameters<typeof upsertWorkflowRun>[0]);
+	}
+
+	beforeEach(() => _resetWorkflowRuns());
+
+	it("phaseTimes: phase abre fase nueva y cierra la previa; reaparición reabre", () => {
+		seedRun("r79a");
+		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "bootstrap" } });
+		let run = getWorkflowRuns().find((r) => r.runId === "r79a");
+		expect(run?.phaseTimes.bootstrap?.startedAt).toBeTypeOf("number");
+		expect(run?.phaseTimes.bootstrap?.endedAt).toBeUndefined();
+
+		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "ship" } });
+		run = getWorkflowRuns().find((r) => r.runId === "r79a");
+		expect(run?.phaseTimes.bootstrap?.endedAt).toBeTypeOf("number");
+		expect(run?.phaseTimes.ship?.startedAt).toBeTypeOf("number");
+
+		// Reaparición (resume / fase que vuelve): reabre, no duplica startedAt base.
+		const before = run?.phaseTimes.ship?.startedAt;
+		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "bootstrap" } });
+		run = getWorkflowRuns().find((r) => r.runId === "r79a");
+		expect(run?.phaseTimes.ship?.endedAt).toBeTypeOf("number");
+		expect(run?.phaseTimes.bootstrap?.endedAt).toBeUndefined();
+		expect(run?.phaseTimes.bootstrap?.startedAt).toBeTypeOf("number");
+		expect(run?.phaseTimes.ship?.startedAt).toBe(before);
+	});
+
+	it("agent_start con label guarda label humano y la fase activa", () => {
+		seedRun("r79b");
+		ev({ runId: "r79b", progress: { type: "progress", kind: "phase", name: "story E3-S2" } });
+		ev({
+			runId: "r79b",
+			progress: {
+				type: "progress",
+				kind: "agent_start",
+				agentId: "a1",
+				structuralPath: ["root"],
+				label: "implement E3-S2",
+			},
+		});
+		const a = getWorkflowRuns().find((r) => r.runId === "r79b")?.agents[0];
+		expect(a?.label).toBe("implement E3-S2");
+		expect(a?.phase).toBe("story E3-S2");
+	});
+
+	it("timelineRows: fases en orden con duración; activa lleva sus agentes anidados", () => {
+		const rows = timelineRows(
+			{
+				phase: "story E2-S1",
+				phases: ["bootstrap", "ship", "story E1-S1", "story E2-S1"],
+				phaseTimes: {
+					bootstrap: { startedAt: 0, endedAt: 12_000 },
+					ship: { startedAt: 12_000, endedAt: 58_000 },
+					"story E1-S1": { startedAt: 58_000, endedAt: 474_000 },
+					"story E2-S1": { startedAt: 474_000 },
+				},
+				agents: [
+					{
+						agentId: "a1",
+						structuralPath: ["root"],
+						label: "implement E2-S1",
+						phase: "story E2-S1",
+						state: "running",
+						startedAt: 480_000,
+					},
+					{
+						agentId: "a0",
+						structuralPath: ["root"],
+						label: "brief",
+						phase: "bootstrap",
+						state: "completed",
+						startedAt: 1_000,
+						endedAt: 10_000,
+					},
+				],
+				groups: [],
+			},
+			600_000,
+		);
+		expect(rows.map((r) => r.name)).toEqual([
+			"bootstrap",
+			"ship",
+			"story E1-S1",
+			"story E2-S1",
+		]);
+		expect(rows[0]).toMatchObject({ state: "done", durationMs: 12_000 });
+		expect(rows[2]).toMatchObject({ state: "done", durationMs: 416_000 });
+		expect(rows[3]).toMatchObject({ state: "current", durationMs: 126_000 });
+		// Agentes anidados bajo SU fase, en orden de inicio.
+		expect(rows[3].agents.map((a) => a.agentId)).toEqual(["a1"]);
+		expect(rows[0].agents.map((a) => a.agentId)).toEqual(["a0"]);
+		// Fase sin agentes conocidos: lista vacía, no undefined.
+		expect(rows[1].agents).toEqual([]);
+	});
+
+	it("timelineRows excluye agentes de grupos y agentDisplayName prefiere label", () => {
+		const rows = timelineRows(
+			{
+				phase: "specs",
+				phases: ["specs"],
+				phaseTimes: { specs: { startedAt: 0 } },
+				agents: [
+					{
+						agentId: "g1",
+						structuralPath: ["root", "specs", "E1"],
+						phase: "specs",
+						state: "running",
+						startedAt: 5,
+					},
+					{
+						agentId: "f1",
+						structuralPath: ["root"],
+						label: "sweep",
+						phase: "specs",
+						state: "running",
+						startedAt: 9,
+					},
+				],
+				groups: [
+					{
+						structuralPath: ["root", "specs"],
+						name: "specs",
+						taskNames: ["E1"],
+						state: "running",
+					},
+				],
+			},
+			10,
+		);
+		// g1 pertenece al grupo (path lo extiende) → queda para la sección de grupos.
+		expect(rows[0].agents.map((a) => a.agentId)).toEqual(["f1"]);
+
+		expect(agentDisplayName({ ...rows[0].agents[0] })).toBe("sweep");
+		expect(
+			agentDisplayName({
+				agentId: "x",
+				structuralPath: ["root", "specs", "E1-S1"],
+				state: "running",
+				startedAt: 0,
+			}),
+		).toBe("E1-S1");
+		expect(
+			agentDisplayName({
+				agentId: "x",
+				structuralPath: ["root"],
+				role: "worker",
+				state: "running",
+				startedAt: 0,
+			}),
+			// Prioridad documentada: label > path > role (#71 conservado).
+			).toBe("root");
+		expect(
+			agentDisplayName({
+				agentId: "x",
+				structuralPath: [],
+				role: "worker",
+				state: "running",
+				startedAt: 0,
+			}),
+		).toBe("worker");
 	});
 });
