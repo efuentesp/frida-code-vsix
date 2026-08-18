@@ -27,9 +27,15 @@ import {
 	type AgentProgressView,
 	type GroupProgressView,
 	type OrphanRunView,
-	type WorkflowRunState,
 	type WorkflowRunView,
 } from "./store";
+import {
+	groupBar,
+	phaseChips,
+	runPill,
+	AGENT_ICON,
+	SEGMENT_BG,
+} from "./panel-view";
 
 /** Factory del elemento raíz (para webBridge.mountPersistent). */
 export function createExtensibleWorkflowPanelElement(): ReactElement {
@@ -121,17 +127,28 @@ function OrphansSection(props: {
 	};
 	return (
 		<fbox flexDirection="column" gap={4} padding={6}>
-			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext bold>🧹 Huérfanos de sesiones previas ({orphans.length})</ftext>
+			<fbox flexDirection="row" gap={4}>
+				<ficon name="trash-2" size={12} color="#8b949e" />
+				<ftext bold>Huérfanos de sesiones previas ({orphans.length})</ftext>
 				{stuckCount > 0 ? (
-					<ftext color="#d29922">{stuckCount} atorado(s) ⚠</ftext>
+					<fbox flexDirection="row" gap={3} alignItems="center">
+						<ficon name="triangle-alert" size={11} color="#d29922" />
+						<ftext color="#d29922" size={11}>
+							{stuckCount} atorado(s)
+						</ftext>
+					</fbox>
 				) : null}
 			</fbox>
 			{orphans.map((o) => (
 				<fbox key={o.runId} flexDirection="column" gap={2}>
 					<fbox flexDirection="row" gap={6} alignItems="center">
-						<ftext color={o.kind === "stuck" ? "#d29922" : "#888"}>
-							{o.kind === "stuck" ? "⚠" : "·"} {o.runId.slice(0, 8)} · {o.workflowName} · {o.state} · {Math.floor(o.ageDays)}d
+						<ficon
+							name={o.kind === "stuck" ? "triangle-alert" : "circle"}
+							size={11}
+							color={o.kind === "stuck" ? "#d29922" : "#8b949e"}
+						/>
+						<ftext color={o.kind === "stuck" ? "#d29922" : "#8b949e"} size={11}>
+							{o.runId.slice(0, 8)} · {o.workflowName} · {o.state} · {Math.floor(o.ageDays)}d
 						</ftext>
 						<fbutton
 							variant="secondary"
@@ -145,10 +162,15 @@ function OrphansSection(props: {
 								);
 							}}
 						>
-							{journal?.runId === o.runId ? "Ocultar" : "Ver journal"}
+							<fbox flexDirection="row" gap={4} alignItems="center">
+								<ficon name="file-text" size={11} />
+								<ftext size={11}>
+									{journal?.runId === o.runId ? "Ocultar" : "Journal"}
+								</ftext>
+							</fbox>
 						</fbutton>
 						<fbutton variant="secondary" onClick={() => purgeOne(o)}>
-							🗑
+							<ficon name="trash-2" size={11} />
 						</fbutton>
 					</fbox>
 					{journal?.runId === o.runId ? (
@@ -159,44 +181,13 @@ function OrphansSection(props: {
 				</fbox>
 			))}
 			<fbutton variant="secondary" onClick={purgeAll}>
-				Purgar los {orphans.length} huérfanos
+				<fbox flexDirection="row" gap={4} alignItems="center">
+					<ficon name="trash-2" size={11} />
+					<ftext size={11}>Purgar los {orphans.length} huérfanos</ftext>
+				</fbox>
 			</fbutton>
 		</fbox>
 	);
-}
-
-/** Glifo de estado de run (port de RUN_STATE_GLYPH de la original). */
-function runIcon(state: WorkflowRunState): string {
-	switch (state) {
-		case "running":
-			return "⟳";
-		case "awaiting":
-			return "⏸";
-		case "completed":
-			return "✓";
-		case "failed":
-			return "✗";
-		case "stopped":
-			return "■";
-		case "budget_exhausted":
-			return "⏸";
-		default:
-			return "•";
-	}
-}
-
-/** Glifo de estado de agente/tarea (port de AGENT_STATE_GLYPH). */
-function agentIcon(state: AgentProgressState | "queued"): string {
-	switch (state) {
-		case "running":
-			return "⟳";
-		case "completed":
-			return "✓";
-		case "failed":
-			return "✗";
-		default:
-			return "○"; // queued: la tarea aún no lanzó agentes
-	}
 }
 
 const STATE_COLOR: Record<AgentProgressState, string | undefined> = {
@@ -245,34 +236,6 @@ function belongsTo(
 	return true;
 }
 
-/** Estado agregado de una tarea (taskName) dentro de un grupo. */
-function taskState(
-	group: GroupProgressView,
-	taskName: string,
-	agents: readonly AgentProgressView[],
-): AgentProgressState | "queued" {
-	const groupPath = pathKey(group.structuralPath);
-	let hasRunning = false;
-	let hasFailed = false;
-	let any = false;
-	for (const a of agents) {
-		// La tarea es el elemento justo después del path del grupo.
-		const taskIdx = group.structuralPath.length;
-		if (
-			pathKey(a.structuralPath.slice(0, taskIdx)) !== groupPath ||
-			a.structuralPath[taskIdx] !== taskName
-		) {
-			continue;
-		}
-		any = true;
-		if (a.state === "running") hasRunning = true;
-		else if (a.state === "failed") hasFailed = true;
-	}
-	if (!any) return "queued";
-	if (hasFailed) return "failed";
-	if (hasRunning) return "running";
-	return "completed";
-}
 
 /** Label legible de un agente (último tramo del path, o role, o "agent"). */
 function agentLabel(a: AgentProgressView): string {
@@ -282,6 +245,8 @@ function agentLabel(a: AgentProgressView): string {
 }
 
 function RunView({ run }: { run: WorkflowRunView }): ReactElement {
+	const pill = runPill(run.state);
+	const chips = phaseChips(run.phases, run.phase);
 	const counts = countAgents(run.agents);
 	const activeGroups = run.groups.filter((g) => g.state === "running");
 	const groupedIds = new Set<string>();
@@ -292,107 +257,236 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 	}
 	const freeAgents = run.agents.filter((a) => !groupedIds.has(a.agentId));
 	const now = Date.now();
+	const hasCounts =
+		counts.completed > 0 || counts.failed > 0 || counts.running > 0;
 
 	return (
-		<fbox flexDirection="column" gap={2}>
-			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext cls="spinner">{runIcon(run.state)}</ftext>
-				<ftext bold>{run.workflowName}</ftext>
-				{run.phase ? (
-					<ftext color="#888" size={11}>
-						[{run.phase}]
+		<fbox bordered flexDirection="column" gap={8} padding={10} cls="wf-card">
+			{/* Header de la card: glifo+nombre+id · pill de estado (#71) */}
+			<fbox
+				flexDirection="row"
+				gap={8}
+				alignItems="center"
+				justifyContent="space-between"
+			>
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ficon
+						name={pill.icon}
+						size={14}
+						color={pill.color}
+						cls={run.state === "running" ? "spinner" : undefined}
+					/>
+					<ftext bold size={13}>
+						{run.workflowName}
 					</ftext>
-				) : null}
-				{(counts.completed > 0 || counts.failed > 0 || counts.running > 0) && (
-					<fbox flexDirection="row" gap={4} alignItems="center">
-						{counts.completed > 0 ? (
-							<ftext size={11} color={STATE_COLOR.completed}>
-								✓{counts.completed}
-							</ftext>
-						) : null}
-						{counts.failed > 0 ? (
-							<ftext size={11} color={STATE_COLOR.failed}>
-								✗{counts.failed}
-							</ftext>
-						) : null}
-						{counts.running > 0 ? (
-							<ftext size={11}>⟳{counts.running}</ftext>
-						) : null}
-					</fbox>
-				)}
-				<ftext color="#888" size={11}>
-					{run.runId.slice(0, 8)}
-				</ftext>
+					<ftext color="#8b949e" size={11}>
+						{run.runId.slice(0, 8)}
+					</ftext>
+				</fbox>
+				<fbox
+					cls="wf-pill"
+					background={`${pill.color}26`}
+					flexDirection="row"
+					gap={4}
+					alignItems="center"
+					padding={3}
+				>
+					<ftext color={pill.color} size={11} bold>
+						{pill.label}
+					</ftext>
+				</fbox>
 			</fbox>
 
+			{/* Fase actual + chips de fases vistas + contadores de agentes */}
+			{run.phase || chips.length > 1 || hasCounts ? (
+				<fbox flexDirection="row" gap={8} alignItems="center">
+					{run.phase ? (
+						<ftext size={11} color="#8b949e">
+							Fase <ftext bold>{run.phase}</ftext>
+						</ftext>
+					) : null}
+					{chips.length > 1 ? (
+						<fbox flexDirection="row" gap={6} alignItems="center">
+							{chips.map((c) => (
+								<fbox
+									key={c.name}
+									flexDirection="row"
+									gap={2}
+									alignItems="center"
+								>
+									<ficon
+										name={
+											c.state === "current"
+												? "circle-dot"
+												: c.state === "done"
+													? "circle-check"
+													: "circle"
+											}
+										size={11}
+										color={
+											c.state === "current"
+												? "#58a6ff"
+												: c.state === "done"
+													? "#3fb950"
+													: "#8b949e"
+											}
+									/>
+									<ftext
+										size={11}
+										color={
+											c.state === "current"
+												? "#58a6ff"
+												: c.state === "done"
+													? "#3fb950"
+													: "#8b949e"
+											}
+									>
+										{c.name}
+									</ftext>
+								</fbox>
+							))}
+						</fbox>
+					) : null}
+					{hasCounts ? (
+						<fbox flexDirection="row" gap={4} alignItems="center">
+							{counts.completed > 0 ? (
+								<ftext size={11} color={STATE_COLOR.completed}>
+									✓{counts.completed}
+								</ftext>
+							) : null}
+							{counts.failed > 0 ? (
+								<ftext size={11} color={STATE_COLOR.failed}>
+									✗{counts.failed}
+								</ftext>
+							) : null}
+							{counts.running > 0 ? (
+								<ftext size={11}>⟳{counts.running}</ftext>
+							) : null}
+						</fbox>
+					) : null}
+				</fbox>
+			) : null}
+
+			{/* Error del run (si falló) — antes no se pintaba */}
+			{run.error ? (
+				<ftext size={11} color="#f85149" wrap>
+					{run.error}
+				</ftext>
+			) : null}
+
+			{/* Banner de checkpoint con acciones al pie de SU card (#64/#71) */}
 			{run.state === "awaiting" && run.checkpointName ? (
-				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext color="#d29922">Esperando tu aprobación: {run.checkpointName}</ftext>
+				<fbox
+					cls="wf-checkpoint"
+					background="#d2992221"
+					flexDirection="row"
+					gap={8}
+					alignItems="center"
+					padding={8}
+				>
+					<ftext color="#d29922" size={12}>
+						Esperando tu aprobación: <ftext bold>{run.checkpointName}</ftext>
+					</ftext>
 					<fbutton
 						variant="primary"
 						onClick={() =>
 							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", true)
 						}
 					>
-						✓ Aprobar
+						<fbox flexDirection="row" gap={4} alignItems="center">
+							<ficon name="check" size={11} /> <ftext size={11}>Aprobar</ftext>
+						</fbox>
 					</fbutton>
 					<fbutton
-						variant="secondary"
+						variant="danger"
 						onClick={() =>
 							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", false)
 						}
 					>
-						✗ Rechazar
+						<fbox flexDirection="row" gap={4} alignItems="center">
+							<ficon name="x" size={11} /> <ftext size={11}>Rechazar</ftext>
+						</fbox>
 					</fbutton>
 				</fbox>
 			) : null}
 
+			{/* Grupos: barra segmentada (#71) + detalle por tarea */}
 			{activeGroups.map((g) => {
-				const states = g.taskNames.map((t) => taskState(g, t, run.agents));
-				const done = states.filter((s) => s === "completed").length;
+				const bar = groupBar(g, run.agents);
 				return (
-					<fbox
-						key={pathKey(g.structuralPath)}
-						flexDirection="row"
-						gap={6}
-						alignItems="center"
-						padding={14}
-					>
-						<ftext color="#888" size={11}>
-							▸ {g.name}
-						</ftext>
-						<ftext size={11}>
-							{done}/{g.taskNames.length}
-						</ftext>
-						{g.taskNames.map((t, i) => {
-							const s = states[i];
-							const color =
-								s === "completed"
-									? STATE_COLOR.completed
-									: s === "failed"
-										? STATE_COLOR.failed
-										: undefined;
-							return (
-								<ftext key={t} size={11} color={color}>
-									{agentIcon(s)} {t}
-								</ftext>
-							);
-						})}
+					<fbox key={pathKey(g.structuralPath)} flexDirection="column" gap={3}>
+						<fbox flexDirection="row" gap={4} alignItems="center">
+							<ftext color="#8b949e" size={11}>
+								{g.name}
+							</ftext>
+							<ftext size={11}>
+								{bar.done}/{bar.total}
+								{bar.failed > 0 ? ` · ✗${bar.failed}` : ""}
+								{bar.running > 0 ? ` · ⟳${bar.running}` : ""}
+							</ftext>
+						</fbox>
+						<fbox
+							flexDirection="row"
+							gap={1}
+							cls="wf-bar"
+							height={6}
+							overflow="hidden"
+						>
+							{bar.segments.map((s, i) => (
+								<fbox
+									key={String(i)}
+									flex={1}
+									height={6}
+									background={SEGMENT_BG[s.state]}
+								/>
+							))}
+						</fbox>
+						<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+							{g.taskNames.map((t, i) => {
+								const s = bar.segments[i]?.state;
+								const color =
+									s === "completed"
+										? STATE_COLOR.completed
+										: s === "failed"
+											? STATE_COLOR.failed
+											: s === "running"
+												? "#58a6ff"
+												: "#8b949e";
+								return (
+									<fbox
+										key={t}
+										flexDirection="row"
+										gap={2}
+										alignItems="center"
+									>
+										<ficon
+											name={AGENT_ICON[s ?? "queued"]}
+											size={10}
+											color={color}
+											cls={s === "running" ? "spinner" : undefined}
+										/>
+										<ftext size={11} color={color}>
+											{t}
+										</ftext>
+									</fbox>
+								);
+							})}
+						</fbox>
 					</fbox>
 				);
 			})}
 
-			{freeAgents.map((a) => (
-				<fbox
-					key={a.agentId}
-					flexDirection="row"
-					gap={6}
-					alignItems="center"
-					padding={14}
-				>
-					<ftext color={STATE_COLOR[a.state]}>{agentIcon(a.state)}</ftext>
+			{/* Agentes libres (sin grupo) con duración */}
+				{freeAgents.map((a) => (
+					<fbox key={a.agentId} flexDirection="row" gap={6} alignItems="center">
+					<ficon
+						name={AGENT_ICON[a.state]}
+						size={11}
+						color={STATE_COLOR[a.state]}
+						cls={a.state === "running" ? "spinner" : undefined}
+					/>
 					<ftext size={11}>{agentLabel(a)}</ftext>
-					<ftext color="#888" size={11}>
+					<ftext color="#8b949e" size={11}>
 						{formatDuration((a.endedAt ?? now) - a.startedAt)}
 					</ftext>
 				</fbox>
@@ -400,3 +494,4 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 		</fbox>
 	);
 }
+

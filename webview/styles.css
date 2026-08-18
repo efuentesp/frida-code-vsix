@@ -5827,3 +5827,19 @@ kbd {
 		left: 100%;
 	}
 }
+
+/* ── WorkflowPanel v2 (#71): cards con pills de estado ────────────────── */
+/* El panel corre host-side (Remote React); las clases viajan por cls y se
+   materializan acá. fbox bordered ya aporta borde+radio+fondo de tarjeta. */
+.wf-pill {
+	border-radius: 999px;
+}
+.wf-bar {
+	border-radius: 3px;
+}
+.wf-bar > .fbox {
+	border-radius: 0;
+}
+.wf-checkpoint {
+	border-radius: 6px;
+}

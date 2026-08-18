@@ -62,6 +62,8 @@ export interface WorkflowRunView {
 	error?: string;
 	/** Fase actual (si el workflow llama phase(name)). */
 	phase?: string;
+	/** Historial de fases vistas por el run (#71) — chips ✓/● del panel v2. */
+	phases: readonly string[];
 	/** Checkpoint pendiente de aprobación cuando state === "awaiting" (#64). */
 	checkpointName?: string;
 	/** Agentes en vivo (issue #7). */
@@ -177,6 +179,9 @@ export function upsertWorkflowRun(
 				"checkpointName" in view ? view.checkpointName : prev.checkpointName,
 			agents: view.agents ?? prev.agents,
 			groups: view.groups ?? prev.groups,
+			// #71: el historial de fases sólo lo muta applyWorkflowProgress;
+			// un upsert de transición (running → awaiting) lo conserva.
+			phases: prev.phases,
 		};
 		const next = current.slice();
 		next[idx] = merged;
@@ -195,6 +200,7 @@ export function upsertWorkflowRun(
 					: { checkpointName: view.checkpointName }),
 				agents: view.agents ?? [],
 				groups: view.groups ?? [],
+				phases: [],
 			},
 		];
 	}
@@ -234,9 +240,14 @@ export function applyWorkflowProgress(opts: {
 	let phase = run.phase;
 	let agents = run.agents;
 	let groups = run.groups;
+	let phases = run.phases;
 
 	if (kind === "phase") {
-		if (name) phase = name;
+		if (name) {
+			phase = name;
+			// #71: acumula el historial (sin duplicados consecutivos).
+			if (phases[phases.length - 1] !== name) phases = [...phases, name];
+		}
 	} else if (kind === "agent_start") {
 		if (agentId) {
 			const started: AgentProgressView = {
@@ -284,10 +295,15 @@ export function applyWorkflowProgress(opts: {
 	}
 
 	// Sólo reasignar si algo cambió.
-	if (phase === run.phase && agents === run.agents && groups === run.groups)
+	if (
+		phase === run.phase &&
+		agents === run.agents &&
+		groups === run.groups &&
+		phases === run.phases
+	)
 		return;
 	const next = current.slice();
-	next[idx] = { ...run, phase, agents, groups };
+	next[idx] = { ...run, phase, agents, groups, phases };
 	current = next;
 	emit();
 }

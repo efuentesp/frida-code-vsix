@@ -6,10 +6,18 @@ import {
 	ChevronDown,
 	ChevronRight,
 	Circle,
+	CircleCheck,
+	CircleDot,
+	CirclePause,
 	CircleStop,
+	CircleX,
+	FileText,
+	Hourglass,
 	LoaderCircle,
 	RotateCw,
 	Square,
+	Trash2,
+	TriangleAlert,
 	X,
 } from "lucide-react";
 
@@ -26,6 +34,15 @@ const F_ICONS: Record<string, LucideIcon> = {
 	"chevron-down": ChevronDown,
 	"chevron-right": ChevronRight,
 	"rotate-cw": RotateCw,
+	/* #71 WorkflowPanel v2 (cards con pills — iconos en vez de glifos). */
+	"circle-check": CircleCheck,
+	"circle-dot": CircleDot,
+	"circle-pause": CirclePause,
+	"circle-x": CircleX,
+	"file-text": FileText,
+	hourglass: Hourglass,
+	"trash-2": Trash2,
+	"triangle-alert": TriangleAlert,
 };
 
 // Renderer espejo de Remote React (opción A). Recibe el árbol WebNode serializado
