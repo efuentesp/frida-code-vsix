@@ -28,6 +28,15 @@ import {
 
 /** Valida los args del patrón aidd-plan (eager, antes de lanzar). */
 export function validateAiddPlanArgs(args: unknown): AiddPlanArgs {
+	// #76: las llamadas directas con string JSON (double-encoded) antes
+	// caían en el error genérico de abajo — el mensaje debía apuntar a la
+	// capa real del problema. (La tool workflow ya decodifica antes de llegar
+	// aquí; esto es defensa en profundidad para callers directos.)
+	if (typeof args === "string") {
+		throw new Error(
+			'Patrón "aidd-plan": args llegó como STRING — pásalo como objeto { idea: "…" } (la tool workflow decodifica strings JSON, pero no era un JSON de objeto válido).',
+		);
+	}
 	const record =
 		args && typeof args === "object" && !Array.isArray(args)
 			? (args as Record<string, unknown>)

@@ -45,6 +45,7 @@ import {
 	resolveCheckpointFromUi,
 } from "./frida-delivery";
 import type { JsonValue } from "./core/types";
+import { normalizeWorkflowArgs } from "./args";
 
 // --- API pública de authoring (extensions.html) ---
 export {
@@ -276,7 +277,7 @@ export function createFridaExtensibleWorkflows() {
 					if (!name)
 						throw new Error("workflow: name is required and must be non-empty");
 
-					const args = (p.args ?? null) as JsonValue;
+					const args = normalizeWorkflowArgs(p.args);
 					encoded(args); // valida frontera JSON (≤10 MB)
 					// Patrones curados (#19 Lote 1): name de un patrón builtin sin
 					// script/scriptPath resuelve al script generado (valida args eager).
