@@ -497,3 +497,77 @@ describe("frida-aidd · hardening v2 (#68)", () => {
 		expect(specPrompts).toHaveLength(2);
 	}, 30000);
 });
+
+/**
+ * Spawner del caso #73 (agente silencioso): simula el fallo real del
+ * 2026-08-18 — el gateway DevEngine devolvía 500 y el agente hijo terminaba
+ * SIN texto ni tool calls (abort.log: stopReason=error, hadText=false). El
+ * runner normaliza eso a null; el expediente debe DIAGNOSTICARLO, no
+ * mostrar líneas vacías.
+ */
+const makeSilentPrdSpawn = (seen: string[], cwd: string) =>
+	(async (prompt: string) => {
+		seen.push(prompt);
+		if (prompt.includes("return ONLY a JSON object")) {
+			return { stories: [{ id: "E1-S1", title: "Exportar CSV" }] };
+		}
+		if (prompt.includes("## Story to spec")) {
+			const id = prompt.match(/## Story to spec\n(E\d+-S\d+)/)?.[1] ?? "?";
+			writeArtifact(cwd, `spec-${id}.md`);
+			return `spec ${id} escrita`;
+		}
+		if (prompt.includes("Business Analyst (Mary)")) {
+			writeArtifact(cwd, "product-brief.md");
+			return "brief.md listo";
+		}
+		if (prompt.includes("Product Manager (John)")) {
+			return null; // provider 500: el agente muere sin texto (run 8fb037a7)
+		}
+		if (prompt.includes("Architect (Winston)")) {
+			writeArtifact(cwd, "architecture.md");
+			return "architecture.md listo";
+		}
+		if (prompt.includes("PM + Architect pairing")) {
+			writeArtifact(cwd, "epics-and-stories.md");
+			return "epics-and-stories.md listo";
+		}
+		return `echo: ${prompt.slice(0, 40)}`;
+	}) as unknown as SpawnAgentFn;
+
+describe("frida-aidd · expediente con agente silencioso (#73)", () => {
+	it("prd silencioso (provider 500): el expediente DIAGNOSTICA el silencio, no líneas vacías", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const promise = runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r73a",
+			spawnAgent: makeSilentPrdSpawn(seen, cwd),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		await expect(promise).rejects.toThrow(/tras 2 intentos/);
+		const err = await promise.catch((e: Error) => e.message);
+		// Intento 1 y 2 SIN texto → diagnóstico del silencio, no cadenas vacías.
+		expect(err).toMatch(/Intento 1: \(agente terminó SIN texto/);
+		expect(err).toMatch(/Intento 2: \(agente terminó SIN texto/);
+		// El reintento informado también recibió la evidencia del silencio.
+		const retryPrompt = seen.find((p) =>
+			p.includes("FALLA ANTERIOR"),
+		);
+		expect(retryPrompt).toContain("SIN texto");
+		// Cap de 1 reintento: exactamente 2 intentos del stage prd.
+		const prdPrompts = seen.filter((p) =>
+			p.includes("Product Manager (John)"),
+		);
+		expect(prdPrompts).toHaveLength(2);
+	}, 30000);
+});
