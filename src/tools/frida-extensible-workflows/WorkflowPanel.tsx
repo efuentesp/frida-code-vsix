@@ -10,18 +10,23 @@
 //
 // Tags intrinsic de frida-webview (fbox/ftext), tipados en src/frida-webview/index.ts.
 
-import { useSyncExternalStore, useState } from "react";
+import { useSyncExternalStore, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 import { resolveCheckpointFromUi } from "./frida-delivery";
+import { purgeOrphans, readOrphanJournal, scanOrphans } from "./gc";
 import { wfLog } from "./telemetry";
 import {
+	getOrphanRuns,
 	getWorkflowRuns,
 	pathKey,
+	setOrphanRuns,
+	subscribeOrphanRuns,
 	subscribeWorkflowRuns,
 	type AgentProgressState,
 	type AgentProgressView,
 	type GroupProgressView,
+	type OrphanRunView,
 	type WorkflowRunState,
 	type WorkflowRunView,
 } from "./store";
@@ -33,18 +38,36 @@ export function createExtensibleWorkflowPanelElement(): ReactElement {
 
 function WorkflowPanel(): ReactElement | null {
 	const runs = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
+	const orphans = useSyncExternalStore(subscribeOrphanRuns, getOrphanRuns);
 	// Activas incluye awaiting (#64): una run esperando aprobación sigue "en
 	// curso" — el panel no debe desaparecer justo cuando necesita al usuario.
 	const active = runs.filter(
 		(r) => r.state === "running" || r.state === "awaiting",
 	);
 	const [collapsed, setCollapsed] = useState(false);
+	// #69: journal expandido de un huérfano ([Ver journal]).
+	const [journal, setJournal] = useState<{ runId: string; text: string } | null>(
+		null,
+	);
+	// #69: scan de huérfanos al montar el panel (la sesión viva queda excluida
+	// por su lease owner.json — no necesita excludeSessionIds).
+	useEffect(() => {
+		scanOrphans()
+			.then(setOrphanRuns)
+			.catch(() => undefined);
+	}, []);
+	const refreshOrphans = () => {
+		scanOrphans()
+			.then(setOrphanRuns)
+			.catch(() => undefined);
+	};
 	wfLog("render", {
 		totalRuns: runs.length,
 		activeRuns: active.length,
+		orphans: orphans.length,
 		runs: runs.map((r) => ({ id: r.runId.slice(0, 8), state: r.state })),
 	});
-	if (active.length === 0) return null; // sólo muestra runs en curso
+	if (active.length === 0 && orphans.length === 0) return null; // nada que mostrar
 	return (
 		<CollapsiblePanel
 			collapsed={collapsed}
@@ -61,7 +84,84 @@ function WorkflowPanel(): ReactElement | null {
 			{active.map((r) => (
 				<RunView key={r.runId} run={r} />
 			))}
+			{orphans.length > 0 ? (
+				<OrphansSection
+					orphans={orphans}
+					journal={journal}
+					setJournal={setJournal}
+					onChanged={refreshOrphans}
+				/>
+			) : null}
 		</CollapsiblePanel>
+	);
+}
+
+/** Sección «Huérfanos» (#69): runs de sesiones muertas con purga individual
+ * y en lote. ⚠ = atascado (irrecuperable); · = terminal (historia).
+ * [Ver journal] muestra el tail (~15 líneas) como evidencia final. */
+function OrphansSection(props: {
+	orphans: readonly OrphanRunView[];
+	journal: { runId: string; text: string } | null;
+	setJournal: (j: { runId: string; text: string } | null) => void;
+	onChanged: () => void;
+}): ReactElement {
+	const { orphans, journal, setJournal, onChanged } = props;
+	const stuckCount = orphans.filter((o) => o.kind === "stuck").length;
+	// Purga individual (🗑): olderThanDays 0 — el usuario ya lo vió y decidió.
+	const purgeOne = (o: OrphanRunView) => {
+		purgeOrphans({ runIds: [o.runId], olderThanDays: 0 })
+			.then(() => onChanged())
+			.catch(() => undefined);
+	};
+	// Lote: todos los huérfanos listados (incluye terminales), sin margen.
+	const purgeAll = () => {
+		purgeOrphans({ runIds: orphans.map((o) => o.runId), olderThanDays: 0 })
+			.then(() => onChanged())
+			.catch(() => undefined);
+	};
+	return (
+		<fbox flexDirection="column" gap={4} padding={6}>
+			<fbox flexDirection="row" gap={6} alignItems="center">
+				<ftext bold>🧹 Huérfanos de sesiones previas ({orphans.length})</ftext>
+				{stuckCount > 0 ? (
+					<ftext color="#d29922">{stuckCount} atorado(s) ⚠</ftext>
+				) : null}
+			</fbox>
+			{orphans.map((o) => (
+				<fbox key={o.runId} flexDirection="column" gap={2}>
+					<fbox flexDirection="row" gap={6} alignItems="center">
+						<ftext color={o.kind === "stuck" ? "#d29922" : "#888"}>
+							{o.kind === "stuck" ? "⚠" : "·"} {o.runId.slice(0, 8)} · {o.workflowName} · {o.state} · {Math.floor(o.ageDays)}d
+						</ftext>
+						<fbutton
+							variant="secondary"
+							onClick={() => {
+								if (journal?.runId === o.runId) {
+									setJournal(null);
+									return;
+								}
+								readOrphanJournal(o.runDir).then((text) =>
+									setJournal({ runId: o.runId, text }),
+								);
+							}}
+						>
+							{journal?.runId === o.runId ? "Ocultar" : "Ver journal"}
+						</fbutton>
+						<fbutton variant="secondary" onClick={() => purgeOne(o)}>
+							🗑
+						</fbutton>
+					</fbox>
+					{journal?.runId === o.runId ? (
+						<ftext size={11} color="#888">
+							{journal.text}
+						</ftext>
+					) : null}
+				</fbox>
+			))}
+			<fbutton variant="secondary" onClick={purgeAll}>
+				Purgar los {orphans.length} huérfanos
+			</fbutton>
+		</fbox>
 	);
 }
 

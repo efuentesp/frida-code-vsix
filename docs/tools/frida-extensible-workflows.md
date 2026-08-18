@@ -114,6 +114,27 @@ Inspecciona funciones/aliases/settings disponibles como globales en los scripts,
 
 Detiene una run background en curso (abort de su controller).
 
+### `workflow_gc` (#69) — runs huérfanos
+
+Cuando una sesión muere (F5, host reiniciado, sesión borrada) con runs vivos
+o en ⏸, esos runs quedan **huérfanos**: `workflow_stop` ya no los alcanza y su
+checkpoint jamás se aprobará. `workflow_gc` los gestiona:
+
+- `mode: "list"` (default, dry run): escanea `~/.frida/projects` y clasifica
+  cada run — **vivo** (sesión con lease `owner.json` activo → intocable),
+  **huérfano terminal** (failed/completed → historia purgable) o **huérfano
+  atascado** (running/awaiting → irrecuperable, con checkpoint pendiente).
+- `mode: "purge"`: borra huérfanos con candados — `olderThanDays` (default 2,
+  anti-carrera contra sesión reiniciándose), `stuckOnly`, `runIds` (🗑 por run
+  del panel). **Nunca** toca runs de sesiones vivas ni de la sesión actual, ni
+  nada fuera de `~/.frida/projects/**/runs/`.
+- Al purgar un atascado, la salida incluye el **tail del journal** (~15 líneas)
+  - checkpoint pendiente — evidencia final de diagnóstico.
+
+El **WorkflowPanel** muestra la sección «🧹 Huérfanos de sesiones previas»
+(auto-oculta si no hay): ⚠ atascado vs · terminal, **[Ver journal]**,
+**🗑** por run y **[Purgar los N]** en lote — el scan corre al montar el panel.
+
 ### `workflow_respond({ runId, name, approved })`
 
 Aprueba/rechaza un **checkpoint** pendiente, o resuelve una decisión. `approved: boolean`.

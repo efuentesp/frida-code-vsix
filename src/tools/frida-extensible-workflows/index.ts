@@ -30,7 +30,9 @@ import {
 	upsertWorkflowRun,
 	applyWorkflowProgress,
 	getWorkflowRuns,
+	setOrphanRuns,
 } from "./store";
+import { formatOrphansList, purgeOrphans, scanOrphans } from "./gc";
 import { wfLog } from "./telemetry";
 import { RunStore } from "./core/persistence";
 import { fridaHome } from "./frida-paths";
@@ -545,8 +547,100 @@ export function createFridaExtensibleWorkflows() {
 							`Run ${runId} no está activa (no es background, ya terminó, o el ID es inválido).`,
 						);
 					}
-					run.controller.abort();
-					return toolResult(`Run ${runId} (${run.workflowName}) cancelada.`);
+						run.controller.abort();
+						return toolResult(`Run ${runId} (${run.workflowName}) cancelada.`);
+					},
+				}),
+			);
+
+		// --- Tool: workflow_gc (#69): runs huérfanos de sesiones muertas ---
+		pi.registerTool(
+			defineTool({
+				name: "workflow_gc",
+				label: "Workflow GC",
+				description:
+				"List or purge orphaned workflow runs left behind by dead sessions (stuck at a checkpoint or running with no live session to manage them — workflow_stop can no longer reach them). Default mode 'list' is a dry run. 'purge' removes orphans older than olderThanDays (default 2) and NEVER touches runs of live sessions nor the current session. Purging a stuck run returns its journal tail as final diagnostic evidence.",
+				parameters: Type.Object(
+					{
+						mode: Type.Optional(
+							Type.Union([Type.Literal("list"), Type.Literal("purge")], {
+								description: "list (dry run, default) or purge",
+							}),
+						),
+						olderThanDays: Type.Optional(
+							Type.Number({
+								description:
+									"purge only: only remove orphans older than this many days (default 2 — anti-race margin vs a session restarting)",
+							}),
+						),
+						stuckOnly: Type.Optional(
+							Type.Boolean({
+								description:
+									"purge only: only remove stuck (running/awaiting) orphans, keep terminal ones",
+							}),
+						),
+						runIds: Type.Optional(
+							Type.Array(Type.String(), {
+								description:
+									"purge only: restrict to these exact run IDs (e.g. picked from the panel)",
+							}),
+						),
+					},
+					{ additionalProperties: false },
+				),
+				async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+					const p = params as {
+						mode?: unknown;
+						olderThanDays?: unknown;
+						stuckOnly?: unknown;
+						runIds?: unknown;
+					};
+					const mode = p.mode === "purge" ? "purge" : "list";
+					const scanOpts = {
+						home: fridaHome(),
+						// Candado extra además del lease: la sesión actual nunca se toca.
+						excludeSessionIds: [ctx.sessionManager.getSessionId()],
+					};
+					if (mode === "list") {
+						const orphans = await scanOrphans(scanOpts);
+						setOrphanRuns(orphans); // el panel muestra la sección
+						return toolResult(formatOrphansList(orphans));
+					}
+					const { purged, skipped } = await purgeOrphans({
+						...scanOpts,
+						...(typeof p.olderThanDays === "number"
+							? { olderThanDays: p.olderThanDays }
+							: {}),
+						...(typeof p.stuckOnly === "boolean"
+							? { stuckOnly: p.stuckOnly }
+							: {}),
+						...(Array.isArray(p.runIds)
+							? { runIds: p.runIds.filter((r): r is string => typeof r === "string") }
+							: {}),
+					});
+					const remaining = await scanOrphans(scanOpts);
+					setOrphanRuns(remaining);
+					const detail = purged
+						.map((r) => {
+							const evidence =
+								r.kind === "stuck" && r.journalTail
+									? `\n  journal tail:\n${r.journalTail
+											.split("\n")
+											.slice(-5)
+											.join("\n")}`
+									: "";
+							return `${r.runId} (${r.workflowName}, ${r.state})${evidence}`;
+						})
+						.join("\n");
+					return toolResult(
+							`Purgados ${purged.length} run(s) huérfano(s); ${skipped} omitido(s) por candados.\n${
+								detail || ""
+							}${
+								remaining.length
+									? `\n\nQuedan ${remaining.length} huérfano(s) más recientes que el margen:\n${formatOrphansList(remaining)}`
+									: ""
+							}`,
+					);
 				},
 			}),
 		);

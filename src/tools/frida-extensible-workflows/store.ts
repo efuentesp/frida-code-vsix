@@ -95,6 +95,51 @@ export function getWorkflowRuns(): readonly WorkflowRunView[] {
 	return current;
 }
 
+// ── Huérfanos de sesiones previas (#69) ─────────────────────────────────────
+// Vista serializable de un run huérfano para el panel (host-side: incluye
+// runDir para [Ver journal] sin re-escanear).
+
+export interface OrphanRunView {
+	runId: string;
+	sessionId: string;
+	workflowName: string;
+	state: string;
+	kind: "stuck" | "terminal";
+	checkpointName?: string;
+	ageDays: number;
+	runDir: string;
+}
+
+let currentOrphans: readonly OrphanRunView[] = [];
+const orphanListeners = new Set<() => void>();
+
+function emitOrphans(): void {
+	for (const listener of orphanListeners) listener();
+}
+
+export function subscribeOrphanRuns(listener: () => void): () => void {
+	orphanListeners.add(listener);
+	return () => {
+		orphanListeners.delete(listener);
+	};
+}
+
+export function getOrphanRuns(): readonly OrphanRunView[] {
+	return currentOrphans;
+}
+
+/** Reemplaza la lista de huérfanos del panel (tras scan/purge del GC #69). */
+export function setOrphanRuns(runs: readonly OrphanRunView[]): void {
+	currentOrphans = runs;
+	emitOrphans();
+}
+
+/** Sólo tests. */
+export function _resetOrphanRuns(): void {
+	currentOrphans = [];
+	orphanListeners.clear();
+}
+
 /**
  * Inserta o actualiza una run por runId (reasigna ref → re-render). Merge:
  * preserva phase/agents/groups existentes si no se proveen en `view` (para que
