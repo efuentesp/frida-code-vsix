@@ -3315,6 +3315,85 @@ export async function activate(
 		},
 		{ match: ["todo", "todos"], file: "docs/tools/todo.md", label: "todo" },
 		{ match: ["todo-web"], file: "docs/tools/todo-web.md", label: "todo-web" },
+		{
+			match: ["goal", "goals", "objetivo", "meta", "/goal"],
+			file: "docs/tools/frida-goal.md",
+			label: "frida-goal",
+		},
+		{
+			match: ["aidd", "bmad", "sprint", "ship", "aidd-plan", "aidd-ship"],
+			file: "docs/tools/frida-aidd.md",
+			label: "frida-aidd",
+		},
+		{
+			match: [
+				"workflows",
+				"patrones",
+				"patterns",
+				"multi-perspective",
+				"adversarial",
+				"code-review-pattern",
+			],
+			file: "docs/tools/frida-extensible-workflows.md",
+			label: "frida-extensible-workflows",
+		},
+		{
+			match: [
+				"subagent",
+				"subagents",
+				"subagentes",
+				"sub-agente",
+				"detached",
+			],
+			file: "docs/tools/frida-subagents.md",
+			label: "frida-subagents",
+		},
+		{
+			match: ["sandbox", "sandboxes", "docker", "contenedor"],
+			file: "docs/tools/frida-sandboxes.md",
+			label: "frida-sandboxes",
+		},
+		{
+			match: ["cc-plugins", "ccplugins", "claude-code", "plugins"],
+			file: "docs/tools/frida-cc-plugins.md",
+			label: "frida-cc-plugins",
+		},
+		{
+			match: ["hermes", "memory", "memoria"],
+			file: "docs/tools/frida-hermes-memory.md",
+			label: "frida-hermes-memory",
+		},
+		{
+			match: ["knowledge", "kb", "okf", "obsidian", "conocimiento"],
+			file: "docs/tools/frida-knowledge-base.md",
+			label: "frida-knowledge-base",
+		},
+		{
+			match: ["git-sync", "gitsync", "sync", "sincronizacion"],
+			file: "docs/tools/frida-git-sync.md",
+			label: "frida-git-sync",
+		},
+		{
+			match: ["mcp", "mcp-adapter"],
+			file: "docs/tools/frida-mcp-adapter.md",
+			label: "frida-mcp-adapter",
+		},
+		{
+			match: ["supi", "supi-web", "demo-web"],
+			file: "docs/tools/frida-supi-web.md",
+			label: "frida-supi-web",
+		},
+		{
+			match: [
+				"toggles",
+				"toggle",
+				"activar",
+				"desactivar",
+				"extension-toggles",
+			],
+			file: "docs/tools/extension-toggles.md",
+			label: "extension-toggles",
+		},
 	];
 
 	async function openHelpDoc(relPath: string, fragment?: string): Promise<void> {

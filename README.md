@@ -202,6 +202,15 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | **frida-pipeline** | Orquestador con 27 skills, 15 sub-agentes y 3 workflows (porte de rpiv-pi) | [→](./docs/tools/frida-pipeline.md) |
 | **frida-subagents** | Sub-agentes autónomos estilo Claude Code (Agent, get_subagent_result, steer_subagent) | [→](./docs/tools/frida-subagents.md) |
 | **frida-mcp-adapter** | Integración MCP — un proxy tool da acceso a cientos de servidores sin quemar contexto | [→](./docs/tools/frida-mcp-adapter.md) |
+| **frida-extensible-workflows** | Workflows deterministas con sub-agentes desechables: `parallel`/`pipeline`, checkpoints, budget y 4 patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review) — porte de pi-dynamic-workflows | [→](./docs/tools/frida-extensible-workflows.md) |
+| **frida-goal** | Modo goal — la sesión se auto-continúa hasta completar un objetivo, con guards (cap de continuaciones, no-progreso, budget de tokens) — porte de pi-goal | [→](./docs/tools/frida-goal.md) |
+| **frida-aidd** | Metodología AiDD (BMAD) adaptada: `aidd-plan` (idea → PRD → arquitectura → specs) + `aidd-ship` (loop determinista por historia con lie-detector y commit del orquestador) | [→](./docs/tools/frida-aidd.md) |
+| **frida-sandboxes** | Contenedores Docker desechables por agente para bash aislado, con políticas por host | [→](./docs/tools/frida-sandboxes.md) |
+| **frida-hermes-memory** | Memoria persistente entre sesiones vía hermes — creencias verificadas con decay | [→](./docs/tools/frida-hermes-memory.md) |
+| **frida-knowledge-base** | Base de conocimiento OKF/Obsidian — búsqueda e ingesta de notas | [→](./docs/tools/frida-knowledge-base.md) |
+| **frida-cc-plugins** | Carga plugins de Claude Code (`.claude/plugins`) como herramientas nativas | [→](./docs/tools/frida-cc-plugins.md) |
+| **frida-git-sync** | Sincronización de paquetes y estado del sistema vía repos git | [→](./docs/tools/frida-git-sync.md) |
+| **extension-toggles** | Activa/desactiva extensiones individuales desde el hub de ajustes | [→](./docs/tools/extension-toggles.md) |
 
 ## Extensiones
 
