@@ -36,11 +36,18 @@ const STATUS_COLOR: Partial<Record<TaskStatus, string>> = {
 };
 
 /** Factory del elemento raíz que monta la extensión vía fridaWebMount. */
-export function createTodoWebPanelElement(): ReactElement {
-	return <TodoWebPanel />;
+export function createTodoWebPanelElement(opts?: {
+	/** #66: botón ↻ — replay desde la rama + follow-up de conciliación manual. */
+	onRefresh?: () => void;
+}): ReactElement {
+	return <TodoWebPanel onRefresh={opts?.onRefresh} />;
 }
 
-function TodoWebPanel(): ReactElement | null {
+function TodoWebPanel({
+	onRefresh,
+}: {
+	onRefresh?: () => void;
+}): ReactElement | null {
 	const state = useSyncExternalStore(subscribeTodoState, getTodoState);
 	const hiddenIds = useSyncExternalStore(subscribeTodoState, getHiddenIds);
 	const [collapsed, setCollapsed] = useState(false);
@@ -84,6 +91,13 @@ function TodoWebPanel(): ReactElement | null {
 						<ftext color="var(--vscode-list-warningForeground, #cca700)">
 							◐ {activeTask.subject}
 						</ftext>
+					) : null}
+					{/* #66: re-sincronizar — replay + conciliación manual (el panel puede
+					    acumular stale si el modelo no cierra tareas; ver issue). */}
+					{onRefresh ? (
+						<fbutton variant="secondary" onClick={onRefresh}>
+							↻
+						</fbutton>
 					) : null}
 				</fbox>
 			}

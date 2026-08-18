@@ -29,6 +29,11 @@ import {
 } from "../todo/types";
 import { replayFromBranch } from "../todo/replay";
 import {
+	conciliationPrompt,
+	createNudgeTracker,
+	type NudgeTracker,
+} from "./nudge";
+import {
 	getTodoState,
 	resetTodoState,
 	setHiddenIds,
@@ -66,6 +71,25 @@ type FridaWebMountUI = {
  */
 export function createTodoWeb() {
 	return (pi: ExtensionAPI) => {
+		// Nudge de conciliación (#66): tareas stale al cierre del turno → follow-up.
+		// Fresco por sesión (el closure vive una vez; session_start lo renueva).
+		let nudge: NudgeTracker = createNudgeTracker();
+		const sendTodoFollowUp = (content: string) => {
+			const send = (
+				pi as unknown as {
+					sendMessage?: (
+						message: { customType: string; content: string; display: boolean },
+					options: { deliverAs: "followUp"; triggerTurn: boolean },
+				) => void;
+				}
+			).sendMessage;
+			if (typeof send !== "function") return;
+			send(
+					{ customType: "todo", content, display: true },
+					{ deliverAs: "followUp", triggerTurn: true },
+			);
+		};
+
 		pi.registerTool({
 			name: TOOL_NAME,
 			label: TOOL_LABEL,
@@ -102,6 +126,13 @@ export function createTodoWeb() {
 					mutatedThisTurn = true;
 				}
 				const result = applyTaskMutation(state, p.action, p);
+			// #66: registrar las tareas tocadas para el nudge de conciliación — una
+			// tarea mutada en el turno (aunque quede pending) no es stale.
+			if (result.op.kind === "create") nudge.onMutation(result.op.taskId);
+			else if (result.op.kind === "update" || result.op.kind === "delete")
+					nudge.onMutation(result.op.id);
+			else if (result.op.kind === "clear")
+				for (const t of state.tasks) nudge.onMutation(t.id);
 				// setTodoState EMITE → el panel persistente re-renderiza (Remote React)
 				// sin que el host tenga que publicar nada por separado.
 				setTodoState(result.state);
@@ -122,9 +153,19 @@ export function createTodoWeb() {
 		pi.on("session_start", async (_event, ctx) => {
 			// Reconstruir desde la rama (sobrevive recarga/switch/compaction).
 			mutatedThisTurn = false;
+			nudge = createNudgeTracker();
 			resetTodoState();
 			setTodoState(replayFromBranch({ sessionManager: ctx.sessionManager }));
-			panel = mountPanel(ctx, panel);
+			// #66: el botón ↻ del panel — replay (red de seguridad store↔rama) +
+			// follow-up de conciliación manual (auditar completed/delete/create).
+			const onRefresh = () => {
+				setTodoState(replayFromBranch({ sessionManager: ctx.sessionManager }));
+				const open = getTodoState().tasks.filter(
+					(t) => t.status === "pending" || t.status === "in_progress",
+				);
+				if (open.length > 0) sendTodoFollowUp(conciliationPrompt(open, "manual"));
+			};
+			panel = mountPanel(ctx, panel, onRefresh);
 		});
 
 		pi.on("session_compact", async (_event, ctx) => {
@@ -138,6 +179,7 @@ export function createTodoWeb() {
 			// Nueva corrida: reset del flag de clear-on-new-create — el primer mutante
 			// de ESTE turno vuelve a poder disparar la limpieza del plan anterior.
 			mutatedThisTurn = false;
+			nudge.onAgentStart();
 			// Ocultar las tareas completadas de turnos anteriores (paridad con
 			// rpiv-todo hideCompletedTasksFromPreviousTurn): al iniciar un nuevo
 			// turno, las que ya están completed pasan a ocultas para reducir ruido.
@@ -148,6 +190,17 @@ export function createTodoWeb() {
 				.tasks.filter((t) => t.status === "completed")
 				.map((t) => t.id);
 			setHiddenIds(new Set(completed));
+		});
+
+		pi.on("agent_settled", async () => {
+			// #66: nudge de conciliación. agent_settled (no agent_end) porque ya no
+			// hay retry/compaction/continuación pendiente — el follow-up dispara su
+			// propio turno, y la máquina anti-loop evita el ping-pong.
+			const decision = nudge.onAgentEnd(getTodoState(), false);
+			if (decision?.send) {
+				sendTodoFollowUp(decision.prompt);
+				nudge.onNudgeSent();
+			}
 		});
 
 		pi.on("session_shutdown", async () => {
@@ -162,6 +215,7 @@ export function createTodoWeb() {
 function mountPanel(
 	ctx: { hasUI: boolean; ui: unknown },
 	current: { unmount: () => void } | undefined,
+	onRefresh: () => void,
 ): { unmount: () => void } | undefined {
 	if (!ctx.hasUI) return current;
 	const ui = ctx.ui as unknown as Partial<FridaWebMountUI>;
@@ -169,5 +223,5 @@ function mountPanel(
 	current?.unmount();
 	// "footer": el panel vive en el footer del webview (entre proc-bar y Composer),
 	// no como overlay en el cuerpo (que es para diálogos efímeros como ask_user_question).
-	return ui.fridaWebMount(() => createTodoWebPanelElement(), "footer");
+	return ui.fridaWebMount(() => createTodoWebPanelElement({ onRefresh }), "footer");
 }
