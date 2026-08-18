@@ -19,9 +19,14 @@ import {
 } from "../../src/tools/frida-extensible-workflows/frida-delivery";
 import type { SpawnAgentFn } from "../../src/tools/frida-extensible-workflows/frida-agent-execution";
 import {
+	TEA_ATDD_PATTERN,
 	TEA_AUTOMATE_PATTERN,
+	TEA_CI_PATTERN,
+	TEA_NFR_PATTERN,
+	TEA_TEACH_PATTERN,
 	TEA_TEST_DESIGN_PATTERN,
 	TEA_TEST_REVIEW_PATTERN,
+	TEA_TRACE_PATTERN,
 } from "../../src/tools/frida-tea";
 
 const REAL_HOME = process.env.HOME;
@@ -66,14 +71,96 @@ const makeSpawn = (seen: string[], extract?: unknown) =>
 				rationale: "ya está en el stack",
 			};
 		}
-		// Setup de framework.
-		if (prompt.includes("Survey decision (honor it)")) {
+		// Setup de framework (encabezado del skill framework, específico antes del genérico).
+		if (prompt.includes("Test Framework Setup")) {
 			return {
 				configFiles: ["vitest.config.ts"],
 				examplePath: "tests/example.test.ts",
 				exampleStatus: "green",
 				notes: "ejemplo corriendo",
 			};
+		}
+		// Survey de CI.
+		if (prompt.includes("Survey this repository to configure CI")) {
+			return {
+				platform: "github-actions",
+				testCommand: "npm test",
+				framework: "vitest",
+				packageManager: "npm",
+				nodeVersion: "22",
+			};
+		}
+		// Pipeline de CI (encabezado del skill ci).
+		if (prompt.includes("CI Pipeline Setup")) {
+			return {
+				pipelineFile: ".github/workflows/test.yml",
+				jobs: ["test"],
+				localVerification: "green",
+				notes: "npm test pasa localmente",
+			};
+		}
+		// Auditor NFR por categoría.
+		if (prompt.includes("## Category to audit")) {
+			const cat = prompt.match(/## Category to audit\n(\S+)/)?.[1] ?? "?";
+			return {
+				category: cat,
+				status: cat === "security" ? "FAIL" : "PASS",
+				evidence: ["tests/perf.test.ts"],
+				gaps: cat === "security" ? [{ severity: "HIGH", gap: "sin escaneo", nextStep: "añadir sast" }] : [],
+				summary: cat + " auditado",
+			};
+		}
+		// Extractor de requisitos de trace.
+		if (prompt.includes("Extract the verifiable requirements")) {
+			return {
+				source: "prd",
+				requirements: [
+					{ id: "R1", text: "Exportar CSV", priority: "P0" },
+					{ id: "R2", text: "Filtro por fecha", priority: "P0" },
+				],
+			};
+		}
+		// Mapper de trace.
+		if (prompt.includes("Traceability Mapping")) {
+			return {
+				mappings: [
+					{ id: "R1", tests: ["tests/export.test.ts"], level: "unit", note: "cubre" },
+					{ id: "R2", tests: [], level: "none", note: "sin cobertura" },
+				],
+			};
+		}
+		// ATDD — escenarios (role A). Ancla: bloque runtime "## Your role"
+		// (NO el texto del skill, que describe ambos roles y colisionaría).
+		if (prompt.includes("## Your role\nA — scenarios")) {
+			return "escenarios escritos en docs/tea/atdd-scenarios.md";
+		}
+		// ATDD — fase roja (role B), mismo criterio de ancla.
+		if (prompt.includes("## Your role\nB — red phase")) {
+			return {
+				level: "component",
+				files: ["tests/login.atdd.test.ts"],
+				testStatus: "red",
+				checklistPath: "docs/tea/atdd-checklist.md",
+				scenariosCovered: 4,
+				notes: "fallando por aserción (correcto)",
+			};
+		}
+		// Lección de teach.
+		if (prompt.includes("## Module to write")) {
+			const id = prompt.match(/## Module to write\n\d+\. (\S+)/)?.[1] ?? "?";
+			return `lección ${id} escrita`;
+		}
+		// Índice de teach.
+		if (prompt.includes("Write the academy index")) {
+			return "índice escrito";
+		}
+		// Reporte de nfr.
+		if (prompt.includes("NFR evidence assessment")) {
+			return "nfr-assessment.md escrito";
+		}
+		// Reporte de trace.
+		if (prompt.includes("traceability matrix to")) {
+			return "traceability-matrix.md escrito";
 		}
 		// Automate por target.
 		if (prompt.includes("## Target to automate")) {
@@ -269,6 +356,162 @@ describe("frida-tea · workflows end-to-end sobre el motor (#41)", () => {
 		expect(r.unscorable).toEqual(["tests/b.test.ts"]);
 		expect(r.bySeverity).toEqual({ MEDIUM: 1 });
 		expect(r.reportSummary).toBe("reporte escrito");
+	}, 30000);
+
+	it("tea-ci corre survey → pipeline → gate → checkpoint", async () => {
+		const script = TEA_CI_PATTERN.resolve({ review: "manual" }, { cwd });
+		const checkpoints: Array<{ name: string }> = [];
+		const runId = randomUUID();
+
+		const promise = runWorkflowInStore({
+			name: "tea-ci",
+			script,
+			args: { review: "manual" },
+			cwd,
+			sessionId: "sess-tea-5",
+			spawnAgent: makeSpawn([]),
+			home,
+			runId,
+			foreground: false,
+			onCheckpoint: (cp) => checkpoints.push({ name: cp.name }),
+		});
+
+		await waitUntil(() => checkpoints.length >= 1);
+		resolveCheckpoint(runId, "ci-gate", true);
+
+		const { result } = await promise;
+		const r = result as {
+			platform: string;
+			setup: { pipelineFile: string; localVerification: string };
+			gate: { decision: string };
+		};
+		expect(r.platform).toBe("github-actions");
+		expect(r.setup.pipelineFile).toBe(".github/workflows/test.yml");
+		expect(r.setup.localVerification).toBe("green");
+		expect(r.gate.decision).toBe("CONCERNS");
+	}, 30000);
+
+	it("tea-nfr fan-out por categoría con gate determinista (FAIL gana)", async () => {
+		const script = TEA_NFR_PATTERN.resolve(
+			{ categories: "performance,security", review: "auto" },
+			{ cwd },
+		);
+
+		const { result } = await runWorkflowInStore({
+			name: "tea-nfr",
+			script,
+			args: { categories: "performance,security", review: "auto" },
+			cwd,
+			sessionId: "sess-tea-6",
+			spawnAgent: makeSpawn([]),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const r = result as {
+			overall: string;
+			byStatus: Record<string, number>;
+			audits: Array<{ category: string; status: string }>;
+		};
+		// performance=PASS, security=FAIL → gate determinista FAIL.
+		expect(r.byStatus).toEqual({ PASS: 1, FAIL: 1 });
+		expect(r.overall).toBe("FAIL");
+		expect(r.audits.map((a) => a.status)).toEqual(["PASS", "FAIL"]);
+	}, 30000);
+
+	it("tea-trace mapea requisitos y gatilla FAIL por P0 sin cobertura", async () => {
+		const script = TEA_TRACE_PATTERN.resolve({ review: "auto" }, { cwd });
+
+		const { result } = await runWorkflowInStore({
+			name: "tea-trace",
+			script,
+			args: { review: "auto" },
+			cwd,
+			sessionId: "sess-tea-7",
+			spawnAgent: makeSpawn([]),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const r = result as {
+			coverage: { covered: number; total: number; pct: number };
+			gateStatus: string;
+			uncovered: string[];
+		};
+		// R1 cubierto, R2 (P0) sin cobertura → 50% y FAIL determinista.
+		expect(r.coverage).toEqual({ covered: 1, total: 2, pct: 50 });
+		expect(r.gateStatus).toBe("FAIL");
+		expect(r.uncovered).toEqual(["R2"]);
+	}, 30000);
+
+	it("tea-atdd: checkpoint de escenarios (contrato) → fase roja", async () => {
+		const script = TEA_ATDD_PATTERN.resolve(
+			{ feature: "login con 2FA", review: "manual" },
+			{ cwd },
+		);
+		const checkpoints: Array<{ name: string }> = [];
+		const runId = randomUUID();
+
+		const promise = runWorkflowInStore({
+			name: "tea-atdd",
+			script,
+			args: { feature: "login con 2FA", review: "manual" },
+			cwd,
+			sessionId: "sess-tea-8",
+			spawnAgent: makeSpawn([]),
+			home,
+			runId,
+			foreground: false,
+			onCheckpoint: (cp) => checkpoints.push({ name: cp.name }),
+		});
+
+		// El contrato (escenarios) se aprueba antes de la fase roja.
+		await waitUntil(() => checkpoints.length >= 1);
+		expect(checkpoints[0].name).toBe("scenarios");
+		resolveCheckpoint(runId, "scenarios", true);
+		await waitUntil(() => checkpoints.length >= 2);
+		resolveCheckpoint(runId, "red-phase", true);
+
+		const { result } = await promise;
+		const r = result as {
+			scenarios: string;
+			red: { testStatus: string; level: string; files: string[] };
+		};
+		expect(r.scenarios).toBe("docs/tea/atdd-scenarios.md");
+		expect(r.red.testStatus).toBe("red");
+		expect(r.red.level).toBe("component");
+		expect(r.red.files).toEqual(["tests/login.atdd.test.ts"]);
+	}, 30000);
+
+	it("tea-teach escribe lecciones filtradas + índice", async () => {
+		const script = TEA_TEACH_PATTERN.resolve(
+			{ modules: "risk,gates", review: "auto" },
+			{ cwd },
+		);
+
+		const { result } = await runWorkflowInStore({
+			name: "tea-teach",
+			script,
+			args: { modules: "risk,gates", review: "auto" },
+			cwd,
+			sessionId: "sess-tea-9",
+			spawnAgent: makeSpawn([]),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const r = result as {
+			modules: string[];
+			lessons: Record<string, string>;
+			indexSummary: string;
+		};
+		expect(r.modules).toEqual(["risk", "gates"]);
+		expect(r.lessons.risk).toContain("lección risk");
+		expect(r.lessons.gates).toContain("lección gates");
+		expect(r.indexSummary).toBe("índice escrito");
 	}, 30000);
 });
 

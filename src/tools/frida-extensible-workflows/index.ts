@@ -485,6 +485,7 @@ export function createFridaExtensibleWorkflows() {
 										name: pattern.name,
 										description: pattern.description,
 										args: pattern.args,
+										...(pattern.meta ? { meta: pattern.meta } : {}),
 										launch:
 											`workflow({ name: "${pattern.name}", args: { ... } }) — sin script; se resuelve al patrón.`,
 									},

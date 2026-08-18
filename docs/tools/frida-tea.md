@@ -1,6 +1,6 @@
 # frida-tea — Test Engineering Architect como skill pack + patrones de workflow
 
-> Issue #41 · [ADR-0053](../adr/0053-frida-tea-test-engineering-architect-skill-pack.md) · Lote 1 (núcleo de 4 workflows)
+> Issue #41 · [ADR-0053](../adr/0053-frida-tea-test-engineering-architect-skill-pack.md) · Lote 1 (núcleo de 4) + Lote 2 (ci, nfr, trace, atdd, teach + D8)
 
 Porte del módulo BMAD **TEA** (Test Engineering Architect,
 [bmad-method-test-architecture-enterprise](https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise),
@@ -21,7 +21,7 @@ dirigida por riesgo (P0-P3), gates de release formales
 (Playwright/Cypress/pytest/…) los elige cada repo; TEA recomienda según el
 stack real que encuentra.
 
-## Lote 1 — los 4 workflows
+## Los 9 workflows
 
 | Patrón | Qué hace | Flujo |
 | --- | --- | --- |
@@ -29,18 +29,25 @@ stack real que encuentra.
 | `tea-framework` | Setup del framework de pruebas para el stack real | survey (lee package.json/go.mod/…, honra `preference`) → setup (config + estructura + **ejemplo que se auto-verifica corriendo**) → gate → checkpoint |
 | `tea-automate` | Expansión de automatización por target del plan | bootstrap determinista (extrae targets, ordena P0→P3, cap `maxTargets`) → **fan-out paralelo** (un agente por target: escribe el test al nivel asignado Y lo corre: `green\|blocked`) → gate → checkpoint |
 | `tea-test-review` | Auditoría de calidad de la suite existente | discover (archivos + **baseline de convenciones** established/emerging/absent) → **fan-out por archivo** con registro de criterios de severidad fija → agregado determinista (score 0-100, manifiesto unscorable) → reporte → checkpoint |
+| `tea-ci` | Pipeline CI con quality gates | survey (plataforma, comando de test real, framework, package manager, node) → pipeline (escribe config Y la verifica corriendo los comandos) → gate → checkpoint |
+| `tea-nfr` | Auditoría de evidencia no funcional | **fan-out por categoría** (performance/security/reliability/maintainability + custom; evidencia citable o `NO_EVIDENCE` honesto) → **gate determinista** (algún FAIL → FAIL; algún CONCERNS/NO_EVIDENCE → CONCERNS) → reporte → checkpoint |
+| `tea-trace` | Matriz de trazabilidad requisito→test | extractor de requisitos (del doc o **oráculo sintético** desde el código) → mapper (tests que de verdad verifican) → **coverage gate determinista** (P0 sin cobertura → FAIL; P1 → CONCERNS) → matriz → checkpoint |
+| `tea-atdd` | Escenarios como contrato + fase roja | escenarios Given/When/Then anclados al código real → **checkpoint de contrato** (apruebas/editas) → fase roja (tests de aceptación fallando por la razón correcta: `red\|green\|blocked` + checklist) → checkpoint |
+| `tea-teach` | Academia de testing en tu repo | **fan-out por módulo** (risk, levels, flakiness, gates, atdd — lecciones con ejemplos del código real, anti-patrones, ejercicios verificables) → índice → checkpoint |
 
-Artefactos en `docs/tea/` (`test-design.md`, `test-review.md`; framework y
-automate dejan config/tests/README en las rutas estándar del repo).
+Artefactos en `docs/tea/` (`test-design.md`, `test-review.md`,
+`nfr-assessment.md`, `traceability-matrix.md`, `atdd-scenarios.md` /
+`atdd-checklist.md`, `academy/`; framework/ci dejan config en las rutas
+estándar del repo).
 
 ## Estructura
 
 ```text
 src/tools/frida-tea/
-├── skills.ts     # Prompts adaptados MIT (Murat + 4 workflows + gate) — capa defaults
+├── skills.ts     # Prompts adaptados MIT (Murat + 9 workflows + gate) — capa defaults
 ├── resolver.ts   # 3-capas reusada de frida-aidd (D3): .frida/tea/stages.json
-├── workflow.ts   # 4 generadores de script deterministas + validación de args
-└── index.ts      # TEA_*_PATTERN + createFridaTea() (registerBuiltinPattern)
+├── workflow.ts   # 9 generadores de script deterministas + validación de args
+└── index.ts      # TEA_*_PATTERN (9, con meta D8) + createFridaTea()
 ```
 
 ### Adaptación vs. espejo (ADR-0053 D1/D5/D6)
@@ -80,32 +87,42 @@ ruidosamente antes de correr nada.
 
 ## Gates de release
 
-Todos los workflows terminan con un agente gate que **audita artefactos y
-claims** (lee los archivos, no confía en resúmenes) y devuelve
-`{ decision, findings[], notes }` con severidades fijas
-(CRITICAL/HIGH/MEDIUM/LOW). El checkpoint final presenta la decisión al
-usuario (`review: "auto"` lo omite).
+Todos los workflows terminan con un gate que **audita artefactos y claims**
+(lee los archivos, no confía en resúmenes) y devuelve `{ decision, findings[],
+notes }` con severidades fijas (CRITICAL/HIGH/MEDIUM/LOW). El checkpoint final
+presenta la decisión al usuario (`review: "auto"` lo omite).
 
-En `tea-test-review` el score es además **determinista**: promedio de los
+Dos gates son además **deterministas** (reglas, no LLM — espejo del upstream):
+
+- `tea-nfr`: algún FAIL → FAIL; algún CONCERNS/NO_EVIDENCE → CONCERNS; else PASS.
+- `tea-trace`: P0 sin cobertura → FAIL; P1 sin cobertura → CONCERNS; else PASS.
+
+En `tea-test-review` el score también es determinista: promedio de los
 archivos puntuados (unscorable excluidos), deducciones por severidad
 (CRITICAL -10, HIGH -5, MEDIUM -3, LOW -1).
 
+## Metadatos D8 (`requiredTools` / `executionHints`)
+
+Los 9 patrones declaran `meta` (extensión menor del motor,
+`BuiltinPattern.meta`): las tools del sandbox que necesitan para correr
+completo (`shell` para framework/ci/automate/atdd, que ejecutan comandos) y su
+postura de autonomía (`autonomous`/`iterative`/`interactive`). Informativos
+— el sandbox siempre provee la misma superficie — pero visibles en
+`workflow_catalog` para descubrimiento y auditoría de capabilities.
+
 ## Pruebas
 
-`test/frida-tea/` — 18 tests:
+`test/frida-tea/` — 31 tests:
 
 - **resolver** (5): defaults, equipo, usuario, ignora desconocidos, JSON
   inválido aborta.
-- **pattern** (7): validación de args de los 4 patrones, anclas del script
-  generado, preamble Murat.
-- **e2e** (4): sobre el motor real (`runWorkflowInStore`) — cadena con
+- **pattern** (16): validación de args de los 9 patrones, anclas del script
+  generado, meta D8, preamble Murat.
+- **e2e** (10): sobre el motor real (`runWorkflowInStore`) — cadena con
   checkpoint, orden por riesgo + fan-out + conteo de verdes, filtro/cap de
-  targets, agregado de score/unscorable/severidades.
-
-## Lote 2 (pendiente)
-
-`tea-ci`, `tea-nfr`, `tea-trace`, `tea-atdd`, `tea-teach` +
-`required_tools`/`execution_hints` (extensión menor del motor, D8).
+  targets, agregado de score/unscorable/severidades, pipeline CI, gate NFR
+  determinista (FAIL gana), coverage trace (P0 sin cobertura → FAIL),
+  contrato ATDD → fase roja, academia filtrada + índice.
 
 ## Atribución
 

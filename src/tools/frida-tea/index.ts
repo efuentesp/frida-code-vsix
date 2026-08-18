@@ -1,14 +1,10 @@
-// frida-tea — extensión (issue #41, ADR-0053 Lote 1: núcleo de 4 workflows).
+// frida-tea — extensión (issue #41, ADR-0053).
 //
-// Naturaleza: skill pack + 4 patrones de workflow que COMPONEN al motor
+// Naturaleza: skill pack + patrones de workflow que COMPONEN al motor
 // existente (frida-extensible-workflows), igual que frida-aidd (#38). No
 // registra tools propios ni toca el ciclo de vida de la sesión: su única
 // superficie son los patrones tea-* registrados en runtime
 // (registerBuiltinPattern) y los prompts bundled en skills.ts.
-//
-// Lote 1 (ADR-0053): tea-test-design, tea-framework, tea-automate,
-// tea-test-review. Lote 2 pendiente: tea-ci, tea-nfr, tea-trace, tea-atdd,
-// tea-teach + required_tools/execution_hints (extensión menor D8).
 //
 // Uso:  workflow({ name: "tea-test-design", args: { subject: "..." } })
 // El resolver 3-capas (reusado de #38, D3) resuelve los prompts en
@@ -22,14 +18,26 @@ import {
 import { resolveStagePrompts } from "./resolver";
 import { DEFAULT_ARTIFACT_LANGUAGE } from "./skills";
 import {
+	generateTeaAtddWorkflow,
 	generateTeaAutomateWorkflow,
+	generateTeaCiWorkflow,
 	generateTeaFrameworkWorkflow,
+	generateTeaNfrWorkflow,
+	generateTeaTeachWorkflow,
 	generateTeaTestDesignWorkflow,
 	generateTeaTestReviewWorkflow,
+	generateTeaTraceWorkflow,
+	STANDARD_NFR_CATEGORIES,
+	TEA_ACADEMY_MODULES,
+	validateTeaAtddArgs,
 	validateTeaAutomateArgs,
+	validateTeaCiArgs,
 	validateTeaFrameworkArgs,
+	validateTeaNfrArgs,
+	validateTeaTeachArgs,
 	validateTeaTestDesignArgs,
 	validateTeaTestReviewArgs,
+	validateTeaTraceArgs,
 } from "./workflow";
 
 /**
@@ -99,6 +107,108 @@ export const TEA_TEST_REVIEW_PATTERN: BuiltinPattern = {
 	},
 };
 
+/** Patrón tea-ci — pipeline CI con quality gates, auto-verificado localmente. */
+export const TEA_CI_PATTERN: BuiltinPattern = {
+	name: "tea-ci",
+	description:
+		"TEA (BMAD adapted): configure the CI pipeline so tests run on every push with quality gates. Survey reads the repo (platform, real test command, framework, package manager, node version), pipeline agent writes the config AND verifies it locally by running the exact commands, then a gate audits it. No soft skips; no jobs for tools the repo doesn't have.",
+	args: '{ platform?: string (slug o "auto", default "auto"), review?: "manual"|"auto" }',
+	meta: { requiredTools: ["shell"], executionHints: { autonomous: true, iterative: true } },
+	resolve(args: unknown, ctx?: { cwd: string }) {
+		const validated = validateTeaCiArgs(args);
+		const stages = resolveStagePrompts(ctx?.cwd ?? process.cwd());
+		return generateTeaCiWorkflow(stages, {
+			platform: validated.platform ?? "auto",
+		});
+	},
+};
+
+/** Patrón tea-nfr — auditoría de evidencia no funcional con gate determinista. */
+export const TEA_NFR_PATTERN: BuiltinPattern = {
+	name: "tea-nfr",
+	description:
+		"TEA (BMAD adapted): audit non-functional evidence (performance, security, reliability, maintainability + custom) AFTER implementation exists. Fan-out per category — each detached auditor hunts citable evidence (tests, scans, metrics, logs; plans are NOT evidence) with honest NO_EVIDENCE answers. Deterministic overall gate: any FAIL → FAIL, any CONCERNS/NO_EVIDENCE → CONCERNS, else PASS. Report at docs/tea/nfr-assessment.md.",
+	args: '{ subject?: string (qué auditar), categories?: string (csv, default "performance,security,reliability,maintainability"), review?: "manual"|"auto" }',
+	meta: { requiredTools: ["read"], executionHints: { autonomous: true, iterative: true } },
+	resolve(args: unknown, ctx?: { cwd: string }) {
+		const validated = validateTeaNfrArgs(args);
+		const stages = resolveStagePrompts(ctx?.cwd ?? process.cwd());
+		const categories = (
+			validated.categories
+				? validated.categories
+						.split(",")
+						.map((c) => c.trim())
+						.filter(Boolean)
+				: [...STANDARD_NFR_CATEGORIES]
+		).slice(0, 6);
+		return generateTeaNfrWorkflow(stages, {
+			subject: validated.subject ?? "release readiness",
+			categories,
+		});
+	},
+};
+
+/** Patrón tea-trace — matriz de trazabilidad requisito→test con coverage gate. */
+export const TEA_TRACE_PATTERN: BuiltinPattern = {
+	name: "tea-trace",
+	description:
+		"TEA (BMAD adapted): traceability matrix requirements → tests with a deterministic coverage gate. Extracts requirements from a doc (or synthesizes them from the code — synthetic oracle), maps each to the tests that genuinely verify it, computes coverage (total, by priority, by level), and gates: any P0 uncovered → FAIL, any P1 uncovered → CONCERNS, else PASS. Matrix at docs/tea/traceability-matrix.md.",
+	args: '{ requirements?: string (ruta del doc de requisitos, default docs/aidd/planning/prd.md), scope?: string (dir de tests, default "tests/"), gate?: "story"|"epic"|"release", review?: "manual"|"auto" }',
+	meta: { requiredTools: ["read"], executionHints: { autonomous: true, iterative: true } },
+	resolve(args: unknown, ctx?: { cwd: string }) {
+		const validated = validateTeaTraceArgs(args);
+		const stages = resolveStagePrompts(ctx?.cwd ?? process.cwd());
+		return generateTeaTraceWorkflow(stages, {
+			requirements:
+				validated.requirements ?? "docs/aidd/planning/prd.md",
+			scope: validated.scope ?? "tests/",
+			gate: validated.gate ?? "release",
+		});
+	},
+};
+
+/** Patrón tea-atdd — escenarios como contrato + fase roja (TDD red). */
+export const TEA_ATDD_PATTERN: BuiltinPattern = {
+	name: "tea-atdd",
+	description:
+		"TEA (BMAD adapted): ATDD red phase — draft Given/When/Then acceptance scenarios grounded in the real code (user approves/edits them at a checkpoint: they are the CONTRACT), then implement failing acceptance tests that encode them (status red|green|blocked) plus an implementation checklist. Never implements the feature.",
+	args: '{ feature: string (la feature, requerida), level?: "auto"|"e2e"|"api"|"component"|"unit" (default "auto"), review?: "manual"|"auto" }',
+	meta: { requiredTools: ["shell"], executionHints: { interactive: true, autonomous: true, iterative: true } },
+	resolve(args: unknown, ctx?: { cwd: string }) {
+		const validated = validateTeaAtddArgs(args);
+		const stages = resolveStagePrompts(ctx?.cwd ?? process.cwd());
+		return generateTeaAtddWorkflow(stages, {
+			feature: validated.feature,
+			level: validated.level ?? "auto",
+		});
+	},
+};
+
+/** Patrón tea-teach — academia de testing (lecciones + ejercicios en el repo). */
+export const TEA_TEACH_PATTERN: BuiltinPattern = {
+	name: "tea-teach",
+	description:
+		"TEA (BMAD adapted, teach-me-testing): write a self-paced testing academy INTO this repo — one lesson per module (risk-based testing, test levels, flakiness, release gates, ATDD) with concrete examples from this codebase, anti-patterns, verifiable exercises with answers, and self-check questions. Index at docs/tea/academy/README.md.",
+	args: '{ topic?: string (enfoque de la academia), modules?: string (csv de ids: risk,levels,flakiness,gates,atdd — default todos), review?: "manual"|"auto" }',
+	meta: { requiredTools: ["read"], executionHints: { autonomous: true, iterative: true } },
+	resolve(args: unknown, ctx?: { cwd: string }) {
+		const validated = validateTeaTeachArgs(args);
+		const stages = resolveStagePrompts(ctx?.cwd ?? process.cwd());
+		const moduleIds = (
+			validated.modules
+				? validated.modules
+						.split(",")
+						.map((m) => m.trim())
+						.filter(Boolean)
+				: []
+		).slice(0, 5);
+		return generateTeaTeachWorkflow(stages, {
+			topic: validated.topic ?? "",
+			moduleIds,
+		});
+	},
+};
+
 /** Factory de la extensión frida-tea. */
 export function createFridaTea() {
 	return (_pi: ExtensionAPI): void => {
@@ -109,5 +219,10 @@ export function createFridaTea() {
 		registerBuiltinPattern(TEA_FRAMEWORK_PATTERN);
 		registerBuiltinPattern(TEA_AUTOMATE_PATTERN);
 		registerBuiltinPattern(TEA_TEST_REVIEW_PATTERN);
+		registerBuiltinPattern(TEA_CI_PATTERN);
+		registerBuiltinPattern(TEA_NFR_PATTERN);
+		registerBuiltinPattern(TEA_TRACE_PATTERN);
+		registerBuiltinPattern(TEA_ATDD_PATTERN);
+		registerBuiltinPattern(TEA_TEACH_PATTERN);
 	};
 }

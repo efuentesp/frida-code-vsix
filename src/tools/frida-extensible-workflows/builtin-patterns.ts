@@ -338,6 +338,27 @@ const synthesis = await agent(
 return { total: allCandidates.length, surviving: surviving.length, findings: top, report: synthesis, diffTruncated }`;
 }
 
+/**
+ * Metadatos opcionales de capabilities/autonomía del patrón (ADR-0053 D8):
+ * espejo de `required_tools`/`execution_hints` de los workflow.yaml del
+ * upstream TEA. Informativos — el sandbox siempre provee la misma superficie
+ * (agent/shell/parallel/checkpoint); declaran lo que el patrón NECESITA para
+ * correr completo y su postura de interacción.
+ */
+export interface BuiltinPatternMeta {
+	/** Tools que el patrón necesita para correr completo (p. ej. "shell"). */
+	requiredTools?: readonly string[];
+	/** Banderas de autonomía (espejo de execution_hints del upstream). */
+	executionHints?: {
+		/** Auto-detecta y avanza sin preguntar salvo bloqueo real. */
+		autonomous?: boolean;
+		/** Pensado para correr repetidamente / en loop. */
+		iterative?: boolean;
+		/** Conversa con el usuario (checkpoints) por diseño. */
+		interactive?: boolean;
+	};
+}
+
 /** Un patrón curado del catálogo, ejecutable por nombre desde el tool workflow. */
 export interface BuiltinPattern {
 	/** Nombre estable (workflow({ name }) sin script lo resuelve). */
@@ -346,6 +367,8 @@ export interface BuiltinPattern {
 	description: string;
 	/** Documentación de args para el catálogo. */
 	args: string;
+	/** Metadatos opcionales de capabilities/autonomía (ADR-0053 D8). */
+	meta?: BuiltinPatternMeta;
 	/**
 	 * Valida args (eager) y devuelve el script del patrón. El cwd de la sesión
 	 * permite a patrones registrados (#38 frida-aidd) resolver recursos del
@@ -461,10 +484,12 @@ export function builtinPatternsCatalog(): Array<{
 	name: string;
 	description: string;
 	args: string;
+	meta?: BuiltinPatternMeta;
 }> {
-	return allPatterns().map(({ name, description, args }) => ({
+	return allPatterns().map(({ name, description, args, meta }) => ({
 		name,
 		description,
 		args,
+		...(meta ? { meta } : {}),
 	}));
 }

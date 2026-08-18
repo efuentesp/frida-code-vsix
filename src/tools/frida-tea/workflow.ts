@@ -132,6 +132,103 @@ export function validateTeaTestReviewArgs(args: unknown): TeaTestReviewArgs {
 	return { scope: record.scope, review: parseReview(record, "tea-test-review") };
 }
 
+// ── Args Lote 2 ───────────────────────────────────────────────────────────
+
+export interface TeaCiArgs extends ReviewMode {
+	platform?: string;
+}
+
+export interface TeaNfrArgs extends ReviewMode {
+	subject?: string;
+	categories?: string;
+}
+
+export interface TeaTraceArgs extends ReviewMode {
+	requirements?: string;
+	scope?: string;
+	gate?: "story" | "epic" | "release";
+}
+
+export interface TeaAtddArgs extends ReviewMode {
+	feature: string;
+	level?: string;
+}
+
+export interface TeaTeachArgs extends ReviewMode {
+	topic?: string;
+	modules?: string;
+}
+
+export function validateTeaCiArgs(args: unknown): TeaCiArgs {
+	const record = asRecord(args);
+	return {
+		platform: optionalString(record, "platform"),
+		review: parseReview(record, "tea-ci"),
+	};
+}
+
+export function validateTeaNfrArgs(args: unknown): TeaNfrArgs {
+	const record = asRecord(args);
+	return {
+		subject: optionalString(record, "subject"),
+		categories: optionalString(record, "categories"),
+		review: parseReview(record, "tea-nfr"),
+	};
+}
+
+const TRACE_GATES = ["story", "epic", "release"] as const;
+
+export function validateTeaTraceArgs(args: unknown): TeaTraceArgs {
+	const record = asRecord(args);
+	if (
+		record.gate !== undefined &&
+		!(TRACE_GATES as readonly string[]).includes(record.gate as string)
+	) {
+		throw new Error(
+			'Patrón "tea-trace": args.gate debe ser "story", "epic" o "release".',
+		);
+	}
+	return {
+		requirements: optionalString(record, "requirements"),
+		scope: optionalString(record, "scope"),
+		...(record.gate ? { gate: record.gate as TeaTraceArgs["gate"] } : {}),
+		review: parseReview(record, "tea-trace"),
+	};
+}
+
+const ATDD_LEVELS = ["auto", "e2e", "api", "component", "unit"] as const;
+
+export function validateTeaAtddArgs(args: unknown): TeaAtddArgs {
+	const record = asRecord(args);
+	if (typeof record.feature !== "string" || !record.feature.trim()) {
+		throw new Error(
+			'Patrón "tea-atdd" requiere args.feature como string no vacío (la feature a trabajar en escenarios).',
+		);
+	}
+	if (
+		record.level !== undefined &&
+		!(ATDD_LEVELS as readonly string[]).includes(record.level as string)
+	) {
+		throw new Error(
+			'Patrón "tea-atdd": args.level debe ser auto, e2e, api, component o unit.',
+		);
+	}
+	return {
+		feature: record.feature,
+		level: optionalString(record, "level"),
+		review: parseReview(record, "tea-atdd"),
+	};
+}
+
+export function validateTeaTeachArgs(args: unknown): TeaTeachArgs {
+	const record = asRecord(args);
+	return {
+		topic: optionalString(record, "topic"),
+		modules: optionalString(record, "modules"),
+		review: parseReview(record, "tea-teach"),
+	};
+}
+
 // ── Interpolación y bloques compartidos ────────────────────────────────────
 
 /** Escape de backslash/backtick/${ para interpolar strings en template literal. */
@@ -430,5 +527,294 @@ if (review === "manual") {
 }
 
 return { scope, files: files.length, scored: scored.length, unscorable, score, bySeverity, reportPath: "${TEA_ARTIFACTS_DIR}/test-review.md", reportSummary: report }
+`;
+}
+
+// ── tea-ci (Lote 2) ─────────────────────────────────────────────────────────
+
+/** Genera el script del workflow `tea-ci`. */
+export function generateTeaCiWorkflow(
+	stages: ResolvedTeaStage[],
+	args: { platform: string },
+): string {
+	return `${scriptPrelude("tea-ci")}
+${stageConsts(stages, { CI: "ci", GATE: "gate" })}
+const platform = (args && args.platform) || ${JSON.stringify(args.platform)}
+const SURVEY_SCHEMA = { type: "object", properties: { platform: { type: "string" }, testCommand: { type: "string" }, framework: { type: "string" }, packageManager: { type: "string" }, nodeVersion: { type: "string" }, existingCI: { type: "string" } }, required: ["platform", "testCommand", "framework", "packageManager"] }
+const SETUP_SCHEMA = { type: "object", properties: { pipelineFile: { type: "string" }, jobs: { type: "array", items: { type: "string" } }, localVerification: { type: "string", enum: ["green", "blocked", "na"] }, notes: { type: "string" } }, required: ["pipelineFile", "jobs", "localVerification", "notes"] }
+const GATE_SCHEMA = { type: "object", properties: { decision: { type: "string", enum: ["PASS", "CONCERNS", "FAIL", "WAIVED"] }, findings: { type: "array", items: { type: "object", properties: { severity: { type: "string", enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] }, evidence: { type: "string" }, fix: { type: "string" } }, required: ["severity", "evidence", "fix"] } }, notes: { type: "string" } }, required: ["decision", "findings"] }
+
+phase("survey")
+const survey = await agent(
+	teaCtx(
+		"Survey this repository to configure CI: read package.json / go.mod / CI configs — do not guess. Platform preference: " + (platform === "auto" ? "auto-detect (github-actions if .github/workflows exists, else choose the most standard for this repo and say why)" : platform + " (honor it)") + ". Resolve the REAL test command (from package.json scripts or the language's convention), framework, package manager and node version (.nvmrc/engines). Return ONLY the JSON per your output contract.",
+		["Return platform as a short slug (github-actions, gitlab-ci, circle-ci, jenkins, azure-devops)."]
+	),
+	{ label: "survey", outputSchema: SURVEY_SCHEMA }
+)
+log("tea-ci: platform=" + survey.platform + " cmd=" + survey.testCommand)
+
+phase("pipeline")
+const setup = await agent(
+	teaCtx(CI, [
+		"## Survey decision (honor it)\\n" + JSON.stringify(survey),
+	]),
+	{ label: "pipeline " + survey.platform, outputSchema: SETUP_SCHEMA }
+)
+log("tea-ci: " + setup.pipelineFile + " localVerification=" + setup.localVerification)
+
+phase("gate")
+const gate = await agent(
+	teaCtx(GATE, [
+		"Audit the CI pipeline. Read the pipeline file before judging — verify jobs fail on failure (no soft skips) and only reference commands/scripts that exist in the repo.",
+		"## Claims to audit\\n" + JSON.stringify(setup, null, 2),
+		"## Survey decision\\n" + JSON.stringify(survey),
+	]),
+	{ label: "gate", outputSchema: GATE_SCHEMA }
+)
+log("tea-ci: gate=" + gate.decision + " findings=" + (gate.findings || []).length)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "ci-gate", prompt: "Pipeline CI listo (" + setup.pipelineFile + ", verificación local: " + setup.localVerification + "). Gate: " + gate.decision + " con " + (gate.findings || []).length + " findings. ¿Apruebas para terminar?", context: { pipeline: setup.pipelineFile, platform: survey.platform, gate: gate.decision } })
+	if (cp !== "approved") throw new Error("tea-ci: checkpoint rechazado — workflow detenido")
+}
+
+return { platform: survey.platform, survey, setup, gate }
+`;
+}
+
+// ── tea-nfr (Lote 2) ────────────────────────────────────────────────────────
+
+/** Categorías NFR estándar del upstream (performance, security, reliability, maintainability). */
+export const STANDARD_NFR_CATEGORIES = [
+	"performance",
+	"security",
+	"reliability",
+	"maintainability",
+] as const;
+
+/** Genera el script del workflow `tea-nfr`. */
+export function generateTeaNfrWorkflow(
+	stages: ResolvedTeaStage[],
+	args: { subject: string; categories: string[] },
+): string {
+	return `${scriptPrelude("tea-nfr")}
+${stageConsts(stages, { NFR: "nfr" })}
+const subject = (args && args.subject) || ${JSON.stringify(args.subject)}
+const NFR_SCHEMA = { type: "object", properties: { category: { type: "string" }, status: { type: "string", enum: ["PASS", "CONCERNS", "FAIL", "NO_EVIDENCE"] }, evidence: { type: "array", items: { type: "string" } }, gaps: { type: "array", items: { type: "object", properties: { severity: { type: "string", enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] }, gap: { type: "string" }, nextStep: { type: "string" } }, required: ["severity", "gap", "nextStep"] } }, summary: { type: "string" } }, required: ["category", "status", "evidence", "gaps", "summary"] }
+const CATEGORIES = ${JSON.stringify(args.categories)}
+
+log("tea-nfr: auditando evidencia de " + CATEGORIES.join(", ") + " — " + subject.slice(0, 60))
+
+phase("audit (fan-out por categoría)")
+const tasks = {}
+CATEGORIES.forEach(function (c) {
+	tasks[c] = function () {
+		return agent(
+			teaCtx(NFR, [
+				"## Category to audit\\n" + c,
+				"## Subject\\n" + subject,
+				"Search the repo (tests, CI config, docs, metrics, logs) for concrete evidence of this category. Cite every evidence item as a path or command output.",
+			]),
+			{ label: "nfr " + c, outputSchema: NFR_SCHEMA }
+		)
+	}
+})
+const audits = await parallel("categories", tasks)
+
+phase("aggregate (gate determinista)")
+// Determinista (espejo del upstream): FAIL > CONCERNS/NO_EVIDENCE > PASS.
+const byStatus = {}
+CATEGORIES.forEach(function (c) {
+	const s = audits[c] && audits[c].status ? audits[c].status : "NO_EVIDENCE"
+	byStatus[s] = (byStatus[s] || 0) + 1
+})
+const overall = byStatus["FAIL"] ? "FAIL" : (byStatus["CONCERNS"] || byStatus["NO_EVIDENCE"]) ? "CONCERNS" : "PASS"
+log("tea-nfr: " + overall + " — " + JSON.stringify(byStatus))
+
+phase("report")
+const report = await agent(
+	"Write the NFR evidence assessment to ${TEA_ARTIFACTS_DIR}/nfr-assessment.md (create the directory if needed) from the JSON below. MARKDOWN: headline (subject, overall " + overall + ", status counts), per-category table (category | status | evidence count | gaps), evidence list with citations, gaps with severity + next step, explicit NO_EVIDENCE callouts. Do not invent findings beyond the JSON. End the file with: <!-- tea: workflow=nfr -->\\n\\n## JSON\\n" + JSON.stringify({ subject: subject, overall: overall, byStatus: byStatus, audits: CATEGORIES.map(function (c) { return audits[c] }) }, null, 2),
+	{ label: "report" }
+)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "nfr-gate", prompt: "NFR assessment listo en ${TEA_ARTIFACTS_DIR}/nfr-assessment.md. Gate determinista: " + overall + " (" + JSON.stringify(byStatus) + "). ¿Apruebas para terminar?", context: { artifact: "${TEA_ARTIFACTS_DIR}/nfr-assessment.md", overall: overall } })
+	if (cp !== "approved") throw new Error("tea-nfr: checkpoint rechazado — workflow detenido")
+}
+
+return { subject, overall, byStatus, audits: CATEGORIES.map(function (c) { return { category: c, status: audits[c] && audits[c].status, gaps: (audits[c] && audits[c].gaps || []).length } }), reportSummary: report }
+`;
+}
+
+// ── tea-trace (Lote 2) ──────────────────────────────────────────────────────
+
+/** Genera el script del workflow `tea-trace`. */
+export function generateTeaTraceWorkflow(
+	stages: ResolvedTeaStage[],
+	args: { requirements: string; scope: string; gate: string },
+): string {
+	return `${scriptPrelude("tea-trace")}
+${stageConsts(stages, { MAPPER: "trace" })}
+const requirementsPath = (args && args.requirements) || ${JSON.stringify(args.requirements)}
+const scope = (args && args.scope) || ${JSON.stringify(args.scope)}
+const gateScope = (args && args.gate) || ${JSON.stringify(args.gate)}
+const REQ_SCHEMA = { type: "object", properties: { source: { type: "string" }, requirements: { type: "array", items: { type: "object", properties: { id: { type: "string" }, text: { type: "string" }, priority: { type: "string", enum: ["P0", "P1", "P2", "P3"] } }, required: ["id", "text", "priority"] } } }, required: ["source", "requirements"] }
+const MAP_SCHEMA = { type: "object", properties: { mappings: { type: "array", items: { type: "object", properties: { id: { type: "string" }, tests: { type: "array", items: { type: "string" } }, level: { type: "string", enum: ["e2e", "api", "component", "unit", "none"] }, note: { type: "string" } }, required: ["id", "tests", "level", "note"] } } }, required: ["mappings"] }
+
+phase("requirements")
+const extracted = await agent(
+	"Extract the verifiable requirements from " + requirementsPath + ". If the file does not exist, synthesize requirements from the codebase's observable behavior (synthetic oracle — mark source accordingly) prioritizing user-visible behavior. Cap at 20 requirements; merge duplicates. Return ONLY the JSON per your output contract with source = the path read or \\"synthetic\\".",
+	{ label: "extract requirements", outputSchema: REQ_SCHEMA }
+)
+const requirements = ((extracted && extracted.requirements) || []).slice(0, 20)
+if (!requirements.length) throw new Error("tea-trace: sin requisitos extraíbles de " + requirementsPath + " ni del código")
+log("tea-trace: " + requirements.length + " requisitos (" + (extracted && extracted.source) + ")")
+
+phase("map")
+const mapped = await agent(
+	teaCtx(MAPPER, [
+		"## Requirements\\n" + JSON.stringify(requirements, null, 2),
+		"## Test scope\\n" + scope,
+	]),
+	{ label: "mapper", outputSchema: MAP_SCHEMA }
+)
+const byId = {}
+requirements.forEach(function (r) { byId[r.id] = r })
+;(mapped && mapped.mappings || []).forEach(function (m) { if (byId[m.id]) byId[m.id] = Object.assign({}, byId[m.id], m) })
+
+phase("coverage (gate determinista)")
+// Determinista (espejo del upstream decision_mode: rule-based).
+const covered = requirements.filter(function (r) { return (byId[r.id] && byId[r.id].tests || []).length > 0 })
+const uncovered = requirements.filter(function (r) { return (byId[r.id] && byId[r.id].tests || []).length === 0 })
+const byPriority = {}
+requirements.forEach(function (r) {
+	const p = byId[r.id] && byId[r.id].tests && byId[r.id].tests.length ? "covered" : "uncovered"
+	byPriority[r.priority] = byPriority[r.priority] || { covered: 0, uncovered: 0 }
+	byPriority[r.priority][p]++
+})
+const pct = requirements.length ? Math.round((covered.length / requirements.length) * 100) : 0
+const gateStatus = uncovered.some(function (r) { return r.priority === "P0" }) ? "FAIL" : uncovered.some(function (r) { return r.priority === "P1" }) ? "CONCERNS" : "PASS"
+log("tea-trace: " + pct + "% (" + covered.length + "/" + requirements.length + ") gate=" + gateStatus + " [" + gateScope + "]")
+
+phase("report")
+const report = await agent(
+	"Write the traceability matrix to ${TEA_ARTIFACTS_DIR}/traceability-matrix.md (create the directory if needed) from the JSON below. MARKDOWN: headline (requirements source, coverage %, gate " + gateStatus + " for scope " + gateScope + "), matrix table (id | priority | requirement (short) | tests | level | note), coverage by priority table, uncovered list with the gate reasoning. Do not invent tests beyond the JSON. End the file with: <!-- tea: workflow=trace -->\\n\\n## JSON\\n" + JSON.stringify({ source: extracted && extracted.source, gateScope: gateScope, coverage: { covered: covered.length, total: requirements.length, pct: pct }, gateStatus: gateStatus, byPriority: byPriority, requirements: requirements.map(function (r) { return { id: r.id, priority: r.priority, text: r.text, tests: (byId[r.id] && byId[r.id].tests || []), level: (byId[r.id] && byId[r.id].level) || "none", note: (byId[r.id] && byId[r.id].note) || "" } }) }, null, 2),
+	{ label: "report" }
+)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "trace-gate", prompt: "Matriz de trazabilidad lista en ${TEA_ARTIFACTS_DIR}/traceability-matrix.md. Cobertura " + pct + "% (" + covered.length + "/" + requirements.length + "). Gate " + gateStatus + " [" + gateScope + "]. ¿Apruebas para terminar?", context: { artifact: "${TEA_ARTIFACTS_DIR}/traceability-matrix.md", coverage: pct, gate: gateStatus } })
+	if (cp !== "approved") throw new Error("tea-trace: checkpoint rechazado — workflow detenido")
+}
+
+return { requirementsSource: extracted && extracted.source, gateScope, coverage: { covered: covered.length, total: requirements.length, pct: pct }, gateStatus, byPriority, uncovered: uncovered.map(function (r) { return r.id }), reportSummary: report }
+`;
+}
+
+// ── tea-atdd (Lote 2) ───────────────────────────────────────────────────────
+
+/** Genera el script del workflow `tea-atdd`. */
+export function generateTeaAtddWorkflow(
+	stages: ResolvedTeaStage[],
+	args: { feature: string; level: string },
+): string {
+	return `${scriptPrelude("tea-atdd")}
+${stageConsts(stages, { ATDD: "atdd" })}
+const feature = (args && args.feature) || ${JSON.stringify(args.feature)}
+const level = (args && args.level) || ${JSON.stringify(args.level)}
+const RED_SCHEMA = { type: "object", properties: { level: { type: "string", enum: ["e2e", "api", "component", "unit"] }, files: { type: "array", items: { type: "string" } }, testStatus: { type: "string", enum: ["red", "green", "blocked"] }, checklistPath: { type: "string" }, scenariosCovered: { type: "number" }, notes: { type: "string" } }, required: ["level", "files", "testStatus", "checklistPath", "scenariosCovered", "notes"] }
+
+log("tea-atdd: escenarios para: " + feature.slice(0, 70))
+
+phase("scenarios")
+const scenariosSummary = await agent(
+	teaCtx(ATDD, [
+		"## Your role\\nA — scenarios",
+		"## Feature (verbatim)\\n" + feature,
+		"Write the scenarios to ${TEA_ARTIFACTS_DIR}/atdd-scenarios.md (create the directory if needed).",
+	]),
+	{ label: "scenarios" }
+)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "scenarios", prompt: "Escenarios ATDD listos en ${TEA_ARTIFACTS_DIR}/atdd-scenarios.md. Revísalos/edítalos (son el contrato) y aprueba para pasar a la fase roja (o rechaza con notas).", context: { artifact: "${TEA_ARTIFACTS_DIR}/atdd-scenarios.md", feature: feature.slice(0, 80) } })
+	if (cp !== "approved") throw new Error("tea-atdd: checkpoint rechazado — workflow detenido")
+}
+
+phase("red phase")
+const red = await agent(
+	teaCtx(ATDD, [
+		"## Your role\\nB — red phase",
+		"## Feature (verbatim)\\n" + feature,
+		"## Scenarios (the CONTRACT — read the file)\\n${TEA_ARTIFACTS_DIR}/atdd-scenarios.md",
+		"Assigned level: " + level + ("auto" === level ? " (choose the lowest level that can verify the behavior; report your choice)" : " (honor it)"),
+		"Write the failing acceptance tests, run them, and write the implementation checklist to ${TEA_ARTIFACTS_DIR}/atdd-checklist.md.",
+	]),
+	{ label: "red phase", outputSchema: RED_SCHEMA }
+)
+log("tea-atdd: red phase status=" + red.testStatus + " level=" + red.level + " scenarios=" + red.scenariosCovered)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "red-phase", prompt: "Fase roja lista: " + red.files.length + " archivos de test (" + red.testStatus + ", nivel " + red.level + ", " + red.scenariosCovered + " escenarios). Checklist en " + red.checklistPath + ". ¿Apruebas para terminar?", context: { status: red.testStatus, files: red.files, checklist: red.checklistPath } })
+	if (cp !== "approved") throw new Error("tea-atdd: checkpoint rechazado — workflow detenido")
+}
+
+return { feature: feature.slice(0, 120), scenarios: "${TEA_ARTIFACTS_DIR}/atdd-scenarios.md", red, scenariosSummary }
+`;
+}
+
+// ── tea-teach (Lote 2) ──────────────────────────────────────────────────────
+
+/** Módulos de la academia (espejo del currículo del upstream, derecho de tamaño). */
+export const TEA_ACADEMY_MODULES = [
+	{ id: "risk", topic: "risk-based testing: clasificar P0-P3 y decidir profundidad" },
+	{ id: "levels", topic: "test levels y la pirámide: el nivel más bajo que puede probar el comportamiento" },
+	{ id: "flakiness", topic: "flakiness y anti-patrones: hard waits, estado compartido, aserciones tautológicas" },
+	{ id: "gates", topic: "gates de release y evidencia: PASS/CONCERNS/FAIL/WAIVED con severidades fijas" },
+	{ id: "atdd", topic: "ATDD: escenarios como contrato y la fase roja" },
+] as const;
+
+/** Genera el script del workflow `tea-teach`. */
+export function generateTeaTeachWorkflow(
+	stages: ResolvedTeaStage[],
+	args: { topic: string; moduleIds: string[] },
+): string {
+	return `${scriptPrelude("tea-teach")}
+${stageConsts(stages, { TEACH: "teach" })}
+const topic = (args && args.topic) || ${JSON.stringify(args.topic)}
+const MODULES = ${JSON.stringify(TEA_ACADEMY_MODULES.filter((m) => args.moduleIds.length === 0 || args.moduleIds.includes(m.id)).map((m) => ({ id: m.id, topic: m.topic })))}
+
+if (!MODULES.length) throw new Error("tea-teach: sin módulos que escribir")
+log("tea-teach: academia — " + MODULES.length + " módulos" + (topic ? " (enfoque: " + topic.slice(0, 50) + ")" : ""))
+
+phase("lessons (fan-out por módulo)")
+const tasks = {}
+MODULES.forEach(function (m, i) {
+	tasks[m.id] = function () {
+		return agent(
+			teaCtx(TEACH, [
+				"## Module to write\\n" + (i + 1) + ". " + m.id + " — " + m.topic,
+				"Write the lesson to ${TEA_ARTIFACTS_DIR}/academy/" + (i + 1) + "-" + m.id + ".md (create the directory if needed).",
+				topic ? "## Learner focus\\n" + topic : "",
+			]),
+			{ label: "lesson " + m.id }
+		)
+	}
+})
+const lessons = await parallel("modules", tasks)
+
+phase("index")
+const index = await agent(
+	"Write the academy index to ${TEA_ARTIFACTS_DIR}/academy/README.md (create the directory if needed): suggested order (the numbering), one line per module (what the learner walks away with), and how to practice against this repo. End the file with: <!-- tea: workflow=teach -->",
+	{ label: "index" }
+)
+
+if (review === "manual") {
+	const cp = await checkpoint({ name: "academy", prompt: "Academia lista: " + MODULES.length + " lecciones en ${TEA_ARTIFACTS_DIR}/academy/ (índice en README.md). ¿Apruebas para terminar?", context: { dir: "${TEA_ARTIFACTS_DIR}/academy", modules: MODULES.map(function (m) { return m.id }) } })
+	if (cp !== "approved") throw new Error("tea-teach: checkpoint rechazado — workflow detenido")
+}
+
+return { dir: "${TEA_ARTIFACTS_DIR}/academy", modules: MODULES.map(function (m) { return m.id }), lessons, indexSummary: index }
 `;
 }

@@ -49,7 +49,7 @@ function writeUserOverrides(overrides: unknown): void {
 }
 
 describe("frida-tea · resolver 3-capas (#41)", () => {
-	it("sin overrides resuelve defaults para los 5 stages", () => {
+	it("sin overrides resuelve defaults para los 10 stages (Lote 1 + Lote 2)", () => {
 		const resolved = resolveStagePrompts(projectRoot);
 		expect(resolved.map((r) => r.stage)).toEqual([...TEA_STAGES]);
 		for (const r of resolved) {
@@ -64,8 +64,8 @@ describe("frida-tea · resolver 3-capas (#41)", () => {
 		const gate = resolved.find((r) => r.stage === "gate")!;
 		expect(gate.source).toBe("team");
 		expect(gate.prompt).toBe("GATE DE EQUIPO");
-		// Los demás stages siguen en defaults.
-		expect(resolved.filter((r) => r.source === "defaults")).toHaveLength(4);
+		// Los demás stages siguen en defaults (10 stages - 1 override).
+		expect(resolved.filter((r) => r.source === "defaults")).toHaveLength(9);
 	});
 
 	it("usuario gana sobre equipo y defaults", () => {
