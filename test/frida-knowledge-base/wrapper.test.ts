@@ -369,3 +369,42 @@ describe("frida-knowledge-base / wrapper", () => {
 		);
 	});
 });
+
+describe("frida-knowledge-base / kb_search formato id vs path (#75)", () => {
+	/**
+	 * Incidente real (2026-08-18, nutrimetrics + GLM-5.3): el resultado
+	 * imprimía el id relativo (`sources/obs-…`) y el path absoluto en líneas
+	 * SIN etiquetar — el modelo agarró el id como ruta relativa del proyecto
+	 * → ENOENT. El formato debe etiquetar ambos y advertir que el id NO es
+	 * una ruta de archivo.
+	 */
+	it("etiqueta id (no-es-ruta) y path (absoluto) — sin líneas ambiguas", async () => {
+		// Fake con id real (el default no interpola el query en el id — el
+		// test viejo pasaba por el path). Espejo del incidente: sources/obs-…
+		writeFakeUpstream("", {
+			search: `export async function searchWikiHybrid(primaryPaths: any, query: string, maxResults = 5) {
+	return [{ id: "sources/obs-demo", title: "Obs demo", type: "source", preview: "preview " + query, path: primaryPaths.wiki + "/sources/obs-demo.md" }];
+}`,
+		});
+		const pi = fakePi();
+		await createFridaKnowledgeBase({
+			agentDir,
+			distDir: path.resolve("dist"),
+			cwd: workDir,
+		})(asApi(pi));
+		const kb = pi.tools.get("kb_search");
+		const r = await kb.execute("id", { query: "rag" });
+		expect(r.isError).toBeFalsy();
+		const text = r.content[0].text as string;
+		// id etiquetado + advertencia explícita de que no es ruta.
+		expect(text).toMatch(/id: sources\/obs-demo — .*NO es una ruta/);
+		// path absoluto etiquetado (línea que empieza con path: /).
+		expect(text).toMatch(/path: \/\S*\/sources\/obs-demo\.md/);
+		// preview sigue presente.
+		expect(text).toContain("preview");
+		// Ninguna línea desnuda con sólo el id (la trampa original).
+		expect(text.split("\n").some((l) => l.trim() === "sources/obs-demo")).toBe(
+			false,
+		);
+	});
+});

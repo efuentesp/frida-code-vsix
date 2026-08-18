@@ -308,11 +308,17 @@ function registerKbAliases(
 					query,
 					args?.max_results ?? 5,
 				);
+				// #75: formato etiquetado id vs path — el id OKF PARECE ruta
+				// relativa (incidente 2026-08-18: GLM-5.3 lo usó como archivo del
+				// proyecto → ENOENT). Nunca imprimir líneas ambiguas sin etiqueta.
 				const text = results.length
 					? results
 							.map(
 								(r) =>
-									`- [${r.type}] ${r.id} — ${r.title}${r.vaultLabel ? ` (${r.vaultLabel})` : ""}\n  ${r.path}\n  ${r.preview.slice(0, 200)}`,
+									`- [${r.type}] ${r.title}${r.vaultLabel ? ` (${r.vaultLabel})` : ""}\n` +
+									`  id: ${r.id} — id de página OKF (para kb_neighbors); NO es una ruta de archivo\n` +
+									`  path: ${r.path}\n` +
+									`  preview: ${r.preview.slice(0, 200)}`,
 							)
 							.join("\n")
 					: "Sin resultados en la KB. Ingiere fuentes con /wiki-ingest.";
