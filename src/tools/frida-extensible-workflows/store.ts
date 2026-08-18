@@ -13,6 +13,7 @@ import { wfLog } from "./telemetry";
 
 export type WorkflowRunState =
 	| "running"
+	| "awaiting"
 	| "completed"
 	| "failed"
 	| "stopped"
@@ -61,6 +62,8 @@ export interface WorkflowRunView {
 	error?: string;
 	/** Fase actual (si el workflow llama phase(name)). */
 	phase?: string;
+	/** Checkpoint pendiente de aprobación cuando state === "awaiting" (#64). */
+	checkpointName?: string;
 	/** Agentes en vivo (issue #7). */
 	agents: readonly AgentProgressView[];
 	/** Grupos parallel/pipeline en vivo (issue #7). */
@@ -101,6 +104,7 @@ export function upsertWorkflowRun(
 	view: Pick<WorkflowRunView, "runId" | "workflowName" | "state"> & {
 		error?: string;
 		phase?: string;
+		checkpointName?: string;
 		agents?: readonly AgentProgressView[];
 		groups?: readonly GroupProgressView[];
 	},
@@ -122,6 +126,10 @@ export function upsertWorkflowRun(
 			...view,
 			// Al no proveerse, conservar el progreso existente.
 			phase: "phase" in view ? view.phase : prev.phase,
+			// checkpointName: undefined EXPLÍCITO lo limpia (awaiting → running);
+			// ausente conserva el valor previo (merge).
+			checkpointName:
+				"checkpointName" in view ? view.checkpointName : prev.checkpointName,
 			agents: view.agents ?? prev.agents,
 			groups: view.groups ?? prev.groups,
 		};
@@ -136,7 +144,10 @@ export function upsertWorkflowRun(
 				workflowName: view.workflowName,
 				state: view.state,
 				...(view.error ? { error: view.error } : {}),
-				...(view.phase !== undefined ? { phase: view.phase } : {}),
+				...(view.phase === undefined ? {} : { phase: view.phase }),
+				...(view.checkpointName === undefined
+					? {}
+					: { checkpointName: view.checkpointName }),
 				agents: view.agents ?? [],
 				groups: view.groups ?? [],
 			},
@@ -187,7 +198,7 @@ export function applyWorkflowProgress(opts: {
 				agentId,
 				structuralPath: structuralPath ?? [],
 				...(role ? { role } : {}),
-				...(occurrence !== undefined ? { occurrence } : {}),
+				...(occurrence === undefined ? {} : { occurrence }),
 				state: "running",
 				startedAt: Date.now(),
 			};

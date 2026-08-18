@@ -13,6 +13,7 @@
 import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
+import { resolveCheckpointFromUi } from "./frida-delivery";
 import { wfLog } from "./telemetry";
 import {
 	getWorkflowRuns,
@@ -32,7 +33,11 @@ export function createExtensibleWorkflowPanelElement(): ReactElement {
 
 function WorkflowPanel(): ReactElement | null {
 	const runs = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
-	const active = runs.filter((r) => r.state === "running");
+	// Activas incluye awaiting (#64): una run esperando aprobación sigue "en
+	// curso" — el panel no debe desaparecer justo cuando necesita al usuario.
+	const active = runs.filter(
+		(r) => r.state === "running" || r.state === "awaiting",
+	);
 	const [collapsed, setCollapsed] = useState(false);
 	wfLog("render", {
 		totalRuns: runs.length,
@@ -65,6 +70,8 @@ function runIcon(state: WorkflowRunState): string {
 	switch (state) {
 		case "running":
 			return "⟳";
+		case "awaiting":
+			return "⏸";
 		case "completed":
 			return "✓";
 		case "failed":
@@ -217,6 +224,28 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 					{run.runId.slice(0, 8)}
 				</ftext>
 			</fbox>
+
+			{run.state === "awaiting" && run.checkpointName ? (
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext color="#d29922">Esperando tu aprobación: {run.checkpointName}</ftext>
+					<fbutton
+						variant="primary"
+						onClick={() =>
+							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", true)
+						}
+					>
+						✓ Aprobar
+					</fbutton>
+					<fbutton
+						variant="secondary"
+						onClick={() =>
+							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", false)
+						}
+					>
+						✗ Rechazar
+					</fbutton>
+				</fbox>
+			) : null}
 
 			{activeGroups.map((g) => {
 				const states = g.taskNames.map((t) => taskState(g, t, run.agents));

@@ -12,6 +12,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { JsonValue } from "./core/types";
+import { getWorkflowRuns, upsertWorkflowRun } from "./store";
 
 export const WORKFLOW_MSG_TYPE = "workflow";
 
@@ -129,6 +130,33 @@ export function resolveCheckpoint(
 /** ¿Hay un checkpoint pendiente para esta run+name? (para la descripción del tool) */
 export function hasPendingCheckpoint(runId: string, name: string): boolean {
 	return pendingCheckpoints.has(checkpointKey(runId, name));
+}
+
+/**
+ * Resuelve un checkpoint desde la UI (botones del panel #64) o desde el chat
+ * (workflow_respond): resuelve el checkpoint en vivo y, si había run
+ * registrada en el panel, la transiciona awaiting → running (upsert
+ * optimista — el workflow reanuda su ejecución). false = no había pendiente
+ * (no toca el store). Unifica ambos caminos para que el panel nunca quede
+ * clavado en "awaiting" tras decidir por chat.
+ */
+export function resolveCheckpointFromUi(
+	runId: string,
+	name: string,
+	approved: boolean,
+): boolean {
+	const resolved = resolveCheckpoint(runId, name, approved);
+	if (!resolved) return false;
+	const run = getWorkflowRuns().find((r) => r.runId === runId);
+	if (run) {
+		upsertWorkflowRun({
+			runId,
+			workflowName: run.workflowName,
+			state: "running",
+			checkpointName: undefined,
+		});
+	}
+	return true;
 }
 
 /** Sólo tests. */

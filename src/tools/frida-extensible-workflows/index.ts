@@ -40,7 +40,7 @@ import {
 	registerBackgroundRun,
 	getBackgroundRun,
 	unregisterBackgroundRun,
-	resolveCheckpoint,
+	resolveCheckpointFromUi,
 } from "./frida-delivery";
 import type { JsonValue } from "./core/types";
 
@@ -304,6 +304,14 @@ export function createFridaExtensibleWorkflows() {
 							name: cp.name,
 							state: "awaiting",
 						} as JsonValue);
+						// #64: el panel debe distinguir "esperando al usuario" de "trabajando" —
+						// sin esto la run seguía en running y el spinner mentía por horas.
+						upsertWorkflowRun({
+							runId: cp.runId,
+							workflowName: name,
+							state: "awaiting",
+							checkpointName: cp.name,
+						});
 						deliverFollowUp(
 							pi,
 							`Workflow ${name} (runId: ${cp.runId}) checkpoint ${cp.name}: ${cp.prompt}\n` +
@@ -572,8 +580,9 @@ export function createFridaExtensibleWorkflows() {
 						throw new Error("workflow_respond: name is required");
 					if (typeof approved !== "boolean")
 						throw new Error("workflow_respond: approved must be boolean");
-					// 1) ¿Checkpoint en vivo? → resolverlo.
-					const resolved = resolveCheckpoint(runId, cpName, approved);
+					// 1) ¿Checkpoint en vivo? → resolverlo (y transicionar el panel
+					// awaiting → running — resolveCheckpointFromUi, #64).
+					const resolved = resolveCheckpointFromUi(runId, cpName, approved);
 					if (resolved) {
 						return toolResult(
 							`Checkpoint ${cpName} de la run ${runId} ${approved ? "aprobado" : "rechazado"}.`,
