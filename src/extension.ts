@@ -1,4 +1,5 @@
 import { createPendingQueueStore } from "./queue/pending-queue";
+import { agentEndFallbackText } from "./agent-end-fallback";
 import path from "node:path";
 import * as fs from "node:fs/promises";
 import { realpathSync } from "node:fs";
@@ -1911,7 +1912,7 @@ export async function activate(
 					post({ type: "agent_busy", busy: true });
 					post({ type: "turn_active" });
 					break;
-				case "agent_end":
+				case "agent_end": {
 					abortDiag(
 						`agent_end — errorMessage=${event.errorMessage ?? "(none)"} willRetry=${!!event.willRetry} hadText=${hadText} hadToolCall=${hadToolCall} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"}`,
 					);
@@ -1961,35 +1962,34 @@ export async function activate(
 					// Sonido + notificación al terminar (sólo si el setting está activo y la
 					// ventana de VS Code perdió el foco → el usuario está en otra app).
 					void notifyCompletion(vscodeWindowFocused);
-					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
-					if (event.errorMessage && !event.willRetry) {
-						post({ type: "provider_error", text: String(event.errorMessage) });
-					} else if (lastMessageError && !event.willRetry) {
-						// issue #6: el provider falló y pi-ai dejó el error en el mensaje
-						// (stopReason="error" → message.errorMessage) pero NO en el evento
-						// agent_end. Sin esto el error real (p. ej. "Invalid API key" de
-						// Moonshot, o "model not found") se traga y el usuario ve el
-						// fallback genérico hardcodeado a DevEngine.
-						post({ type: "provider_error", text: lastMessageError });
-					} else if (!hadText && !hadToolCall) {
-						// Fix UX #1 + issue #6: el agente terminó sin texto/tools ni error
-						// capturable. Mensaje consciente del proveedor activo (antes estaba
-						// hardcodeado a DevEngine incluso para Moonshot/z.ai).
-						const isDevEngine = activeModel?.provider === SOFTTEK_PROVIDER;
-						const provName =
-							getApiKeyProvider(activeModel?.provider ?? "")?.displayName ??
-							activeModel?.provider ??
-							"este proveedor";
-						const fallbackText = isDevEngine
-							? `El modelo no generó respuesta. Causa probable: API key inválida o vencida (401), o el gateway DevEngine no respondió. Renueva tu API key o ejecuta "Frida: Diagnosticar gateway DevEngine".`
-							: `El modelo no generó respuesta (${provName}). Causa probable: API key inválida o vencida (401), o el modelo/ID es incorrecto. Verifica tu API key en el panel de Proveedores.`;
-						post({ type: "provider_error", text: fallbackText });
-					}
+				// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
+				// El fallback genérico (rama 3) TAMBIÉN respeta willRetry: el fallo
+				// retriable del intento 1 publicaba "El modelo no generó respuesta
+				// (401)" y después llegaba la respuesta del auto-retry (mensaje
+				// fantasma). Lógica en src/agent-end-fallback.ts (pura, testeada).
+				const isDevEngine = activeModel?.provider === SOFTTEK_PROVIDER;
+				const provName =
+						getApiKeyProvider(activeModel?.provider ?? "")?.displayName ??
+						activeModel?.provider ??
+						"este proveedor";
+				const fallbackText = agentEndFallbackText({
+						errorMessage: event.errorMessage,
+						lastMessageError,
+						willRetry: !!event.willRetry,
+						hadText,
+						hadToolCall,
+						isDevEngine,
+						providerDisplayName: provName,
+					});
+				if (fallbackText !== null) {
+					post({ type: "provider_error", text: fallbackText });
+				}
 					// El agente terminó: a partir de aquí los diagnósticos tardíos (cascade)
 					// se publican solos (mergeLens comprueba lensBusy).
 					lensBusy = false;
 					flushLens();
 					break;
+				}
 				case "turn_start": {
 					// turn_start tras el primero (turnsInRun>0) = entrega de un mensaje
 					// encolado: creamos su turno aquí para que los deltas caigan en él.
