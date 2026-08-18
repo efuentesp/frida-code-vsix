@@ -10,6 +10,11 @@
 // variables — un override es el prompt nuevo del stage, punto. Eso mantiene la
 // auditoría trivial (¿quién definió este prompt? la capa más profunda que lo
 // declara) y evita reimprimir el motor de TOML del upstream.
+//
+// El núcleo está generalizado en createLayeredStageResolver para que otros
+// skill packs lo consuman sin reimplementarlo (ADR-0050 D1 / ADR-0053 D3):
+// frida-tea (#41) es el segundo consumidor; frida-aidd lo usa vía el wrapper
+// de abajo, así su API pública no cambia.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -36,43 +41,120 @@ export interface ResolvedStage {
 /** Capa de overrides: mapa stage → prompt. Stages desconocidos se ignoran. */
 export type OverridesMap = Partial<Record<AiddPlanStage, string>>;
 
-function parseOverrides(text: string, origin: string): OverridesMap {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(text);
-	} catch (error) {
-		throw new Error(
-			`${origin}: JSON inválido (${(error as Error).message}). Corrígelo o bórralo.`,
-		);
-	}
-	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new Error(`${origin}: se esperaba un objeto JSON { "stages": {...} }.`);
-	}
-	const stages = (parsed as { stages?: unknown }).stages;
-	if (stages === undefined) return {};
-	if (stages === null || typeof stages !== "object" || Array.isArray(stages)) {
-		throw new Error(`${origin}: "stages" debe ser un objeto.`);
-	}
-	const out: OverridesMap = {};
-	for (const [key, value] of Object.entries(
-		stages as Record<string, unknown>,
-	)) {
-		if (!(AIDD_PLAN_STAGES as readonly string[]).includes(key)) continue;
-		if (typeof value === "string" && value.trim()) {
-			out[key as AiddPlanStage] = value;
-		}
-	}
-	return out;
+/**
+ * Núcleo genérico del resolver 3-capas (defaults → equipo → usuario), listo
+ * para reusar por otros skill packs. Cada consumidor aporta sus stages, sus
+ * prompts default y las rutas de sus capas de override.
+ */
+export interface LayeredResolverConfig<S extends string> {
+	/** Stages válidos, en el orden del pipeline. */
+	stages: readonly S[];
+	/** Prompts por defecto (capa "defaults"), uno por stage. */
+	defaults: Readonly<Record<S, string>>;
+	/** Ruta del override de equipo, relativa a la raíz del proyecto. */
+	teamPath: string;
+	/** Ruta absoluta del override de usuario (se evalúa en cada resolve). */
+	userPath: () => string;
 }
 
-function readLayer(path: string, origin: string): OverridesMap {
-	try {
-		return parseOverrides(readFileSync(path, "utf8"), origin);
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-		throw error; // JSON roto u otro error de lectura: falla ruidosamente
-	}
+/** Resultado del resolver genérico: prompt efectivo + capa de origen. */
+export interface ResolvedLayeredStage<S extends string> {
+	stage: S;
+	prompt: string;
+	source: "defaults" | "team" | "user";
 }
+
+/**
+ * Fábrica del resolver 3-capas. Devuelve una función projectRoot → stages
+ * resueltos. Un archivo de capa con JSON inválido aborta el resolve — nunca
+ * se corre un prompt a medias sin saberlo.
+ */
+export function createLayeredStageResolver<S extends string>(
+	config: LayeredResolverConfig<S>,
+): (projectRoot: string) => ResolvedLayeredStage<S>[] {
+	const parse = (text: string, origin: string): Partial<Record<S, string>> => {
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(text);
+		} catch (error) {
+			throw new Error(
+				`${origin}: JSON inválido (${(error as Error).message}). Corrígelo o bórralo.`,
+			);
+		}
+		if (
+			parsed === null ||
+			typeof parsed !== "object" ||
+			Array.isArray(parsed)
+		) {
+			throw new Error(
+				`${origin}: se esperaba un objeto JSON { "stages": {...} }.`,
+			);
+		}
+		const stages = (parsed as { stages?: unknown }).stages;
+		if (stages === undefined) return {};
+		if (
+			stages === null ||
+			typeof stages !== "object" ||
+			Array.isArray(stages)
+		) {
+			throw new Error(`${origin}: "stages" debe ser un objeto.`);
+		}
+		const out: Partial<Record<S, string>> = {};
+		for (const [key, value] of Object.entries(
+			stages as Record<string, unknown>,
+		)) {
+			if (!(config.stages as readonly string[]).includes(key)) continue;
+			if (typeof value === "string" && value.trim()) {
+				out[key as S] = value;
+			}
+		}
+		return out;
+	};
+
+	const readLayer = (
+		path: string,
+		origin: string,
+	): Partial<Record<S, string>> => {
+		try {
+			return parse(readFileSync(path, "utf8"), origin);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+			throw error; // JSON roto u otro error de lectura: falla ruidosamente
+		}
+	};
+
+	return (projectRoot: string): ResolvedLayeredStage<S>[] => {
+		const teamPath = join(projectRoot, config.teamPath);
+		const team: Partial<Record<S, string>> = existsSync(teamPath)
+			? readLayer(teamPath, config.teamPath)
+			: {};
+		const userPath = config.userPath();
+		const user: Partial<Record<S, string>> = existsSync(userPath)
+			? readLayer(userPath, userPath)
+			: {};
+
+		return config.stages.map((stage) => {
+			if (user[stage] !== undefined) {
+				return { stage, prompt: user[stage]!, source: "user" } as const;
+			}
+			if (team[stage] !== undefined) {
+				return { stage, prompt: team[stage]!, source: "team" } as const;
+			}
+			return {
+				stage,
+				prompt: config.defaults[stage],
+				source: "defaults",
+			} as const;
+		}) as ResolvedLayeredStage<S>[];
+	};
+}
+
+const resolveAiddStages = createLayeredStageResolver<AiddPlanStage>({
+	stages: AIDD_PLAN_STAGES,
+	defaults: DEFAULT_STAGE_PROMPTS,
+	teamPath: TEAM_OVERRIDES_PATH,
+	userPath: userOverridesPath,
+});
 
 /**
  * Resuelve los prompts efectivos de TODOS los stages: defaults → team (repo) →
@@ -80,25 +162,5 @@ function readLayer(path: string, origin: string): OverridesMap {
  * nunca se corre un prompt a medias sin saberlo.
  */
 export function resolveStagePrompts(projectRoot: string): ResolvedStage[] {
-	const team = existsSync(join(projectRoot, TEAM_OVERRIDES_PATH))
-		? readLayer(join(projectRoot, TEAM_OVERRIDES_PATH), TEAM_OVERRIDES_PATH)
-		: {};
-	const userPath = userOverridesPath();
-	const user = existsSync(userPath)
-		? readLayer(userPath, userPath)
-		: {};
-
-	return AIDD_PLAN_STAGES.map((stage) => {
-		if (user[stage] !== undefined) {
-			return { stage, prompt: user[stage]!, source: "user" } as const;
-		}
-		if (team[stage] !== undefined) {
-			return { stage, prompt: team[stage]!, source: "team" } as const;
-		}
-		return {
-			stage,
-			prompt: DEFAULT_STAGE_PROMPTS[stage],
-			source: "defaults",
-		} as const;
-	}).map((r) => ({ ...r }));
+	return resolveAiddStages(projectRoot);
 }

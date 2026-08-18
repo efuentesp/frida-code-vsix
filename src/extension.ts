@@ -1735,9 +1735,7 @@ export async function activate(
 	// worktree vinculado vive bajo <common>/.git/worktrees/<name>; el del
 	// principal es <repo>/.git. El nombre sale gratis del mismo rev-parse que
 	// ya corría la detección booleana. Issue #13.
-	async function detectWorktreeName(
-		cwd: string,
-	): Promise<string | undefined> {
+	async function detectWorktreeName(cwd: string): Promise<string | undefined> {
 		try {
 			const { stdout } = await execFileP(
 				"git",
@@ -1774,7 +1772,7 @@ export async function activate(
 			const lines = stdout.split("\n");
 			// 1ª línea "## branch...up [ahead N, behind M]" (o "## HEAD (no branch)").
 			const head = parseStatusHead(lines[0] ?? "");
-				// Resto: líneas porcelain XY path → conteo added/modified/deleted.
+			// Resto: líneas porcelain XY path → conteo added/modified/deleted.
 			const diff = parseGitDiff(lines.slice(1).join("\n"));
 			const dirty = diff.added + diff.modified + diff.deleted > 0;
 			const wtName = await detectWorktreeName(cwd);
@@ -2263,18 +2261,18 @@ export async function activate(
 
 	async function handleWebviewMessage(msg: any): Promise<void> {
 		switch (msg?.type) {
-            case "webview_ready":
-                webviewReady = true;
-                post({ type: "mode", mode: approvalMode });
-                post({ type: "version", version: fridaVersion });
-                postToolToggles();
-                postPermissionsConfig();
-                postCodebaseIndexState();
-                // #20 — re-envía el último snapshot del goal si el webview montó
-                // después del evento (cacheado en postGoalState).
-                if (lastGoalState !== undefined) {
-                    post({ type: "goal_state", goal: lastGoalState ?? null });
-                }
+			case "webview_ready":
+				webviewReady = true;
+				post({ type: "mode", mode: approvalMode });
+				post({ type: "version", version: fridaVersion });
+				postToolToggles();
+				postPermissionsConfig();
+				postCodebaseIndexState();
+				// #20 — re-envía el último snapshot del goal si el webview montó
+				// después del evento (cacheado en postGoalState).
+				if (lastGoalState !== undefined) {
+					post({ type: "goal_state", goal: lastGoalState ?? null });
+				}
 				if (pendingSettingsTab) {
 					post({ type: "open_settings", tab: pendingSettingsTab });
 					pendingSettingsTab = undefined;
@@ -3336,6 +3334,24 @@ export async function activate(
 		},
 		{
 			match: [
+				"tea",
+				"testing",
+				"test-design",
+				"test-review",
+				"automate",
+				"framework",
+				"qa",
+				"tea-test-design",
+				"tea-framework",
+				"tea-automate",
+				"tea-test-review",
+			],
+			file: "docs/tools/frida-tea.md",
+			howTo: "docs/how-to-frida-tea.md",
+			label: "frida-tea",
+		},
+		{
+			match: [
 				"workflows",
 				"patrones",
 				"patterns",
@@ -3348,13 +3364,7 @@ export async function activate(
 			label: "frida-extensible-workflows",
 		},
 		{
-			match: [
-				"subagent",
-				"subagents",
-				"subagentes",
-				"sub-agente",
-				"detached",
-			],
+			match: ["subagent", "subagents", "subagentes", "sub-agente", "detached"],
 			file: "docs/tools/frida-subagents.md",
 			howTo: "docs/how-to-frida-subagents.md",
 			label: "frida-subagents",
@@ -3400,13 +3410,7 @@ export async function activate(
 			label: "frida-supi-web",
 		},
 		{
-			match: [
-				"toggles",
-				"toggle",
-				"activar",
-				"desactivar",
-				"extension-toggles",
-			],
+			match: ["toggles", "toggle", "activar", "desactivar", "extension-toggles"],
 			file: "docs/tools/extension-toggles.md",
 			label: "extension-toggles",
 		},
@@ -3448,9 +3452,7 @@ export async function activate(
 		const words = head.trim().split(/\s+/);
 		const last = words.length > 1 ? (words.at(-1) ?? "") : "";
 		const qualifier = last.toLowerCase();
-		const isRef = ["referencia", "ref", "tecnica", "técnica"].includes(
-			qualifier,
-		);
+		const isRef = ["referencia", "ref", "tecnica", "técnica"].includes(qualifier);
 		const isGuide = ["guia", "guía", "uso", "howto", "how-to", "guide"].includes(
 			qualifier,
 		);
@@ -5036,32 +5038,32 @@ export async function activate(
 		vscode.commands.registerCommand("frida.openHelp", async () => {
 			// /help desde la paleta: picker de README + herramientas.
 			type HelpItem = vscode.QuickPickItem & { rel?: string };
-				const items: HelpItem[] = [
-					{ label: "Frida Code — Índice general (README)", rel: "README.md" },
-					// Con how-to: dos filas explícitas (guía + referencia).
-					...HELP_TOOLS.flatMap((t) =>
-						t.howTo && t.howTo !== t.file
-							? [
-									{
-										label: t.label,
-										description: "guía de uso",
-										rel: t.howTo,
-									},
-									{
-										label: t.label,
-										description: "referencia técnica",
-										rel: t.file,
-									},
-								]
-								: [
-										{
-											label: t.label,
-											description: "herramienta",
-											rel: t.file,
-										},
-									],
-						),
-				];
+			const items: HelpItem[] = [
+				{ label: "Frida Code — Índice general (README)", rel: "README.md" },
+				// Con how-to: dos filas explícitas (guía + referencia).
+				...HELP_TOOLS.flatMap((t) =>
+					t.howTo && t.howTo !== t.file
+						? [
+								{
+									label: t.label,
+									description: "guía de uso",
+									rel: t.howTo,
+								},
+								{
+									label: t.label,
+									description: "referencia técnica",
+									rel: t.file,
+								},
+							]
+						: [
+								{
+									label: t.label,
+									description: "herramienta",
+									rel: t.file,
+								},
+							],
+				),
+			];
 			const pick = await vscode.window.showQuickPick(items, {
 				placeHolder: "Abrir ayuda de…",
 			});
