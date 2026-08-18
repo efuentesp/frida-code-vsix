@@ -181,3 +181,46 @@ describe("frida-aidd · gate de artefacto por stage (#65)", () => {
 		expect(script).toContain("revisa el summary");
 	});
 });
+
+describe("frida-aidd · reintento informado del gate de artefacto (#67)", () => {
+	it("gate A y gate B desenrollados por stage, con agente de reintento entre ambos", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		for (const [i, stage] of STAGE_CHAIN.entries()) {
+			const artifact = `${PLANNING_DIR}/${ARTIFACTS[stage]}`;
+			const gateA = `const gate${i}a = await shell("test -s ${artifact}"`;
+			const retryLabel = `stage ${stage} (reintento)`;
+			const gateB = `const gate${i}b = await shell("test -s ${artifact}"`;
+			expect(script).toContain(gateA);
+			expect(script).toContain(retryLabel);
+			expect(script).toContain(gateB);
+			// Orden dentro del stage: gate A → reintento → gate B → checkpoint.
+			const a = script.indexOf(gateA);
+			const r = script.indexOf(retryLabel, a);
+			const b = script.indexOf(gateB, r);
+			expect(a).toBeGreaterThan(-1);
+			expect(r).toBeGreaterThan(a);
+			expect(b).toBeGreaterThan(r);
+			const cpIdx = script.indexOf(`checkpoint({ name: "stage-${stage}"`);
+			if (cpIdx >= 0) expect(b).toBeLessThan(cpIdx);
+			// Los dos gates son callsites DISTINTOS (journaling #65: nada de loops).
+			expect(script.match(/while \(|for \(/g)?.length ?? 0).toBe(0);
+		}
+	});
+
+	it("el reintento es informado: evidencia del gate + summary del intento 1, reusando el prompt del stage", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("Tu intento anterior NO escribió");
+		// El summary del intento 1 viaja truncado (no blob)…
+		expect(script).toContain("slice(0, 400)");
+		// …y el reintento reutiliza ctxFor con el MISMO prompt del stage.
+		expect(script).toContain("ctxFor(STAGES[1], P1, prevPaths) +");
+	});
+
+	it("segunda falla rechaza con expediente: ambos intentos + ls real del directorio", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("tras 2 intentos");
+		expect(script).toContain("Intento 1:");
+		expect(script).toContain("Intento 2:");
+		expect(script).toContain(`await shell("ls -la ${PLANNING_DIR}"`);
+	});
+});

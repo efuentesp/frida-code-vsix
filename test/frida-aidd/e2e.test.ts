@@ -214,3 +214,111 @@ async function resolveCheckpoint0(runId: string, name: string, ok: boolean) {
 	resolveCheckpoint(runId, name, ok);
 }
 void resolveCheckpoint0;
+
+/**
+ * Spawner del caso #67: el stage prd MIENTE (dice "prd.md listo" sin
+ * escribir). `prdLies` controla cuántas veces: 1 = el reintento informado
+ * sí escribe y la cadena continúa; Infinity = persiste y el expediente
+ * detiene el run. Todos los demás stages se portan bien.
+ */
+const makeLyingPrdSpawn = (seen: string[], cwd: string, prdLies: number) =>
+	(async (prompt: string) => {
+		seen.push(prompt);
+		if (prompt.includes("return ONLY a JSON object")) {
+			return { stories: [{ id: "E1-S1", title: "Exportar CSV" }] };
+		}
+		if (prompt.includes("## Story to spec")) return "spec escrita";
+		if (prompt.includes("Business Analyst (Mary)")) {
+			writeArtifact(cwd, "product-brief.md");
+			return "brief.md listo";
+		}
+		if (prompt.includes("Product Manager (John)")) {
+			const esReintento = prompt.includes("Tu intento anterior NO escribió");
+			const intento = seen.filter(
+				(p) =>
+					p.includes("Product Manager (John)") &&
+					p.includes("Tu intento anterior NO escribió") === esReintento,
+			).length;
+			if (esReintento && intento <= prdLies) {
+				writeArtifact(cwd, "prd.md");
+				return "prd.md listo (reintento honesto)";
+			}
+			return "prd.md listo"; // mentira: no escribe
+		}
+		if (prompt.includes("Architect (Winston)")) {
+			writeArtifact(cwd, "architecture.md");
+			return "architecture.md listo";
+		}
+		if (prompt.includes("PM + Architect pairing")) {
+			writeArtifact(cwd, "epics-and-stories.md");
+			return "epics-and-stories.md listo";
+		}
+		return `echo: ${prompt.slice(0, 40)}`;
+	}) as unknown as SpawnAgentFn;
+
+describe("frida-aidd · reintento del gate de artefacto (#67)", () => {
+	it("prd fantasma 1 vez: el reintento informado escribe y la cadena continúa", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const { result } = await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r67a",
+			spawnAgent: makeLyingPrdSpawn(seen, cwd, 1),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		// El summary del stage es el del reintento (el válido).
+		const r = result as { summaries: Record<string, string> };
+		expect(r.summaries.prd).toBe("prd.md listo (reintento honesto)");
+		// El reintento recibió el summary del intento 1 como evidencia.
+		const retryPrompt = seen.find((p) =>
+			p.includes("Tu intento anterior NO escribió"),
+		)!;
+		expect(retryPrompt).toContain("prd.md");
+		expect(retryPrompt).toContain("prd.md listo");
+		// La cadena llegó al fan-out con el artefacto real.
+		expect(seen.some((p) => p.includes("## Story to spec"))).toBe(true);
+	}, 30000);
+
+	it("prd fantasma persistente: falla con expediente (ambos intentos + directorio)", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const promise = runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r67b",
+			spawnAgent: makeLyingPrdSpawn(seen, cwd, 0),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		await expect(promise).rejects.toThrow(
+			/tras 2 intentos[\s\S]*Intento 1:[\s\S]*Intento 2:/,
+		);
+		// Dos intentos del stage prd, ni uno más (cap de 1 reintento).
+		const prdPrompts = seen.filter((p) =>
+			p.includes("Product Manager (John)"),
+		);
+		expect(prdPrompts).toHaveLength(2);
+		// El expediente incluye el estado real del directorio (brief SÍ escrito).
+		const err = await promise.catch((e: Error) => e.message);
+		expect(err).toContain("ls");
+		expect(err).toContain("product-brief.md");
+	}, 30000);
+});

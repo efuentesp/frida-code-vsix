@@ -105,7 +105,29 @@ ${chain
 			i < chain.length - 1
 				? `\nif (review === "manual") {\n\tconst cp = await checkpoint({ name: "stage-${s.stage}", prompt: "Stage ${s.stage} listo. Revisa/edita ${CHAIN_ARTIFACTS[s.stage]} y aprueba para continuar (o rechaza con notas en la respuesta).", context: { artifact: planningDir + "/" + A${i}, stage: "${s.stage}" } })\n\tif (cp !== "approved") throw new Error("stage ${s.stage}: checkpoint rechazado — workflow detenido")\n}`
 				: "";
-		return `\nphase("${s.stage}")\nsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\n// Gate de artefacto (#65): el contrato «escribe el archivo» del agente NO es garantía —\n// el prd.md fantasma probó que un summary sin archivo rompía la cadena aguas abajo.\nconst gate${i} = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\nif (gate${i}.exitCode !== 0) throw new Error("stage ${s.stage}: el agente NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} — revisa el summary del stage; la cadena no continúa con artefactos fantasma")\nprevPaths = prevPaths.concat([planningDir + "/" + A${i}])${cp}`;
+		return `\nphase("${s.stage}")\nsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\n// Gate de artefacto (#65): el contrato «escribe el archivo» del agente NO es garantía —\n// el prd.md fantasma probó que un summary sin archivo rompía la cadena aguas abajo.\nconst gate${i}a = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")
+if (gate${i}a.exitCode !== 0) {
+	// Reintento informado (#67): el summary del intento 1 como evidencia ataca
+	// la «completada mentirosa»; mismo prompt del stage + contexto del fracaso.
+	log("stage ${s.stage}: gate en rojo — reintento informado (#67)")
+	const intento1 = String(summaries["${s.stage}"] || "")
+	summaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths) +
+		'\\n\\n## FALLA ANTERIOR — última oportunidad\\n' +
+		'Tu intento anterior NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} (verificado con test -s).\\n' +
+		'Tu summary fue: "' + intento1.slice(0, 400) + '"\\n' +
+		'ESCRÍBELO de verdad ahora con tus file tools — sin el archivo en disco el stage falla.',
+		{ label: "stage ${s.stage} (reintento)" })
+	const gate${i}b = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")
+	if (gate${i}b.exitCode !== 0) {
+		// Expediente (#67): ambos intentos + estado real del directorio para
+		// diagnóstico inmediato (ruta equivocada / resumen sin escribir / nada).
+		const diag${i} = await shell("ls -la ${planningDir}")
+		throw new Error("stage ${s.stage}: tras 2 intentos el agente NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} — revisa el summary de ambos intentos y el ls del directorio; la cadena no continúa con artefactos fantasma\\n" +
+			'Intento 1: ' + intento1.slice(0, 200) + '\\n' +
+			'Intento 2: ' + String(summaries["${s.stage}"] || "").slice(0, 200) + '\\n' +
+			'$ ls -la ${planningDir}\\n' + (diag${i}.stdout || '(sin salida)'))
+	}
+}\nprevPaths = prevPaths.concat([planningDir + "/" + A${i}])${cp}`;
 	})
 	.join("")}
 
