@@ -58,6 +58,11 @@ import {
 	getApiKeyProvider,
 } from "./providers/api-key-providers";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
+import {
+	createFridaEnterpriseHooks,
+	FRIDA_ENTERPRISE_PROVIDER,
+	FRIDA_ENTERPRISE_PROVIDER_DISPLAY,
+} from "./providers/frida-enterprise";
 import { createVscodePresenter as createCcPluginsPresenter } from "./tools/frida-cc-plugins/presenter";
 import {
 	MOONSHOT_PROVIDER,
@@ -183,7 +188,11 @@ const execFileP = promisify(execFile);
 const ACTIVE_MODEL_KEY = "frida.activeModel";
 // ADR-0017: secret por proveedor (itera el registry de API-key providers). El id
 // de Copilot se añade por separado (OAuth, sin secret propio).
-const SUPPORTED_PROVIDERS = [...API_KEY_PROVIDER_IDS, "github-copilot"];
+const SUPPORTED_PROVIDERS = [
+	...API_KEY_PROVIDER_IDS,
+	FRIDA_ENTERPRISE_PROVIDER,
+	"github-copilot",
+];
 
 // ¿El proveedor está autenticado? getProviderAuthStatus revisa storedProviders
 // (auth.json persistido) → confiable para OAuth (Copilot) incluso tras reinicios.
@@ -1241,6 +1250,9 @@ export async function activate(
 		if (id === ZAI_PROVIDER) return ZAI_PROVIDER_DISPLAY;
 		if (id === MOONSHOT_PROVIDER) return MOONSHOT_PROVIDER_DISPLAY;
 		if (id === OPENAI_PROVIDER) return OPENAI_PROVIDER_DISPLAY;
+		if (id === FRIDA_ENTERPRISE_PROVIDER) {
+		return FRIDA_ENTERPRISE_PROVIDER_DISPLAY;
+		}
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
 	}
@@ -1266,7 +1278,10 @@ export async function activate(
 		const providers = SUPPORTED_PROVIDERS.map((id) => ({
 			id,
 			name: providerDisplayName(id),
-			oauth: !!mr.isUsingOAuth?.(id),
+			// Errata-3 (#58): isUsingOAuth sólo reporta con credential guardada; el
+			// flag pre-login sale del Provider registrado (auth.oauth), para que el
+			// webview renderice el botón de OAuth y no el campo de API key.
+			oauth: !!mr.isUsingOAuth?.(id) || !!mr.getProvider?.(id)?.auth?.oauth,
 			apiKey: !!getApiKeyProvider(id),
 			authed: isProviderAuthed(mr, id),
 			models: (mr.getModels?.(id) ?? []).map((mm: any) => ({
@@ -3162,6 +3177,14 @@ export async function activate(
 			cwd,
 			agentDir,
 			settingsManager,
+			// Errata-11 (#58): sin estas factories la sesión hija viaja SIN hooks del
+			// provider → el gateway 422-ea el título (missing user_id, Errata-2).
+			extensionFactories: [
+				{
+					name: "frida-enterprise-provider",
+					factory: createFridaEnterpriseHooks({ onUnauthorized: () => {} }),
+				},
+			],
 			systemPrompt:
 				"Eres un generador de títulos de sesión. Responde SOLO con un título conciso de máximo 5 palabras que capture la intención del mensaje del usuario. Sin comillas, sin puntuación final, sin explicación, sin prefijos como «Título:».",
 		});
@@ -3262,6 +3285,22 @@ export async function activate(
 			file: "docs/tools/frida-permission-system.md",
 			howTo: "docs/how-to-frida-permissions.md",
 			label: "frida-permission-system",
+		},
+		{
+			match: [
+				"frida-enterprise",
+				"enterprise",
+				"proveedor",
+				"provider",
+				"login",
+				"sso",
+				"compatible-api",
+				"demeter",
+				"titan",
+				"midas",
+			],
+			file: "docs/tools/frida-enterprise.md",
+			label: "frida-enterprise",
 		},
 		{
 			match: ["context"],

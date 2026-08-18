@@ -27,6 +27,11 @@ import {
 	discoverZaiModels,
 	ZAI_PROVIDER,
 } from "./providers/z-ai-provider";
+import {
+	buildFridaEnterpriseProviderConfig,
+	createFridaEnterpriseHooks,
+	FRIDA_ENTERPRISE_PROVIDER,
+} from "./providers/frida-enterprise";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
@@ -386,6 +391,15 @@ export async function createFridaSession(
 		SOFTTEK_PROVIDER,
 		buildSofttekProviderConfig({ limitsByModel, metaByModel }),
 	);
+	// Frida Enterprise (#58): OAuth corporativo de Frida Platform + Compatible
+	// API (gateway OpenAI-compatible). Los tokens ROTAN (idToken ~1h): registramos
+	// el OAuth nativo de pi-ai y el runtime persiste/rota la credential. El
+	// catálogo llega vía refreshModels (GET /v1/models) una vez autenticado; por
+	// eso el registro arranca con models: [] y baseUrl placeholder.
+	modelRuntime.registerProvider(
+		FRIDA_ENTERPRISE_PROVIDER,
+		buildFridaEnterpriseProviderConfig() as any,
+	);
 	// Z.ai es un provider BUILT-IN de pi-ai (`providers/zai`): NO se registra aquí.
 	// El ModelRuntime ya lo carga con baseUrl, modelos oficiales (glm-4.5-air / 4.7 /
 	// 5.x) y compat.thinkingFormat:"zai" (el SDK inyecta el `thinking` de GLM → el
@@ -513,6 +527,12 @@ export async function createFridaSession(
 				name: "z-ai-provider",
 				factory: createZaiProviderHooks({
 					onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+				}),
+			},
+			{
+				name: "frida-enterprise-provider",
+				factory: createFridaEnterpriseHooks({
+					onUnauthorized: () => opts.onUnauthorized(FRIDA_ENTERPRISE_PROVIDER),
 				}),
 			},
 			{
@@ -949,6 +969,12 @@ export async function createFridaSession(
 						name: "z-ai-provider",
 						factory: createZaiProviderHooks({
 							onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+						}),
+					},
+					{
+						name: "frida-enterprise-provider",
+						factory: createFridaEnterpriseHooks({
+							onUnauthorized: () => opts.onUnauthorized(FRIDA_ENTERPRISE_PROVIDER),
 						}),
 					},
 					{
