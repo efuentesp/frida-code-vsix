@@ -34,6 +34,7 @@ import {
 	runPill,
 	timelineRows,
 	agentDisplayName,
+	collapsedHeader,
 	AGENT_ICON,
 	SEGMENT_BG,
 } from "./panel-view";
@@ -81,12 +82,7 @@ function WorkflowPanel(): ReactElement | null {
 			onToggle={() => setCollapsed((c) => !c)}
 			padding={6}
 			gap={4}
-			header={
-				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext bold>Workflows</ftext>
-					<ftext color="#888">({active.length})</ftext>
-				</fbox>
-			}
+			header={<HeaderSummary runs={runs} collapsed={collapsed} />}
 		>
 			{active.map((r) => (
 				<RunView key={r.runId} run={r} />
@@ -267,6 +263,64 @@ function CountsRow({
 				<fbox flexDirection="row" gap={2} alignItems="center">
 					<ficon name="loader-circle" size={10} cls="spinner" />
 					<ftext size={11}>{counts.running}</ftext>
+				</fbox>
+			) : null}
+		</fbox>
+	);
+}
+
+/** Header del panel (#80): contraído muestra progreso — barra de fases
+ * segmentada + fase activa + ⟳N; expandido, título a secas. */
+function HeaderSummary({
+	runs,
+	collapsed,
+}: {
+	runs: readonly WorkflowRunView[];
+	collapsed: boolean;
+}): ReactElement {
+	const h = collapsedHeader(runs);
+	const p = collapsed ? h.progress : undefined;
+	return (
+		<fbox flexDirection="row" gap={6} alignItems="center">
+			<ftext bold>{h.title}</ftext>
+			{p && p.total > 0 ? (
+				<>
+					<fbox
+						flexDirection="row"
+						gap={1}
+						cls="wf-bar"
+						height={6}
+						overflow="hidden"
+					>
+						{Array.from({ length: p.total }, (_, i) => (
+							<fbox
+								key={i}
+								flex={1}
+								height={6}
+								background={
+									i < p.done
+										? SEGMENT_BG.completed
+										: i === p.done
+											? SEGMENT_BG.running
+											: SEGMENT_BG.queued
+								}
+							/>
+						))}
+					</fbox>
+					<ftext size={11} color="#8b949e">
+						{p.done}/{p.total}
+					</ftext>
+					{h.phase ? (
+						<ftext size={11} color="#58a6ff">
+							{h.phase}
+						</ftext>
+					) : null}
+				</>
+			) : null}
+			{collapsed && h.running > 0 ? (
+				<fbox flexDirection="row" gap={2} alignItems="center">
+					<ficon name="loader-circle" size={10} cls="spinner" />
+					<ftext size={11}>{h.running}</ftext>
 				</fbox>
 			) : null}
 		</fbox>

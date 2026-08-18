@@ -187,6 +187,62 @@ export function agentDisplayName(a: AgentProgressView): string {
 	return a.occurrence && a.occurrence > 1 ? `${base} #${a.occurrence}` : base;
 }
 
+/** Progreso de fases del run (#80): done = índice de la fase activa
+ * (la activa aún no cuenta); fase desconocida → done = total. */
+export function phaseProgress(
+	run: Pick<WorkflowRunView, "phases" | "phase">,
+): { done: number; total: number } {
+	const total = run.phases.length;
+	if (!total) return { done: 0, total: 0 };
+	const idx = run.phases.indexOf(run.phase ?? "");
+	return { done: idx >= 0 ? idx : total, total };
+}
+
+/** Datos del header contraído del panel (#80). */
+export interface CollapsedHeader {
+	title: string;
+	progress?: { done: number; total: number };
+	phase?: string;
+	running: number;
+}
+
+/** Header del panel contraído (#80): con 1 run activo muestra nombre +
+ * barra de fases + fase activa + ⟳N; con varios, agregado sin barra. */
+export function collapsedHeader(
+	runs: readonly (Pick<
+		WorkflowRunView,
+		"workflowName" | "state" | "phase" | "phases" | "agents"
+	>)[],
+): CollapsedHeader {
+	const active = runs.filter(
+		(r) => r.state === "running" || r.state === "awaiting",
+	);
+	const running = active.reduce(
+		(n, r) => n + r.agents.filter((a) => a.state === "running").length,
+		0,
+	);
+	if (active.length === 1) {
+		const r = active[0];
+		const h: CollapsedHeader = { title: r.workflowName, running };
+		if (r.phase && r.phases.length > 0) {
+			const p = phaseProgress(r);
+			if (p.total > 0) {
+				h.progress = p;
+				h.phase = r.phase;
+			}
+		}
+		return h;
+	}
+	if (active.length > 1) {
+		return { title: `Workflows · ${active.length}`, running };
+	}
+	// Sin activos: título a secas (count de todos si hay varios).
+	return {
+		title: runs.length > 1 ? `Workflows · ${runs.length}` : "Workflows",
+		running: 0,
+	};
+}
+
 /** ¿El agente cuelga de un grupo parallel/pipeline? (su path lo extiende) */
 function hangsFromGroup(
 	a: AgentProgressView,

@@ -55,8 +55,12 @@ export function CollapsiblePanel({
 				onClick={onToggle}
 				cls="panel-header"
 			>
-				<ftext cls="panel-chev">{collapsed ? "▶" : "▼"}</ftext>
-				{header}
+			<ficon
+				name={collapsed ? "chevron-right" : "chevron-down"}
+				size={11}
+				color="#8b949e"
+			/>
+			{header}
 			</fbox>
 			{collapsed ? null : children}
 		</fbox>

@@ -14,6 +14,8 @@ import {
 	AGENT_ICON,
 	timelineRows,
 	agentDisplayName,
+	collapsedHeader,
+	phaseProgress,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -340,5 +342,89 @@ describe("frida-extensible-workflows · timeline vertical + label real (#79)", (
 				startedAt: 0,
 			}),
 		).toBe("worker");
+	});
+});
+
+describe("frida-extensible-workflows · header contraído con progreso (#80)", () => {
+	const run = (over: Partial<Parameters<typeof collapsedHeader>[0][number]>) =>
+		({
+			runId: "r",
+			workflowName: "wf",
+			state: "running",
+			phase: undefined,
+			phases: [],
+			phaseTimes: {},
+			agents: [],
+			groups: [],
+			...over,
+		}) as Parameters<typeof collapsedHeader>[0][number];
+
+	it("phaseProgress: done = índice de la fase activa; terminal = total", () => {
+		expect(
+			phaseProgress({
+				phases: ["bootstrap", "ship", "story E1"],
+				phase: "ship",
+			}),
+		).toEqual({ done: 1, total: 3 });
+		expect(
+			phaseProgress({ phases: ["a", "b"], phase: "b" }),
+		).toEqual({ done: 1, total: 2 });
+		// Fase actual no está en el historial (edge) → done = total.
+		expect(phaseProgress({ phases: ["a"], phase: "zzz" })).toEqual({
+			done: 1,
+			total: 1,
+		});
+	});
+
+	it("collapsedHeader con 1 run: nombre, barra, fase y ⟳N", () => {
+		const h = collapsedHeader([
+			run({
+				workflowName: "aidd-ship-nutrimetrics",
+				phase: "story E3-S2",
+				phases: ["bootstrap", "ship", "story E1", "story E3-S2"],
+				agents: [
+					{
+						agentId: "a1",
+						structuralPath: ["root"],
+						state: "running",
+						startedAt: 0,
+					},
+					{
+						agentId: "a2",
+						structuralPath: ["root"],
+						state: "completed",
+						startedAt: 0,
+					},
+				],
+			}),
+		]);
+		expect(h.title).toBe("aidd-ship-nutrimetrics");
+		expect(h.progress).toEqual({ done: 3, total: 4 });
+		expect(h.phase).toBe("story E3-S2");
+		expect(h.running).toBe(1);
+	});
+
+	it("collapsedHeader con 2+: título agregado, sin barra, ⟳ suma", () => {
+		const h = collapsedHeader([
+			run({ workflowName: "uno", phase: "p1", phases: ["p1"], agents: [
+				{ agentId: "a", structuralPath: [], state: "running", startedAt: 0 },
+			] }),
+			run({ workflowName: "dos", phase: "q1", phases: ["q1"], agents: [
+				{ agentId: "b", structuralPath: [], state: "running", startedAt: 0 },
+			] }),
+		]);
+		expect(h.title).toBe("Workflows · 2");
+		expect(h.progress).toBeUndefined();
+		expect(h.phase).toBeUndefined();
+		expect(h.running).toBe(2);
+	});
+
+	it("collapsedHeader sin runs activos: sin progreso", () => {
+		const h = collapsedHeader([
+			run({ state: "completed", phases: ["a", "b"], phase: undefined }),
+		]);
+		expect(h.title).toBe("Workflows");
+		expect(h.progress).toBeUndefined();
+		expect(h.running).toBe(0);
 	});
 });
