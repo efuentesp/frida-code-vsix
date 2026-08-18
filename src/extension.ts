@@ -3236,7 +3236,13 @@ export async function activate(
 
 	// /help: abre el README o la doc de una herramienta en markdown preview.
 	// Índice de herramientas con sus alias de match (para /help <alias>).
-	const HELP_TOOLS: { match: string[]; file: string; label: string }[] = [
+	const HELP_TOOLS: {
+		match: string[];
+		file: string;
+		/** Guía de uso (how-to) cuando existe: aterrizaje default de /help. */
+		howTo?: string;
+		label: string;
+	}[] = [
 		{
 			match: ["workflow", "wf", "frida-workflow"],
 			file: "docs/tools/frida-workflow.md",
@@ -3256,6 +3262,7 @@ export async function activate(
 		{
 			match: ["permission", "gates", "frida-permission-system"],
 			file: "docs/tools/frida-permission-system.md",
+			howTo: "docs/how-to-frida-permissions.md",
 			label: "frida-permission-system",
 		},
 		{
@@ -3318,11 +3325,13 @@ export async function activate(
 		{
 			match: ["goal", "goals", "objetivo", "meta", "/goal"],
 			file: "docs/tools/frida-goal.md",
+			howTo: "docs/how-to-frida-goal.md",
 			label: "frida-goal",
 		},
 		{
 			match: ["aidd", "bmad", "sprint", "ship", "aidd-plan", "aidd-ship"],
 			file: "docs/tools/frida-aidd.md",
+			howTo: "docs/how-to-frida-aidd.md",
 			label: "frida-aidd",
 		},
 		{
@@ -3335,6 +3344,7 @@ export async function activate(
 				"code-review-pattern",
 			],
 			file: "docs/tools/frida-extensible-workflows.md",
+			howTo: "docs/how-to-frida-workflows.md",
 			label: "frida-extensible-workflows",
 		},
 		{
@@ -3346,26 +3356,32 @@ export async function activate(
 				"detached",
 			],
 			file: "docs/tools/frida-subagents.md",
+			howTo: "docs/how-to-frida-subagents.md",
 			label: "frida-subagents",
 		},
 		{
 			match: ["sandbox", "sandboxes", "docker", "contenedor"],
 			file: "docs/tools/frida-sandboxes.md",
+			howTo: "docs/how-to-frida-sandboxes.md",
 			label: "frida-sandboxes",
 		},
 		{
 			match: ["cc-plugins", "ccplugins", "claude-code", "plugins"],
 			file: "docs/tools/frida-cc-plugins.md",
+			howTo: "docs/how-to-cc-plugins.md",
 			label: "frida-cc-plugins",
 		},
 		{
 			match: ["hermes", "memory", "memoria"],
 			file: "docs/tools/frida-hermes-memory.md",
+			// How-to transversal de la pila Moat (index + hermes + knowledge-base).
+			howTo: "docs/how-to-frida-learn.md",
 			label: "frida-hermes-memory",
 		},
 		{
 			match: ["knowledge", "kb", "okf", "obsidian", "conocimiento"],
 			file: "docs/tools/frida-knowledge-base.md",
+			howTo: "docs/how-to-frida-learn.md",
 			label: "frida-knowledge-base",
 		},
 		{
@@ -3394,6 +3410,20 @@ export async function activate(
 			file: "docs/tools/extension-toggles.md",
 			label: "extension-toggles",
 		},
+		{
+			// /worktree: tutorial (sin doc técnica — el comando es la superficie).
+			match: ["worktree", "worktrees", "wt"],
+			file: "docs/how-to-frida-worktrees.md",
+			howTo: "docs/how-to-frida-worktrees.md",
+			label: "frida-worktrees",
+		},
+		{
+			// Pila Moat: index + hermes + knowledge-base en un solo manual.
+			match: ["learn", "codebase-index", "moat", "aprendizaje"],
+			file: "docs/how-to-frida-learn.md",
+			howTo: "docs/how-to-frida-learn.md",
+			label: "frida-learn",
+		},
 	];
 
 	async function openHelpDoc(relPath: string, fragment?: string): Promise<void> {
@@ -3411,20 +3441,37 @@ export async function activate(
 		}
 		const [head, ...rest] = a.split("#");
 		const frag = rest.join("#") || undefined;
-		const needle = head.trim().toLowerCase();
+		// Calificador final opcional: "/help goal referencia" (doc técnica) o
+		// "/help goal guia|uso" (guía). Sin calificador aterriza en el how-to
+		// cuando existe — quien pide ayuda quiere el uso, y la referencia queda
+		// a un click en el cross-link del encabezado del how-to.
+		const words = head.trim().split(/\s+/);
+		const last = words.length > 1 ? (words.at(-1) ?? "") : "";
+		const qualifier = last.toLowerCase();
+		const isRef = ["referencia", "ref", "tecnica", "técnica"].includes(
+			qualifier,
+		);
+		const isGuide = ["guia", "guía", "uso", "howto", "how-to", "guide"].includes(
+			qualifier,
+		);
+		const needle = (isRef || isGuide ? words.slice(0, -1) : words)
+			.join(" ")
+			.toLowerCase();
 		const tool = HELP_TOOLS.find(
 			(t) =>
 				t.match.some((m) => m.toLowerCase() === needle) ||
 				t.label.toLowerCase().includes(needle),
 		);
 		if (tool) {
-			await openHelpDoc(tool.file, frag);
+			if (isRef) await openHelpDoc(tool.file, frag);
+			else if (isGuide && tool.howTo) await openHelpDoc(tool.howTo, frag);
+			else await openHelpDoc(tool.howTo ?? tool.file, frag);
 			return;
 		}
 		await openHelpDoc("README.md");
 		post({
 			type: "info",
-			text: `No encontré "${arg}". Abriendo el índice (README). Herramientas: ${HELP_TOOLS.map((t) => t.label).join(", ")}.`,
+			text: `No encontré "${arg}". Abriendo el índice (README). Herramientas: ${HELP_TOOLS.map((t) => t.label).join(", ")}. Tip: "/help <herramienta> referencia" abre la doc técnica.`,
 		});
 	}
 
@@ -4989,14 +5036,32 @@ export async function activate(
 		vscode.commands.registerCommand("frida.openHelp", async () => {
 			// /help desde la paleta: picker de README + herramientas.
 			type HelpItem = vscode.QuickPickItem & { rel?: string };
-			const items: HelpItem[] = [
-				{ label: "Frida Code — Índice general (README)", rel: "README.md" },
-				...HELP_TOOLS.map((t) => ({
-					label: t.label,
-					description: "herramienta",
-					rel: t.file,
-				})),
-			];
+				const items: HelpItem[] = [
+					{ label: "Frida Code — Índice general (README)", rel: "README.md" },
+					// Con how-to: dos filas explícitas (guía + referencia).
+					...HELP_TOOLS.flatMap((t) =>
+						t.howTo && t.howTo !== t.file
+							? [
+									{
+										label: t.label,
+										description: "guía de uso",
+										rel: t.howTo,
+									},
+									{
+										label: t.label,
+										description: "referencia técnica",
+										rel: t.file,
+									},
+								]
+								: [
+										{
+											label: t.label,
+											description: "herramienta",
+											rel: t.file,
+										},
+									],
+						),
+				];
 			const pick = await vscode.window.showQuickPick(items, {
 				placeHolder: "Abrir ayuda de…",
 			});

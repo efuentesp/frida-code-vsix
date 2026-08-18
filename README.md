@@ -190,7 +190,7 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | Herramienta | Qué hace | Doc |
 | --- | --- | --- |
 | **frida-workflow** | Motor de workflows: cadenas de etapas (skills en sesiones hijas) con routing, loops y jueces | [→](./docs/tools/frida-workflow.md) |
-| **frida-permission-system** | Sistema de permisos y gates (registro, auditoría) | [→](./docs/tools/frida-permission-system.md) |
+| **frida-permission-system** | Sistema de permisos y gates (registro, auditoría) | [→](./docs/tools/frida-permission-system.md) · [guía](./docs/how-to-frida-permissions.md) |
 | **frida-context** | Snapshot de presión del contexto para auto-regulación | [→](./docs/tools/frida-context.md) |
 | **frida-agent-browser** | Automatización de navegador real + búsqueda web (Exa/Brave) + apps Electron (tools `agent_browser` / `agent_browser_web_search`) | [→](./docs/tools/frida-agent-browser.md) |
 | **frida-supi-web** | Fetch de URL pública → Markdown + docs de librerías vía Context7 (tools `web_fetch_md` / `web_docs_search` / `web_docs_fetch`) — porte de `@mrclrchtr/supi-web` | [→](./docs/tools/frida-supi-web.md) |
@@ -200,15 +200,16 @@ tengan setting con la clave `frida.<tool>.enabled` (aplica al recargar con `/rel
 | **ask-user-question-web** | El agente pregunta con opciones estructuradas (UI web) | [→](./docs/tools/ask-user-question-web.md) |
 | **todo** / **todo-web** | Seguimiento multi-paso de tareas + panel | [→](./docs/tools/todo.md) |
 | **frida-pipeline** | Orquestador con 27 skills, 15 sub-agentes y 3 workflows (porte de rpiv-pi) | [→](./docs/tools/frida-pipeline.md) |
-| **frida-subagents** | Sub-agentes autónomos estilo Claude Code (Agent, get_subagent_result, steer_subagent) | [→](./docs/tools/frida-subagents.md) |
+| **frida-subagents** | Sub-agentes autónomos estilo Claude Code (Agent, get_subagent_result, steer_subagent) | [→](./docs/tools/frida-subagents.md) · [guía](./docs/how-to-frida-subagents.md) |
 | **frida-mcp-adapter** | Integración MCP — un proxy tool da acceso a cientos de servidores sin quemar contexto | [→](./docs/tools/frida-mcp-adapter.md) |
-| **frida-extensible-workflows** | Workflows deterministas con sub-agentes desechables: `parallel`/`pipeline`, checkpoints, budget y 4 patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review) — porte de pi-dynamic-workflows | [→](./docs/tools/frida-extensible-workflows.md) |
-| **frida-goal** | Modo goal — la sesión se auto-continúa hasta completar un objetivo, con guards (cap de continuaciones, no-progreso, budget de tokens) — porte de pi-goal | [→](./docs/tools/frida-goal.md) |
-| **frida-aidd** | Metodología AiDD (BMAD) adaptada: `aidd-plan` (idea → PRD → arquitectura → specs) + `aidd-ship` (loop determinista por historia con lie-detector y commit del orquestador) | [→](./docs/tools/frida-aidd.md) |
-| **frida-sandboxes** | Contenedores Docker desechables por agente para bash aislado, con políticas por host | [→](./docs/tools/frida-sandboxes.md) |
-| **frida-hermes-memory** | Memoria persistente entre sesiones vía hermes — creencias verificadas con decay | [→](./docs/tools/frida-hermes-memory.md) |
-| **frida-knowledge-base** | Base de conocimiento OKF/Obsidian — búsqueda e ingesta de notas | [→](./docs/tools/frida-knowledge-base.md) |
-| **frida-cc-plugins** | Carga plugins de Claude Code (`.claude/plugins`) como herramientas nativas | [→](./docs/tools/frida-cc-plugins.md) |
+| **frida-extensible-workflows** | Workflows deterministas con sub-agentes desechables: `parallel`/`pipeline`, checkpoints, budget y 4 patrones curados (multi-perspective, codebase-audit, adversarial-review, code-review) — porte de pi-dynamic-workflows | [→](./docs/tools/frida-extensible-workflows.md) · [guía](./docs/how-to-frida-workflows.md) |
+| **frida-goal** | Modo goal — la sesión se auto-continúa hasta completar un objetivo, con guards (cap de continuaciones, no-progreso, budget de tokens) — porte de pi-goal | [→](./docs/tools/frida-goal.md) · [guía](./docs/how-to-frida-goal.md) |
+| **frida-aidd** | Metodología AiDD (BMAD) adaptada: `aidd-plan` (idea → PRD → arquitectura → specs) + `aidd-ship` (loop determinista por historia con lie-detector y commit del orquestador) | [→](./docs/tools/frida-aidd.md) · [guía](./docs/how-to-frida-aidd.md) |
+| **frida-sandboxes** | Contenedores Docker desechables por agente para bash aislado, con políticas por host | [→](./docs/tools/frida-sandboxes.md) · [guía](./docs/how-to-frida-sandboxes.md) |
+| **frida-codebase-index** | Aprende el código: índice simbólico consultable por el agente | [guía](./docs/how-to-frida-learn.md) |
+| **frida-hermes-memory** | Memoria persistente entre sesiones vía hermes — creencias verificadas con decay | [→](./docs/tools/frida-hermes-memory.md) · [guía](./docs/how-to-frida-learn.md) |
+| **frida-knowledge-base** | Base de conocimiento OKF/Obsidian — búsqueda e ingesta de notas | [→](./docs/tools/frida-knowledge-base.md) · [guía](./docs/how-to-frida-learn.md) |
+| **frida-cc-plugins** | Carga plugins de Claude Code (`.claude/plugins`) como herramientas nativas | [→](./docs/tools/frida-cc-plugins.md) · [guía](./docs/how-to-cc-plugins.md) |
 | **frida-git-sync** | Sincronización de paquetes y estado del sistema vía repos git | [→](./docs/tools/frida-git-sync.md) |
 | **extension-toggles** | Activa/desactiva extensiones individuales desde el hub de ajustes | [→](./docs/tools/extension-toggles.md) |
 
