@@ -1,12 +1,13 @@
 // E2E live — Matriz de niveles de razonamiento para DevEngine.
 //
 // OBJETIVO: verificar que el gateway DevEngine soporta todos los niveles de
-// reasoning_effort (none/low/medium/high) y detectar el bug conocido
+// reasoning_effort (none/low/medium/high) en TODOS los modelos del catálogo
+// (ADR-0056: mini, luna, sol, terra) y detectar el bug conocido
 // requiresThinkingAsText (el gateway devuelve reasoning_content pero lo
 // rechaza en el historial → 500 en turno 2).
 //
 //   npx vitest run test/devengine/e2e/live-reasoning.e2e.test.ts
-//   Override: DEVENGINE_MODEL="gpt-4o"
+//   Override: DEVENGINE_MODELS="gpt-5.6-sol" (csv)
 //
 // Genera test/devengine/e2e/reporte-reasoning-devengine.md con la matriz
 // completa (modelo × effort → status, texto, reasoning_tokens, ms).
@@ -15,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import {
 	DEVENGINE_BASE_URL,
-	DEVENGINE_MODEL,
+	DEVENGINE_MODELS,
 	DEVENGINE_TIMEOUT,
 	readCredential,
 	makeEngine,
@@ -60,9 +61,18 @@ const CASES: ReasoningCase[] = [
 	},
 ];
 
-describe("E2E live REASONING: DevEngine × effort levels", () => {
+interface ReasoningResult {
+	effort: string;
+	ok: boolean;
+	text: string;
+	reasoningTokens: number;
+	detail?: string;
+	ms: number;
+}
+
+describe("E2E live REASONING: DevEngine × effort levels × modelos", () => {
 	it(
-		`matriz effort (none/low/medium/high) × 1 modelo → reporte MD`,
+		`matriz effort (none/low/medium/high) × ${DEVENGINE_MODELS.length} modelos → reporte MD`,
 		async () => {
 			const cred = await readCredential();
 			if (!cred?.access) {
@@ -72,83 +82,84 @@ describe("E2E live REASONING: DevEngine × effort levels", () => {
 				return;
 			}
 
-			const { turn } = await makeEngine({
-				baseUrl: DEVENGINE_BASE_URL,
-				key: cred.access,
-				model: DEVENGINE_MODEL,
-			});
+			const byModel: Array<{ model: string; results: ReasoningResult[] }> = [];
+			for (const model of DEVENGINE_MODELS) {
+				const { turn } = await makeEngine({
+					baseUrl: DEVENGINE_BASE_URL,
+					key: cred.access,
+					model,
+				});
 
-			const results: Array<{
-				effort: string;
-				ok: boolean;
-				text: string;
-				reasoningTokens: number;
-				detail?: string;
-				ms: number;
-			}> = [];
+				const results: ReasoningResult[] = [];
+				byModel.push({ model, results });
 
-			for (const c of CASES) {
-				const t0 = Date.now();
-				try {
-					const r = await turn(
-						[{ role: "user", content: [{ type: "text", text: c.prompt }] }],
-						[],
-						{ reasoningEffort: c.effort, maxTokens: 2000 },
-					);
+				for (const c of CASES) {
+					const t0 = Date.now();
+					try {
+						const r = await turn(
+							[{ role: "user", content: [{ type: "text", text: c.prompt }] }],
+							[],
+							{ reasoningEffort: c.effort, maxTokens: 2000 },
+						);
 
-					const verifyErr = c.verify(r.text, r.reasoningTokens);
-					results.push({
-						effort: c.effort,
-						ok: !verifyErr,
-						text: r.text.slice(0, 200),
-						reasoningTokens: r.reasoningTokens,
-						detail: verifyErr ?? undefined,
-						ms: Date.now() - t0,
-					});
-				} catch (e: any) {
-					results.push({
-						effort: c.effort,
-						ok: false,
-						text: "",
-						reasoningTokens: 0,
-						detail: `excepción: ${String(e?.message ?? e).slice(0, 140)}`,
-						ms: Date.now() - t0,
-					});
+						const verifyErr = c.verify(r.text, r.reasoningTokens);
+						results.push({
+							effort: c.effort,
+							ok: !verifyErr,
+							text: r.text.slice(0, 200),
+							reasoningTokens: r.reasoningTokens,
+							detail: verifyErr ?? undefined,
+							ms: Date.now() - t0,
+						});
+					} catch (e: any) {
+						results.push({
+							effort: c.effort,
+							ok: false,
+							text: "",
+							reasoningTokens: 0,
+							detail: `excepción: ${String(e?.message ?? e).slice(0, 140)}`,
+							ms: Date.now() - t0,
+						});
+					}
 				}
-			}
+			} // fin for model
 
-			// ── Reporte MD ──
-			const okCount = results.filter((r) => r.ok).length;
+			// ── Reporte MD (sección por modelo) ──
 			const lines: string[] = [];
 			lines.push(
-				`# Reporte E2E reasoning — ${DEVENGINE_MODEL} (${new Date().toISOString()})`,
+				`# Reporte E2E reasoning — ${DEVENGINE_MODELS.join(", ")} (${new Date().toISOString()})`,
 			);
 			lines.push("");
 			lines.push(
 				`Endpoint: ${DEVENGINE_BASE_URL}/v1/chat/completions · Adapter: openai-completions`,
 			);
-			lines.push("");
-			lines.push(`## Resumen`);
-			lines.push("");
-			lines.push(`- **${okCount}/${CASES.length}** efforts funcionan correctamente`);
-			lines.push("");
-			lines.push(
-				`| Effort | Resultado | Reasoning tokens | Texto (primeros 200 chars) | ms |`,
-			);
-			lines.push(`|---|---|---|---|---|`);
-			for (const r of results) {
+			for (const { model, results } of byModel) {
+				const okCount = results.filter((r) => r.ok).length;
+				lines.push("");
+				lines.push(`## ${model}`);
+				lines.push("");
+				lines.push(`### Resumen`);
+				lines.push("");
 				lines.push(
-					`| ${r.effort} | ${r.ok ? "✅" : "❌"} | ${r.reasoningTokens} | ${r.text.replace(/\|/g, "\\|").replace(/\n/g, " ")} | ${r.ms} |`,
+					`- **${okCount}/${CASES.length}** efforts funcionan correctamente`,
 				);
-			}
-			if (results.some((r) => !r.ok)) {
 				lines.push("");
-				lines.push(`## Detalles de fallos`);
-				lines.push("");
-				for (const r of results.filter((r) => !r.ok)) {
+				lines.push(
+					`| Effort | Resultado | Reasoning tokens | Texto (primeros 200 chars) | ms |`,
+				);
+				lines.push(`|---|---|---|---|---|`);
+				for (const r of results) {
 					lines.push(
-						`- **${r.effort}**: ${r.detail ?? "sin detalle"}`,
+						`| ${r.effort} | ${r.ok ? "✅" : "❌"} | ${r.reasoningTokens} | ${r.text.replace(/\|/g, "\\|").replace(/\n/g, " ")} | ${r.ms} |`,
 					);
+				}
+				if (results.some((r) => !r.ok)) {
+					lines.push("");
+					lines.push(`#### Detalles de fallos`);
+					lines.push("");
+					for (const r of results.filter((r) => !r.ok)) {
+						lines.push(`- **${r.effort}**: ${r.detail ?? "sin detalle"}`);
+					}
 				}
 			}
 			lines.push("");
@@ -164,9 +175,15 @@ describe("E2E live REASONING: DevEngine × effort levels", () => {
 			await fs.writeFile(reportPath, report, "utf8");
 			console.log(`\n=== REPORTE: ${reportPath} ===\n${report}\n`);
 
-			// Exige que al menos 2 efforts funcionen (para detectar regresión total)
-			expect(okCount).toBeGreaterThanOrEqual(2);
+			// Exige que al menos 2 efforts funcionen POR modelo (regresión total)
+			for (const { model, results } of byModel) {
+				const okCount = results.filter((r) => r.ok).length;
+				expect(
+					okCount,
+					`${model}: regresión total de reasoning (${okCount}/${CASES.length})`,
+				).toBeGreaterThanOrEqual(2);
+			}
 		},
-		{ timeout: DEVENGINE_TIMEOUT },
+		DEVENGINE_TIMEOUT * DEVENGINE_MODELS.length,
 	);
 });

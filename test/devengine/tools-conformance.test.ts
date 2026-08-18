@@ -57,7 +57,7 @@ function runtimeTools() {
 	}));
 }
 
-// ─── Schemas del harness (16) ────────────────────────────────────────────────
+// ─── Schemas del harness (29) ────────────────────────────────────────────────
 
 const obj = (properties: Record<string, unknown>, required?: string[]) => ({
 	type: "object",
@@ -341,10 +341,158 @@ const harnessTools = [
 				search: { type: "string" },
 				regex: { type: "boolean" },
 				includeSchemas: { type: "boolean" },
-				connect: { type: "string" },
-				describe: { type: "string" },
-				instructions: { type: "string" },
+			connect: { type: "string" },
+			describe: { type: "string" },
+			instructions: { type: "string" },
 			}),
+		},
+	},
+	// ─── 13 tools nuevas del host (v0.23: subagents Agent, goal, kb, sandboxes,
+	// workflow_catalog, context) — schemas fieles de src/tools/* ───────────────
+	{
+		type: "function",
+		function: {
+			name: "Agent",
+			description: "Lanza un sub-agente autónomo",
+			parameters: obj(
+				{
+					prompt: { type: "string" },
+					description: { type: "string" },
+					subagent_type: { type: "string" },
+					model: { type: "string" },
+					run_in_background: { type: "boolean" },
+				},
+				["prompt", "description", "subagent_type"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "context",
+			description: "RAG documental del equipo (frida-context)",
+			parameters: obj(
+				{ query: { type: "string" }, maxTokens: { type: "number" } },
+				["query"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "goal_complete",
+			description: "Marca el goal activo como completado",
+			parameters: obj(
+				{
+					goal_id: { type: "string" },
+					summary: { type: "string" },
+					evidence: { type: "string" },
+				},
+				["goal_id", "summary"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "goal_blocked",
+			description: "Reporta un bloqueo del goal activo",
+			parameters: obj(
+				{
+					goal_id: { type: "string" },
+					blocker: { type: "string" },
+					evidence: { type: "string" },
+				},
+				["goal_id", "blocker"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "kb_search",
+			description: "Búsqueda en la base de conocimiento (frida-knowledge-base)",
+			parameters: obj(
+				{ query: { type: "string" }, limit: { type: "number" } },
+				["query"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "kb_neighbors",
+			description: "Vecinos de una página en la base de conocimiento",
+			parameters: obj(
+				{ page: { type: "string" }, depth: { type: "number" } },
+				["page"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_create",
+			description: "Crea un contenedor Docker desechable",
+			parameters: obj({
+				name: { type: "string" },
+				image: { type: "string" },
+				workdir: { type: "string" },
+			}),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_exec",
+			description: "Ejecuta un comando en el sandbox",
+			parameters: obj(
+				{ id: { type: "string" }, command: { type: "string" } },
+				["id", "command"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_status",
+			description: "Estado del sandbox",
+			parameters: obj({ id: { type: "string" } }),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_changes",
+			description: "Diff de cambios del sandbox",
+			parameters: obj({ id: { type: "string" } }, ["id"]),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_merge",
+			description: "Fusiona cambios del sandbox al workspace",
+			parameters: obj(
+				{ id: { type: "string" }, paths: { type: "array", items: { type: "string" } } },
+				["id"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_destroy",
+			description: "Destruye el sandbox",
+			parameters: obj({ id: { type: "string" } }, ["id"]),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "workflow_catalog",
+			description: "Lista workflows/patrones disponibles",
+			parameters: obj({ verbose: { type: "boolean" } }),
 		},
 	},
 ];
@@ -356,9 +504,9 @@ function allTools() {
 // ─── Pruebas ────────────────────────────────────────────────────────────────
 
 describe("conformance de tools: todas las tools de frida code viajan intactas", () => {
-	it("el inventario cubre las 7 core del runtime + 16 del harness (23 totales)", () => {
+	it("el inventario cubre las 7 core del runtime + 29 del harness (36 totales)", () => {
 		const tools = allTools();
-		expect(tools).toHaveLength(createAllToolDefinitions ? 23 : 16);
+		expect(tools).toHaveLength(createAllToolDefinitions ? 36 : 29);
 		if (createAllToolDefinitions) {
 			expect(tools.slice(0, 7).map((t: any) => t.function.name)).toEqual(
 				expect.arrayContaining([
@@ -384,7 +532,7 @@ describe("conformance de tools: todas las tools de frida code viajan intactas", 
 		expect(tools).toEqual(snapshot);
 	});
 
-	it("el payload completo con las 23 tools es JSON-serializable (lo que viaja por HTTP)", () => {
+	it("el payload completo con las 36 tools es JSON-serializable (lo que viaja por HTTP)", () => {
 		const tools = allTools();
 		const payload = {
 			model: "gpt-5.4-mini",

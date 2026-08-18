@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
 	DEVENGINE_BASE_URL,
-	DEVENGINE_MODEL,
+	DEVENGINE_MODELS,
 	DEVENGINE_TIMEOUT,
 	readCredential,
 	makeSandbox,
@@ -326,6 +326,92 @@ function hostToolSchemas(): Array<{
 				"Envía el mensaje 'prioriza los tests' al sub-agente agent-123.",
 			requiredFields: ["agent_id", "message"],
 		},
+		// ─── 6 tools nuevas del host (v0.23) ─────────────────────────────────
+		{
+			name: "Agent",
+			description:
+				"Launch a new agent to handle complex, multi-step tasks autonomously.",
+			parameters: {
+				type: "object",
+				required: ["prompt", "description", "subagent_type"],
+				properties: {
+					prompt: { type: "string" },
+					description: { type: "string" },
+					subagent_type: { type: "string" },
+					model: { type: "string" },
+					run_in_background: { type: "boolean" },
+				},
+			},
+			prompt:
+				"Delega a un sub-agente especializado la tarea de averiguar qué versión de TypeScript usa este repo.",
+			requiredFields: ["prompt", "subagent_type"],
+		},
+		{
+			name: "kb_search",
+			description: "Search the team knowledge base (OKF/Obsidian) by query.",
+			parameters: {
+				type: "object",
+				required: ["query"],
+				properties: { query: { type: "string" }, limit: { type: "number" } },
+			},
+			prompt:
+				"Busca en la base de conocimiento del equipo notas sobre 'pipeline de release'.",
+			requiredFields: ["query"],
+		},
+		{
+			name: "sandbox_create",
+			description: "Create a disposable Docker sandbox for isolated bash work.",
+			parameters: {
+				type: "object",
+				properties: {
+					name: { type: "string" },
+					image: { type: "string" },
+					workdir: { type: "string" },
+				},
+			},
+			prompt:
+				"Necesito un entorno desechable y aislado con la imagen python:3.12-slim para probar un script sin tocar mi máquina.",
+			requiredFields: [],
+		},
+		{
+			name: "sandbox_exec",
+			description: "Run a shell command inside a sandbox.",
+			parameters: {
+				type: "object",
+				required: ["id", "command"],
+				properties: { id: { type: "string" }, command: { type: "string" } },
+			},
+			prompt:
+				"En el sandbox sbx-1 corre el comando 'python --version' y dime la salida.",
+			requiredFields: ["id", "command"],
+		},
+		{
+			name: "workflow_catalog",
+			description: "List available workflows/builtin patterns.",
+			parameters: {
+				type: "object",
+				properties: { verbose: { type: "boolean" } },
+			},
+			prompt:
+				"Muéstrame el catálogo de flujos de trabajo predefinidos que puedo correr en este proyecto.",
+			requiredFields: [],
+		},
+		{
+			name: "goal_complete",
+			description: "Mark the active goal as completed with a summary.",
+			parameters: {
+				type: "object",
+				required: ["goal_id", "summary"],
+				properties: {
+					goal_id: { type: "string" },
+					summary: { type: "string" },
+					evidence: { type: "string" },
+				},
+			},
+			prompt:
+				"El objetivo goal-42 ya quedó logrado: registra el resumen 'migración completada sin regresiones'.",
+			requiredFields: ["goal_id", "summary"],
+		},
 	];
 }
 
@@ -333,7 +419,7 @@ function hostToolSchemas(): Array<{
 
 describe("E2E live TOOLS: DevEngine × todas las tools de frida code", () => {
 	it(
-		`matriz A (ciclo real 7 core) + B (generación 8 host) → reporte MD`,
+		`matriz A (ciclo real 7 core) + B (generación 14 host) × ${DEVENGINE_MODELS.length} modelos → reporte MD`,
 		async () => {
 			const cred = await readCredential();
 			if (!cred?.access) {
@@ -350,13 +436,16 @@ describe("E2E live TOOLS: DevEngine × todas las tools de frida code", () => {
 				parameters: t.parameters,
 			}));
 
+			const byModel: Array<{ model: string; results: CaseResult[] }> = [];
+			for (const model of DEVENGINE_MODELS) {
 			const { turn } = await makeEngine({
 				baseUrl: DEVENGINE_BASE_URL,
 				key: cred.access,
-				model: DEVENGINE_MODEL,
+				model,
 			});
 
 			const results: CaseResult[] = [];
+			byModel.push({ model, results });
 
 			// ── NIVEL A: ciclo real con MINI-LOOP agentic (hasta 3 tool-calls
 			//    encadenadas: el modelo puede leer antes de editar, etc.).
@@ -578,38 +667,43 @@ describe("E2E live TOOLS: DevEngine × todas las tools de frida code", () => {
 						ms: Date.now() - t0,
 					});
 				}
-			}
+				}
+				} // fin for model
 
-			// ── Reporte MD ──
-			const okA = results.filter((r) => r.level === "A" && r.ok).length;
-			const okB = results.filter((r) => r.level === "B" && r.ok).length;
+			// ── Reporte MD (agregado por modelo) ──
 			const lines: string[] = [];
-			lines.push(`# Reporte E2E tools — ${DEVENGINE_MODEL} (reasoning: ${THINKING})`);
+			lines.push(
+				`# Reporte E2E tools — ${DEVENGINE_MODELS.join(", ")} (reasoning: ${THINKING})`,
+			);
 			lines.push("");
 			lines.push(
 				`Fecha: ${new Date().toISOString()} · endpoint: ${DEVENGINE_BASE_URL}/v1/chat/completions · adapter openai-completions`,
 			);
-			lines.push("");
-			lines.push(`## Resumen`);
-			lines.push("");
-			lines.push(
-				`- Nivel A (ciclo real, tools core): **${okA}/${CASES_A.length}**`,
-			);
-			lines.push(
-				`- Nivel B (generación, tools host): **${okB}/${hostToolSchemas().length}**`,
-			);
-			lines.push("");
-			lines.push(`| Nivel | Tool | Resultado | Fase | Detalle | ms |`);
-			lines.push(`|---|---|---|---|---|---|`);
-			for (const r of results) {
+			for (const { model, results } of byModel) {
+				const okA = results.filter((r) => r.level === "A" && r.ok).length;
+				const okB = results.filter((r) => r.level === "B" && r.ok).length;
+				lines.push("");
+				lines.push(`## ${model}`);
+				lines.push("");
 				lines.push(
-					`| ${r.level} | ${r.tool} | ${r.ok ? "✅" : "❌"} | ${r.phase ?? "—"} | ${(r.detail ?? "").replace(/\|/g, "\\|").slice(0, 160)} | ${r.ms ?? ""} |`,
+					`- Nivel A (ciclo real, tools core): **${okA}/${CASES_A.length}**`,
 				);
+				lines.push(
+					`- Nivel B (generación, tools host): **${okB}/${hostToolSchemas().length}**`,
+				);
+				lines.push("");
+				lines.push(`| Nivel | Tool | Resultado | Fase | Detalle | ms |`);
+				lines.push(`|---|---|---|---|---|---|`);
+				for (const r of results) {
+					lines.push(
+						`| ${r.level} | ${r.tool} | ${r.ok ? "✅" : "❌"} | ${r.phase ?? "—"} | ${(r.detail ?? "").replace(/\|/g, "\\|").slice(0, 160)} | ${r.ms ?? ""} |`,
+					);
+				}
 			}
 			lines.push("");
 			lines.push(`## Prompts usados`);
 			lines.push("");
-			for (const r of results)
+			for (const r of byModel[0]?.results ?? [])
 				lines.push(`- **${r.tool}**: ${r.prompt}`);
 			const report = lines.join("\n");
 			const reportPath = join(__dirname, "reporte-tools-devengine.md");
@@ -618,12 +712,13 @@ describe("E2E live TOOLS: DevEngine × todas las tools de frida code", () => {
 			console.log(`\n=== REPORTE: ${reportPath} ===\n${report}\n`);
 
 			// El test NO falla por tools rotas (el reporte ES el entregable),
-			// pero sí exige que el ciclo básico (read) funcionó: si DevEngine no
-			// puede NINGUNA tool, algo estructural rompió.
-			expect(results.filter((r) => r.level === "A" && r.ok).length).toBeGreaterThan(
-				0,
-			);
+			// pero sí exige que el ciclo básico funcionó en ALGÚN modelo: si
+			// DevEngine no puede NINGUNA tool, algo estructural rompió.
+			const anyOkA = byModel
+				.flatMap((x) => x.results)
+				.filter((r) => r.level === "A" && r.ok);
+			expect(anyOkA.length).toBeGreaterThan(0);
 		},
-		{ timeout: DEVENGINE_TIMEOUT },
+		DEVENGINE_TIMEOUT * DEVENGINE_MODELS.length,
 	);
 });

@@ -33,6 +33,17 @@ export const DEVENGINE_BASE_URL =
 // NOTA: el gateway rutea cualquier id a gpt-5.6-luna en el backend (ver
 // campo model de la respuesta), pero el id debe viajar igual (contrato OpenAI).
 export const DEVENGINE_MODEL = process.env.DEVENGINE_MODEL ?? "gpt-5.4-mini";
+
+/** Catálogo completo del gateway (ADR-0056: mini + luna + sol + terra).
+ *  Override: DEVENGINE_MODELS="a,b" (csv). Default: los 4 del catálogo. */
+export const DEVENGINE_MODELS: string[] = (
+	process.env.DEVENGINE_MODELS ??
+	"gpt-5.4-mini,gpt-5.6-luna,gpt-5.6-sol,gpt-5.6-terra"
+)
+	.split(",")
+	.map((s) => s.trim())
+	.filter(Boolean);
+
 export const DEVENGINE_TIMEOUT =
 	Number(process.env.DEVENGINE_TIMEOUT) || 120_000;
 
