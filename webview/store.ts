@@ -264,7 +264,6 @@ export function reduce(state: State, msg: InMessage): State {
 				turns: [...state.turns, turn],
 				nextId: state.nextId + 1,
 				info: undefined,
-				providerError: undefined,
 			};
 		}
 		case "notice": {
@@ -307,15 +306,15 @@ export function reduce(state: State, msg: InMessage): State {
 			return {
 				...state,
 				turns: withLast(state.turns, (t) => ({ ...t, status: "thinking" })),
-				providerError: undefined,
 			};
 
 		case "delta":
-			// El modelo está respondiendo → limpiar el error efímero del provider.
+			// El modelo está respondiendo. providerError YA NO se limpia aquí: el error
+			// debe persistir hasta cierre manual (antes desaparecía con el primer delta
+			// del reintento antes de que el usuario pudiera leerlo/copiarlo).
 			return {
 				...state,
 				turns: withLast(state.turns, (t) => appendSegment(t, msg.text, "text")),
-				providerError: undefined,
 			};
 
 		case "thinking_delta":
@@ -698,10 +697,14 @@ export function reduce(state: State, msg: InMessage): State {
 				turns: withLast(state.turns, (t) => ({ ...t, error: msg.text })),
 			};
 		case "provider_error":
-			// Error efímero del provider (401/500/sin respuesta): banner en el footer, no
-			// en la conversación. Se limpia al recibir respuesta (delta/turn_active) o
-			// un nuevo mensaje (user). Ver ADR-0009 (401 invisible).
+			// Error del provider (401/500/H-2…): persiste hasta cierre MANUAL (botón X
+			// del banner → clear_provider_error) o reset de la conversación (cleared).
+			// Ya no se limpia con delta/turn_active/user — desaparecía antes de que el
+			// usuario pudiera leer/copiar el mensaje. Ver ADR-0009 (401 invisible).
 			return { ...state, providerError: msg.text };
+
+		case "clear_provider_error":
+			return { ...state, providerError: undefined };
 
 		case "composer_insert":
 			// Un overlay (SkillsPanel) pidió insertar texto en el composer. El nonce `n`

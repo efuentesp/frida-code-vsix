@@ -10,7 +10,7 @@ export interface QueueItem {
 
 export type ToolState = "running" | "ok" | "error";
 
-/** Nivel de un toast: error NO se auto-cierra (cierre manual); los demás sí. */
+/** Nivel de un toast: error y warning NO se auto-cierran (cierre manual); info/success sí (4.5s). */
 export type ToastLevel = "info" | "warning" | "error" | "success";
 
 /** Progreso estructurado de un sub-agente (reenvía el host vía tool_update.details
@@ -774,6 +774,7 @@ export type InMessage =
 	| { type: "info"; text: string; level?: ToastLevel }
 	| { type: "notice"; text: string }
 	| { type: "provider_error"; text: string }
+	| { type: "clear_provider_error" }
 	| { type: "cleared" }
 	| ({ type: "usage" } & Usage)
 	| {
@@ -944,6 +945,7 @@ export type OutMessage =
 	| { type: "reload" }
 	| { type: "abort" }
 	| { type: "abort_diag"; text: string }
+	| { type: "clear_provider_error" }
 	| { type: "queue_remove"; id: string }
 	| { type: "queue_edit"; id: string }
 	| { type: "queue_move"; id: string; dir: -1 | 1 }

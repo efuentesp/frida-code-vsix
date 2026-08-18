@@ -678,6 +678,14 @@ export function App() {
 				{state.providerError && (
 					<div className="provider-error-bar">
 						<TriangleAlert size={12} /> {state.providerError}
+						<button
+							aria-label="Cerrar error del proveedor"
+							className="info-toast-close"
+							type="button"
+							onClick={() => post({ type: "clear_provider_error" })}
+						>
+							<X size={13} />
+						</button>
 					</div>
 				)}
 				{state.isCompacting ? (
@@ -956,9 +964,10 @@ function InfoToast({
 		if (!toast) return;
 		setCur(toast);
 		setVisible(true);
-		// Los errores NO se auto-cierran: el usuario debe cerrarlos manualmente para
-		// alcanzar a leerlos/copiarlos. Los demás desaparecen a los 4.5s.
-		if (toast.level === "error") return;
+		// Errores y warnings NO se auto-cierran: el usuario debe cerrarlos manualmente
+		// para alcanzar a leerlos/copiarlos (p. ej. el ABI de better-sqlite3 llegaba como
+		// warning y desaparecía a los 4.5s). info/success sí desaparecen.
+		if (toast.level === "error" || toast.level === "warning") return;
 		const t = setTimeout(() => setVisible(false), 4500);
 		return () => clearTimeout(t);
 	}, [toast]);

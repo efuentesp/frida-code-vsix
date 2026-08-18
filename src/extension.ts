@@ -2633,6 +2633,12 @@ export async function activate(
 				// en el canal "Frida Abort". text ya incluye el prefijo del origen.
 				abortDiag(String(msg.text ?? "(abort_diag sin texto)"));
 				break;
+			case "clear_provider_error":
+				// El usuario cerró el banner del error del provider (botón X): eco al
+				// webview para que su reducer limpie providerError (persistente por
+			// diseño — ya no se auto-limpia con delta/turn_active/user).
+				post({ type: "clear_provider_error" });
+				break;
 			case "reload":
 				await reloadResources();
 				break;
