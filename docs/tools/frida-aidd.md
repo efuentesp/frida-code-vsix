@@ -2,8 +2,8 @@
 
 > **Estado:** Lotes 1+2 implementados — **fase plan** (`aidd-plan`) y **fase
 > ship** (`aidd-ship`) (issue #38, ADR-0050 piezas 1-8). Para el uso diario ver
-> [how-to-frida-workflows.md](../how-to-frida-workflows.md) (patrón
-> `aidd-plan`).
+> [how-to-frida-aidd.md](../how-to-frida-aidd.md) (las secciones de ambos
+> patrones también viven en [how-to-frida-workflows.md](../how-to-frida-workflows.md)).
 
 ## Qué es (y qué no es)
 
