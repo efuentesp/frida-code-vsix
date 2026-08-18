@@ -17,6 +17,37 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.23.0] - 2026-08-18
+### Añadido
+
+- **providers** — proveedor Frida Enterprise — SSO corporativo + Compatible API (Refs #58)
+- **frida-tea** — Lote 2 — ci, nfr, trace, atdd, teach + meta D8 (Refs #41)
+- **frida-tea** — Lote 1 — núcleo de 4 workflows de QA dirigido por riesgo (Refs #41)
+- **help** — aterrizaje inteligente — /help abre el how-to cuando existe
+- **frida-aidd** — Lote 2 fase ship — loop determinista por historia con lie-detector, sprint-status never-regress y sweep (Refs #38)
+- **frida-aidd** — Lote 1 fase plan — skill pack BMAD adaptado + patrón aidd-plan (Refs #38)
+- **frida-goal** — porte nativo de pi-goal — agente autónomo orientado a objetivos, MVP (Refs #20)
+- **frida-extensible-workflows** — Lote 2 de #19 — outputSchema con reparación, tier routing, adversarial-review y code-review
+- **frida-extensible-workflows** — patrones curados multi-perspective y codebase-audit (Refs #19)
+- **webview** — chip «wt: nombre» en el footer cuando la sesión corre en un worktree (Refs #56)
+- **webview** — panel de Auto-Aprobación en Configuración — reemplaza al overlay /gates-config (Refs #55)
+
+### Corregido
+
+- **frida-enterprise** — prompt de login con instrucciones claras de paste (Refs #58)
+- **help** — indexa las 12 extensiones recientes en /help y el índice del README
+- **pi-session** — cargar frida-lens vía pathToFileURL — import() ESM no acepta paths crudos de Windows (Refs #57)
+- **webview** — indicador de progreso en tab Index durante instalación/indexación (Refs #25)
+- **webview** — nota de paths — most-restrictive-wins, no last-match (Refs #55)
+
+### Interno
+
+- **frida-aidd** — how-to dedicado de AiDD — plan + ship, guards, recetas (Refs #38)
+- **research** — diagnóstico de 'cambia solo a DevEngine' — causas, fix quirúrgico aplicado y diseño diferido
+- how-to de workflows con patrones curados + ruta corregida de settings (Refs #19)
+- how-to de usuario de frida-permission-system — permisos y auto-aprobación (Refs #55)
+- **versioning** — guard f&& en el awk del runbook — exit matcheaba [Unreleased] antes de la versión
+
 ## [0.22.0] - 2026-08-16
 ### Añadido
 
