@@ -128,6 +128,139 @@ export interface EnsureInstalledResult {
 	retargeted: boolean;
 }
 
+/** Modelo disponible en el registry (shape mínimo para el auto-review #72). */
+export interface NativeModelRef {
+	provider: string;
+	id: string;
+}
+
+/** Config de hermes que garantiza auto-review funcional (#72). */
+export interface AutoReviewOverride {
+	llmModelOverride: string;
+	llmThinkingOverride: "off";
+}
+
+/**
+ * Providers registrados por frida-code vía ModelRuntime.registerProvider
+ * (frida-enterprise, softtek-devengine): el subprocess de hermes corre un pi
+ * plano SIN extensiones → no los ve, tengas o no token. Jamás son candidatos
+ * de override (#72); sólo los providers nativos de pi lo son.
+ */
+const EXTENSION_ONLY_PROVIDERS = new Set(["frida-enterprise", "softtek-devengine"]);
+
+/**
+ * #72: si el modelo activo es de un provider de EXTENSIÓN (frida-enterprise,
+ * softtek…), el subprocess de hermes no lo ve (pi plano sin extensiones →
+ * "Model not found") y el direct puede tropezar con formatos de respuesta
+ * que su parser no tolera (array puro → parse_error). Resuelve un override
+ * a un provider NATIVO con auth disponible para que el auto-review corra
+ * OOB en ambos transports. Pura — la llamada al registry/escritura es aparte.
+ *
+ * - Modelo activo nativo → undefined (no hace falta override).
+ * - Sin modelo activo, sin nativos con auth, o ya resuelto → undefined
+ *   (best-effort: nunca rompe el install).
+ * - Elección determinista: primer nativo con auth distinto del activo, en
+ *   el orden del registry (estable entre corridas).
+ */
+export function resolveAutoReviewOverride(
+	activeModel: { provider?: string; id?: string } | undefined,
+	availableModels: readonly NativeModelRef[],
+	authedNativeProviders: readonly string[],
+): AutoReviewOverride | undefined {
+	const authed = new Set(authedNativeProviders);
+	// Sin modelo activo no hay problema diagnosticable — no se escribe un
+	// override preventivo (el usuario puede elegir luego un nativo).
+	if (!activeModel?.provider || !activeModel.id) return undefined;
+	// El modelo activo ya lo ve el subprocess → nada que hacer.
+	if (authed.has(activeModel.provider)) return undefined;
+	// Primer nativo con auth disponible (orden del registry, determinista).
+	// Los providers de extensión jamás son candidatos aunque estén en la lista.
+	const candidate = availableModels.find(
+		(m) =>
+			m.provider !== activeModel.provider &&
+			authed.has(m.provider) &&
+			!EXTENSION_ONLY_PROVIDERS.has(m.provider),
+	);
+	if (!candidate) return undefined;
+	return {
+		llmModelOverride: `${candidate.provider}/${candidate.id}`,
+		llmThinkingOverride: "off",
+	};
+}
+
+/**
+ * #72: computa el override desde el registry real — filtra providers de
+ * extensión (sin auth de subprocess) y exige auth verificada
+ * (getApiKeyForProvider) antes de proponer un nativo. Best-effort: un error
+ * de auth cuenta como "sin auth" (ese provider queda descartado).
+ */
+export async function computeAutoReviewOverride(opts: {
+	activeModel: { provider?: string; id?: string } | undefined;
+	allModels: readonly NativeModelRef[];
+	getApiKeyForProvider: (provider: string) => Promise<string | undefined>;
+}): Promise<AutoReviewOverride | undefined> {
+	// Deduplica providers de los modelos disponibles y verifica auth de cada
+	// uno. Los de extensión se descartan sin gastar la llamada de auth.
+	const providers = [
+		...new Set(
+			opts.allModels
+				.map((m) => m.provider)
+				.filter((p) => !EXTENSION_ONLY_PROVIDERS.has(p)),
+		),
+	];
+	const authed: string[] = [];
+	for (const provider of providers) {
+		try {
+			const key = await opts.getApiKeyForProvider(provider);
+			if (key && key.trim()) authed.push(provider);
+		} catch {
+			// Error de auth = sin auth para este provider (best-effort).
+		}
+	}
+	return resolveAutoReviewOverride(opts.activeModel, opts.allModels, authed);
+}
+
+/**
+ * #72: escribe hermes-memory-config.json con el override — MERGE no
+ * destructivo: preserva llaves ajenas del usuario. Se abstiene (false) si:
+ * - override undefined (nada que garantizar),
+ * - ya existe llmModelOverride del usuario (su decisión manda),
+ * - el override ya está aplicado (idempotente, no re-loggea en cada reload).
+ * Best-effort: fallas de escritura se tragan (el install no debe romper).
+ */
+export function applyAutoReviewOverride(
+	agentDir: string,
+	override: AutoReviewOverride | undefined,
+): boolean {
+	if (!override) return false;
+	const cfgPath = path.join(agentDir, "hermes-memory-config.json");
+	let existing: Record<string, unknown> = {};
+	try {
+		existing = JSON.parse(fs.readFileSync(cfgPath, "utf-8")) as Record<string, unknown>;
+	} catch {
+		// Sin config previo (o corrupto) → se crea nuevo.
+	}
+	// El usuario ya decidió su modelo de auto-review → no pisarlo.
+	if (typeof existing.llmModelOverride === "string" && existing.llmModelOverride.trim()) {
+		return false;
+	}
+	// Idempotente: ya aplicado (p. ej. tras /reload) → no reescribir.
+	if (existing.llmModelOverride === override.llmModelOverride) return false;
+	try {
+		fs.writeFileSync(
+			cfgPath,
+			JSON.stringify(
+				{ ...existing, ...override },
+			null,
+			"\t",
+		) + "\n",
+		);
+		return true;
+	} catch {
+		return false; // Best-effort: nunca rompe el arranque.
+	}
+}
+
 /**
  * Garantiza que pi-hermes-memory@PIN esté instalado en <agentDir>/npm.
  * Idempotente: si ya está al pin con entry válido, no toca nada.

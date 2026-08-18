@@ -39,7 +39,12 @@ import {
 	upstreamEntryPath,
 	upstreamPeerAliases,
 } from "./constants";
-import { ensureInstalled, isInstalledAtPin } from "./installer";
+import {
+	applyAutoReviewOverride,
+	computeAutoReviewOverride,
+	ensureInstalled,
+	isInstalledAtPin,
+} from "./installer";
 
 export interface CreateHermesMemoryOpts {
 	/** Agent dir de Frida (~/.frida). */
@@ -121,6 +126,39 @@ export function createFridaHermesMemory(
 			process.env.PI_CODING_AGENT_DIR = path.resolve(agentDir);
 			onLog?.(
 				`[hermes-memory] PI_CODING_AGENT_DIR=${process.env.PI_CODING_AGENT_DIR}`,
+			);
+		}
+
+		// #72: auto-review funcional OOB — si el modelo activo es de un provider
+		// de extensión (invisible para el subprocess de hermes), se garantiza un
+		// override a un nativo con auth en hermes-memory-config.json. Best-effort,
+		// merge no destructivo e idempotente (no pisa la decisión del usuario).
+		// Se registra en ambos caminos (instalado y modo-guía): el config es
+		// consumido por el upstream cuando corra, hoy o tras el próximo /reload.
+		try {
+			pi.on("session_start", (_event, ctx) => {
+				void computeAutoReviewOverride({
+					activeModel: ctx.model
+						? { provider: ctx.model.provider, id: ctx.model.id }
+						: undefined,
+					allModels: ctx.modelRegistry
+						.getAll()
+						.map((m) => ({ provider: m.provider, id: m.id })),
+					getApiKeyForProvider: (p) =>
+						ctx.modelRegistry.getApiKeyForProvider(p),
+				})
+					.then((override) => {
+						if (override && applyAutoReviewOverride(agentDir, override)) {
+							onLog?.(
+								`[hermes-memory] auto-review: el modelo activo es invisible para hermes — override a ${override.llmModelOverride} escrito en hermes-memory-config.json (#72)`,
+							);
+						}
+					})
+					.catch(() => undefined);
+			});
+		} catch (e: any) {
+			onLog?.(
+					`[hermes-memory] hook session_start (#72) falló: ${e?.message ?? e}`,
 			);
 		}
 

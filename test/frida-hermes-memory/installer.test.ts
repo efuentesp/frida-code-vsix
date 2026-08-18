@@ -238,3 +238,208 @@ describe("frida-hermes-memory installer · retarget electron (issue #62)", () =>
 		expect(res.retargeted).toBe(false);
 	});
 });
+
+// ── #72: auto-review funcional OOB con providers de extensión ──────────────
+
+import { resolveAutoReviewOverride } from "../../src/tools/frida-hermes-memory/installer";
+
+describe("frida-hermes-memory · resolveAutoReviewOverride (#72)", () => {
+	it("modelo activo de provider de extensión → override a nativo disponible", () => {
+		const r = resolveAutoReviewOverride(
+			{ provider: "frida-enterprise", id: "DEMETER-BLOOM" },
+			[
+				{ provider: "github-copilot", id: "gpt-5.4" },
+				{ provider: "frida-enterprise", id: "DEMETER-BLOOM" },
+				{ provider: "anthropic", id: "claude-sonnet-4" },
+			],
+			["github-copilot"],
+		);
+		// Elige un NATIVO (no el enterprise), estable entre corridas.
+		expect(r).toEqual({ llmModelOverride: "github-copilot/gpt-5.4", llmThinkingOverride: "off" });
+	});
+
+	it("prefiere el propio proveedor nativo activo si lo es (sin override necesario)", () => {
+		const r = resolveAutoReviewOverride(
+			{ provider: "anthropic", id: "claude-sonnet-4" },
+			[
+				{ provider: "anthropic", id: "claude-sonnet-4" },
+				{ provider: "github-copilot", id: "gpt-5.4" },
+			],
+			["anthropic", "github-copilot"],
+		);
+		// El modelo activo ya es visible para el subprocess → no hace falta override.
+		expect(r).toBeUndefined();
+	});
+
+	it("sin modelo activo o sin nativos con auth → undefined (best-effort, no rompe)", () => {
+		expect(
+			resolveAutoReviewOverride(undefined, [{ provider: "github-copilot", id: "gpt-5.4" }], ["github-copilot"]),
+		).toBeUndefined();
+		expect(
+			resolveAutoReviewOverride(
+				{ provider: "frida-enterprise", id: "X" },
+				[{ provider: "frida-enterprise", id: "X" }],
+				[],
+			),
+		).toBeUndefined();
+	});
+
+	it("no pisa un config existente del usuario (merge: preserva llaves ajenas)", () => {
+		// La función de escritura respeta configs previos; aquí validamos la
+		// decisión pura: con override resuelto, el write es merge no destructivo.
+		const r = resolveAutoReviewOverride(
+			{ provider: "frida-enterprise", id: "X" },
+			[{ provider: "github-copilot", id: "gpt-5.4" }],
+			["github-copilot"],
+		);
+		expect(r?.llmModelOverride).toBe("github-copilot/gpt-5.4");
+	});
+});
+
+import {
+	applyAutoReviewOverride,
+	computeAutoReviewOverride,
+} from "../../src/tools/frida-hermes-memory/installer";
+
+describe("frida-hermes-memory · applyAutoReviewOverride (#72)", () => {
+	it("escribe el config con override cuando no existe", () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-cfg-"));
+		try {
+			const ok = applyAutoReviewOverride(dir, {
+				llmModelOverride: "github-copilot/gpt-5.4",
+				llmThinkingOverride: "off",
+			});
+			expect(ok).toBe(true);
+			const cfg = JSON.parse(
+				fs.readFileSync(path.join(dir, "hermes-memory-config.json"), "utf-8"),
+			) as Record<string, unknown>;
+			expect(cfg.llmModelOverride).toBe("github-copilot/gpt-5.4");
+			expect(cfg.llmThinkingOverride).toBe("off");
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("NO pisa un llmModelOverride explícito del usuario (ni otra llave)", () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-cfg-"));
+		try {
+			const cfgPath = path.join(dir, "hermes-memory-config.json");
+			fs.writeFileSync(
+				cfgPath,
+				JSON.stringify({ llmModelOverride: "anthropic/claude-sonnet-4", reviewTransport: "direct" }),
+			);
+			const ok = applyAutoReviewOverride(dir, {
+				llmModelOverride: "github-copilot/gpt-5.4",
+				llmThinkingOverride: "off",
+			});
+			expect(ok).toBe(false);
+			const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8")) as Record<string, unknown>;
+			expect(cfg.llmModelOverride).toBe("anthropic/claude-sonnet-4");
+			expect(cfg.reviewTransport).toBe("direct");
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("idempotente: mismo override ya presente → false (no reescribe, no re-loggea)", () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-cfg-"));
+		try {
+			applyAutoReviewOverride(dir, {
+				llmModelOverride: "github-copilot/gpt-5.4",
+				llmThinkingOverride: "off",
+			});
+			expect(
+				applyAutoReviewOverride(dir, {
+					llmModelOverride: "github-copilot/gpt-5.4",
+					llmThinkingOverride: "off",
+				}),
+			).toBe(false);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("merge: preserva llaves ajenas del usuario al escribir", () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-cfg-"));
+		try {
+			const cfgPath = path.join(dir, "hermes-memory-config.json");
+			fs.writeFileSync(cfgPath, JSON.stringify({ autoReview: true, maxMemories: 50 }));
+			applyAutoReviewOverride(dir, {
+				llmModelOverride: "github-copilot/gpt-5.4",
+				llmThinkingOverride: "off",
+			});
+			const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8")) as Record<string, unknown>;
+			expect(cfg.autoReview).toBe(true);
+			expect(cfg.maxMemories).toBe(50);
+			expect(cfg.llmModelOverride).toBe("github-copilot/gpt-5.4");
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("override undefined → false, no toca nada", () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hermes-cfg-"));
+		try {
+			expect(applyAutoReviewOverride(dir, undefined)).toBe(false);
+			expect(fs.existsSync(path.join(dir, "hermes-memory-config.json"))).toBe(false);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("frida-hermes-memory · computeAutoReviewOverride (#72)", () => {
+	it("filtra providers de extensión y requiere auth real (getApiKeyForProvider)", async () => {
+		const keys: Record<string, string | undefined> = {
+			"github-copilot": "ghu_x",
+			anthropic: undefined, // sin auth → descartado
+		};
+		const r = await computeAutoReviewOverride({
+			activeModel: { provider: "frida-enterprise", id: "DEMETER-BLOOM" },
+			allModels: [
+				{ provider: "frida-enterprise", id: "DEMETER-BLOOM" },
+				{ provider: "anthropic", id: "claude-sonnet-4" },
+				{ provider: "github-copilot", id: "gpt-5.4" },
+			],
+			getApiKeyForProvider: async (p) => keys[p],
+		});
+		// anthropic sin auth queda fuera; elige el copilot autenticado.
+		expect(r).toEqual({ llmModelOverride: "github-copilot/gpt-5.4", llmThinkingOverride: "off" });
+	});
+
+	it("getApiKeyForProvider que lanza → tratado como sin auth (best-effort)", async () => {
+		const r = await computeAutoReviewOverride({
+			activeModel: { provider: "frida-enterprise", id: "X" },
+			allModels: [{ provider: "openai", id: "gpt-5.4" }],
+			getApiKeyForProvider: async () => {
+				throw new Error("no auth entry");
+			},
+		});
+		expect(r).toBeUndefined();
+	});
+});
+
+describe("frida-hermes-memory · providers de extensión jamás candidatos (#72)", () => {
+	it("activo softtek-devengine + frida-enterprise authed → override a un NATIVO, no al otro invisible", async () => {
+		const keys: Record<string, string | undefined> = {
+			"frida-enterprise": "bearer-token-enterprise", // authed PERO invisible
+			"softtek-devengine": "key-devengine", // authed PERO invisible (y activo)
+			"github-copilot": "ghu_x",
+		};
+		const r = await computeAutoReviewOverride({
+			activeModel: { provider: "softtek-devengine", id: "gpt-5.6-luna" },
+			allModels: [
+				{ provider: "softtek-devengine", id: "gpt-5.6-luna" },
+				{ provider: "frida-enterprise", id: "DEMETER-BLOOM" },
+				{ provider: "github-copilot", id: "gpt-5.4" },
+			],
+			getApiKeyForProvider: async (p) => keys[p],
+		});
+		// Aunque frida-enterprise tenga auth, es invisible para el subprocess
+		// de hermes → el candidato DEBE ser el nativo copilot.
+		expect(r).toEqual({
+			llmModelOverride: "github-copilot/gpt-5.4",
+			llmThinkingOverride: "off",
+		});
+	});
+});
