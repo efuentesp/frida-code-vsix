@@ -167,8 +167,12 @@ function sanitizeTitle(title) {
   return String(title).replace(/["\`$\\\\]/g, "").replace(/[\\r\\n]+/g, " ").trim()
 }
 async function changedFiles(baseline) {
-  var tracked = await run("git diff --name-only " + baseline)
-  var untracked = await run("git ls-files --others --exclude-standard")
+  // core.quotepath=false: sin esto git cita los paths no-ASCII como
+  // "consumidor-instant\\303\\241nea.ts" (comillas + octal) y el string UTF-8
+  // reclamado por el dev no matchea → falso positivo del lie-detector
+  // (v. NutriMetrics run 81a208d7, historia E3-S3).
+  var tracked = await run("git -c core.quotepath=false diff --name-only " + baseline)
+  var untracked = await run("git -c core.quotepath=false ls-files --others --exclude-standard")
   var all = String(tracked + "\\n" + untracked).split("\\n")
   var set = {}
   for (var i = 0; i < all.length; i++) {
