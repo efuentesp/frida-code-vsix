@@ -29,6 +29,11 @@ import {
 } from "../todo/types";
 import { replayFromBranch } from "../todo/replay";
 import {
+	isGatedCompletion,
+	runVerifyCommand,
+	verifyFailText,
+} from "../todo/verify-gate";
+import {
 	conciliationPrompt,
 	createNudgeTracker,
 	type NudgeTracker,
@@ -52,6 +57,7 @@ export const DEFAULT_PROMPT_GUIDELINES: string[] = [
 	"Never mark a task completed if tests are failing, the implementation is partial, or you hit unresolved errors — keep it in_progress and create a new task for the blocker instead.",
 	"Task status is a 4-state machine: pending → in_progress → completed, plus deleted as a tombstone. Pass activeForm (present-continuous label, e.g. 'researching existing tool') when marking in_progress.",
 	"Use blockedBy to express dependencies (A is blocked by B). On create, pass blockedBy as the initial set. On update, use addBlockedBy / removeBlockedBy (additive merge — do not resend the full array). Cycles are rejected.",
+	"Optionally pass verify (a shell command — the 'Done when' contract) on create. Completing a task with verify runs it deterministically: on FAIL the task stays open with the raw output — fix the underlying problem, then complete again; pass force:true on update ONLY to override a wrong verify command.",
 	"list hides tombstoned (deleted) tasks by default; pass includeDeleted:true to see them. Pass status to filter by a single status.",
 	"Subject must be short and imperative (e.g. 'Research existing tool'); description is for long-form detail. activeForm is a present-continuous label shown while in_progress.",
 ];
@@ -79,14 +85,14 @@ export function createTodoWeb() {
 				pi as unknown as {
 					sendMessage?: (
 						message: { customType: string; content: string; display: boolean },
-					options: { deliverAs: "followUp"; triggerTurn: boolean },
-				) => void;
+						options: { deliverAs: "followUp"; triggerTurn: boolean },
+					) => void;
 				}
 			).sendMessage;
 			if (typeof send !== "function") return;
 			send(
-					{ customType: "todo", content, display: true },
-					{ deliverAs: "followUp", triggerTurn: true },
+				{ customType: "todo", content, display: true },
+				{ deliverAs: "followUp", triggerTurn: true },
 			);
 		};
 
@@ -122,17 +128,36 @@ export function createTodoWeb() {
 						};
 					}
 				}
-				if (p.action !== "list" && p.action !== "get") {
-					mutatedThisTurn = true;
+			if (p.action !== "list" && p.action !== "get") {
+				mutatedThisTurn = true;
+			}
+			// R1 (#66): verify gate determinista — un completamiento gated corre su
+			// contrato ANTES de aplicar la mutación; FAIL deja la tarea abierta y
+			// devuelve la salida cruda (el modelo ve por qué falló y debe arreglarlo).
+			if (p.action === "update" && p.status === "completed") {
+				const target = state.tasks.find((t) => t.id === p.id);
+				const cmd = target?.verify;
+				if (target && cmd && isGatedCompletion(p.action, p, target)) {
+					const r = await runVerifyCommand(cmd, process.cwd());
+					if (r.exitCode !== 0) {
+						// El intento rechazado cuenta como touched para el nudge: el modelo
+						// SÍ la tocó (intentó cerrarla y el gate la devolvió).
+						nudge.onMutation(target.id);
+						return buildToolResult(p.action, p, state, {
+							kind: "error",
+							message: verifyFailText(target, r),
+						});
+					}
 				}
-				const result = applyTaskMutation(state, p.action, p);
-			// #66: registrar las tareas tocadas para el nudge de conciliación — una
-			// tarea mutada en el turno (aunque quede pending) no es stale.
-			if (result.op.kind === "create") nudge.onMutation(result.op.taskId);
-			else if (result.op.kind === "update" || result.op.kind === "delete")
+			}
+			const result = applyTaskMutation(state, p.action, p);
+				// #66: registrar las tareas tocadas para el nudge de conciliación — una
+				// tarea mutada en el turno (aunque quede pending) no es stale.
+				if (result.op.kind === "create") nudge.onMutation(result.op.taskId);
+				else if (result.op.kind === "update" || result.op.kind === "delete")
 					nudge.onMutation(result.op.id);
-			else if (result.op.kind === "clear")
-				for (const t of state.tasks) nudge.onMutation(t.id);
+				else if (result.op.kind === "clear")
+					for (const t of state.tasks) nudge.onMutation(t.id);
 				// setTodoState EMITE → el panel persistente re-renderiza (Remote React)
 				// sin que el host tenga que publicar nada por separado.
 				setTodoState(result.state);
@@ -223,5 +248,8 @@ function mountPanel(
 	current?.unmount();
 	// "footer": el panel vive en el footer del webview (entre proc-bar y Composer),
 	// no como overlay en el cuerpo (que es para diálogos efímeros como ask_user_question).
-	return ui.fridaWebMount(() => createTodoWebPanelElement({ onRefresh }), "footer");
+	return ui.fridaWebMount(
+		() => createTodoWebPanelElement({ onRefresh }),
+		"footer",
+	);
 }

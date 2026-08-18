@@ -87,6 +87,7 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
 			if (params.blockedBy?.length) newTask.blockedBy = [...params.blockedBy];
 			if (params.owner) newTask.owner = params.owner;
 			if (params.metadata) newTask.metadata = { ...params.metadata };
+			if (params.verify) newTask.verify = params.verify;
 
 			const newTasks = [...state.tasks, newTask];
 			return {
@@ -108,6 +109,7 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
 				params.status !== undefined ||
 				params.owner !== undefined ||
 				params.metadata !== undefined ||
+				params.verify !== undefined ||
 				(params.addBlockedBy && params.addBlockedBy.length > 0) ||
 				(params.removeBlockedBy && params.removeBlockedBy.length > 0);
 			if (!hasMutation) return errorResult(state, "update requires at least one mutable field");
@@ -153,6 +155,7 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
 			if (params.description !== undefined) updated.description = params.description;
 			if (params.activeForm !== undefined) updated.activeForm = params.activeForm;
 			if (params.owner !== undefined) updated.owner = params.owner;
+			if (params.verify !== undefined) updated.verify = params.verify;
 			if (newBlockedBy.length) updated.blockedBy = newBlockedBy;
 			else delete updated.blockedBy;
 			if (newMetadata === undefined) delete updated.metadata;
@@ -178,7 +181,7 @@ export function applyTaskMutation(state: TaskState, action: TaskAction, params: 
 				op: {
 					kind: "list",
 					includeDeleted: params.includeDeleted === true,
-					...(params.status !== undefined ? { statusFilter: params.status } : {}),
+					...(params.status === undefined ? {} : { statusFilter: params.status }),
 				},
 			};
 		}

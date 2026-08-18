@@ -34,6 +34,9 @@ export interface Task {
 	blockedBy?: number[];
 	owner?: string;
 	metadata?: Record<string, unknown>;
+	/** R1 (#66): contrato "Done when" — comando shell que debe exit 0 antes de
+	 * poder marcar completed (verify gate determinista). */
+	verify?: string;
 }
 
 /**
@@ -64,6 +67,10 @@ export interface TaskMutationParams {
 	metadata?: Record<string, unknown>;
 	id?: number;
 	includeDeleted?: boolean;
+	/** R1 (#66): contrato "Done when" (create/update). */
+	verify?: string;
+	/** R1 (#66): escape hatch — override de un verify fallido/mal escrito. */
+	force?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +120,18 @@ export const TodoParamsSchema = Type.Object({
 	id: Type.Optional(
 		Type.Number({
 			description: "Task id (required for update, get, delete)",
+		}),
+	),
+	verify: Type.Optional(
+		Type.String({
+			description:
+			"'Done when' contract (create/update): shell command that must exit 0 before this task can be marked completed (deterministic gate)",
+		}),
+	),
+	force: Type.Optional(
+		Type.Boolean({
+			description:
+			"update only: override a failed or wrong verify contract and force the completion",
 		}),
 	),
 	includeDeleted: Type.Optional(
