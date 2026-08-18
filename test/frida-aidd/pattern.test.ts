@@ -71,8 +71,9 @@ describe("frida-aidd · generación del script aidd-plan (#38)", () => {
 			expect(script).toContain(`phase("${stage}")`);
 		}
 		expect(script).toContain('phase("spec (fan-out por historia)")');
-		// Checkpoints entre stages (review manual por defecto).
-		expect(script.match(/await checkpoint\(/g)?.length).toBe(3);
+		// Checkpoints entre stages (review manual por defecto) + pre-fan-out (#68).
+		expect(script.match(/await checkpoint\(/g)?.length).toBe(4);
+		expect(script).toContain('checkpoint({ name: "spec-fanout"');
 		// Specs paralelas por historia con outputSchema en el extractor.
 		expect(script).toContain("outputSchema");
 		expect(script).toContain("parallel(\"specs\"");
@@ -222,5 +223,68 @@ describe("frida-aidd · reintento informado del gate de artefacto (#67)", () => 
 		expect(script).toContain("Intento 1:");
 		expect(script).toContain("Intento 2:");
 		expect(script).toContain(`await shell("ls -la ${PLANNING_DIR}"`);
+	});
+});
+
+describe("frida-aidd · hardening v2 (#68)", () => {
+	it("contrato de salida primero: OUTPUT CONTRACT — READ FIRST con ruta absoluta, antes del prompt del skill", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("## OUTPUT CONTRACT — READ FIRST");
+		// El contrato vive en ctxFor — antes de que se concatene el prompt del skill.
+		const contractIdx = script.indexOf("## OUTPUT CONTRACT — READ FIRST");
+		const ctxBodyIdx = script.indexOf("prompt +");
+		expect(contractIdx).toBeGreaterThan(-1);
+		expect(contractIdx).toBeLessThan(ctxBodyIdx);
+		// Ruta absoluta interpolada host-side (cwd de resolve) + prohibición de inline.
+		expect(script).toContain(
+			`const absDir = ${JSON.stringify(`${process.cwd()}/${PLANNING_DIR}`)}`,
+		);
+		expect(script).toContain("NEVER paste the artifact content inline");
+		// Recordatorio al cierre (primacy + recency).
+		expect(script).toContain("## Reminder");
+		// El mapa stage→artefacto existe para el contrato (incluye spec).
+		expect(script).toContain('ART["spec"]');
+	});
+
+	it("resume idempotente: pre-check por stage — si el artefacto existe se preserva y el agente se salta", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		for (const [i, stage] of STAGE_CHAIN.entries()) {
+			const pre = `const pre${i} = await shell("test -s ${PLANNING_DIR}/${ARTIFACTS[stage]}"`;
+			const agentCall = `summaries["${stage}"] = await agent(ctxFor(STAGES[${i}]`;
+			expect(script).toContain(pre);
+			expect(script).toContain(agentCall);
+			// El pre-check va ANTES del agente del stage (skip temprano, cero gasto).
+			expect(script.indexOf(pre)).toBeLessThan(script.indexOf(agentCall));
+		}
+		expect(script).toContain("preservado — ya existía");
+		// Upstream absolutos para el agente (sin ambigüedad de cwd).
+		expect(script).toContain('prevPaths.concat([absDir + "/" + A0');
+	});
+
+	it("fan-out de specs con gate por lote, reintento informado y expediente (#68)", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("const specPre = await shell(");
+		expect(script).toContain("const specGate = await shell(");
+		expect(script).toContain("const specRetryGate = await shell(");
+		expect(script).toContain("const specDiag = await shell(");
+		expect(script).toContain("specs fantasma");
+		// El expediente de specs incluye stderr del ls (no sólo stdout).
+		expect(script).toContain("specDiag.stdout || specDiag.stderr");
+	});
+
+	it("checkpoint pre-fan-out gated por review=manual, después del extractor y antes del parallel", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		const cpIdx = script.indexOf('checkpoint({ name: "spec-fanout"');
+		expect(cpIdx).toBeGreaterThan(-1);
+		expect(cpIdx).toBeGreaterThan(script.indexOf("return ONLY a JSON object"));
+		expect(cpIdx).toBeLessThan(script.indexOf('parallel("specs"'));
+		// Está dentro del if (review === "manual") más cercano antes de él.
+		const manualIf = script.lastIndexOf('if (review === "manual")', cpIdx);
+		expect(manualIf).toBeGreaterThan(-1);
+	});
+
+	it("expediente de cadena (#67) incluye stderr del ls", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("diag0.stdout || diag0.stderr");
 	});
 });

@@ -76,6 +76,7 @@ export const AIDD_PLAN_PATTERN: BuiltinPattern = {
 			project: validated.project ?? "project",
 			language: validated.language ?? DEFAULT_ARTIFACT_LANGUAGE,
 			planningDir: AIDD_PLANNING_DIR,
+			cwd: ctx?.cwd ?? process.cwd(),
 		});
 	},
 };

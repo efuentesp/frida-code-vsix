@@ -41,6 +41,18 @@ brief → prd → architecture → epics-and-stories → spec (fan-out por histo
   `epics-and-stories.md` y cada historia recibe su spec en su propio agente
   (`spec-E1-S1.md`, …) — el kernel de 5 campos: Why, Capabilities,
   Constraints, Non-goals, Success signal.
+- **Gate de artefacto + reintento informado** (#65/#67): tras cada stage,
+  `test -s` verifica que el artefacto exista; si el agente «dijo que escribió»
+  sin escribir, se reintenta UNA vez con la evidencia del fracaso en el
+  prompt; a la segunda falla el run muere con expediente (ambos summaries +
+  `ls` del directorio). Las specs del fan-out tienen el mismo blindaje por
+  lote (#68).
+- **Resume idempotente** (#68): si al (re)lanzar un artefacto ya existe con
+  contenido (p. ej. escrito a mano tras una falla), se **preserva** y el
+  agente de ese stage se omite — relanzar es barato y NO pisa tu trabajo.
+- **Checkpoint pre-fan-out** (#68): en `review: "manual"` apruebas la lista
+  de historias antes de que se generen las N specs (el gasto se aprueba, no
+  se asume).
 
 | Arg | Tipo | Default |
 | --- | --- | --- |

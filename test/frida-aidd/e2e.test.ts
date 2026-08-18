@@ -8,7 +8,14 @@
 // script (cadena + checkpoints + fan-out) sin LLM.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+	mkdtempSync,
+	rmSync,
+	mkdirSync,
+	writeFileSync,
+	readFileSync,
+	existsSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -65,9 +72,10 @@ const makeSpawn = (seen: string[], cwd: string) =>
 				],
 			};
 		}
-		// Specs del fan-out.
+		// Specs del fan-out — ESCRIBEN su archivo (gate #68 exige spec-<id>.md).
 		if (prompt.includes("## Story to spec")) {
 			const id = prompt.match(/## Story to spec\n(E\d+-S\d+)/)?.[1] ?? "?";
+			writeArtifact(cwd, `spec-${id}.md`);
 			return `spec ${id} escrita en ${id}.spec.md`;
 		}
 		// Stages de la cadena — anclas únicas por encabezado del skill. Cada uno
@@ -118,13 +126,15 @@ describe("frida-aidd · workflow aidd-plan end-to-end sobre el motor (#38)", () 
 			onCheckpoint: (cp) => checkpoints.push({ name: cp.name, prompt: cp.prompt }),
 		});
 
-		// Los 3 checkpoints de la cadena (tras brief, prd, architecture).
+		// Los 3 checkpoints de la cadena + el pre-fan-out (#68).
 		await vi0(() => checkpoints.length >= 1);
 		await resolveCheckpoint0(runId, "stage-product-brief", true);
 		await vi0(() => checkpoints.length >= 2);
 		await resolveCheckpoint0(runId, "stage-prd", true);
 		await vi0(() => checkpoints.length >= 3);
 		await resolveCheckpoint0(runId, "stage-architecture", true);
+		await vi0(() => checkpoints.length >= 4);
+		await resolveCheckpoint0(runId, "spec-fanout", true);
 
 		const { result } = await promise;
 		const r = result as {
@@ -227,7 +237,11 @@ const makeLyingPrdSpawn = (seen: string[], cwd: string, prdLies: number) =>
 		if (prompt.includes("return ONLY a JSON object")) {
 			return { stories: [{ id: "E1-S1", title: "Exportar CSV" }] };
 		}
-		if (prompt.includes("## Story to spec")) return "spec escrita";
+		if (prompt.includes("## Story to spec")) {
+			const id = prompt.match(/## Story to spec\n(E\d+-S\d+)/)?.[1] ?? "?";
+			writeArtifact(cwd, `spec-${id}.md`);
+			return `spec ${id} escrita`;
+		}
 		if (prompt.includes("Business Analyst (Mary)")) {
 			writeArtifact(cwd, "product-brief.md");
 			return "brief.md listo";
@@ -320,5 +334,166 @@ describe("frida-aidd · reintento del gate de artefacto (#67)", () => {
 		const err = await promise.catch((e: Error) => e.message);
 		expect(err).toContain("ls");
 		expect(err).toContain("product-brief.md");
+	}, 30000);
+});
+
+/**
+ * Spawner del caso #68 (specs mentirosas): la cadena se porta bien; los
+ * agentes de spec dicen "lista" SIN escribir. specLies controla si el
+ * reintento informado escribe (1) o sigue mintiendo (0).
+ */
+const makeLyingSpecsSpawn = (seen: string[], cwd: string, specLies: number) =>
+	(async (prompt: string) => {
+		seen.push(prompt);
+		if (prompt.includes("return ONLY a JSON object")) {
+			return { stories: [{ id: "E1-S1", title: "Exportar CSV" }] };
+		}
+		if (prompt.includes("## Story to spec")) {
+			const id = prompt.match(/## Story to spec\n(E\d+-S\d+)/)?.[1] ?? "?";
+			const esReintento = prompt.includes("Tu intento anterior NO escribió");
+			if (esReintento && specLies >= 1) {
+				writeArtifact(cwd, `spec-${id}.md`);
+				return `spec ${id} lista (reintento honesto)`;
+			}
+			return `spec ${id} lista`; // mentira: no escribe
+		}
+		if (prompt.includes("Business Analyst (Mary)")) {
+			writeArtifact(cwd, "product-brief.md");
+			return "brief.md listo";
+		}
+		if (prompt.includes("Product Manager (John)")) {
+			writeArtifact(cwd, "prd.md");
+			return "prd.md listo";
+		}
+		if (prompt.includes("Architect (Winston)")) {
+			writeArtifact(cwd, "architecture.md");
+			return "architecture.md listo";
+		}
+		if (prompt.includes("PM + Architect pairing")) {
+			writeArtifact(cwd, "epics-and-stories.md");
+			return "epics-and-stories.md listo";
+		}
+		return `echo: ${prompt.slice(0, 40)}`;
+	}) as unknown as SpawnAgentFn;
+
+describe("frida-aidd · hardening v2 (#68)", () => {
+	it("resume idempotente: relanzar NO invoca agentes de stages resueltos NI pisa artefactos", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		// 1ª corrida: cadena completa + specs.
+		await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r68a-1",
+			spawnAgent: makeSpawn([], cwd),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+		// El usuario edita el PRD a mano entre corridas — su trabajo debe sobrevivir.
+		const prdPath = join(cwd, "docs/aidd/planning/prd.md");
+		writeFileSync(prdPath, "# PRD editado a mano por el usuario (sentinel #68)\n");
+		const specPath = join(cwd, "docs/aidd/planning/spec-E1-S1.md");
+		const specSentinel = "sentinel-spec-68";
+		writeFileSync(specPath, `${specSentinel}\n`);
+
+		// 2ª corrida (mismo cwd): sólo el extractor corre; nada se re-escribe.
+		const seen2: string[] = [];
+		const r2 = (await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r68a-2",
+			spawnAgent: makeSpawn(seen2, cwd),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		})) as unknown as { result: { summaries: Record<string, string> } };
+
+		// Ningún agente de stage/spec corrió — sólo el extractor de historias.
+		expect(
+			seen2.filter(
+				(p) =>
+					p.includes("Business Analyst (Mary)") ||
+					p.includes("Product Manager (John)") ||
+					p.includes("Architect (Winston)") ||
+					p.includes("PM + Architect pairing") ||
+					p.includes("## Story to spec"),
+			),
+		).toHaveLength(0);
+		expect(seen2.some((p) => p.includes("return ONLY a JSON object"))).toBe(
+			true,
+		);
+		// Los artefactos manualmente editados sobreviven intactos.
+		expect(readFileSync(prdPath, "utf8")).toContain("sentinel #68");
+		expect(readFileSync(specPath, "utf8")).toBe(`${specSentinel}\n`);
+		// Los summaries reportan preservación.
+		expect(r2.result.summaries.prd).toContain("preservado");
+	}, 30000);
+
+	it("spec mentirosa 1 vez: el reintento informado la escribe y el run completa", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const { result } = await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r68b",
+			spawnAgent: makeLyingSpecsSpawn(seen, cwd, 1),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const r = result as { stories: string[]; specs: Record<string, string> };
+		expect(r.stories).toEqual(["E1-S1"]);
+		expect(r.specs["E1-S1"]).toContain("reintento honesto");
+		expect(existsSync(join(cwd, "docs/aidd/planning/spec-E1-S1.md"))).toBe(
+			true,
+		);
+		// El reintento recibió la evidencia de la falla.
+		const retryPrompt = seen.find(
+			(p) => p.includes("## Story to spec") && p.includes("NO escribió"),
+		);
+		expect(retryPrompt).toContain("spec-E1-S1.md");
+	}, 30000);
+
+	it("specs mentirosas persistentes: failed con expediente (faltantes + ls)", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const promise = runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r68c",
+			spawnAgent: makeLyingSpecsSpawn(seen, cwd, 0),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const err = await promise
+			.then(() => "")
+			.catch((e: Error) => e.message);
+		expect(err).toMatch(/specs fantasma[\s\S]*E1-S1/);
+		expect(err).toContain("$ ls -la");
+		// Cap estricto: 2 intentos por spec (inicial + reintento), ni uno más.
+		const specPrompts = seen.filter((p) => p.includes("## Story to spec"));
+		expect(specPrompts).toHaveLength(2);
 	}, 30000);
 });
