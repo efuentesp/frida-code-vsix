@@ -17,15 +17,12 @@ import {
 	existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import * as fs from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import {
-	runWorkflowInStore,
-} from "../../src/tools/frida-extensible-workflows/frida-host";
-import {
-	resolveCheckpoint,
-} from "../../src/tools/frida-extensible-workflows/frida-delivery";
+import { runWorkflowInStore } from "../../src/tools/frida-extensible-workflows/frida-host";
+import { resolveCheckpoint } from "../../src/tools/frida-extensible-workflows/frida-delivery";
 import type { SpawnAgentFn } from "../../src/tools/frida-extensible-workflows/frida-agent-execution";
 import { AIDD_PLAN_PATTERN } from "../../src/tools/frida-aidd";
 
@@ -57,7 +54,10 @@ afterEach(() => {
 const writeArtifact = (cwd: string, file: string) => {
 	const dir = join(cwd, "docs/aidd/planning");
 	mkdirSync(dir, { recursive: true });
-	writeFileSync(join(dir, file), `# ${file}\n\nArtefacto de prueba del e2e (gate #65).\n`);
+	writeFileSync(
+		join(dir, file),
+		`# ${file}\n\nArtefacto de prueba del e2e (gate #65).\n`,
+	);
 };
 
 const makeSpawn = (seen: string[], cwd: string) =>
@@ -102,7 +102,11 @@ const makeSpawn = (seen: string[], cwd: string) =>
 describe("frida-aidd · workflow aidd-plan end-to-end sobre el motor (#38)", () => {
 	it("corre la cadena completa con checkpoints y fan-out de specs", async () => {
 		const script = AIDD_PLAN_PATTERN.resolve(
-			{ idea: "módulo de reportes exportables", project: "frida", review: "manual" },
+			{
+				idea: "módulo de reportes exportables",
+				project: "frida",
+				review: "manual",
+			},
 			{ cwd },
 		);
 		const seen: string[] = [];
@@ -326,9 +330,7 @@ describe("frida-aidd · reintento del gate de artefacto (#67)", () => {
 			/tras 2 intentos[\s\S]*Intento 1:[\s\S]*Intento 2:/,
 		);
 		// Dos intentos del stage prd, ni uno más (cap de 1 reintento).
-		const prdPrompts = seen.filter((p) =>
-			p.includes("Product Manager (John)"),
-		);
+		const prdPrompts = seen.filter((p) => p.includes("Product Manager (John)"));
 		expect(prdPrompts).toHaveLength(2);
 		// El expediente incluye el estado real del directorio (brief SÍ escrito).
 		const err = await promise.catch((e: Error) => e.message);
@@ -396,7 +398,10 @@ describe("frida-aidd · hardening v2 (#68)", () => {
 		});
 		// El usuario edita el PRD a mano entre corridas — su trabajo debe sobrevivir.
 		const prdPath = join(cwd, "docs/aidd/planning/prd.md");
-		writeFileSync(prdPath, "# PRD editado a mano por el usuario (sentinel #68)\n");
+		writeFileSync(
+			prdPath,
+			"# PRD editado a mano por el usuario (sentinel #68)\n",
+		);
 		const specPath = join(cwd, "docs/aidd/planning/spec-E1-S1.md");
 		const specSentinel = "sentinel-spec-68";
 		writeFileSync(specPath, `${specSentinel}\n`);
@@ -426,9 +431,7 @@ describe("frida-aidd · hardening v2 (#68)", () => {
 					p.includes("## Story to spec"),
 			),
 		).toHaveLength(0);
-		expect(seen2.some((p) => p.includes("return ONLY a JSON object"))).toBe(
-			true,
-		);
+		expect(seen2.some((p) => p.includes("return ONLY a JSON object"))).toBe(true);
 		// Los artefactos manualmente editados sobreviven intactos.
 		expect(readFileSync(prdPath, "utf8")).toContain("sentinel #68");
 		expect(readFileSync(specPath, "utf8")).toBe(`${specSentinel}\n`);
@@ -458,9 +461,7 @@ describe("frida-aidd · hardening v2 (#68)", () => {
 		const r = result as { stories: string[]; specs: Record<string, string> };
 		expect(r.stories).toEqual(["E1-S1"]);
 		expect(r.specs["E1-S1"]).toContain("reintento honesto");
-		expect(existsSync(join(cwd, "docs/aidd/planning/spec-E1-S1.md"))).toBe(
-			true,
-		);
+		expect(existsSync(join(cwd, "docs/aidd/planning/spec-E1-S1.md"))).toBe(true);
 		// El reintento recibió la evidencia de la falla.
 		const retryPrompt = seen.find(
 			(p) => p.includes("## Story to spec") && p.includes("NO escribió"),
@@ -487,9 +488,7 @@ describe("frida-aidd · hardening v2 (#68)", () => {
 			foreground: false,
 		});
 
-		const err = await promise
-			.then(() => "")
-			.catch((e: Error) => e.message);
+		const err = await promise.then(() => "").catch((e: Error) => e.message);
 		expect(err).toMatch(/specs fantasma[\s\S]*E1-S1/);
 		expect(err).toContain("$ ls -la");
 		// Cap estricto: 2 intentos por spec (inicial + reintento), ni uno más.
@@ -560,14 +559,121 @@ describe("frida-aidd · expediente con agente silencioso (#73)", () => {
 		expect(err).toMatch(/Intento 1: \(agente terminó SIN texto/);
 		expect(err).toMatch(/Intento 2: \(agente terminó SIN texto/);
 		// El reintento informado también recibió la evidencia del silencio.
-		const retryPrompt = seen.find((p) =>
-			p.includes("FALLA ANTERIOR"),
-		);
+		const retryPrompt = seen.find((p) => p.includes("FALLA ANTERIOR"));
 		expect(retryPrompt).toContain("SIN texto");
 		// Cap de 1 reintento: exactamente 2 intentos del stage prd.
-		const prdPrompts = seen.filter((p) =>
-			p.includes("Product Manager (John)"),
-		);
+		const prdPrompts = seen.filter((p) => p.includes("Product Manager (John)"));
 		expect(prdPrompts).toHaveLength(2);
+	}, 30000);
+});
+
+describe("frida-aidd · status.yaml de avance del plan (#78)", () => {
+	const readStatusYaml = () =>
+		fs.readFileSync(join(cwd, "docs/aidd/planning/status.yaml"), "utf-8");
+
+	it("run completo: completed con stages done/attempts y specs done", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r78a",
+			spawnAgent: makeLyingPrdSpawn(seen, cwd, 1),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+
+		const yaml = readStatusYaml();
+		// Raíz completada.
+		expect(yaml).toContain("status: completed");
+		// Cada stage done con su artefacto; prd necesitó reintento (attempts: 2).
+		expect(yaml).toMatch(
+			/product-brief:\s*\n\s+status: done\s*\n\s+artifact: product-brief\.md/,
+		);
+		expect(yaml).toMatch(
+			/prd:\s*\n\s+status: done\s*\n\s+artifact: prd\.md\s*\n\s+attempts: 2/,
+		);
+		expect(yaml).toMatch(
+			/epics-and-stories:\s*\n\s+status: done/,
+		);
+		// Spec del fan-out.
+		expect(yaml).toMatch(/E1-S1:\s*\n\s+status: done\s*\n\s+artifact: spec-E1-S1\.md/);
+	}, 30000);
+
+	it("resume idempotente: stages preserved, specs preserved, sin agentes de stage", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		// Run 1 completo.
+		await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r78b",
+			spawnAgent: makeLyingPrdSpawn([], cwd, 99),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+		// Run 2 (resume): todo preservado, ningún agente de stage.
+		const seen2: string[] = [];
+		await runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r78b2",
+			spawnAgent: makeLyingPrdSpawn(seen2, cwd, 99),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+		const yaml = readStatusYaml();
+		expect(yaml).toContain("status: completed");
+		expect(yaml).toMatch(
+			/product-brief:\s*\n\s+status: preserved/,
+		);
+		expect(yaml).toMatch(/prd:\s*\n\s+status: preserved/);
+		expect(yaml).toMatch(/E1-S1:\s*\n\s+status: preserved/);
+		// Los agentes de stage NO corrieron (solo el extractor de historias).
+		expect(
+			seen2.filter((p) => p.includes("Business Analyst (Mary)")).length,
+		).toBe(0);
+	}, 30000);
+
+	it("fallo persistente: failed con failedStage; stages previos quedan done", async () => {
+		const script = AIDD_PLAN_PATTERN.resolve(
+			{ idea: "reportes", review: "auto" },
+			{ cwd },
+		);
+		const seen: string[] = [];
+
+		const promise = runWorkflowInStore({
+			name: "aidd-plan",
+			script,
+			args: { idea: "reportes", review: "auto" },
+			cwd,
+			sessionId: "sess-r78c",
+			spawnAgent: makeLyingPrdSpawn(seen, cwd, 0),
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+		await expect(promise).rejects.toThrow(/tras 2 intentos/);
+
+		const yaml = readStatusYaml();
+		expect(yaml).toContain("status: failed");
+		expect(yaml).toContain("failedStage: prd");
+		// brief SÍ quedó done (never-regress del avance logrado).
+		expect(yaml).toMatch(/product-brief:\s*\n\s+status: done/);
 	}, 30000);
 });

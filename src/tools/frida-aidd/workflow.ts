@@ -138,6 +138,36 @@ function ctxFor(stage, prompt, previous, artifact) {
 		"Write " + absDir + "/" + art + " now with your file tools — the file first, then the short summary reply."
 }
 
+// ── #78: status.yaml de avance — único writer el script (infraestructura) ──
+const stStatus = { project: project, status: "in_progress", stages: {}, specs: {} }
+function stSerialize() {
+	var lines = []
+	lines.push("# Escrito por frida-aidd (aidd-plan) - unico writer. No editar a mano.")
+	lines.push("project: " + stStatus.project)
+	lines.push("status: " + stStatus.status)
+	if (stStatus.failedStage) lines.push("failedStage: " + stStatus.failedStage)
+	lines.push("stages:")
+	Object.keys(stStatus.stages).forEach(function (stName) {
+		var st = stStatus.stages[stName]
+		lines.push("  " + stName + ":")
+		lines.push("    status: " + st.status)
+		lines.push("    artifact: " + st.artifact)
+		if (st.attempts) lines.push("    attempts: " + st.attempts)
+	})
+	lines.push("specs:")
+	Object.keys(stStatus.specs).forEach(function (spId) {
+		var sp = stStatus.specs[spId]
+		lines.push("  " + spId + ":")
+		lines.push("    status: " + sp.status)
+		lines.push("    artifact: " + sp.artifact)
+	})
+	return lines.join("\\n") + "\\n"
+}
+async function stWrite() {
+	await shell("cat > ${planningDir}/status.yaml << 'AIDD_EOF'\\n" + stSerialize() + "AIDD_EOF")
+}
+await stWrite()
+
 // ── Cadena secuencial: resume idempotente + gate + reintento (#65/#67/#68) ──
 const summaries = {}
 let prevPaths = []
@@ -147,7 +177,7 @@ ${chain
 			i < chain.length - 1
 				? `\nif (review === "manual") {\n\tconst cp = await checkpoint({ name: "stage-${s.stage}", prompt: "Stage ${s.stage} listo. Revisa/edita ${CHAIN_ARTIFACTS[s.stage]} y aprueba para continuar (o rechaza con notas en la respuesta).", context: { artifact: absDir + "/" + A${i}, stage: "${s.stage}" } })\n\tif (cp !== "approved") throw new Error("stage ${s.stage}: checkpoint rechazado — workflow detenido")\n}`
 				: "";
-		return `\nphase("${s.stage}")\n// Resume idempotente (#68): si el artefacto ya existe (p. ej. escrito a mano\n// en un intento anterior), se PRESERVA y el agente del stage se omite.\nconst pre${i} = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\nif (pre${i}.exitCode === 0) {\n\tsummaries["${s.stage}"] = "${CHAIN_ARTIFACTS[s.stage]} preservado — ya existía (resume idempotente #68)"\n\tlog("stage ${s.stage}: artefacto ya existe — preservado, agente omitido")\n} else {\n\tsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\n\t// Gate de artefacto (#65): el contrato «escribe el archivo» del agente NO es garantía —\n\t// el prd.md fantasma probó que un summary sin archivo rompía la cadena aguas abajo.\n\tconst gate${i}a = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\n\tif (gate${i}a.exitCode !== 0) {\n\t\t// Reintento informado (#67): el summary del intento 1 como evidencia ataca\n\t\t// la «completada mentirosa»; mismo prompt del stage + contexto del fracaso.\n\t\tlog("stage ${s.stage}: gate en rojo — reintento informado (#67)")\n\t\tconst intento1 = ev(summaries["${s.stage}"])\n\t\tsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths) +\n\t\t\t'\\n\\n## FALLA ANTERIOR — última oportunidad\\n' +\n\t\t\t'Tu intento anterior NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} (verificado con test -s).\\n' +\n\t\t\t'Tu summary fue: "' + intento1.slice(0, 400) + '"\\n' +\n\t\t\t'ESCRÍBELO de verdad ahora con tus file tools — sin el archivo en disco el stage falla.',\n\t\t\t{ label: "stage ${s.stage} (reintento)" })\n\t\tconst gate${i}b = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\n\t\tif (gate${i}b.exitCode !== 0) {\n\t\t\t// Expediente (#67): ambos intentos + estado real del directorio para\n\t\t\t// diagnóstico inmediato (ruta equivocada / resumen sin escribir / nada).\n\t\t\tconst diag${i} = await shell("ls -la ${planningDir}")\n\t\t\tthrow new Error("stage ${s.stage}: tras 2 intentos el agente NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} — revisa el summary de ambos intentos y el ls del directorio; la cadena no continúa con artefactos fantasma\\n" +\n\t\t\t\t'Intento 1: ' + intento1.slice(0, 200) + '\\n' +\n\t\t\t\t'Intento 2: ' + ev(summaries["${s.stage}"]).slice(0, 200) + '\\n' +\n\t\t\t\t'$ ls -la ${planningDir}\\n' + (diag${i}.stdout || diag${i}.stderr || "(sin salida)"))\n\t\t}\n\t}\n}\nprevPaths = prevPaths.concat([absDir + "/" + A${i}])${cp}`;
+		return `\nphase("${s.stage}")\n// #78: avance publicado en ${planningDir}/status.yaml (único writer).\nstStatus.stages["${s.stage}"] = { status: "in_progress", artifact: "${CHAIN_ARTIFACTS[s.stage]}" }\nawait stWrite()\n// Resume idempotente (#68): si el artefacto ya existe (p. ej. escrito a mano\n// en un intento anterior), se PRESERVA y el agente del stage se omite.\nconst pre${i} = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\nif (pre${i}.exitCode === 0) {\n\tsummaries["${s.stage}"] = "${CHAIN_ARTIFACTS[s.stage]} preservado — ya existía (resume idempotente #68)"\n\tstStatus.stages["${s.stage}"].status = "preserved"\n\tawait stWrite()\n\tlog("stage ${s.stage}: artefacto ya existe — preservado, agente omitido")\n} else {\n\tvar stAtt${i} = 1\n\tsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\n\t// Gate de artefacto (#65): el contrato «escribe el archivo» del agente NO es garantía —\n\t// el prd.md fantasma probó que un summary sin archivo rompía la cadena aguas abajo.\n\tconst gate${i}a = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\n\tif (gate${i}a.exitCode !== 0) {\n\t\t// Reintento informado (#67): el summary del intento 1 como evidencia ataca\n\t\t// la «completada mentirosa»; mismo prompt del stage + contexto del fracaso.\n\t\tlog("stage ${s.stage}: gate en rojo — reintento informado (#67)")\n\t\tconst intento1 = ev(summaries["${s.stage}"])\n\t\tsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths) +\n\t\t\t'\\n\\n## FALLA ANTERIOR — última oportunidad\\n' +\n\t\t\t'Tu intento anterior NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} (verificado con test -s).\\n' +\n\t\t\t'Tu summary fue: "' + intento1.slice(0, 400) + '"\\n' +\n\t\t\t'ESCRÍBELO de verdad ahora con tus file tools — sin el archivo en disco el stage falla.',\n\t\t\t{ label: "stage ${s.stage} (reintento)" })\n\t\tconst gate${i}b = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\n\t\tif (gate${i}b.exitCode !== 0) {\n\t\t\t// Expediente (#67): ambos intentos + estado real del directorio para\n\t\t\t// diagnóstico inmediato (ruta equivocada / resumen sin escribir / nada).\n\t\t\tconst diag${i} = await shell("ls -la ${planningDir}")\n\t\t\tstStatus.failedStage = "${s.stage}"\n\t\t\tstStatus.status = "failed"\n\t\t\tawait stWrite()\n\t\t\tthrow new Error("stage ${s.stage}: tras 2 intentos el agente NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} — revisa el summary de ambos intentos y el ls del directorio; la cadena no continúa con artefactos fantasma\\n" +\n\t\t\t\t'Intento 1: ' + intento1.slice(0, 200) + '\\n' +\n\t\t\t\t'Intento 2: ' + ev(summaries["${s.stage}"]).slice(0, 200) + '\\n' +\n\t\t\t\t'$ ls -la ${planningDir}\\n' + (diag${i}.stdout || diag${i}.stderr || "(sin salida)"))\n\t\t}\n\t\tstAtt${i} = 2\n\t}\n\tstStatus.stages["${s.stage}"].status = "done"\n\tstStatus.stages["${s.stage}"].attempts = stAtt${i}\n\tawait stWrite()\n}\nprevPaths = prevPaths.concat([absDir + "/" + A${i}])${cp}`;
 	})
 	.join("")}
 
@@ -172,7 +202,11 @@ const specPre = await shell("ls " + planningDir + "/spec-*.md 2>/dev/null")
 const specExisting = new Set(specPre.stdout.split("\\n").map(l => l.trim()).filter(Boolean))
 const specTasks = {}
 stories.forEach(s => {
-	if (specExisting.has(planningDir + "/spec-" + s.id + ".md")) return
+	if (specExisting.has(planningDir + "/spec-" + s.id + ".md")) {
+		stStatus.specs[s.id] = { status: "preserved", artifact: "spec-" + s.id + ".md" }
+		return
+	}
+	stStatus.specs[s.id] = { status: "in_progress", artifact: "spec-" + s.id + ".md" }
 	specTasks[s.id] = () => agent(
 		ctxFor("spec", SPEC_PROMPT, prevPaths, "spec-" + s.id + ".md") + "\\n\\n## Story to spec\\n" + s.id + ": " + s.title + "\\nWrite the spec to " + absDir + "/spec-" + s.id + ".md",
 		{ label: "spec " + s.id }
@@ -201,11 +235,19 @@ if (specGate.stdout.trim()) {
 	Object.assign(specs, retried)
 	const specRetryGate = await shell("for f in " + stories.map(s => planningDir + "/spec-" + s.id + ".md").join(" ") + "; do test -s $f || echo missing:$f; done")
 	if (specRetryGate.stdout.trim()) {
+		stStatus.failedStage = "spec"
+		stStatus.status = "failed"
+		await stWrite()
 		const specDiag = await shell("ls -la " + planningDir)
 		throw new Error("spec fan-out: specs fantasma tras reintento (#68) — la cadena no continúa. Faltantes:\\n" + specRetryGate.stdout.trim() + "\\n$ ls -la " + planningDir + "\\n" + (specDiag.stdout || specDiag.stderr || "(sin salida)"))
 	}
 }
 
+Object.keys(stStatus.specs).forEach(function (stSpecId) {
+	if (stStatus.specs[stSpecId].status !== "preserved") stStatus.specs[stSpecId].status = "done"
+})
+stStatus.status = "completed"
+await stWrite()
 return {
 	project,
 	idea,
