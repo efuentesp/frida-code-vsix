@@ -5,7 +5,7 @@
 // Fuentes de las schemas:
 //  • 7 tools core: createAllToolDefinitions() del propio runtime pi-coding-agent
 //    (read, bash, edit, write, grep, find, ls) — las schemas EXACTAS que viajan.
-//  • 16 tools de extensión del harness: replicadas fielmente de sus contratos
+//  • 27 tools de extensión del harness: replicadas fielmente de sus contratos
 //    (anidados, enums, arrays, opcionales/obligatorios, oneOf/anyOf de mcp).
 
 import { describe, expect, it } from "vitest";
@@ -65,7 +65,7 @@ function runtimeTools() {
 	}));
 }
 
-// ─── Schemas replicadas del harness (16) ────────────────────────────────────
+// ─── Schemas replicadas del harness (27) ─────────────────────────────────
 
 const obj = (properties: Record<string, unknown>, required?: string[]) => ({
 	type: "object",
@@ -351,6 +351,130 @@ const harnessTools = [
 			),
 		},
 	},
+	// ── 11 tools del host verificadas en la matriz DevEngine (db03356) ──
+	// Schemas fieles a src/tools/* (frida-context, frida-goal, frida-knowledge-base,
+	// frida-sandboxes).
+	{
+		type: "function",
+		function: {
+			name: "context",
+			description: "RAG documental del equipo (frida-context)",
+			parameters: obj(
+				{ query: { type: "string" }, maxTokens: { type: "number" } },
+				["query"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "goal_complete",
+			description: "Marca el goal activo como completado",
+			parameters: obj(
+				{
+					goal_id: { type: "string" },
+					summary: { type: "string" },
+					evidence: { type: "string" },
+				},
+				["goal_id", "summary"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "goal_blocked",
+			description: "Reporta un bloqueo del goal activo",
+			parameters: obj(
+				{
+					goal_id: { type: "string" },
+					blocker: { type: "string" },
+					evidence: { type: "string" },
+				},
+				["goal_id", "blocker"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "kb_search",
+			description: "Búsqueda en la base de conocimiento (frida-knowledge-base)",
+			parameters: obj(
+				{ query: { type: "string" }, limit: { type: "number" } },
+				["query"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "kb_neighbors",
+			description: "Vecinos de una página en la base de conocimiento",
+			parameters: obj(
+				{ page: { type: "string" }, depth: { type: "number" } },
+				["page"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_create",
+			description: "Crea un contenedor Docker desechable",
+			parameters: obj({
+				name: { type: "string" },
+				image: { type: "string" },
+				workdir: { type: "string" },
+			}),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_exec",
+			description: "Ejecuta un comando en el sandbox",
+			parameters: obj(
+				{ id: { type: "string" }, command: { type: "string" } },
+				["id", "command"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_status",
+			description: "Estado del sandbox",
+			parameters: obj({ id: { type: "string" } }),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_changes",
+			description: "Diff de cambios del sandbox",
+			parameters: obj({ id: { type: "string" } }, ["id"]),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_merge",
+			description: "Fusiona cambios del sandbox al workspace",
+			parameters: obj(
+				{ id: { type: "string" }, paths: { type: "array", items: { type: "string" } } },
+				["id"],
+			),
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "sandbox_destroy",
+			description: "Destruye el sandbox",
+			parameters: obj({ id: { type: "string" } }, ["id"]),
+		},
+	},
 ];
 
 function allTools() {
@@ -362,9 +486,9 @@ function allTools() {
 describe("conformance de tools: todas las tools de frida code viajan intactas", () => {
 	const identity = { user_id: "uid-1", email: "u@softtek.com" };
 
-	it("el inventario cubre las 7 core del runtime + 16 del harness (23 en repo)", () => {
+	it("el inventario cubre las 7 core del runtime + 27 del harness (34 en repo)", () => {
 		const tools = allTools();
-		expect(tools).toHaveLength(createAllToolDefinitions ? 23 : 16);
+		expect(tools).toHaveLength(createAllToolDefinitions ? 34 : 27);
 		if (createAllToolDefinitions) {
 			expect(tools.slice(0, 7).map((t: any) => t.function.name)).toEqual(
 				expect.arrayContaining(["read", "bash", "edit", "write", "grep", "find", "ls"]),
@@ -385,7 +509,7 @@ describe("conformance de tools: todas las tools de frida code viajan intactas", 
 		expect(out.auto_log).toBe(true);
 	});
 
-	it("el payload completo con las 23 tools es JSON-serializable (lo que viaja por HTTP)", () => {
+	it("el payload completo con las 34 tools es JSON-serializable (lo que viaja por HTTP)", () => {
 		const payload = buildFridaPayload(
 			{
 				model: "NIKE-VICTORY",
@@ -405,6 +529,22 @@ describe("conformance de tools: todas las tools de frida code viajan intactas", 
 		expect(json).not.toContain("reasoning_effort");
 		expect(json).toContain("ask_user_question");
 		expect(json).toContain("agent_browser");
+		// Las 11 nuevas (goal/kb/sandbox/context) también viajan íntegras
+		for (const n of [
+			"context",
+			"goal_complete",
+			"goal_blocked",
+			"kb_search",
+			"kb_neighbors",
+			"sandbox_create",
+			"sandbox_exec",
+			"sandbox_status",
+			"sandbox_changes",
+			"sandbox_merge",
+			"sandbox_destroy",
+		]) {
+			expect(json).toContain(`"name":"${n}"`);
+		}
 		// re-parse → estructura estable
 		expect(JSON.parse(json).tools).toHaveLength(allTools().length);
 	});

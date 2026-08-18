@@ -13,11 +13,11 @@
 //   con arguments JSON válidos según el schema (la ejecución es UI-bound y
 //   queda fuera del E2E CLI).
 //
-// Al final escribe reporte-tools-nike.md (tabla + evidencia) junto a este
-// archivo. NOTA: build/polish/vet (lanes internos de workflow) no se exponen
+// Al final (afterAll) escribe reporte-tools-enterprise.md con sección por
+// modelo (multi-modelo, issue #60) junto a este archivo. NOTA: build/polish/vet (lanes internos de workflow) no se exponen
 // al modelo conversacional — fuera de la matriz por diseño.
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +35,18 @@ import {
 } from "../../../src/providers/frida-enterprise";
 
 const live = process.env.FRIDA_ENTERPRISE_LIVE === "1";
-const MODEL_ID = process.env.FRIDA_ENTERPRISE_TOOLS_MODEL ?? "NIKE-VICTORY";
+// Multi-modelo (issue #60): default los 4 SELECTED del catálogo (DEMETER-BLOOM,
+// TITAN-CROWN, MIDAS-GOLD, model-router — ADR catálogo curado). Override:
+//   FRIDA_ENTERPRISE_MODELS="DEMETER-BLOOM,model-router"   (lista csv)
+//   FRIDA_ENTERPRISE_TOOLS_MODEL=NIKE-VICTORY               (singular, retro)
+const MODELS = (
+	process.env.FRIDA_ENTERPRISE_TOOLS_MODEL ??
+	process.env.FRIDA_ENTERPRISE_MODELS ??
+	"DEMETER-BLOOM,TITAN-CROWN,MIDAS-GOLD,model-router"
+)
+	.split(",")
+	.map((s) => s.trim())
+	.filter(Boolean);
 const THINKING = "high";
 
 type Credential = {
@@ -91,6 +102,10 @@ type CaseResult = {
 	ms?: number;
 };
 
+// Resultados acumulados por modelo (el reporte consolidado se escribe en
+// afterAll — patrón multi-modelo de test/devengine/e2e).
+const allResults: Array<{ model: string; r: CaseResult }> = [];
+
 // ─── Fixtures del sandbox (Nivel A) ──────────────────────────────────────────
 
 function makeSandbox(): string {
@@ -116,7 +131,7 @@ interface FnCall {
 	call_id: string;
 }
 
-async function makeEngine(cred: Credential, root: string) {
+async function makeEngine(cred: Credential, root: string, modelId: string) {
 	const { stream } = await loadOpenAIResponses();
 	const runtime = createFridaEnterpriseRuntime(VERIFIED_MODEL_IDS);
 	const hooks = await makeRunner();
@@ -124,7 +139,7 @@ async function makeEngine(cred: Credential, root: string) {
 		createFridaEnterpriseHooks({ onUnauthorized: () => {}, runtime }),
 	);
 	const model = {
-		id: MODEL_ID,
+		id: modelId,
 		provider: FRIDA_ENTERPRISE_PROVIDER,
 		api: "openai-responses",
 		baseUrl: `${root}/v1`,
@@ -455,14 +470,101 @@ function hostToolSchemas(): Array<{
 				"Envía con steer_subagent el mensaje 'prioriza los tests' al agente agent-123.",
 			requiredFields: ["agent_id", "message"],
 		},
+		// ─── 6 tools nuevas del host (v0.23; prompts naturales, sin nombrar la
+		// tool — el modelo debe ELEGIR cuál emitir) ───────────────────────
+		{
+			name: "Agent",
+			description:
+				"Launch a new agent to handle complex, multi-step tasks autonomously.",
+			parameters: {
+				type: "object",
+				required: ["prompt", "description", "subagent_type"],
+				properties: {
+					prompt: { type: "string" },
+					description: { type: "string" },
+					subagent_type: { type: "string" },
+					model: { type: "string" },
+					run_in_background: { type: "boolean" },
+				},
+			},
+			prompt:
+				"Delega a un sub-agente especializado la tarea de averiguar qué versión de TypeScript usa este repo.",
+			requiredFields: ["prompt", "subagent_type"],
+		},
+		{
+			name: "kb_search",
+			description: "Search the team knowledge base (OKF/Obsidian) by query.",
+			parameters: {
+				type: "object",
+				required: ["query"],
+				properties: { query: { type: "string" }, limit: { type: "number" } },
+			},
+			prompt:
+				"Busca en la base de conocimiento del equipo notas sobre 'pipeline de release'.",
+			requiredFields: ["query"],
+		},
+		{
+			name: "sandbox_create",
+			description: "Create a disposable Docker sandbox for isolated bash work.",
+			parameters: {
+				type: "object",
+				properties: {
+					name: { type: "string" },
+					image: { type: "string" },
+					workdir: { type: "string" },
+				},
+			},
+			prompt:
+				"Necesito un entorno desechable y aislado con la imagen python:3.12-slim para probar un script sin tocar mi máquina.",
+			requiredFields: [],
+		},
+		{
+			name: "sandbox_exec",
+			description: "Run a shell command inside a sandbox.",
+			parameters: {
+				type: "object",
+				required: ["id", "command"],
+				properties: { id: { type: "string" }, command: { type: "string" } },
+			},
+			prompt:
+				"En el sandbox sbx-1 corre el comando 'python --version' y dime la salida.",
+			requiredFields: ["id", "command"],
+		},
+		{
+			name: "workflow_catalog",
+			description: "List available workflows/builtin patterns.",
+			parameters: {
+				type: "object",
+				properties: { verbose: { type: "boolean" } },
+			},
+			prompt:
+				"Muéstrame el catálogo de flujos de trabajo predefinidos que puedo correr en este proyecto.",
+			requiredFields: [],
+		},
+		{
+			name: "goal_complete",
+			description: "Mark the active goal as completed with a summary.",
+			parameters: {
+				type: "object",
+				required: ["goal_id", "summary"],
+				properties: {
+					goal_id: { type: "string" },
+					summary: { type: "string" },
+					evidence: { type: "string" },
+				},
+			},
+			prompt:
+				"El objetivo goal-42 ya quedó logrado: registra el resumen 'migración completada sin regresiones'.",
+			requiredFields: ["goal_id", "summary"],
+		},
 	];
 }
 
 // ─── El test ─────────────────────────────────────────────────────────────────
 
-describe.skipIf(!live)("E2E live TOOLS: NIKE alto razonamiento × todas las tools de frida code", () => {
+describe.skipIf(!live)("E2E live TOOLS: razonamiento alto × todas las tools de frida code (multi-modelo)", () => {
 	it(
-		`matriz A (ciclo real 7 core) + B (generación 8 host) → reporte MD`,
+		`matriz A (ciclo real 7 core) + B (generación 14 host) × ${MODELS.length} modelo(s) → reporte MD`,
 		async () => {
 			const cred = await readCredential();
 			const root = (
@@ -472,7 +574,8 @@ describe.skipIf(!live)("E2E live TOOLS: NIKE alto razonamiento × todas las tool
 			).replace(/\/$/, "");
 			expect(root).toMatch(/^https:\/\//);
 
-			const sandbox = makeSandbox();
+			for (const modelId of MODELS) {
+			const sandbox = makeSandbox(); // fixtures frescos por modelo
 			const coreTools = createCoreTools(sandbox);
 			const coreSchemas = Object.values(coreTools).map((t) => ({
 				type: "function" as const,
@@ -480,7 +583,7 @@ describe.skipIf(!live)("E2E live TOOLS: NIKE alto razonamiento × todas las tool
 				description: t.description,
 				parameters: t.parameters,
 			}));
-			const { turn } = await makeEngine(cred, root);
+			const { turn } = await makeEngine(cred, root, modelId);
 			const results: CaseResult[] = [];
 
 			// ── NIVEL A: ciclo real con MINI-LOOP agentic (hasta 3 tool-calls
@@ -619,41 +722,71 @@ describe.skipIf(!live)("E2E live TOOLS: NIKE alto razonamiento × todas las tool
 				}
 			}
 
-			// ── Reporte MD ──
+			// ── Acumular por modelo (reporte consolidado en afterAll) ──
 			const okA = results.filter((r) => r.level === "A" && r.ok).length;
 			const okB = results.filter((r) => r.level === "B" && r.ok).length;
-			const lines: string[] = [];
-			lines.push(`# Reporte E2E tools — ${MODEL_ID} (reasoning: ${THINKING})`);
-			lines.push("");
-			lines.push(`Fecha: ${new Date().toISOString()} · endpoint: /v1/responses · adapter openai-responses`);
-			lines.push("");
-			lines.push(`## Resumen`);
-			lines.push("");
-			lines.push(`- Nivel A (ciclo real, tools core): **${okA}/${CASES_A.length}**`);
-			lines.push(`- Nivel B (generación, tools host): **${okB}/${hostToolSchemas().length}**`);
-			lines.push("");
-			lines.push(`| Nivel | Tool | Resultado | Fase | Detalle | ms |`);
-			lines.push(`|---|---|---|---|---|---|`);
-			for (const r of results) {
-				lines.push(
-					`| ${r.level} | ${r.tool} | ${r.ok ? "✅" : "❌"} | ${r.phase ?? "—"} | ${(r.detail ?? "").replace(/\|/g, "\\|").slice(0, 160)} | ${r.ms ?? ""} |`,
-				);
-			}
-			lines.push("");
-			lines.push(`## Prompts usados`);
-			lines.push("");
-			for (const r of results) lines.push(`- **${r.tool}**: ${r.prompt}`);
-			const report = lines.join("\n");
-			const reportPath = join(__dirname, "reporte-tools-nike.md");
-			const fs = await import("node:fs/promises");
-			await fs.writeFile(reportPath, report, "utf8");
-			console.log(`\n=== REPORTE: ${reportPath} ===\n${report}\n`);
+			console.log(
+				`── ${modelId}: A ${okA}/${CASES_A.length} · B ${okB}/${hostToolSchemas().length} ──`,
+			);
+			allResults.push(...results.map((r) => ({ model: modelId, r })));
 
 			// El test NO falla por tools rotas (el reporte ES el entregable),
-			// pero sí exige que el ciclo básico (read) funcionó: si NIKE no
+			// pero sí exige que el ciclo básico funcionó: si un modelo no
 			// puede NINGUNA tool, algo estructural rompió.
 			expect(results.filter((r) => r.level === "A" && r.ok).length).toBeGreaterThan(0);
+			}
 		},
-		{ timeout: 900_000 },
+		900_000 * MODELS.length,
 	);
+});
+
+// ─── Reporte consolidado multi-modelo (issue #60) ───────────────────────────
+
+afterAll(async () => {
+	if (!live || allResults.length === 0) return;
+	const lines: string[] = [];
+	lines.push(`# Reporte E2E tools × ${MODELS.length} modelo(s) (reasoning: ${THINKING})`);
+	lines.push("");
+	lines.push(`Modelos: ${MODELS.join(", ")}`);
+	lines.push(`Fecha: ${new Date().toISOString()} · endpoint: /v1/responses · adapter openai-responses`);
+	lines.push("");
+	lines.push(`## Resumen`);
+	lines.push("");
+	for (const modelId of MODELS) {
+		const rs = allResults.filter((x) => x.model === modelId).map((x) => x.r);
+		if (!rs.length) continue;
+		const okA = rs.filter((r) => r.level === "A" && r.ok).length;
+		const okB = rs.filter((r) => r.level === "B" && r.ok).length;
+		lines.push(
+			`- **${modelId}**: Nivel A **${okA}/${rs.filter((r) => r.level === "A").length}** · Nivel B **${okB}/${rs.filter((r) => r.level === "B").length}**`,
+		);
+	}
+	for (const modelId of MODELS) {
+		const rs = allResults.filter((x) => x.model === modelId).map((x) => x.r);
+		if (!rs.length) continue;
+		lines.push("");
+		lines.push(`## ${modelId}`);
+		lines.push("");
+		lines.push(`| Nivel | Tool | Resultado | Fase | Detalle | ms |`);
+		lines.push(`|---|---|---|---|---|---|`);
+		for (const r of rs) {
+			lines.push(
+				`| ${r.level} | ${r.tool} | ${r.ok ? "✅" : "❌"} | ${r.phase ?? "—"} | ${(r.detail ?? "").replace(/\|/g, "\\|").slice(0, 160)} | ${r.ms ?? ""} |`,
+			);
+		}
+	}
+	lines.push("");
+	lines.push(`## Prompts usados (idénticos para cada modelo)`);
+	lines.push("");
+	const seen = new Set<string>();
+	for (const { r } of allResults) {
+		if (seen.has(r.tool)) continue;
+		seen.add(r.tool);
+		lines.push(`- **${r.tool}**: ${r.prompt}`);
+	}
+	const report = lines.join("\n");
+	const reportPath = join(__dirname, "reporte-tools-enterprise.md");
+	const fs = await import("node:fs/promises");
+	await fs.writeFile(reportPath, report, "utf8");
+	console.log(`\n=== REPORTE: ${reportPath} ===\n${report}\n`);
 });
