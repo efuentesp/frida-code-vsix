@@ -392,6 +392,9 @@ describe("buildFridaEnterpriseOAuth", () => {
 		const cbs = {
 			onAuth: (info: any) => seen.auth.push(info),
 			onProgress: (m: string) => seen.progress.push(m),
+			onDeviceCode: async () => {},
+			onPrompt: async () =>
+				"vscode://fridaplatform.frida-extension?code=THECODE&state=x",
 			onManualCodeInput: async () =>
 				"vscode://fridaplatform.frida-extension?code=THECODE&state=x",
 			...override,
@@ -401,6 +404,53 @@ describe("buildFridaEnterpriseOAuth", () => {
 
 	beforeEach(() => {
 		vi.restoreAllMocks();
+	});
+
+	it("login: prefiere onPrompt con instrucciones de paste (UX #58) sobre el texto genérico del SDK", async () => {
+		const orig = globalThis.fetch;
+		const prompts: any[] = [];
+		const bodies: string[] = [];
+		(globalThis as any).fetch = async (url: any, init?: any) => {
+			if (init?.body) bodies.push(String(init.body));
+			if (String(url).includes("auth/enterprise/token"))
+				return jsonResponse({ custom_token: "CT" });
+			if (String(url).includes("signInWithCustomToken"))
+				return jsonResponse({
+					idToken: "ID1",
+				refreshToken: "R1",
+				expiresIn: "3600",
+				});
+			if (String(url).includes("/auth/token"))
+				return jsonResponse({ access_token: "AT" });
+			if (String(url).includes("get-env-vars"))
+				return jsonResponse({
+					env_vars: { COMPATIBLE_API_URL: "https://gw" },
+				});
+			return jsonResponse({});
+		};
+		try {
+			const { cbs } = makeCallbacks({
+				onPrompt: async (p: any) => {
+					prompts.push(p);
+					return "https://extension.enterprise.fridaplatform.online/redirect?code=PROMPTCODE&state=y";
+				},
+				onManualCodeInput: async () => {
+					throw new Error(
+						"onManualCodeInput no debe usarse cuando onPrompt existe",
+					);
+				},
+			});
+			const cred = await oauth.login(cbs);
+			expect(prompts).toHaveLength(1);
+			// Instrucciones claras: la URL de la barra de direcciones, no un "code" abstracto.
+			expect(prompts[0].message).toMatch(/barra de direcciones/);
+			expect(String(prompts[0].placeholder ?? "")).toMatch(/code=/);
+			expect((cred as any).access).toBe("ID1");
+			// El exchange viajó con el code extraído del paste de onPrompt.
+			expect(bodies.some((b) => b.includes("PROMPTCODE"))).toBe(true);
+		} finally {
+			(globalThis as any).fetch = orig;
+		}
 	});
 
 	it("login: URL con PKCE S256 + exchange + firebase + env-vars", async () => {

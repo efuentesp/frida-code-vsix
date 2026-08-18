@@ -1251,7 +1251,7 @@ export async function activate(
 		if (id === MOONSHOT_PROVIDER) return MOONSHOT_PROVIDER_DISPLAY;
 		if (id === OPENAI_PROVIDER) return OPENAI_PROVIDER_DISPLAY;
 		if (id === FRIDA_ENTERPRISE_PROVIDER) {
-		return FRIDA_ENTERPRISE_PROVIDER_DISPLAY;
+			return FRIDA_ENTERPRISE_PROVIDER_DISPLAY;
 		}
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;

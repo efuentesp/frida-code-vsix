@@ -251,10 +251,19 @@ export function buildFridaEnterpriseOAuth(runtime: FridaEnterpriseRuntime) {
 			callbacks.onAuth({ url: loginUrl });
 
 			throwIfAborted(callbacks.signal);
-			const pasted = await (callbacks.onManualCodeInput?.() ??
-				callbacks.onPrompt({
-					message: "Pega la URL de callback (o el code) de autorización",
-				}));
+			// UX (#58): el SDK adapta onManualCodeInput con el texto genérico
+			// "Paste the authorization code", que confunde — el SSO nunca muestra
+			// un code legible: el usuario debe copiar la URL de redirección que
+			// queda en la barra de direcciones del navegador (parseCallbackInput
+			// extrae el code de ahí). Preferimos onPrompt con instrucciones claras;
+			// onManualCodeInput queda como fallback si el adaptador no expone prompt.
+			const pasted = callbacks.onPrompt
+				? await callbacks.onPrompt({
+						message:
+							"Pega la URL de redirección que quedó en la barra de direcciones del navegador (la página 'Redirecting to Vscode://fridaplatform': …/redirect?…code=… o vscode://…?code=…) — o sólo el code",
+						placeholder: "https://…/redirect?…code=… (o vscode://…?code=…)",
+					})
+				: ((await callbacks.onManualCodeInput?.()) ?? "");
 			const code = parseCallbackInput(pasted);
 
 			throwIfAborted(callbacks.signal);
