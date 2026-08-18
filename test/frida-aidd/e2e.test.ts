@@ -8,7 +8,7 @@
 // script (cadena + checkpoints + fan-out) sin LLM.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -45,7 +45,15 @@ afterEach(() => {
  * el prompt de architecture menciona "PRD" y el de epics menciona
  * "Architect" — mismos colisiones que los bridges del lote2 (#19).
  */
-const makeSpawn = (seen: string[]) =>
+/** Escribe el artefacto de un stage a disco — el gate #65 exige que exista
+ * (contrato headless real: el agente escribe con sus file tools). */
+const writeArtifact = (cwd: string, file: string) => {
+	const dir = join(cwd, "docs/aidd/planning");
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(join(dir, file), `# ${file}\n\nArtefacto de prueba del e2e (gate #65).\n`);
+};
+
+const makeSpawn = (seen: string[], cwd: string) =>
 	(async (prompt: string) => {
 		seen.push(prompt);
 		// Extractor de historias: outputSchema → objeto parseado.
@@ -62,12 +70,24 @@ const makeSpawn = (seen: string[]) =>
 			const id = prompt.match(/## Story to spec\n(E\d+-S\d+)/)?.[1] ?? "?";
 			return `spec ${id} escrita en ${id}.spec.md`;
 		}
-		// Stages de la cadena — anclas únicas por encabezado del skill.
-		if (prompt.includes("Business Analyst (Mary)")) return "brief.md listo";
-		if (prompt.includes("Architect (Winston)")) return "architecture.md listo";
-		if (prompt.includes("Product Manager (John)")) return "prd.md listo";
-		if (prompt.includes("PM + Architect pairing"))
+		// Stages de la cadena — anclas únicas por encabezado del skill. Cada uno
+		// ESCRIBE su artefacto (el gate #65 hace test -s antes del checkpoint).
+		if (prompt.includes("Business Analyst (Mary)")) {
+			writeArtifact(cwd, "product-brief.md");
+			return "brief.md listo";
+		}
+		if (prompt.includes("Architect (Winston)")) {
+			writeArtifact(cwd, "architecture.md");
+			return "architecture.md listo";
+		}
+		if (prompt.includes("Product Manager (John)")) {
+			writeArtifact(cwd, "prd.md");
+			return "prd.md listo";
+		}
+		if (prompt.includes("PM + Architect pairing")) {
+			writeArtifact(cwd, "epics-and-stories.md");
 			return "epics-and-stories.md listo";
+		}
 		return `echo: ${prompt.slice(0, 40)}`;
 	}) as unknown as SpawnAgentFn;
 
@@ -91,7 +111,7 @@ describe("frida-aidd · workflow aidd-plan end-to-end sobre el motor (#38)", () 
 			},
 			cwd,
 			sessionId: "sess-1",
-			spawnAgent: makeSpawn(seen),
+			spawnAgent: makeSpawn(seen, cwd),
 			home,
 			runId,
 			foreground: false,
@@ -141,7 +161,7 @@ describe("frida-aidd · workflow aidd-plan end-to-end sobre el motor (#38)", () 
 			args: { idea: "x", review: "manual" },
 			cwd,
 			sessionId: "sess-2",
-			spawnAgent: makeSpawn([]),
+			spawnAgent: makeSpawn([], cwd),
 			home,
 			runId,
 			foreground: false,
@@ -167,7 +187,7 @@ describe("frida-aidd · workflow aidd-plan end-to-end sobre el motor (#38)", () 
 			args: { idea: "y", review: "auto" },
 			cwd,
 			sessionId: "sess-3",
-			spawnAgent: makeSpawn(seen),
+			spawnAgent: makeSpawn(seen, cwd),
 			home,
 			runId: randomUUID(),
 			foreground: false,

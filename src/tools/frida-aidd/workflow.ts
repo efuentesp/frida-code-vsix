@@ -105,7 +105,7 @@ ${chain
 			i < chain.length - 1
 				? `\nif (review === "manual") {\n\tconst cp = await checkpoint({ name: "stage-${s.stage}", prompt: "Stage ${s.stage} listo. Revisa/edita ${CHAIN_ARTIFACTS[s.stage]} y aprueba para continuar (o rechaza con notas en la respuesta).", context: { artifact: planningDir + "/" + A${i}, stage: "${s.stage}" } })\n\tif (cp !== "approved") throw new Error("stage ${s.stage}: checkpoint rechazado — workflow detenido")\n}`
 				: "";
-		return `\nphase("${s.stage}")\nsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\nprevPaths = prevPaths.concat([planningDir + "/" + A${i}])${cp}`;
+		return `\nphase("${s.stage}")\nsummaries["${s.stage}"] = await agent(ctxFor(STAGES[${i}], P${i}, prevPaths), { label: "stage ${s.stage}" })\n// Gate de artefacto (#65): el contrato «escribe el archivo» del agente NO es garantía —\n// el prd.md fantasma probó que un summary sin archivo rompía la cadena aguas abajo.\nconst gate${i} = await shell("test -s ${planningDir}/${CHAIN_ARTIFACTS[s.stage]}")\nif (gate${i}.exitCode !== 0) throw new Error("stage ${s.stage}: el agente NO escribió ${planningDir}/${CHAIN_ARTIFACTS[s.stage]} — revisa el summary del stage; la cadena no continúa con artefactos fantasma")\nprevPaths = prevPaths.concat([planningDir + "/" + A${i}])${cp}`;
 	})
 	.join("")}
 

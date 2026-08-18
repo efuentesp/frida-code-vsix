@@ -131,3 +131,53 @@ describe("frida-aidd · registro en runtime sobre el motor (#38)", () => {
 		);
 	});
 });
+
+const STAGE_CHAIN = [
+	"product-brief",
+	"prd",
+	"architecture",
+	"epics-and-stories",
+] as const;
+const PLANNING_DIR = "docs/aidd/planning";
+const ARTIFACTS: Record<string, string> = {
+	"product-brief": "product-brief.md",
+	prd: "prd.md",
+	architecture: "architecture.md",
+	"epics-and-stories": "epics-and-stories.md",
+};
+
+function resolveBuiltInPatternScriptForTest(): string {
+	return AIDD_PLAN_PATTERN.resolve(
+		{ idea: "módulo de reportes", project: "frida" },
+		{ cwd: process.cwd() },
+	);
+}
+
+describe("frida-aidd · gate de artefacto por stage (#65)", () => {
+	it("cada stage de la cadena verifica test -s <artifact> ANTES de concatenar y del checkpoint", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		for (const [i, stage] of STAGE_CHAIN.entries()) {
+			const artifact = `${PLANNING_DIR}/${ARTIFACTS[stage]}`;
+			const gate = `await shell("test -s ${artifact}"`;
+			expect(script).toContain(gate);
+			// El gate DEBE estar antes del checkpoint de su stage (si tiene).
+			const gateIdx = script.indexOf(gate);
+			const cpIdx = script.indexOf(`checkpoint({ name: "stage-${stage}"`);
+			if (cpIdx >= 0) expect(gateIdx).toBeLessThan(cpIdx);
+			expect(gateIdx).toBeGreaterThan(0);
+			// …y antes de que el siguiente stage reciba la ruta como upstream.
+			if (i + 1 < STAGE_CHAIN.length) {
+				const nextGate = script.indexOf(
+					`await shell("test -s ${PLANNING_DIR}/${ARTIFACTS[STAGE_CHAIN[i + 1]]}"`,
+				);
+				expect(gateIdx).toBeLessThan(nextGate);
+			}
+		}
+	});
+
+	it("el error del gate es accionable: menciona el stage, la ruta y qué hacer", () => {
+		const script = resolveBuiltInPatternScriptForTest();
+		expect(script).toContain("NO escribió");
+		expect(script).toContain("revisa el summary");
+	});
+});
