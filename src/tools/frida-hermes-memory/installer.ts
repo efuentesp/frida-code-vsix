@@ -6,12 +6,16 @@
  * installer.ts): `npm install <spec> --prefix <agentDir>/npm
  * --legacy-peer-deps`. Los peer-deps (pi-ai, pi-coding-agent) NO se instalan
  * — se resuelven vía aliases de jiti a la copia del SDK que frida ya shipea
- * (constants.upstreamPeerAliases). better-sqlite3 (dep nativa del upstream)
- * resuelve su prebuild N-API en el install (ABI-estable; verificado que hay
- * prebuilds node-v115..v141 y que el binding usa node-addon-api NAPI v10).
+ * (constants.upstreamPeerAliases).
  *
- * Sin poda de natives (a diferencia de codebase-index): better-sqlite3
- * descarga SOLO el prebuild de la plataforma actual vía prebuild-install.
+ * ⚠️ better-sqlite3 NO es ABI-estable: publica prebuilds POR runtime/ABI, y
+ * npm resuelve el del node que lo ejecuta (p. ej. nvm node 25 → ABI 141).
+ * Pero el módulo lo REQUIERE el extension host, que corre el node bundled
+ * de Electron (VS Code 1.133 → Electron 42 → ABI 146) → ABI mismatch → el
+ * require falla y memory auto-review muere en ambos transports (issue #62).
+ * Fix: tras un install exitoso bajo Electron, re-targetear el prebuild con
+ * `prebuild-install --runtime electron --target <ver>` (bin del propio tree,
+ * sin red extra; si falla: advisory, nunca rompe el install).
  */
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -41,9 +45,12 @@ export interface InstallDeps {
 	run?: (
 		bin: string,
 		args: string[],
+		opts?: { cwd?: string },
 	) => Promise<{ code: number | null; stderr: string }>;
-	/** Timeout del spawn (ms). Default 5 min (mejor-sqlite3 puede compilar). */
+	/** Timeout del spawn (ms). Default 5 min (better-sqlite3 puede compilar). */
 	timeoutMs?: number;
+	/** Binario node para el retarget electron (issue #62); default "node". */
+	nodeBin?: string;
 }
 
 /** Versión instalada del paquete en ~/.frida/npm (lee su package.json). */
@@ -67,10 +74,13 @@ export function isInstalledAtPin(agentDir: string): boolean {
 }
 
 /** Ejecuta un comando (impl real por defecto; win32 usa shell para npm.cmd). */
-async function defaultRun(bin: string, args: string[]) {
+async function defaultRun(bin: string, args: string[], opts?: {
+	cwd?: string;
+}) {
 	return new Promise<{ code: number | null; stderr: string }>(
 		(resolve, reject) => {
 			const child = spawn(bin, args, {
+				...(opts?.cwd ? { cwd: opts.cwd } : {}),
 				shell: process.platform === "win32",
 			});
 			let stderr = "";
@@ -114,6 +124,8 @@ export function manualInstallCmd(agentDir: string): string {
 
 export interface EnsureInstalledResult {
 	alreadyInstalled: boolean;
+	/** Issue #62: se re-targeteó el prebuild de better-sqlite3 al Electron del host. */
+	retargeted: boolean;
 }
 
 /**
@@ -128,13 +140,16 @@ export async function ensureInstalled(
 	opts: {
 		deps?: InstallDeps;
 		onProgress?: (line: string) => void;
+		/** Versión de Electron del host (issue #62). Default: process.versions.electron. */
+		electronVersion?: string;
 	} = {},
 ): Promise<EnsureInstalledResult> {
-	if (isInstalledAtPin(agentDir)) return { alreadyInstalled: true };
+	if (isInstalledAtPin(agentDir)) return { alreadyInstalled: true, retargeted: false };
 	const {
 		npmBin = "npm",
 		run = defaultRun,
 		timeoutMs = 5 * 60_000,
+		nodeBin = "node",
 	} = opts.deps ?? {};
 	opts.onProgress?.(
 		`Instalando ${HERMES_MEMORY_SPEC} en ${path.join(agentDir, "npm")} (incluye better-sqlite3 nativo)…`,
@@ -175,5 +190,42 @@ export async function ensureInstalled(
 				manualInstallCmd(agentDir),
 		);
 	}
-	return { alreadyInstalled: false };
+
+	// Issue #62: bajo Electron, re-targetear el prebuild de better-sqlite3 al
+	// ABI del extension host (npm lo resolvió para el node que ejecutó npm).
+	// Best-effort: cualquier falla es advisory, nunca rompe el install.
+	const electronVersion =
+		opts.electronVersion ??
+		(typeof process.versions.electron === "string" ? process.versions.electron : undefined);
+	if (electronVersion) {
+		const nm = path.join(agentDir, "npm", "node_modules");
+		const pbiBin = path.join(nm, "prebuild-install", "bin.js");
+		const sqliteDir = path.join(nm, "better-sqlite3");
+		if (fs.existsSync(pbiBin) && fs.existsSync(path.join(sqliteDir, "package.json"))) {
+			opts.onProgress?.(
+				`Ajustando better-sqlite3 al Electron ${electronVersion} del extension host…`,
+			);
+			try {
+				const rt = await withTimeout(
+					run(
+						nodeBin,
+						[pbiBin, "--runtime", "electron", "--target", electronVersion],
+						{ cwd: sqliteDir },
+					),
+					timeoutMs,
+				);
+				if (rt.code === 0) return { alreadyInstalled: false, retargeted: true };
+				opts.onProgress?.(
+					`No se pudo re-ajustar el prebuild de better-sqlite3 a Electron ${electronVersion} (exit ${rt.code}). ` +
+						`Si la memoria falla con error de ABI, corre manualmente: cd "${sqliteDir}" && npx prebuild-install --runtime electron --target ${electronVersion}`,
+				);
+			} catch {
+				opts.onProgress?.(
+					`No se pudo re-ajustar el prebuild de better-sqlite3 a Electron ${electronVersion}. ` +
+					`Si la memoria falla con error de ABI, corre manualmente: cd "${sqliteDir}" && npx prebuild-install --runtime electron --target ${electronVersion}`,
+				);
+			}
+		}
+	}
+	return { alreadyInstalled: false, retargeted: false };
 }
