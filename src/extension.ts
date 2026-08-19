@@ -66,6 +66,13 @@ import {
 } from "./providers/frida-enterprise";
 import { createVscodePresenter as createCcPluginsPresenter } from "./tools/frida-cc-plugins/presenter";
 import {
+	createForensicAppender,
+	forensicLine,
+	forensicLogPath,
+	formatModelRef,
+	type ForensicAppender,
+} from "./tools/frida-forensics";
+import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
 } from "./providers/moonshot-provider";
@@ -712,6 +719,19 @@ export async function activate(
 	const abortSessionTag = `${path
 		.basename(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd())
 		.slice(0, 24)}-${Math.random().toString(16).slice(2, 6)}`;
+
+	// #85/#86: appender forense provider-audit.log (compartido con todos los caminos
+	// de cambio de proveedor: BASELINE sesión, REQUEST per-call, HTTP errors, MANUAL
+	// UI, AUTO-CHANGE divergencia). El tag es el mismo abortSessionTag (ventanas VS
+	// Code concurrentes en el mismo log global).
+	const providerAuditAppender = createForensicAppender({
+		file: forensicLogPath("provider-audit.log"),
+		maxBytes: 1024 * 1024,
+	});
+	// Storage forense: último error HTTP de provider (para AUTO-CHANGE causality).
+	let lastProviderHttpError:
+		| { status: number; atMs: number; message?: string }
+		| undefined;
 	function appendAbortLog(line: string): void {
 		try {
 			if (!abortLogReady) {
@@ -1391,6 +1411,13 @@ export async function activate(
 			await frida.session.setModel(m);
 			activeModel = { provider: providerId, modelId };
 			await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
+			// #86: provider-audit MANUAL — confirmación de intención del usuario.
+			providerAuditAppender.append(
+				forensicLine(
+					abortSessionTag,
+					`MANUAL setModel=${formatModelRef(providerId, modelId)}`,
+				),
+			);
 			sendModelInfo();
 			postModels();
 			postUsage(frida.session);
@@ -1934,11 +1961,23 @@ export async function activate(
 							activeModel &&
 							(cur.provider !== activeModel.provider || cur.id !== activeModel.modelId)
 						) {
-							modelChangeBridge ??= new ModelChangeBridge((reqs) =>
-								post({ type: "model_changes", items: reqs }),
-							);
-							const prev = { ...activeModel };
-							void modelChangeBridge
+						modelChangeBridge ??= new ModelChangeBridge((reqs) =>
+							post({ type: "model_changes", items: reqs }),
+						);
+						const prev = { ...activeModel };
+						// #86: provider-audit AUTO-CHANGE — divergencia detectada + causality.
+						const httpCause =
+							lastProviderHttpError &&
+							Date.now() - lastProviderHttpError.atMs < 120_000
+								? ` disparadoPor=HTTP ${lastProviderHttpError.status} hace ${Math.round((Date.now() - lastProviderHttpError.atMs) / 1000)}s`
+								: "";
+						providerAuditAppender.append(
+							forensicLine(
+								abortSessionTag,
+								`AUTO-CHANGE from=${formatModelRef(prev.provider, prev.modelId)} to=${formatModelRef(cur.provider, cur.id)}${httpCause}`,
+							),
+						);
+						void modelChangeBridge
 								.request({
 									id: `mc-${Date.now()}`,
 									from: {
@@ -1967,17 +2006,17 @@ export async function activate(
 					// Sonido + notificación al terminar (sólo si el setting está activo y la
 					// ventana de VS Code perdió el foco → el usuario está en otra app).
 					void notifyCompletion(vscodeWindowFocused);
-				// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
-				// El fallback genérico (rama 3) TAMBIÉN respeta willRetry: el fallo
-				// retriable del intento 1 publicaba "El modelo no generó respuesta
-				// (401)" y después llegaba la respuesta del auto-retry (mensaje
-				// fantasma). Lógica en src/agent-end-fallback.ts (pura, testeada).
-				const isDevEngine = activeModel?.provider === SOFTTEK_PROVIDER;
-				const provName =
+					// Error terminal del provider que NO se reintenta (los retriables van por auto_retry_end).
+					// El fallback genérico (rama 3) TAMBIÉN respeta willRetry: el fallo
+					// retriable del intento 1 publicaba "El modelo no generó respuesta
+					// (401)" y después llegaba la respuesta del auto-retry (mensaje
+					// fantasma). Lógica en src/agent-end-fallback.ts (pura, testeada).
+					const isDevEngine = activeModel?.provider === SOFTTEK_PROVIDER;
+					const provName =
 						getApiKeyProvider(activeModel?.provider ?? "")?.displayName ??
 						activeModel?.provider ??
 						"este proveedor";
-				const fallbackText = agentEndFallbackText({
+					const fallbackText = agentEndFallbackText({
 						errorMessage: event.errorMessage,
 						lastMessageError,
 						willRetry: !!event.willRetry,
@@ -1986,9 +2025,9 @@ export async function activate(
 						isDevEngine,
 						providerDisplayName: provName,
 					});
-				if (fallbackText !== null) {
-					post({ type: "provider_error", text: fallbackText });
-				}
+					if (fallbackText !== null) {
+						post({ type: "provider_error", text: fallbackText });
+					}
 					// El agente terminó: a partir de aquí los diagnósticos tardíos (cascade)
 					// se publican solos (mergeLens comprueba lensBusy).
 					lensBusy = false;
@@ -2185,6 +2224,55 @@ export async function activate(
 					break;
 			}
 		});
+
+		// #86: provider-audit BASELINE — loggea modelo al armar cada sesión.
+		const sessionModel = session?.model;
+		providerAuditAppender.append(
+			forensicLine(
+				abortSessionTag,
+				`BASELINE session.model=${formatModelRef(sessionModel?.provider, sessionModel?.id)} activeModel=${formatModelRef(activeModel?.provider, activeModel?.modelId)}`,
+			),
+		);
+
+		// #86: provider-audit REQUEST — cada llamada al LLM graba el modelo REAL del payload.
+		session.on(
+			"before_provider_request",
+			(event: {
+				provider?: string;
+				model?: string;
+				payload?: { model?: string };
+			}) => {
+				const realModel =
+					event.payload?.model ?? event.model ?? sessionModel?.id;
+				providerAuditAppender.append(
+					forensicLine(
+						abortSessionTag,
+						`REQUEST model=${formatModelRef(event.provider ?? sessionModel?.provider, realModel)}`,
+					),
+				);
+			},
+		);
+
+		// #86: provider-audit HTTP — respuesta ≥400 (el 500/401 que precede un fallback).
+		session.on(
+			"after_provider_response",
+			(event: { status?: number; error?: { message?: string } }) => {
+				const status = event.status ?? 0;
+				if (status >= 400) {
+					const msg = event.error?.message ?? "(sin mensaje)";
+					providerAuditAppender.append(
+						forensicLine(abortSessionTag, `HTTP status=${status} error=${msg}`),
+					);
+					// Storage para AUTO-CHANGE: el último error HTTP reciente (<2 min) se
+					// incluye como disparador cuando agent_end detecta divergencia.
+					lastProviderHttpError = {
+						status,
+						atMs: Date.now(),
+						message: msg,
+					};
+				}
+			},
+		);
 	}
 
 	// Frida Code vive en una vista lateral (webview view) registrada en la barra de
@@ -2641,7 +2729,7 @@ export async function activate(
 			case "clear_provider_error":
 				// El usuario cerró el banner del error del provider (botón X): eco al
 				// webview para que su reducer limpie providerError (persistente por
-			// diseño — ya no se auto-limpia con delta/turn_active/user).
+				// diseño — ya no se auto-limpia con delta/turn_active/user).
 				post({ type: "clear_provider_error" });
 				break;
 			case "reload":
@@ -5141,8 +5229,7 @@ export async function activate(
 					(r) => r.state === "running" || r.state === "awaiting",
 				);
 				const running = rs.reduce(
-					(n, r) =>
-						n + r.agents.filter((a) => a.state === "running").length,
+					(n, r) => n + r.agents.filter((a) => a.state === "running").length,
 					0,
 				);
 				item.text = act.length
