@@ -1035,9 +1035,23 @@ export async function activate(
 					// #20 — chip 🎯 del footer + avisos del runtime de frida-goal.
 					onGoalState: (goal) => postGoalState(goal),
 					onGoalNotify: (_level, text) => post({ type: "info", text }),
-					getContext7Key,
-					onProviderError,
-					requestDumpPath,
+				getContext7Key,
+				onProviderError,
+				// #86: deps del provider-audit (extensión frida-provider-audit vía pi.on).
+				providerAudit: {
+					append: (line) => providerAuditAppender.append(line),
+					tag: () => abortSessionTag,
+					// Storage para AUTO-CHANGE: el último error HTTP reciente (<2 min) se
+					// incluye como disparador cuando agent_end detecta divergencia.
+					onHttpError: (status, modelRef) => {
+						lastProviderHttpError = {
+							status,
+							atMs: Date.now(),
+							message: modelRef,
+						};
+					},
+				},
+				requestDumpPath,
 					diagnosticDumpPath,
 					onGatewayDiagnosis,
 					codebaseIndexEnabled: isCodebaseIndexEnabled,
@@ -2226,52 +2240,15 @@ export async function activate(
 		});
 
 		// #86: provider-audit BASELINE — loggea modelo al armar cada sesión.
+		// REQUEST/HTTP viven en la extensión frida-provider-audit (pi-session:
+		// pi.on — los eventos de provider NO son métodos del AgentSession;
+		// session.on no existe y crasheaba el arranque, regresión 6fed59a).
 		const sessionModel = session?.model;
 		providerAuditAppender.append(
 			forensicLine(
 				abortSessionTag,
 				`BASELINE session.model=${formatModelRef(sessionModel?.provider, sessionModel?.id)} activeModel=${formatModelRef(activeModel?.provider, activeModel?.modelId)}`,
 			),
-		);
-
-		// #86: provider-audit REQUEST — cada llamada al LLM graba el modelo REAL del payload.
-		session.on(
-			"before_provider_request",
-			(event: {
-				provider?: string;
-				model?: string;
-				payload?: { model?: string };
-			}) => {
-				const realModel =
-					event.payload?.model ?? event.model ?? sessionModel?.id;
-				providerAuditAppender.append(
-					forensicLine(
-						abortSessionTag,
-						`REQUEST model=${formatModelRef(event.provider ?? sessionModel?.provider, realModel)}`,
-					),
-				);
-			},
-		);
-
-		// #86: provider-audit HTTP — respuesta ≥400 (el 500/401 que precede un fallback).
-		session.on(
-			"after_provider_response",
-			(event: { status?: number; error?: { message?: string } }) => {
-				const status = event.status ?? 0;
-				if (status >= 400) {
-					const msg = event.error?.message ?? "(sin mensaje)";
-					providerAuditAppender.append(
-						forensicLine(abortSessionTag, `HTTP status=${status} error=${msg}`),
-					);
-					// Storage para AUTO-CHANGE: el último error HTTP reciente (<2 min) se
-					// incluye como disparador cuando agent_end detecta divergencia.
-					lastProviderHttpError = {
-						status,
-						atMs: Date.now(),
-						message: msg,
-					};
-				}
-			},
 		);
 	}
 

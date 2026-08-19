@@ -21,6 +21,7 @@ import {
 	SOFTTEK_MODELS,
 	SOFTTEK_PROVIDER,
 } from "./providers/softtek-provider";
+import { createProviderAuditHooks } from "./providers/provider-audit";
 import {
 	buildZaiCatalogOverride,
 	createZaiProviderHooks,
@@ -179,6 +180,11 @@ export interface CreateFridaSessionOptions {
 	/** Dumpea el request al gateway ante un 4xx/5xx (DevEngine no devuelve body en
 	 *  el 500; el request nos dice qué campo lo rechaza). Ver ADR-0009. */
 	onProviderError?: (payload: unknown, status: number) => void;
+	/** #86: deps del provider-audit (REQUEST/HTTP → provider-audit.log). Si se
+	 *  da, se registra la extensión frida-provider-audit (pi.on) — los eventos
+	 *  de provider son de la ExtensionAPI, NO métodos del AgentSession
+	 *  (regresión 6fed59a: session.on crasheaba el arranque). */
+	providerAudit?: import("./providers/provider-audit").ProviderAuditDeps;
 	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
 	requestDumpPath?: string;
 	/** H-2/H-3 (HALLAZGOS-GATEWAY): path del diagnóstico del último 500 opaco
@@ -532,6 +538,18 @@ export async function createFridaSession(
 					onGatewayDiagnosis: opts.onGatewayDiagnosis,
 				}),
 			},
+			// #86: provider-audit — REQUEST (cada llamada al LLM, modelo REAL del
+			// payload) y HTTP (≥400) a ~/.frida/logs/provider-audit.log. Registrado
+			// como extensión (pi.on) porque los eventos de provider NO son métodos
+			// del AgentSession (regresión 6fed59a: session.on crasheó el arranque).
+			...(opts.providerAudit
+				? [
+						{
+							name: "frida-provider-audit",
+							factory: createProviderAuditHooks(opts.providerAudit),
+						},
+					]
+				: []),
 			{
 				name: "z-ai-provider",
 				factory: createZaiProviderHooks({
