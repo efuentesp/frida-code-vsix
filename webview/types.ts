@@ -95,6 +95,7 @@ export type Segment =
 			endedAt?: number;
 			tokensLLM?: number;
 	  }
+	| { kind: "reasoning_hint"; tokens: number }
 	| ({ kind: "tool" } & ToolEntry);
 
 export interface Turn {
@@ -517,6 +518,7 @@ export type InMessage =
 	| { type: "turn_active" }
 	| { type: "delta"; text: string }
 	| { type: "thinking_delta"; text: string }
+	| { type: "reasoning_hint"; tokens: number }
 	| { type: "tool_start"; tool: string; args?: unknown; toolCallId?: string }
 	| {
 			type: "tool_update";

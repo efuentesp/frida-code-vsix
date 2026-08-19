@@ -54,6 +54,14 @@ export const PROVIDER_REGISTRY: ProviderMeta[] = [
 		getKeyUrl: "https://github.com/features/copilot",
 		blurb: "Suscripción de GitHub. Inicia sesión con tu cuenta (device code).",
 	},
+	{
+		id: "frida-enterprise",
+		name: "Frida Enterprise",
+		authType: "oauth",
+		getKeyUrl: "https://extension.enterprise.fridaplatform.online/login",
+		blurb:
+			"SSO corporativo de Frida Platform (Compatible API). Inicia sesión con tu cuenta de Softtek.",
+	},
 ];
 
 const FALLBACK_NAME: Record<string, string> = {};

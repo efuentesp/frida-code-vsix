@@ -44,6 +44,11 @@ import {
 } from "./providers/api-key-providers";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./providers/z-ai-provider";
 import {
+	createFridaEnterpriseHooks,
+	FRIDA_ENTERPRISE_PROVIDER,
+	FRIDA_ENTERPRISE_PROVIDER_DISPLAY,
+} from "./providers/frida-enterprise";
+import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
 } from "./providers/moonshot-provider";
@@ -127,7 +132,11 @@ const execFileP = promisify(execFile);
 const ACTIVE_MODEL_KEY = "frida.activeModel";
 // ADR-0017: secret por proveedor (itera el registry de API-key providers). El id
 // de Copilot se añade por separado (OAuth, sin secret propio).
-const SUPPORTED_PROVIDERS = [...API_KEY_PROVIDER_IDS, "github-copilot"];
+const SUPPORTED_PROVIDERS = [
+	...API_KEY_PROVIDER_IDS,
+	FRIDA_ENTERPRISE_PROVIDER,
+	"github-copilot",
+];
 
 // ¿El proveedor está autenticado? getProviderAuthStatus revisa storedProviders
 // (auth.json persistido) → confiable para OAuth (Copilot) incluso tras reinicios.
@@ -459,6 +468,11 @@ export async function activate(
 		context.globalStorageUri.fsPath,
 		"devengine-last-request.json",
 	);
+	// H-2/H-3: diagnóstico del último 500 opaco decodificado (re-probe stream:false).
+	const diagnosticDumpPath = path.join(
+		context.globalStorageUri.fsPath,
+		"devengine-gateway-diagnosis.json",
+	);
 	let approvalMode: PermissionMode = "manual";
 	let frida: FridaSession | undefined;
 	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
@@ -710,6 +724,20 @@ export async function activate(
 		return `(${parts.join(" · ")}). `;
 	}
 
+	// H-2/H-3 (HALLAZGOS-GATEWAY): el 500 opaco del gateway se decodifica con un
+	// re-probe stream:false desde el provider (message_end con stopReason error).
+	// Aquí solo publicamos el mensaje ACCIONABLE al panel; la evidencia completa
+	// queda en diagnosticDumpPath.
+	function onGatewayDiagnosis(diagnosis: {
+		actionableMessage: string;
+		probeStatus: number | null;
+	}): void {
+		post({
+			type: "provider_error",
+			text: `${diagnosis.actionableMessage} Diagnóstico: ${diagnosticDumpPath}`,
+		});
+	}
+
 	// Copia el último dump (devengine-last-request.json) a
 	// devengine-errors/<fecha-hora>__<sesión>.json para conservar los requests que
 	// fallaron, identificables por cuándo y qué sesión. Ver ADR-0009.
@@ -784,6 +812,8 @@ export async function activate(
 					getContext7Key,
 					onProviderError,
 					requestDumpPath,
+					diagnosticDumpPath,
+					onGatewayDiagnosis,
 				});
 				frida = s;
 				wireSession(s.session);
@@ -1007,6 +1037,8 @@ export async function activate(
 	function providerDisplayName(id: string): string {
 		if (id === SOFTTEK_PROVIDER) return SOFTTEK_PROVIDER_DISPLAY;
 		if (id === ZAI_PROVIDER) return ZAI_PROVIDER_DISPLAY;
+		if (id === FRIDA_ENTERPRISE_PROVIDER)
+			return FRIDA_ENTERPRISE_PROVIDER_DISPLAY;
 		if (id === MOONSHOT_PROVIDER) return MOONSHOT_PROVIDER_DISPLAY;
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
@@ -1033,7 +1065,11 @@ export async function activate(
 		const providers = SUPPORTED_PROVIDERS.map((id) => ({
 			id,
 			name: providerDisplayName(id),
-			oauth: !!mr.isUsingOAuth?.(id),
+			// OAuth real: con credential guardada (isUsingOAuth) O registrado con
+			// auth oauth (pre-login). Sin esto, un provider oauth sin sesión aún
+			// se renderizaría como API key en el webview (ADR-1001 §Errata-3).
+			oauth:
+				!!mr.isUsingOAuth?.(id) || !!mr.getProvider?.(id)?.auth?.oauth,
 			apiKey: !!getApiKeyProvider(id),
 			authed: isProviderAuthed(mr, id),
 			models: (mr.getModels?.(id) ?? []).map((mm: any) => ({
@@ -1717,10 +1753,20 @@ export async function activate(
 					// (usageTokens del último assistant). Sin esto la barra se congela en
 					// medio de una corrida con muchos tools: sólo se refrescaba en agent_end.
 					// Paridad con el footer de la TUI de pi, que recalcula en cada render.
-					if (event.message?.role === "assistant") {
-						postUsage(session);
+				if (event.message?.role === "assistant") {
+					postUsage(session);
+					// ADR-1003-F3: razonó tokens pero sin resumen (el backend no emitió
+					// reasoning_summary) → pista "razonó N tokens" en el turn. Genérico
+					// (cualquier proveedor que reporte usage.reasoning, ej. openai-responses);
+					// el store lo ignora si ya llegó tarjeta thinking.
+					const reasoningTokens = Number(
+						(event.message as any)?.usage?.reasoning ?? 0,
+					);
+					if (Number.isFinite(reasoningTokens) && reasoningTokens > 0) {
+						post({ type: "reasoning_hint", tokens: reasoningTokens });
 					}
-					break;
+				}
+				break;
 				case "tool_execution_start":
 					hadToolCall = true;
 					post({
@@ -2434,6 +2480,20 @@ export async function activate(
 			cwd,
 			agentDir,
 			settingsManager,
+			// Errata-11: sin estas factories la sesión hija viaja SIN hooks del
+			// provider → el gateway 422-ea el título (missing user_id, Errata-2;
+			// reproducido 5/5 el 2026-08-16). El side-channel patch (Errata-9)
+		// NO cubre este canal: el título va por session.prompt → provider.stream.
+			// onUnauthorized es no-op aquí: el título es best-effort y el 401 del
+			// turno principal es quien reabre el login.
+			extensionFactories: [
+				{
+					name: "frida-enterprise-provider",
+					factory: createFridaEnterpriseHooks({
+						onUnauthorized: () => {},
+					}),
+				},
+			],
 			systemPrompt:
 				"Eres un generador de títulos de sesión. Responde SOLO con un título conciso de máximo 5 palabras que capture la intención del mensaje del usuario. Sin comillas, sin puntuación final, sin explicación, sin prefijos como «Título:».",
 		});
@@ -3645,6 +3705,8 @@ export async function activate(
 				onLensDiagnostics: mergeLens,
 				onProviderError,
 				requestDumpPath,
+				diagnosticDumpPath,
+				onGatewayDiagnosis,
 			});
 			wireSession(frida.session);
 			// Sesión abierta por switch: el acumulador lens es stale → limpiar y ocultar.
@@ -3744,6 +3806,17 @@ export async function activate(
 							segs.push(seg);
 							if (p.id) pendingTools.set(String(p.id), seg);
 						}
+					}
+					// ADR-1003-F3 (replay): reconstruye también la pista de tokens
+					// razonados si el mensaje persistido la justifica (usage.reasoning
+					// > 0 y sin bloque thinking en el contenido).
+					const reasoningTokens = Number(m?.usage?.reasoning ?? 0);
+					if (
+						Number.isFinite(reasoningTokens) &&
+						reasoningTokens > 0 &&
+						!segs.some((s) => s.kind === "thinking")
+					) {
+						segs.push({ kind: "reasoning_hint", tokens: reasoningTokens });
 					}
 					if (segs.length > 0)
 						items.push({ role: "assistant", segments: segs });

@@ -301,6 +301,38 @@ export function reduce(state: State, msg: InMessage): State {
 				),
 			};
 
+		case "reasoning_hint":
+			// ADR-1003-F3: el modelo gastó reasoning_tokens pero el backend no
+			// emitió resumen (sin tarjeta thinking). Pista sutil en el turn:
+			// "razonó N tokens". Redundante si ya llegó thinking_delta → se
+			// ignora; idempotente (dos hints → conserva el máximo).
+			return {
+				...state,
+				turns: withLast(state.turns, (t) => {
+					if (t.segments.some((s) => s.kind === "thinking")) return t;
+					const existing = t.segments.find(
+						(s): s is Extract<Segment, { kind: "reasoning_hint" }> =>
+							s.kind === "reasoning_hint",
+					);
+					if (existing)
+						return {
+							...t,
+							segments: t.segments.map((s) =>
+								s.kind === "reasoning_hint"
+									? { ...s, tokens: Math.max(s.tokens, msg.tokens) }
+									: s,
+							),
+						};
+					return {
+						...t,
+						segments: [
+							...t.segments,
+							{ kind: "reasoning_hint" as const, tokens: msg.tokens },
+						],
+					};
+				}),
+			};
+
 		case "tool_start":
 			return {
 				...state,

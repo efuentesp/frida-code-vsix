@@ -24,6 +24,12 @@ import {
 	discoverZaiModels,
 	ZAI_PROVIDER,
 } from "./providers/z-ai-provider";
+import {
+	buildFridaEnterpriseProviderConfig,
+	createFridaEnterpriseHooks,
+	FRIDA_ENTERPRISE_PROVIDER,
+	patchFridaSideChannelsOn,
+} from "./providers/frida-enterprise";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { createPermissionSystem } from "./tools/frida-permission-system";
 import { GateStatsStore } from "./tools/frida-permission-system/session-store";
@@ -143,6 +149,13 @@ export interface CreateFridaSessionOptions {
 	onProviderError?: (payload: unknown, status: number) => void;
 	/** Path para dumpear cada request enviado al gateway (overwrite). Ver ADR-0009. */
 	requestDumpPath?: string;
+	/** H-2/H-3 (HALLAZGOS-GATEWAY): path del diagnóstico del último 500 opaco
+	 *  (re-probe stream:false) y callback con el mensaje accionable. */
+	diagnosticDumpPath?: string;
+	onGatewayDiagnosis?: (diagnosis: {
+		actionableMessage: string;
+		probeStatus: number | null;
+	}) => void;
 	onPendingApprovals: (reqs: ApprovalRequest[]) => void;
 	/** Stats footer (Fase 3): el gate cuenta decisiones de la sesión y las publica
 	 *  aquí para el webview (✓N aprobadas / ✗M bloqueadas / ⚡Z auto-allow). */
@@ -271,6 +284,19 @@ export async function createFridaSession(
 			meta: canonicalMeta,
 		}),
 	);
+	// Frida Enterprise (ADR-1001): OAuth corporativo de Frida Platform + Compatible
+	// API (gateway OpenAI-compatible). A diferencia de DevEngine/z.ai, los tokens
+	// ROTAN (idToken ~1h): registramos el OAuth nativo de pi-ai y el runtime
+	// persiste/rota la credential en ~/.frida/auth.json. El catálogo llega vía
+	// refreshModels (GET /v1/models con Bearer idToken) una vez autenticado; por eso
+	// el registro arranca con models: [] y baseUrl placeholder.
+	modelRuntime.registerProvider(
+		FRIDA_ENTERPRISE_PROVIDER,
+		buildFridaEnterpriseProviderConfig() as any,
+	);
+	// Errata-9 (ADR-1002): el compact/summarization usa un canal que no pasa
+	// por before_provider_request; este patch cubre SOLO modelos frida-enterprise.
+	patchFridaSideChannelsOn(modelRuntime);
 	// Z.ai es un provider BUILT-IN de pi-ai (`providers/zai`): NO se registra aquí.
 	// El ModelRuntime ya lo carga con baseUrl, modelos oficiales (glm-4.5-air / 4.7 /
 	// 5.x) y compat.thinkingFormat:"zai" (el SDK inyecta el `thinking` de GLM → el
@@ -383,12 +409,20 @@ export async function createFridaSession(
 					onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
 					onProviderError: opts.onProviderError,
 					requestDumpPath: opts.requestDumpPath,
+					diagnosticDumpPath: opts.diagnosticDumpPath,
+					onGatewayDiagnosis: opts.onGatewayDiagnosis,
 				}),
 			},
 			{
 				name: "z-ai-provider",
 				factory: createZaiProviderHooks({
 					onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+				}),
+			},
+			{
+				name: "frida-enterprise-provider",
+				factory: createFridaEnterpriseHooks({
+					onUnauthorized: () => opts.onUnauthorized(FRIDA_ENTERPRISE_PROVIDER),
 				}),
 			},
 			{
@@ -654,12 +688,20 @@ export async function createFridaSession(
 							onUnauthorized: () => opts.onUnauthorized(SOFTTEK_PROVIDER),
 							onProviderError: opts.onProviderError,
 							requestDumpPath: opts.requestDumpPath,
+							diagnosticDumpPath: opts.diagnosticDumpPath,
+							onGatewayDiagnosis: opts.onGatewayDiagnosis,
 						}),
 					},
 					{
 						name: "z-ai-provider",
 						factory: createZaiProviderHooks({
 							onUnauthorized: () => opts.onUnauthorized(ZAI_PROVIDER),
+						}),
+					},
+					{
+						name: "frida-enterprise-provider",
+						factory: createFridaEnterpriseHooks({
+							onUnauthorized: () => opts.onUnauthorized(FRIDA_ENTERPRISE_PROVIDER),
 						}),
 					},
 					{
