@@ -23,6 +23,17 @@ import type { AgentAccounting, JsonSchema, JsonValue } from "./core/types";
 /** Intentos de reparación tras el primer intento (total = 1 + maxRepairAttempts). */
 export const DEFAULT_MAX_REPAIR_ATTEMPTS = 1;
 
+/** #91 E1: techo del output incluido en el error final — suficiente para
+ *  diagnosticar (principio de la respuesta, donde se ve si es prosa/fence/
+ *  truncado), sin volar el contexto del caller con la respuesta completa. */
+const THROW_OUTPUT_LIMIT = 1000;
+
+function truncateForThrow(s: string): string {
+	return s.length > THROW_OUTPUT_LIMIT
+		? `${s.slice(0, THROW_OUTPUT_LIMIT)}… (truncado)`
+		: s;
+}
+
 /** Quita fences ```json, backticks sueltos y espacios; JSON.parse estricto. */
 export function parseJsonLoose(text: string): unknown {
 	let t = text.trim();
@@ -280,6 +291,11 @@ export function withStructuredOutput(
 		let currentPrompt = structuredPrompt(prompt, schema);
 		let accounting: AgentAccounting | undefined;
 		let durationMs = 0;
+		// #91 E1: evidencia del ÚLTIMO intento para el error final — sin esto el
+		// throw era opaco («no produjo JSON válido») y 3 runs de aidd-plan
+		// fallaron sin poder saber qué respondió el agente.
+		let lastErrors: string[] = [];
+		let lastOutput = "";
 
 		for (let attempt = 0; attempt <= maxRepair; attempt++) {
 			const raw = (await spawn(
@@ -301,7 +317,13 @@ export function withStructuredOutput(
 				const errors = validateJsonSchemaValue(normalized, schema);
 				if (!errors.length)
 					return spawnResult(normalized as JsonValue, { accounting, durationMs });
-				if (attempt === maxRepair) break;
+				if (attempt === maxRepair) {
+					lastErrors = errors;
+					lastOutput = truncateForThrow(
+						JSON.stringify(unpacked.value) ?? String(unpacked.value),
+					);
+					break;
+				}
 				currentPrompt = repairPrompt(
 					prompt,
 					schema,
@@ -318,10 +340,20 @@ export function withStructuredOutput(
 				const errors = validateJsonSchemaValue(parsed, schema);
 				if (!errors.length)
 					return spawnResult(parsed, { accounting, durationMs });
-				if (attempt === maxRepair) break;
+				if (attempt === maxRepair) {
+					lastErrors = errors;
+					lastOutput = truncateForThrow(text);
+					break;
+				}
 				currentPrompt = repairPrompt(prompt, schema, text, errors);
 			} catch (e) {
-				if (attempt === maxRepair) break;
+				if (attempt === maxRepair) {
+					lastErrors = [
+						`invalid JSON: ${e instanceof Error ? e.message : String(e)}`,
+					];
+					lastOutput = truncateForThrow(text);
+					break;
+				}
 				currentPrompt = repairPrompt(
 					prompt,
 					schema,
@@ -335,7 +367,11 @@ export function withStructuredOutput(
 
 		throw new Error(
 			`agent(${options.label ?? "unlabeled"}): outputSchema no satisfecho tras ${1 + maxRepair} intento(s); ` +
-				"el agente no produjo JSON válido contra el schema. Revisa el schema o relaja sus constraints.",
+				"el agente no produjo JSON válido contra el schema. Revisa el schema o relaja sus constraints." +
+				(lastErrors.length
+					? `\nErrores de validación del último intento:\n- ${lastErrors.join("\n- ")}`
+					: "") +
+				`\nÚltima respuesta del agente:\n${lastOutput}`,
 		);
 	};
 }

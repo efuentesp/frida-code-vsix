@@ -185,6 +185,53 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 		).rejects.toThrow(/outputSchema no satisfecho/);
 	});
 
+	// #91 E1: el throw opaco («no produjo JSON válido») no dejaba diagnosticar
+	// NADA — ni los errores de validación ni lo que el modelo respondió (caso
+	// real: 3 runs de aidd-plan fallidos sin poder saber el output del agente).
+	it("#91 E1: el throw incluye los ERRORES de validación del último intento", async () => {
+		const wrapped = withStructuredOutput(
+			scriptedSpawn(["{\"ok\":\"texto\"}"]), // ok esperaba boolean
+			{ maxRepairAttempts: 0 },
+		);
+		await expect(
+			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+		).rejects.toThrow(/\$\.ok: expected boolean, got string/);
+	});
+
+	it("#91 E1: el throw incluye el OUTPUT crudo que produjo el modelo (JSON inválido)", async () => {
+		const wrapped = withStructuredOutput(scriptedSpawn(["Basándome en el documento…"]), {
+			maxRepairAttempts: 0,
+		});
+		await expect(
+			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+		).rejects.toThrow(/Basándome en el documento/);
+	});
+
+	it("#91 E1: el output en el throw está TRUNCADO (no vuela el contexto con la respuesta completa)", async () => {
+		const largo = "x".repeat(5000);
+		const wrapped = withStructuredOutput(scriptedSpawn([largo]), {
+			maxRepairAttempts: 0,
+		});
+		await expect(
+			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+		).rejects.toThrow(/x{0,900}x\.{3}... \(truncado\)|x{1000}/);
+		// el mensaje NO contiene los 5000 chars completos
+		try {
+			await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident());
+		} catch (e) {
+			expect((e as Error).message.length).toBeLessThan(2000);
+		}
+	});
+
+	it("#91 E1: sin label la sección de output sigue presente (label unlabeled)", async () => {
+		const wrapped = withStructuredOutput(scriptedSpawn(["prosa pura"]), {
+			maxRepairAttempts: 0,
+		});
+		await expect(
+			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+		).rejects.toThrow(/unlabeled[\s\S]*prosa pura/);
+	});
+
 	it("suma el accounting de todos los intentos (#18)", async () => {
 		const prompts: string[] = [];
 		const inner: SpawnAgentFn = async () => {

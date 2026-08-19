@@ -44,6 +44,47 @@ import type {
 	WorkflowBridge,
 } from "./core/types";
 import { fridaDefaultAgentDir } from "./frida-paths";
+import {
+	createProviderAuditHooks,
+	type ProviderAuditDeps,
+} from "../../providers/provider-audit";
+import {
+	createForensicAppender,
+	forensicLogPath,
+	type ForensicAppender,
+} from "../frida-forensics";
+
+/** Appender forense por defecto de las hijas (cacheado por instancia — el
+ *  conteo de bytes de rotación vive dentro del appender). */
+let childAuditAppender: ForensicAppender | undefined;
+function defaultChildAuditAppender(): ForensicAppender {
+	childAuditAppender ??= createForensicAppender({
+		file: forensicLogPath("provider-audit.log"),
+	});
+	return childAuditAppender;
+}
+
+/** #91 E2: extensionFactories para las sesiones HIJAS del workflow. Antes el
+ *  DefaultResourceLoader del spawner iba SIN factories → cero hooks → los
+ *  REQUESTs/HTTP de los agentes del workflow eran invisibles al provider-audit
+ *  (3 runs de aidd-plan fallidos sin un solo request registrado). El tag por
+ *  defecto deriva del cwd (wf-<basename>) — mismo namespace que abort.log. */
+export function createWorkflowChildFactories(
+	cwd: string,
+	providerAudit?: ProviderAuditDeps,
+): Array<{ name: string; factory: (pi: any) => any }> {
+	const deps: ProviderAuditDeps =
+		providerAudit ?? {
+			append: (line) => defaultChildAuditAppender().append(line),
+			tag: () => `wf-${cwd.split("/").filter(Boolean).pop() ?? "session"}`,
+		};
+	return [
+		{
+			name: "frida-provider-audit",
+			factory: createProviderAuditHooks(deps),
+		},
+	];
+}
 
 // Herramientas excluidas en las sesiones hijas del workflow para evitar
 // recursión infinita (un sub-agente no debe lanzar workflows ni sub-agentes).
@@ -279,6 +320,9 @@ export function createFridaAgentSpawner(
 			cwd: ctx.cwd,
 			agentDir,
 			settingsManager,
+			// #91 E2: sin factories las hijas corrían CERO hooks — los REQUESTs/HTTP
+			// de los agentes del workflow eran invisibles al provider-audit.
+			extensionFactories: createWorkflowChildFactories(ctx.cwd),
 		});
 		// ADR-0010/0022: las API keys de providers con SecretStorage viven en el
 		// runtime del padre; sin propagar modelRuntime, la hija falla con

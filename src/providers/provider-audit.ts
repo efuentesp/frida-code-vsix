@@ -39,6 +39,14 @@ function modelRefOfCtx(ctx: any): { provider?: string; id?: string } {
 
 export function createProviderAuditHooks(deps: ProviderAuditDeps) {
 	return (pi: ExtensionAPI): void => {
+		// #91 E3: línea de vida — prueba que ESTA factory corrió (registro en el
+		// loader). Si falta tras un F5, el registro nunca ocurrió; si está pero
+		// no hay REQUESTs, el despacho no llega. Diagnóstico en una línea.
+		try {
+			deps.append(forensicLine(deps.tag(), "FACTORY-LOADED (hooks pi.on registrados)"));
+		} catch {
+			/* noop */
+		}
 		pi.on("before_provider_request", (event: any, ctx: any) => {
 			try {
 				const payloadModel =

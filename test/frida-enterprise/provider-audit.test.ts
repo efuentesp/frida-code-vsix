@@ -32,8 +32,10 @@ describe("createProviderAuditHooks (#86 provider-audit por extensión)", () => {
 			payload: { model: "glm-5.3", messages: [] },
 		}, { model: { provider: "z.ai", id: "glm-5.3" } });
 
-		expect(lines).toHaveLength(1);
-		expect(lines[0]).toMatch(
+		// Línea 0 = FACTORY-LOADED (#91 E3, se escribe al registrar); línea 1 = REQUEST
+		expect(lines).toHaveLength(2);
+		expect(lines[0]).toMatch(/FACTORY-LOADED/);
+		expect(lines[1]).toMatch(
 			/\[ws-abc1\] REQUEST model=z\.ai\/glm-5\.3/,
 		);
 	});
@@ -49,7 +51,9 @@ describe("createProviderAuditHooks (#86 provider-audit por extensión)", () => {
 		pi.fire("before_provider_request", { payload: {} }, {
 			model: { provider: "devengine", id: "gpt-5.4-x" },
 		});
-		expect(lines[0]).toContain("REQUEST model=devengine/gpt-5.4-x");
+		// Línea 0 = FACTORY-LOADED (#91 E3); línea 1 = REQUEST
+		expect(lines).toHaveLength(2);
+		expect(lines[1]).toContain("REQUEST model=devengine/gpt-5.4-x");
 	});
 
 	it("HTTP: status ≥400 loggea y notifica onHttpError; <400 no escribe", () => {
@@ -65,13 +69,15 @@ describe("createProviderAuditHooks (#86 provider-audit por extensión)", () => {
 		pi.fire("after_provider_response", { status: 200, headers: {} }, {
 			model: { provider: "z.ai", id: "m" },
 		});
-		expect(lines).toHaveLength(0);
+		// <400 no escribe: sólo la línea de vida del registro
+		expect(lines).toHaveLength(1);
+		expect(lines[0]).toMatch(/FACTORY-LOADED/);
 
 		pi.fire("after_provider_response", { status: 500, headers: {} }, {
 			model: { provider: "devengine", id: "gpt-5.4" },
 		});
-		expect(lines).toHaveLength(1);
-		expect(lines[0]).toMatch(/HTTP status=500 model=devengine\/gpt-5\.4/);
+		expect(lines).toHaveLength(2);
+		expect(lines[1]).toMatch(/HTTP status=500 model=devengine\/gpt-5\.4/);
 		expect(http).toEqual([{ status: 500 }]);
 	});
 
