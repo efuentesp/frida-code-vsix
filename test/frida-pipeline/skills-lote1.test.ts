@@ -13,7 +13,10 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execFileSync } from "node:child_process";
-import { computePipelineStatus } from "../../src/tools/frida-pipeline/setup-command";
+import {
+	computePipelineStatus,
+	EXPECTED_SKILLS,
+} from "../../src/tools/frida-pipeline/setup-command";
 
 const SKILLS_DIR = path.join(
 	__dirname,
@@ -31,7 +34,7 @@ describe("frida-pipeline / skills lote 1 / existencia", () => {
 	it("el conteo del banner reporta Skills >= 3/27", () => {
 		const status = computePipelineStatus();
 		expect(status.counts.skills.present).toBeGreaterThanOrEqual(3);
-		expect(status.counts.skills.expected).toBe(27);
+		expect(status.counts.skills.expected).toBe(EXPECTED_SKILLS);
 	});
 });
 

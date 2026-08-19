@@ -72,7 +72,10 @@ describe("frida-pipeline / status", () => {
 	it("formatPipelineStatus incluye el conteo real de agentes", () => {
 		const text = formatPipelineStatus(computePipelineStatus());
 		expect(text).toContain("Hermanas: 5/5 detectadas");
-		expect(text).toContain("Skills:    27/27");
+		const status = computePipelineStatus();
+		expect(text).toContain(
+			`Skills:    ${status.counts.skills.present}/${status.counts.skills.expected}`,
+		);
 		expect(text).toContain("Agentes:   15/15");
 		expect(text).toContain("Workflows: 3/3");
 	});

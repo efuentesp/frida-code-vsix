@@ -14,7 +14,10 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { computePipelineStatus } from "../../src/tools/frida-pipeline/setup-command";
+import {
+	computePipelineStatus,
+	EXPECTED_SKILLS,
+} from "../../src/tools/frida-pipeline/setup-command";
 
 const SKILLS_DIR = path.join(
 	__dirname,
@@ -48,10 +51,11 @@ describe("frida-pipeline / skills lote 4 / existencia", () => {
 		}
 	});
 
-	it("el conteo del banner reporta Skills: 27/27 (COMPLETO)", () => {
+	it("el conteo del banner reporta el set completo (present == expected)", () => {
 		const status = computePipelineStatus();
-		expect(status.counts.skills.present).toBe(27);
-		expect(status.counts.skills.expected).toBe(27);
+		// #87: sin magic-number — el contrato es que disco == constante src.
+		expect(status.counts.skills.present).toBe(EXPECTED_SKILLS);
+		expect(status.counts.skills.expected).toBe(EXPECTED_SKILLS);
 	});
 });
 
@@ -198,7 +202,7 @@ describe("frida-pipeline / skills / set COMPLETO (27/27)", () => {
 			.readdirSync(SKILLS_DIR, { withFileTypes: true })
 			.filter((e) => e.isDirectory() && e.name !== "_shared")
 			.map((e) => e.name);
-		expect(dirs).toHaveLength(27);
+		expect(dirs).toHaveLength(EXPECTED_SKILLS);
 		for (const dir of dirs) {
 			const content = readSkill(dir);
 			expect(content, `${dir} debe tener name:`).toContain(`name: ${dir}`);

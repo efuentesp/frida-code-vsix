@@ -58,7 +58,10 @@ export interface PipelineStatus {
 
 // Conteos esperados. Los Workflows built-in (`build`/`vet`/`polish`) se
 // registran via registerWorkflows() desde createFridaPipeline().
-const EXPECTED_SKILLS = 27;
+// #87: contrato de empaquetado — cuántas skills DEBEN enviarse. El conteo
+// real (present) viene del directorio; si difiere, el banner lo muestra y el
+// estado degrada. Actualizar al añadir/quitar una skill del set.
+export const EXPECTED_SKILLS = 28;
 const EXPECTED_AGENTS = 15;
 const EXPECTED_WORKFLOWS = 3;
 
