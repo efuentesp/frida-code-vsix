@@ -190,7 +190,11 @@ import {
 	TOOL_TOGGLE_BASES,
 	TOOL_TOGGLE_KEY_BY_FACTORY,
 } from "./tool-toggles";
-import { attributeResources, type AttribSkill } from "./module-attribution";
+import {
+	attributeResources,
+	resolveSkillSource,
+	type AttribSkill,
+} from "./module-attribution";
 import { loadRegistry } from "./tools/frida-cc-plugins/registry";
 import {
 	classifySeverity,
@@ -1660,46 +1664,51 @@ export async function activate(
 		// la sección Comandos con source "extension" para distinguirlos de los
 		// built-in del host. Dedupe: si un nombre ya es built-in, gana el built-in.
 		const builtinNames = new Set(BUILTIN_COMMANDS.map((c) => c.name));
+		const allSkills: AttribSkill[] = (skills.skills ?? []).map((s: any): AttribSkill => {
+			const p = String(s.filePath ?? "");
+			let realPath = p;
+			try {
+				realPath = realpathSync(p);
+			} catch {
+				/* sin realpath (archivo normal o ausente) → path */
+			}
+			return {
+				name: String(s.name),
+				path: p,
+				realPath,
+				description: String(s.description ?? ""),
+				source: String(s?.sourceInfo?.scope ?? "path"),
+			};
+		});
+		const allPrompts = (prompts.prompts ?? []).map((p: any) => ({
+			name: String(p.name),
+			description: String(p.description ?? ""),
+		}));
+		const bundledSkillNames = getBundledSkillNames();
+		const ccSkillNames = (() => {
+			const names = new Set<string>();
+			try {
+				const reg = loadRegistry(defaultAgentDir());
+				const plugins: any[] = Object.values(reg.plugins ?? {});
+				for (const p of plugins)
+					for (const s of p?.skills ?? []) names.add(String(s));
+			} catch {
+				/* sin registry → sin atribución cc-plugins */
+			}
+			return names;
+		})();
+
 		// #54 — Atribución de recursos a módulos (toggles #53 + bases): los
 		// tools/comandos/skills/prompts/errores de cada módulo frida se muestran
 		// en el acordeón de Configuración > Herramientas; Recursos queda con lo
 		// general (extensiones externas, skills globales/proyecto, built-ins).
 		const attribution = attributeResources({
 			extensions: extensionsData,
-			skills: (skills.skills ?? []).map((s: any): AttribSkill => {
-				const p = String(s.filePath ?? "");
-				let realPath = p;
-				try {
-					realPath = realpathSync(p);
-				} catch {
-					/* sin realpath (archivo normal o ausente) → path */
-				}
-				return {
-					name: String(s.name),
-					path: p,
-					realPath,
-					description: String(s.description ?? ""),
-					source: String(s?.sourceInfo?.scope ?? "path"),
-				};
-			}),
-			prompts: (prompts.prompts ?? []).map((p: any) => ({
-				name: String(p.name),
-				description: String(p.description ?? ""),
-			})),
+			skills: allSkills,
+			prompts: allPrompts,
 			errors,
-			bundledSkillNames: getBundledSkillNames(),
-			ccSkillNames: (() => {
-				const names = new Set<string>();
-				try {
-					const reg = loadRegistry(defaultAgentDir());
-					const plugins: any[] = Object.values(reg.plugins ?? {});
-					for (const p of plugins)
-						for (const s of p?.skills ?? []) names.add(String(s));
-				} catch {
-					/* sin registry → sin atribución cc-plugins */
-				}
-				return names;
-			})(),
+			bundledSkillNames,
+			ccSkillNames,
 			kbRealPathPrefixes: [
 				path.join(
 					defaultAgentDir(),
@@ -1738,18 +1747,17 @@ export async function activate(
 		}
 		return {
 			extensions: attribution.general.extensions,
-			skills: attribution.general.skills.map((s) => ({
+			// #92: ResourceSummary.skills alimenta el autocompletado de "/" y "$"
+			// del Composer y la sección Skills de Recursos. Debe contener la
+			// totalidad de las skills descubiertas (atribuyendo su origen como
+			// extension, global, project o path).
+			skills: allSkills.map((s) => ({
 				name: s.name,
 				description: s.description,
-				source:
-					s.source === "project"
-						? "project"
-						: s.source === "user"
-							? "global"
-							: "path",
+				source: resolveSkillSource(s, bundledSkillNames, ccSkillNames),
 				path: s.path,
 			})),
-			prompts: attribution.general.prompts,
+			prompts: allPrompts,
 			themes: (themes.themes ?? []).map((t: any) => ({ name: String(t.name) })),
 			// Comandos slash: built-in del host (fuente única: BUILTIN_COMMANDS) más
 			// los registrados por extensiones vía la API de Pi. Se muestran en

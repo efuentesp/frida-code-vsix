@@ -201,3 +201,24 @@ export function attributeResources(input: AttributionInput): AttributionResult {
 
 	return { modules: [...byModule.values()], general };
 }
+
+/**
+ * Resuelve la procedencia (source) de una skill para el ResourceSummary del webview (#92):
+ * - "extension": si está empaquetada en frida-pipeline o registrada por cc-plugins.
+ * - "project": si fue descubierta en el workspace (.frida/skills o .pi/skills).
+ * - "global": si fue descubierta en ~/.frida/skills (~/.pi/agent/skills).
+ * - "path": cualquier otra ruta adicional.
+ */
+export function resolveSkillSource(
+	skill: { name: string; source?: string },
+	bundledSkillNames: ReadonlySet<string>,
+	ccSkillNames: ReadonlySet<string>,
+): "extension" | "global" | "project" | "path" {
+	if (bundledSkillNames.has(skill.name) || ccSkillNames.has(skill.name)) {
+		return "extension";
+	}
+	if (skill.source === "project") return "project";
+	if (skill.source === "user") return "global";
+	return "path";
+}
+

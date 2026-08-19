@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
 	attributeResources,
 	factoryNameOf,
+	resolveSkillSource,
 	type AttributionInput,
 } from "../src/module-attribution";
 
@@ -183,3 +184,32 @@ describe("attributeResources", () => {
 		]);
 	});
 });
+
+describe("resolveSkillSource (#92: procedencia de skills para ResourceSummary)", () => {
+	const bundled = new Set(["create-handoff", "resume-handoff", "discover", "plan"]);
+	const cc = new Set(["deploy-skill"]);
+
+	it("asigna 'extension' a las skills empaquetadas en frida-pipeline", () => {
+		expect(resolveSkillSource({ name: "create-handoff", source: "user" }, bundled, cc)).toBe("extension");
+		expect(resolveSkillSource({ name: "resume-handoff", source: "global" }, bundled, cc)).toBe("extension");
+		expect(resolveSkillSource({ name: "discover", source: "path" }, bundled, cc)).toBe("extension");
+	});
+
+	it("asigna 'extension' a las skills de cc-plugins", () => {
+		expect(resolveSkillSource({ name: "deploy-skill", source: "user" }, bundled, cc)).toBe("extension");
+	});
+
+	it("asigna 'global' a skills de usuario (~/.frida/skills)", () => {
+		expect(resolveSkillSource({ name: "mi-custom-skill", source: "user" }, bundled, cc)).toBe("global");
+	});
+
+	it("asigna 'project' a skills de proyecto (.frida/skills o .pi/skills)", () => {
+		expect(resolveSkillSource({ name: "project-skill", source: "project" }, bundled, cc)).toBe("project");
+	});
+
+	it("asigna 'path' como fallback para cualquier otra procedencia", () => {
+		expect(resolveSkillSource({ name: "extra-skill", source: "other" }, bundled, cc)).toBe("path");
+		expect(resolveSkillSource({ name: "extra-skill" }, bundled, cc)).toBe("path");
+	});
+});
+
