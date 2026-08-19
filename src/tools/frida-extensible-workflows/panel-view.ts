@@ -243,6 +243,32 @@ export function collapsedHeader(
 	};
 }
 
+// ── #81: stats del run — ⏱ elapsed + ∑ tokens/costo ──────────────────────────
+
+/** Tokens legibles (#81): 950 → "950", 543000 → "543K", 1234567 → "1.2M". */
+export function formatTokens(n: number): string {
+	if (n >= 1_000_000) {
+		const m = Math.round((n / 1_000_000) * 10) / 10;
+		return `${m}M`;
+	}
+	if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+	return String(n);
+}
+
+/** Stats agregadas del run para la card (#81). Elapsed = última interacción
+ * − inicio (o now si sigue corriendo sin actividad reciente). */
+export function runStats(
+	run: Pick<WorkflowRunView, "startedAt" | "lastActivityAt" | "tokens" | "costUsd">,
+	now: number,
+): { elapsedMs: number; tokens: number; costUsd: number } {
+	const start = run.startedAt ?? now;
+	return {
+		elapsedMs: Math.max(0, (run.lastActivityAt ?? now) - start),
+		tokens: run.tokens,
+		costUsd: run.costUsd,
+	};
+}
+
 /** ¿El agente cuelga de un grupo parallel/pipeline? (su path lo extiende) */
 function hangsFromGroup(
 	a: AgentProgressView,

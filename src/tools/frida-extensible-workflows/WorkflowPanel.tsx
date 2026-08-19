@@ -35,6 +35,8 @@ import {
 	timelineRows,
 	agentDisplayName,
 	collapsedHeader,
+	formatTokens,
+	runStats,
 	AGENT_ICON,
 	SEGMENT_BG,
 } from "./panel-view";
@@ -350,6 +352,8 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 	);
 	const hasCounts =
 		counts.completed > 0 || counts.failed > 0 || counts.running > 0;
+	// #81: stats del run — ⏱ desde el inicio a la última interacción + ∑ tokens.
+	const stats = runStats(run, now);
 
 	return (
 		<fbox bordered flexDirection="column" gap={8} padding={10} cls="wf-card">
@@ -387,6 +391,27 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 					</ftext>
 				</fbox>
 			</fbox>
+
+			{/* #81: ⏱ elapsed + ∑ tokens/costo del run */}
+			{run.startedAt === undefined ? null : (
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ficon name="clock" size={10} color="#8b949e" />
+					<ftext size={11} color="#8b949e">
+						{formatDuration(stats.elapsedMs)}
+					</ftext>
+					{stats.tokens > 0 ? (
+						<>
+							<ficon name="coins" size={10} color="#8b949e" />
+							<ftext size={11} color="#8b949e">
+								∑ {formatTokens(stats.tokens)}
+								{stats.costUsd > 0
+									? ` ($${stats.costUsd.toFixed(2)})`
+									: ""}
+							</ftext>
+						</>
+					) : null}
+				</fbox>
+			)}
 
 			{/* Contadores agregados de agentes (iconos lucide, no glifos) */}
 			{hasCounts ? <CountsRow counts={counts} /> : null}
@@ -452,12 +477,17 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 													color={STATE_COLOR[a.state]}
 													cls={a.state === "running" ? "spinner" : undefined}
 												/>
-												<ftext size={11} color={STATE_COLOR[a.state]}>
-													{a.label}
-												</ftext>
+											<ftext size={11} color={STATE_COLOR[a.state]}>
+												{a.label}
+											</ftext>
+											{a.tokens !== undefined && a.tokens > 0 ? (
 												<ftext size={11} color="#8b949e">
-													{formatDuration(a.durationMs)}
+													{formatTokens(a.tokens)}
 												</ftext>
+											) : null}
+											<ftext size={11} color="#8b949e">
+												{formatDuration(a.durationMs)}
+											</ftext>
 											</fbox>
 											))
 										: null}
@@ -606,6 +636,11 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 						cls={a.state === "running" ? "spinner" : undefined}
 					/>
 					<ftext size={11}>{agentDisplayName(a)}</ftext>
+					{a.tokens !== undefined && a.tokens > 0 ? (
+						<ftext size={11} color="#8b949e">
+							{formatTokens(a.tokens)}
+						</ftext>
+					) : null}
 					<ftext color="#8b949e" size={11}>
 						{formatDuration((a.endedAt ?? now) - a.startedAt)}
 					</ftext>

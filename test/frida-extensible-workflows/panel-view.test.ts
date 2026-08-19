@@ -16,6 +16,8 @@ import {
 	agentDisplayName,
 	collapsedHeader,
 	phaseProgress,
+	formatTokens,
+	runStats,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -426,5 +428,45 @@ describe("frida-extensible-workflows · header contraído con progreso (#80)", (
 		expect(h.title).toBe("Workflows");
 		expect(h.progress).toBeUndefined();
 		expect(h.running).toBe(0);
+	});
+});
+
+describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", () => {
+	beforeEach(() => _resetWorkflowRuns());
+
+	it("agent_end con tokens: acumula en el run y en el agente", () => {
+		upsertWorkflowRun({ runId: "r81", workflowName: "wf", state: "running" });
+		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "phase", name: "p" } });
+		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_start", agentId: "a1", structuralPath: ["r"] } });
+		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_end", agentId: "a1", ok: true, tokens: 48_000, cost: 0.11 } });
+		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_start", agentId: "a2", structuralPath: ["r"] } });
+		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_end", agentId: "a2", ok: true, tokens: 6_000 } });
+		const run = getWorkflowRuns().find((r) => r.runId === "r81");
+		expect(run?.tokens).toBe(54_000);
+		expect(run?.costUsd).toBeCloseTo(0.11);
+		expect(run?.agents.find((a) => a.agentId === "a1")?.tokens).toBe(48_000);
+	});
+
+	it("startedAt al primer evento; lastActivityAt avanza con cada evento", () => {
+		upsertWorkflowRun({ runId: "r81b", workflowName: "wf", state: "running" });
+		applyWorkflowProgress({ runId: "r81b", progress: { type: "progress", kind: "phase", name: "p" } });
+		const t1 = getWorkflowRuns()[0].lastActivityAt;
+		expect(getWorkflowRuns()[0].startedAt).toBeTypeOf("number");
+		applyWorkflowProgress({ runId: "r81b", progress: { type: "progress", kind: "agent_start", agentId: "a1", structuralPath: [] } });
+		expect(getWorkflowRuns()[0].lastActivityAt).toBeGreaterThanOrEqual(t1);
+	});
+
+	it("formatTokens legible; runStats elapsed con lastActivity", () => {
+		expect(formatTokens(543_000)).toBe("543K");
+		expect(formatTokens(1_234_567)).toBe("1.2M");
+		expect(formatTokens(950)).toBe("950");
+		const s = runStats(
+			{ startedAt: 1_000, lastActivityAt: 61_000, tokens: 543_000, costUsd: 1.24 },
+			120_000,
+		);
+		expect(s).toEqual({ elapsedMs: 60_000, tokens: 543_000, costUsd: 1.24 });
+		// Sin lastActivity (running): elapsed hasta now.
+		const s2 = runStats({ startedAt: 1_000, lastActivityAt: undefined, tokens: 0, costUsd: 0 }, 61_000);
+		expect(s2.elapsedMs).toBe(60_000);
 	});
 });

@@ -155,7 +155,7 @@ const internalAgent = (...values) => {
   send({ type: "progress", kind: "agent_start", agentId: agentId, structuralPath: identity.structuralPath, occurrence: occurrence, ...(wfRole ? { role: wfRole } : {}), ...(typeof options.label === "string" && options.label.trim() ? { label: options.label } : {}) });
   let result;
   try {
-    result = rpc("agent", [values[0], options, identity]).then((v) => { const value = unwrap(v); send({ type: "progress", kind: "agent_end", agentId: agentId, ok: true }); return value; }, (e) => { send({ type: "progress", kind: "agent_end", agentId: agentId, ok: false, ...(errorCode(e) ? { code: errorCode(e) } : {}) }); throw e; });
+    result = rpc("agent", [values[0], options, identity]).then((v) => { const acct = (v && typeof v === "object" && v.accounting && typeof v.accounting === "object") ? v.accounting : undefined; const tk = acct ? ((acct.input || 0) + (acct.output || 0)) : undefined; send({ type: "progress", kind: "agent_end", agentId: agentId, ok: true, ...(tk !== undefined ? { tokens: tk } : {}), ...(acct && typeof acct.cost === "number" ? { cost: acct.cost } : {}) }); const value = unwrap(v); return value; }, (e) => { send({ type: "progress", kind: "agent_end", agentId: agentId, ok: false, ...(errorCode(e) ? { code: errorCode(e) } : {}) }); throw e; });
   } catch (error) {
     agentInflight.delete(occurrenceKey);
     throw error;

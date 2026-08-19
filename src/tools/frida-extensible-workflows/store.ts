@@ -35,6 +35,10 @@ export interface AgentProgressView {
 	startedAt: number;
 	endedAt?: number;
 	code?: string;
+	/** Tokens facturados del agente (#81): input+output, llega en agent_end. */
+	tokens?: number;
+	/** Costo USD facturado del agente (#81). */
+	cost?: number;
 }
 
 /** Grupo (parallel/pipeline) con sus tareas esperadas (taskNames se conocen al inicio). */
@@ -57,6 +61,10 @@ export interface WorkflowProgressEvent {
 	occurrence?: number;
 	ok?: boolean;
 	code?: string;
+	/** Tokens del agente terminado (#81): input+output facturados. */
+	tokens?: number;
+	/** Costo USD del agente terminado (#81). */
+	cost?: number;
 	name?: string;
 	taskNames?: string[];
 }
@@ -84,6 +92,14 @@ export interface WorkflowRunView {
 	agents: readonly AgentProgressView[];
 	/** Grupos parallel/pipeline en vivo (issue #7). */
 	groups: readonly GroupProgressView[];
+	/** ∑ tokens facturados de los agentes terminados (#81). */
+	tokens: number;
+	/** ∑ costo USD facturado (#81). */
+	costUsd: number;
+	/** Primer evento de progreso visto (#81) — inicio del elapsed. */
+	startedAt?: number;
+	/** Último evento de progreso (#81) — «última interacción». */
+	lastActivityAt?: number;
 }
 
 let current: readonly WorkflowRunView[] = [];
@@ -218,6 +234,8 @@ export function upsertWorkflowRun(
 				groups: view.groups ?? [],
 				phases: [],
 				phaseTimes: {},
+				tokens: 0,
+				costUsd: 0,
 			},
 		];
 	}
@@ -253,6 +271,8 @@ export function applyWorkflowProgress(opts: {
 		occurrence,
 		ok,
 		code,
+		tokens,
+		cost,
 		taskNames,
 	} = progress;
 	const now = Date.now();
@@ -261,6 +281,12 @@ export function applyWorkflowProgress(opts: {
 	let groups = run.groups;
 	let phases = run.phases;
 	let phaseTimes = run.phaseTimes;
+	// #81: inicio en el primer evento; cada evento refresca la última interacción.
+	const startedAt = run.startedAt ?? now;
+	const lastActivityAt = now;
+	// #81: acumulado del run (tokens = input+output por agente, como usage del host).
+	let runTokens = run.tokens;
+	let runCost = run.costUsd;
 
 	if (kind === "phase") {
 		if (name) {
@@ -309,9 +335,15 @@ export function applyWorkflowProgress(opts: {
 							state: ok ? "completed" : "failed",
 							endedAt: now,
 							...(code && !ok ? { code } : {}),
+							...(tokens === undefined ? {} : { tokens }),
+							...(cost === undefined ? {} : { cost }),
 						}
 					: a,
 			);
+			// #81: sólo contabiliza agentes que reportaron (los fallidos sin
+			// tokens no ensucian el acumulado).
+			if (tokens !== undefined) runTokens += tokens;
+			if (cost !== undefined) runCost += cost;
 		}
 	} else if (kind === "group_start") {
 		const key = pathKey(structuralPath);
@@ -339,11 +371,25 @@ export function applyWorkflowProgress(opts: {
 		agents === run.agents &&
 		groups === run.groups &&
 		phases === run.phases &&
-		phaseTimes === run.phaseTimes
+		phaseTimes === run.phaseTimes &&
+		startedAt === run.startedAt &&
+		runTokens === run.tokens &&
+		runCost === run.costUsd
 	)
 		return;
 	const next = current.slice();
-	next[idx] = { ...run, phase, agents, groups, phases, phaseTimes };
+	next[idx] = {
+		...run,
+		phase,
+		agents,
+		groups,
+		phases,
+		phaseTimes,
+		startedAt,
+		lastActivityAt,
+		tokens: runTokens,
+		costUsd: runCost,
+	};
 	current = next;
 	emit();
 }
