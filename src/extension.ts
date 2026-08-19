@@ -1,5 +1,6 @@
 import { createPendingQueueStore } from "./queue/pending-queue";
 import { agentEndFallbackText } from "./agent-end-fallback";
+import { ABORT_GATE_TTL_MS, createAbortGate } from "./abort-gate";
 import path from "node:path";
 import * as fs from "node:fs/promises";
 import { realpathSync } from "node:fs";
@@ -793,6 +794,10 @@ export async function activate(
 	let lensAnyTruncated = false;
 	let lensBusy = false;
 	let inRetry = false;
+	// #90: gate de re-abort — session.abort() cae en el GAP entre runs del SDK
+	// (tool→LLM) y resuelve como no-op; el siguiente run arranca libre. El gate
+	// re-aborta ese run en agent_start hasta que haya settle real (isIdle=true).
+	const abortGate = createAbortGate();
 	let lensActive = false;
 	// ¿Tiene el foco la ventana de VS Code? Se actualiza con
 	// onDidChangeWindowState. Sirve para emitir el sonido/notificación de fin de
@@ -1939,11 +1944,32 @@ export async function activate(
 					// MIENTRAS un request sigue en vuelo (o antes de un abort pedido), el run
 					// escapó al tracking del AgentSession → abort() será no-op aunque siga
 					// quemando tokens (modo de fallo 1 y 2 del issue).
+					// #90: settle REAL (isIdle) limpia el gate de re-abort; un settle con
+					// isIdle=false (retry/ciclo vivo) lo mantiene.
+					if (abortGate.isPending()) {
+						abortDiag(
+							`agent_settled (abortGate pendiente) — isIdle=${!!session.isIdle} isRetrying=${!!session.isRetrying} → ${session.isIdle ? "gate LIMPIO (ciclo paró)" : "gate MANTENIDO (ciclo vivo)"}`,
+						);
+					}
+					abortGate.onAgentSettled({ isIdle: !!session.isIdle });
 					abortDiag(
 						`agent_settled — isIdle=${!!session.isIdle} isRetrying=${!!session.isRetrying} retryAttempt=${session.retryAttempt ?? 0}`,
 					);
 					break;
 				case "agent_start":
+					// #90: si hay un abort pendiente, este agent_start es el run ESCAPADO que
+					// arrancó justo después del abort no-op (gap entre runs del SDK). Con
+					// isStreaming ya true, un abort AQUÍ sí lo mata — re-abortamos.
+					if (abortGate.onAgentStart({ isIdle: !!session.isIdle })) {
+						abortDiag(
+							`agent_start con abortGate PENDIENTE → RE-ABORT del run escapado (isStreaming=${!!session.isStreaming})`,
+						);
+						try {
+							void session.abort?.();
+						} catch {
+							/* best-effort */
+						}
+					}
 					abortDiag(
 						`agent_start — isStreaming=${!!session.isStreaming} isBashRunning=${!!session.isBashRunning} queueSteer=${session.getSteeringMessages?.().length ?? "?"} queueFollow=${session.getFollowUpMessages?.().length ?? "?"} pendingLocal=${queueStore.snapshot().length}`,
 					);
@@ -2400,6 +2426,9 @@ export async function activate(
 				}
 				break;
 			case "submit":
+				// #90: trabajo nuevo INTENCIONAL del usuario → limpia el gate de re-abort
+				// (no queremos re-abortar el run que el usuario acaba de pedir).
+				abortGate.onUserPrompt();
 				await runPrompt(
 					String(msg.text ?? ""),
 					msg.mode === "followUp" ? "followUp" : "steer",
@@ -4432,6 +4461,12 @@ export async function activate(
 					`abort() TIMEOUT 8000ms — SIGUE isStreaming=${!!s?.isStreaming} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} (probable tool/MCP/subagente que ignora la señal de abort)`,
 				);
 			}
+			// #90: marcar el gate — si el abort cayó en el GAP entre runs (no-op) o el
+			// ciclo tool→LLM sigue vivo, el PRÓXIMO agent_start se re-aborta (ahí el
+			// abort del SDK sí mata el run con isStreaming=true). El gate se limpia con
+			// agent_settled real (isIdle) o un prompt nuevo del usuario.
+			abortGate.requestAbort();
+			abortDiag(`abortGate SET (re-abortará agent_start si el ciclo sigue vivo; TTL ${ABORT_GATE_TTL_MS / 1000}s)`);
 			abortDiag(`abortRun END tras ${Date.now() - t0}ms`);
 		} catch (e: any) {
 			abortDiag(`abortRun THROW: ${String(e?.message ?? e)}`);
