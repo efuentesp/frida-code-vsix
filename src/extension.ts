@@ -1044,23 +1044,23 @@ export async function activate(
 					// #20 — chip 🎯 del footer + avisos del runtime de frida-goal.
 					onGoalState: (goal) => postGoalState(goal),
 					onGoalNotify: (_level, text) => post({ type: "info", text }),
-				getContext7Key,
-				onProviderError,
-				// #86: deps del provider-audit (extensión frida-provider-audit vía pi.on).
-				providerAudit: {
-					append: (line) => providerAuditAppender.append(line),
-					tag: () => abortSessionTag,
-					// Storage para AUTO-CHANGE: el último error HTTP reciente (<2 min) se
-					// incluye como disparador cuando agent_end detecta divergencia.
-					onHttpError: (status, modelRef) => {
-						lastProviderHttpError = {
-							status,
-							atMs: Date.now(),
-							message: modelRef,
-						};
+					getContext7Key,
+					onProviderError,
+					// #86: deps del provider-audit (extensión frida-provider-audit vía pi.on).
+					providerAudit: {
+						append: (line) => providerAuditAppender.append(line),
+						tag: () => abortSessionTag,
+						// Storage para AUTO-CHANGE: el último error HTTP reciente (<2 min) se
+						// incluye como disparador cuando agent_end detecta divergencia.
+						onHttpError: (status, modelRef) => {
+							lastProviderHttpError = {
+								status,
+								atMs: Date.now(),
+								message: modelRef,
+							};
+						},
 					},
-				},
-				requestDumpPath,
+					requestDumpPath,
 					diagnosticDumpPath,
 					onGatewayDiagnosis,
 					codebaseIndexEnabled: isCodebaseIndexEnabled,
@@ -1664,22 +1664,24 @@ export async function activate(
 		// la sección Comandos con source "extension" para distinguirlos de los
 		// built-in del host. Dedupe: si un nombre ya es built-in, gana el built-in.
 		const builtinNames = new Set(BUILTIN_COMMANDS.map((c) => c.name));
-		const allSkills: AttribSkill[] = (skills.skills ?? []).map((s: any): AttribSkill => {
-			const p = String(s.filePath ?? "");
-			let realPath = p;
-			try {
-				realPath = realpathSync(p);
-			} catch {
-				/* sin realpath (archivo normal o ausente) → path */
-			}
-			return {
-				name: String(s.name),
-				path: p,
-				realPath,
-				description: String(s.description ?? ""),
-				source: String(s?.sourceInfo?.scope ?? "path"),
-			};
-		});
+		const allSkills: AttribSkill[] = (skills.skills ?? []).map(
+			(s: any): AttribSkill => {
+				const p = String(s.filePath ?? "");
+				let realPath = p;
+				try {
+					realPath = realpathSync(p);
+				} catch {
+					/* sin realpath (archivo normal o ausente) → path */
+				}
+				return {
+					name: String(s.name),
+					path: p,
+					realPath,
+					description: String(s.description ?? ""),
+					source: String(s?.sourceInfo?.scope ?? "path"),
+				};
+			},
+		);
 		const allPrompts = (prompts.prompts ?? []).map((p: any) => ({
 			name: String(p.name),
 			description: String(p.description ?? ""),
@@ -2009,23 +2011,23 @@ export async function activate(
 							activeModel &&
 							(cur.provider !== activeModel.provider || cur.id !== activeModel.modelId)
 						) {
-						modelChangeBridge ??= new ModelChangeBridge((reqs) =>
-							post({ type: "model_changes", items: reqs }),
-						);
-						const prev = { ...activeModel };
-						// #86: provider-audit AUTO-CHANGE — divergencia detectada + causality.
-						const httpCause =
-							lastProviderHttpError &&
-							Date.now() - lastProviderHttpError.atMs < 120_000
-								? ` disparadoPor=HTTP ${lastProviderHttpError.status} hace ${Math.round((Date.now() - lastProviderHttpError.atMs) / 1000)}s`
-								: "";
-						providerAuditAppender.append(
-							forensicLine(
-								abortSessionTag,
-								`AUTO-CHANGE from=${formatModelRef(prev.provider, prev.modelId)} to=${formatModelRef(cur.provider, cur.id)}${httpCause}`,
-							),
-						);
-						void modelChangeBridge
+							modelChangeBridge ??= new ModelChangeBridge((reqs) =>
+								post({ type: "model_changes", items: reqs }),
+							);
+							const prev = { ...activeModel };
+							// #86: provider-audit AUTO-CHANGE — divergencia detectada + causality.
+							const httpCause =
+								lastProviderHttpError &&
+								Date.now() - lastProviderHttpError.atMs < 120_000
+									? ` disparadoPor=HTTP ${lastProviderHttpError.status} hace ${Math.round((Date.now() - lastProviderHttpError.atMs) / 1000)}s`
+									: "";
+							providerAuditAppender.append(
+								forensicLine(
+									abortSessionTag,
+									`AUTO-CHANGE from=${formatModelRef(prev.provider, prev.modelId)} to=${formatModelRef(cur.provider, cur.id)}${httpCause}`,
+								),
+							);
+							void modelChangeBridge
 								.request({
 									id: `mc-${Date.now()}`,
 									from: {
@@ -4474,7 +4476,9 @@ export async function activate(
 			// abort del SDK sí mata el run con isStreaming=true). El gate se limpia con
 			// agent_settled real (isIdle) o un prompt nuevo del usuario.
 			abortGate.requestAbort();
-			abortDiag(`abortGate SET (re-abortará agent_start si el ciclo sigue vivo; TTL ${ABORT_GATE_TTL_MS / 1000}s)`);
+			abortDiag(
+				`abortGate SET (re-abortará agent_start si el ciclo sigue vivo; TTL ${ABORT_GATE_TTL_MS / 1000}s)`,
+			);
 			abortDiag(`abortRun END tras ${Date.now() - t0}ms`);
 		} catch (e: any) {
 			abortDiag(`abortRun THROW: ${String(e?.message ?? e)}`);

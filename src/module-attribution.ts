@@ -172,9 +172,7 @@ export function attributeResources(input: AttributionInput): AttributionResult {
 			byModule.get("ccPlugins")?.skills.push(s.name);
 		} else if (input.bundledSkillNames.has(s.name)) {
 			byModule.get("frida-pipeline")?.skills.push(s.name);
-		} else if (
-			input.kbRealPathPrefixes.some((p) => s.realPath.startsWith(p))
-		) {
+		} else if (input.kbRealPathPrefixes.some((p) => s.realPath.startsWith(p))) {
 			byModule.get("knowledgeBase")?.skills.push(s.name);
 		} else {
 			general.skills.push(s);
@@ -221,4 +219,3 @@ export function resolveSkillSource(
 	if (skill.source === "user") return "global";
 	return "path";
 }
-

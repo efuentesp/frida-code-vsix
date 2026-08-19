@@ -112,17 +112,17 @@ describe("attributeResources", () => {
 				ccSkillNames: new Set(["appwrite-deploy"]),
 			}),
 		);
-		expect(
-			r.modules.find((m) => m.module === "ccPlugins")?.skills,
-		).toContain("appwrite-deploy");
+		expect(r.modules.find((m) => m.module === "ccPlugins")?.skills).toContain(
+			"appwrite-deploy",
+		);
 		// bundled con fixture sintético: pipeline registra "commit" aunque no esté
 		// en skills[] del input (la regla es por nombre).
 		expect(r.modules.find((m) => m.module === "ccPlugins")?.skills).not.toContain(
 			"llm-wiki",
 		);
-		expect(
-			r.modules.find((m) => m.module === "knowledgeBase")?.skills,
-		).toContain("llm-wiki");
+		expect(r.modules.find((m) => m.module === "knowledgeBase")?.skills).toContain(
+			"llm-wiki",
+		);
 		expect(r.general.skills).toHaveLength(0);
 	});
 
@@ -135,9 +135,9 @@ describe("attributeResources", () => {
 				],
 			}),
 		);
-		expect(
-			r.modules.find((m) => m.module === "knowledgeBase")?.prompts,
-		).toEqual(["wiki-init"]);
+		expect(r.modules.find((m) => m.module === "knowledgeBase")?.prompts).toEqual([
+			"wiki-init",
+		]);
 		expect(r.general.prompts.map((p) => p.name)).toEqual(["mi-prompt"]);
 	});
 
@@ -146,7 +146,8 @@ describe("attributeResources", () => {
 			baseInput({
 				errors: [
 					{
-						path: "/home/u/.frida/npm/node_modules/@zosmaai/pi-llm-wiki/prompts/wiki-x.md",
+						path:
+							"/home/u/.frida/npm/node_modules/@zosmaai/pi-llm-wiki/prompts/wiki-x.md",
 						error: "boom",
 					},
 					{ path: "/home/u/.frida/skills/otra", error: "mal" },
@@ -186,30 +187,56 @@ describe("attributeResources", () => {
 });
 
 describe("resolveSkillSource (#92: procedencia de skills para ResourceSummary)", () => {
-	const bundled = new Set(["create-handoff", "resume-handoff", "discover", "plan"]);
+	const bundled = new Set([
+		"create-handoff",
+		"resume-handoff",
+		"discover",
+		"plan",
+	]);
 	const cc = new Set(["deploy-skill"]);
 
 	it("asigna 'extension' a las skills empaquetadas en frida-pipeline", () => {
-		expect(resolveSkillSource({ name: "create-handoff", source: "user" }, bundled, cc)).toBe("extension");
-		expect(resolveSkillSource({ name: "resume-handoff", source: "global" }, bundled, cc)).toBe("extension");
-		expect(resolveSkillSource({ name: "discover", source: "path" }, bundled, cc)).toBe("extension");
+		expect(
+			resolveSkillSource({ name: "create-handoff", source: "user" }, bundled, cc),
+		).toBe("extension");
+		expect(
+			resolveSkillSource(
+				{ name: "resume-handoff", source: "global" },
+				bundled,
+				cc,
+			),
+		).toBe("extension");
+		expect(
+			resolveSkillSource({ name: "discover", source: "path" }, bundled, cc),
+		).toBe("extension");
 	});
 
 	it("asigna 'extension' a las skills de cc-plugins", () => {
-		expect(resolveSkillSource({ name: "deploy-skill", source: "user" }, bundled, cc)).toBe("extension");
+		expect(
+			resolveSkillSource({ name: "deploy-skill", source: "user" }, bundled, cc),
+		).toBe("extension");
 	});
 
 	it("asigna 'global' a skills de usuario (~/.frida/skills)", () => {
-		expect(resolveSkillSource({ name: "mi-custom-skill", source: "user" }, bundled, cc)).toBe("global");
+		expect(
+			resolveSkillSource({ name: "mi-custom-skill", source: "user" }, bundled, cc),
+		).toBe("global");
 	});
 
 	it("asigna 'project' a skills de proyecto (.frida/skills o .pi/skills)", () => {
-		expect(resolveSkillSource({ name: "project-skill", source: "project" }, bundled, cc)).toBe("project");
+		expect(
+			resolveSkillSource(
+				{ name: "project-skill", source: "project" },
+				bundled,
+				cc,
+			),
+		).toBe("project");
 	});
 
 	it("asigna 'path' como fallback para cualquier otra procedencia", () => {
-		expect(resolveSkillSource({ name: "extra-skill", source: "other" }, bundled, cc)).toBe("path");
+		expect(
+			resolveSkillSource({ name: "extra-skill", source: "other" }, bundled, cc),
+		).toBe("path");
 		expect(resolveSkillSource({ name: "extra-skill" }, bundled, cc)).toBe("path");
 	});
 });
-
