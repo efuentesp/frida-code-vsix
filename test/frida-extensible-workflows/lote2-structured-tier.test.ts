@@ -404,3 +404,67 @@ describe("patrones Lote 2 · ejecución en sandbox real", () => {
 		expect(result.findings).toEqual([]);
 	}, 20000);
 });
+
+describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM)", () => {
+	const TARGETS_SCHEMA: JsonSchema = {
+		type: "object",
+		properties: {
+			targets: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						id: { type: "string" },
+						risk: { type: "string" },
+					},
+					required: ["id", "risk"],
+				},
+			},
+		},
+		required: ["targets"],
+	};
+	const spawnReturning = (value: JsonValue): SpawnAgentFn =>
+		(async () => spawnResult(value)) as unknown as SpawnAgentFn;
+
+	it("array hijo serializado como string JSON pasa en el PRIMER intento", async () => {
+		// GLM-5.3: objetos anidados como string JSON (incidente #82/#76).
+		const spawn = spawnReturning({
+			targets: '[{"id":"T1","risk":"P0"},{"id":"T2","risk":"P1"}]',
+		});
+		const out = (await withStructuredOutput(spawn)({}, { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+			value: unknown;
+		};
+		expect(out.value).toEqual({
+			targets: [
+				{ id: "T1", risk: "P0" },
+				{ id: "T2", risk: "P1" },
+			],
+		});
+	});
+
+	it("string-encoded anidado dentro de string-encoded (recursión + fences)", async () => {
+		const spawn = spawnReturning(
+			'{"targets": "[{\\"id\\":\\"T1\\",\\"risk\\":\\"P0\\"}]"}',
+		);
+		const out = (await withStructuredOutput(spawn)({}, { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+			value: unknown;
+		};
+		expect(out.value).toEqual({
+			targets: [{ id: "T1", risk: "P0" }],
+		});
+	});
+
+	it("string que el schema espera como string NO se toca", async () => {
+		const SCHEMA: JsonSchema = {
+			type: "object",
+			properties: { summary: { type: "string" } },
+			required: ["summary"],
+		};
+		const spawn = spawnReturning({ summary: '{"parece":"json"}' });
+		const out = (await withStructuredOutput(spawn)({}, { outputSchema: SCHEMA } as never, {} as never, {} as never)) as {
+			value: unknown;
+		};
+		// El schema pide string → el contenido json-looking se conserva tal cual.
+		expect(out.value).toEqual({ summary: '{"parece":"json"}' });
+	});
+});

@@ -142,6 +142,85 @@ export function validateJsonSchemaValue(
 	return errors;
 }
 
+/** Profundidad máxima de decodificación recursiva (#82) — cota defensiva. */
+const MAX_DECODE_DEPTH = 8;
+
+/**
+ * Decodificación guiada por schema (#82: double-encoding de GLM-5.3, espejo
+ * del #76 en la salida): cuando el schema espera object/array pero el valor
+ * es un string que PARSEA a ese tipo exacto, se sustituye por el parseado —
+ * recursivamente. Los strings que el schema espera como string se conservan
+ * tal cual (nunca se promociona prosa ni se toca lo correcto); si el string
+ * no parsea, se devuelve intacto y la validación reportará el error real.
+ */
+export function normalizeStructuredValue(
+	value: unknown,
+	schema: JsonSchema | undefined,
+	depth = 0,
+): unknown {
+	if (!schema || typeof schema !== "object" || Array.isArray(schema))
+		return value;
+	if (depth >= MAX_DECODE_DEPTH) return value;
+	const t = typeof schema.type === "string" ? schema.type : undefined;
+
+	if (typeof value === "string" && (t === "object" || t === "array")) {
+		try {
+			const parsed = parseJsonLoose(value);
+			const actual = Array.isArray(parsed)
+				? "array"
+				: parsed === null
+					? "null"
+					: typeof parsed;
+			// Sólo promociona si el tipo parseado calza con el esperado.
+			if (actual === t) return normalizeStructuredValue(parsed, schema, depth + 1);
+		} catch {
+			// no parsea → se valida tal cual y el error es accionable
+		}
+		return value;
+	}
+
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		const record = value as Record<string, unknown>;
+		const props = schema.properties;
+		if (props && typeof props === "object" && !Array.isArray(props)) {
+			let changed = false;
+			const next: Record<string, unknown> = {};
+			for (const [k, v] of Object.entries(record)) {
+				const child = (props as Record<string, JsonValue>)[k];
+				const nv =
+					child && typeof child === "object"
+						? normalizeStructuredValue(v, child as JsonSchema, depth + 1)
+						: v;
+				if (nv !== v) changed = true;
+				next[k] = nv;
+			}
+			if (changed) return next;
+		}
+		return value;
+	}
+
+	if (
+		Array.isArray(value) &&
+		schema.items &&
+		typeof schema.items === "object"
+	) {
+		let changed = false;
+		const next = value.map((item) => {
+			const nv = normalizeStructuredValue(
+				item,
+				schema.items as JsonSchema,
+				depth + 1,
+			);
+			if (nv !== item) changed = true;
+			return nv;
+		});
+		if (changed) return next;
+		return value;
+	}
+
+	return value;
+}
+
 /** Prompt del primer intento: la tarea + contrato de salida JSON. */
 export function structuredPrompt(prompt: string, schema: JsonSchema): string {
 	return (
@@ -217,10 +296,11 @@ export function withStructuredOutput(
 				typeof unpacked.value === "string" ? unpacked.value : null;
 			if (text === null) {
 				// El agente ya devolvió un JsonValue no-string (spawn custom):
-				// se asume estructurado y se valida tal cual.
-				const errors = validateJsonSchemaValue(unpacked.value, schema);
+				// se normaliza (#82: hijos string-encoded) y se valida tal cual.
+				const normalized = normalizeStructuredValue(unpacked.value, schema);
+				const errors = validateJsonSchemaValue(normalized, schema);
 				if (!errors.length)
-					return spawnResult(unpacked.value, { accounting, durationMs });
+					return spawnResult(normalized as JsonValue, { accounting, durationMs });
 				if (attempt === maxRepair) break;
 				currentPrompt = repairPrompt(
 					prompt,
@@ -231,7 +311,10 @@ export function withStructuredOutput(
 				continue;
 			}
 			try {
-				const parsed = parseJsonLoose(text) as JsonValue;
+				const parsed = normalizeStructuredValue(
+					parseJsonLoose(text) as JsonValue,
+					schema,
+				) as JsonValue;
 				const errors = validateJsonSchemaValue(parsed, schema);
 				if (!errors.length)
 					return spawnResult(parsed, { accounting, durationMs });
