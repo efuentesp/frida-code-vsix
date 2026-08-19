@@ -5843,3 +5843,159 @@ kbd {
 .wf-checkpoint {
 	border-radius: 6px;
 }
+
+/* ── Fundaciones Visuales y Primitivas Copilot (Fase 1) ───────────────── */
+@keyframes chat-thinking-shimmer {
+	0% {
+		background-position: 120% 0;
+	}
+	100% {
+		background-position: -120% 0;
+	}
+}
+
+.tc-shimmer {
+	background: linear-gradient(
+		90deg,
+		var(--vscode-descriptionForeground) 0%,
+		var(--vscode-editor-foreground, #cfe3ff) 50%,
+		var(--vscode-descriptionForeground) 100%
+	);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: chat-thinking-shimmer 2s linear infinite;
+}
+
+.tc-shimmer-verb {
+	background: linear-gradient(
+		90deg,
+		var(--vscode-descriptionForeground) 0%,
+		var(--vscode-textLink-foreground, #4daafc) 50%,
+		var(--vscode-descriptionForeground) 100%
+	);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: chat-thinking-shimmer 2s linear infinite;
+	font-weight: 500;
+}
+
+.tabular-nums {
+	font-variant-numeric: tabular-nums;
+}
+
+.tc-sub {
+	font-size: 11px;
+	opacity: 0.75;
+	font-variant-numeric: tabular-nums;
+}
+
+.tc-sub::before {
+	content: " – ";
+	opacity: 0.7;
+}
+
+.tc-anchor {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.tc-anchor:hover {
+	text-decoration: underline;
+}
+
+/* Base de Fila Plana Copilot (.tool-flat) */
+.tool-flat {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 3px 6px 3px 4px;
+	border-radius: 4px;
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	line-height: 18px;
+	cursor: pointer;
+	text-align: left;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.tool-flat:hover {
+	background-color: var(
+		--vscode-list-hoverBackground,
+		rgba(128, 128, 128, 0.1)
+	);
+}
+
+.tool-flat .codicon-check {
+	color: var(
+		--vscode-testing-iconPassed,
+		var(--vscode-gitDecoration-addedResourceForeground, #89d185)
+	);
+}
+
+.tool-flat .codicon-error {
+	color: var(--vscode-errorForeground, #f48771);
+}
+
+.tool-flat-chevron {
+	opacity: 0;
+	margin-left: auto;
+	color: var(--vscode-descriptionForeground);
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s ease;
+}
+
+.tool-flat:hover .tool-flat-chevron {
+	opacity: 0.8;
+}
+
+.tool-flat.is-expanded .tool-flat-chevron {
+	opacity: 0.8;
+	transform: rotate(90deg);
+}
+
+/* Transición suave para contenido colapsable (1fr → 0fr) */
+.collapsible-grid {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition:
+		grid-template-rows 180ms cubic-bezier(0.2, 0, 0, 1),
+		opacity 140ms ease;
+	opacity: 0;
+}
+
+.collapsible-grid.is-expanded {
+	grid-template-rows: 1fr;
+	opacity: 1;
+}
+
+.collapsible-grid-inner {
+	overflow: hidden;
+}
+
+/* Accesibilidad: Respeta la preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+	.tc-shimmer,
+	.tc-shimmer-verb {
+		animation: none !important;
+		-webkit-text-fill-color: initial !important;
+		background: none !important;
+	}
+	.collapsible-grid {
+		transition: none !important;
+	}
+	.tool-flat-chevron {
+		transition: none !important;
+	}
+	.codicon-modifier-spin {
+		animation: none !important;
+	}
+}
+
