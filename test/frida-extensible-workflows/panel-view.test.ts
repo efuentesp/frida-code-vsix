@@ -18,6 +18,7 @@ import {
 	phaseProgress,
 	formatTokens,
 	runStats,
+	recentFailed,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -191,19 +192,28 @@ describe("frida-extensible-workflows · timeline vertical + label real (#79)", (
 
 	it("phaseTimes: phase abre fase nueva y cierra la previa; reaparición reabre", () => {
 		seedRun("r79a");
-		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "bootstrap" } });
+		ev({
+			runId: "r79a",
+			progress: { type: "progress", kind: "phase", name: "bootstrap" },
+		});
 		let run = getWorkflowRuns().find((r) => r.runId === "r79a");
 		expect(run?.phaseTimes.bootstrap?.startedAt).toBeTypeOf("number");
 		expect(run?.phaseTimes.bootstrap?.endedAt).toBeUndefined();
 
-		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "ship" } });
+		ev({
+			runId: "r79a",
+			progress: { type: "progress", kind: "phase", name: "ship" },
+		});
 		run = getWorkflowRuns().find((r) => r.runId === "r79a");
 		expect(run?.phaseTimes.bootstrap?.endedAt).toBeTypeOf("number");
 		expect(run?.phaseTimes.ship?.startedAt).toBeTypeOf("number");
 
 		// Reaparición (resume / fase que vuelve): reabre, no duplica startedAt base.
 		const before = run?.phaseTimes.ship?.startedAt;
-		ev({ runId: "r79a", progress: { type: "progress", kind: "phase", name: "bootstrap" } });
+		ev({
+			runId: "r79a",
+			progress: { type: "progress", kind: "phase", name: "bootstrap" },
+		});
 		run = getWorkflowRuns().find((r) => r.runId === "r79a");
 		expect(run?.phaseTimes.ship?.endedAt).toBeTypeOf("number");
 		expect(run?.phaseTimes.bootstrap?.endedAt).toBeUndefined();
@@ -213,7 +223,10 @@ describe("frida-extensible-workflows · timeline vertical + label real (#79)", (
 
 	it("agent_start con label guarda label humano y la fase activa", () => {
 		seedRun("r79b");
-		ev({ runId: "r79b", progress: { type: "progress", kind: "phase", name: "story E3-S2" } });
+		ev({
+			runId: "r79b",
+			progress: { type: "progress", kind: "phase", name: "story E3-S2" },
+		});
 		ev({
 			runId: "r79b",
 			progress: {
@@ -334,7 +347,7 @@ describe("frida-extensible-workflows · timeline vertical + label real (#79)", (
 				startedAt: 0,
 			}),
 			// Prioridad documentada: label > path > role (#71 conservado).
-			).toBe("root");
+		).toBe("root");
 		expect(
 			agentDisplayName({
 				agentId: "x",
@@ -368,9 +381,10 @@ describe("frida-extensible-workflows · header contraído con progreso (#80)", (
 				phase: "ship",
 			}),
 		).toEqual({ done: 1, total: 3 });
-		expect(
-			phaseProgress({ phases: ["a", "b"], phase: "b" }),
-		).toEqual({ done: 1, total: 2 });
+		expect(phaseProgress({ phases: ["a", "b"], phase: "b" })).toEqual({
+			done: 1,
+			total: 2,
+		});
 		// Fase actual no está en el historial (edge) → done = total.
 		expect(phaseProgress({ phases: ["a"], phase: "zzz" })).toEqual({
 			done: 1,
@@ -408,12 +422,22 @@ describe("frida-extensible-workflows · header contraído con progreso (#80)", (
 
 	it("collapsedHeader con 2+: título agregado, sin barra, ⟳ suma", () => {
 		const h = collapsedHeader([
-			run({ workflowName: "uno", phase: "p1", phases: ["p1"], agents: [
-				{ agentId: "a", structuralPath: [], state: "running", startedAt: 0 },
-			] }),
-			run({ workflowName: "dos", phase: "q1", phases: ["q1"], agents: [
-				{ agentId: "b", structuralPath: [], state: "running", startedAt: 0 },
-			] }),
+			run({
+				workflowName: "uno",
+				phase: "p1",
+				phases: ["p1"],
+				agents: [
+					{ agentId: "a", structuralPath: [], state: "running", startedAt: 0 },
+				],
+			}),
+			run({
+				workflowName: "dos",
+				phase: "q1",
+				phases: ["q1"],
+				agents: [
+					{ agentId: "b", structuralPath: [], state: "running", startedAt: 0 },
+				],
+			}),
 		]);
 		expect(h.title).toBe("Workflows · 2");
 		expect(h.progress).toBeUndefined();
@@ -436,11 +460,49 @@ describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", (
 
 	it("agent_end con tokens: acumula en el run y en el agente", () => {
 		upsertWorkflowRun({ runId: "r81", workflowName: "wf", state: "running" });
-		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "phase", name: "p" } });
-		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_start", agentId: "a1", structuralPath: ["r"] } });
-		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_end", agentId: "a1", ok: true, tokens: 48_000, cost: 0.11 } });
-		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_start", agentId: "a2", structuralPath: ["r"] } });
-		applyWorkflowProgress({ runId: "r81", progress: { type: "progress", kind: "agent_end", agentId: "a2", ok: true, tokens: 6_000 } });
+		applyWorkflowProgress({
+			runId: "r81",
+			progress: { type: "progress", kind: "phase", name: "p" },
+		});
+		applyWorkflowProgress({
+			runId: "r81",
+			progress: {
+				type: "progress",
+				kind: "agent_start",
+				agentId: "a1",
+				structuralPath: ["r"],
+			},
+		});
+		applyWorkflowProgress({
+			runId: "r81",
+			progress: {
+				type: "progress",
+				kind: "agent_end",
+				agentId: "a1",
+				ok: true,
+				tokens: 48_000,
+				cost: 0.11,
+			},
+		});
+		applyWorkflowProgress({
+			runId: "r81",
+			progress: {
+				type: "progress",
+				kind: "agent_start",
+				agentId: "a2",
+				structuralPath: ["r"],
+			},
+		});
+		applyWorkflowProgress({
+			runId: "r81",
+			progress: {
+				type: "progress",
+				kind: "agent_end",
+				agentId: "a2",
+				ok: true,
+				tokens: 6_000,
+			},
+		});
 		const run = getWorkflowRuns().find((r) => r.runId === "r81");
 		expect(run?.tokens).toBe(54_000);
 		expect(run?.costUsd).toBeCloseTo(0.11);
@@ -449,10 +511,21 @@ describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", (
 
 	it("startedAt al primer evento; lastActivityAt avanza con cada evento", () => {
 		upsertWorkflowRun({ runId: "r81b", workflowName: "wf", state: "running" });
-		applyWorkflowProgress({ runId: "r81b", progress: { type: "progress", kind: "phase", name: "p" } });
+		applyWorkflowProgress({
+			runId: "r81b",
+			progress: { type: "progress", kind: "phase", name: "p" },
+		});
 		const t1 = getWorkflowRuns()[0].lastActivityAt;
 		expect(getWorkflowRuns()[0].startedAt).toBeTypeOf("number");
-		applyWorkflowProgress({ runId: "r81b", progress: { type: "progress", kind: "agent_start", agentId: "a1", structuralPath: [] } });
+		applyWorkflowProgress({
+			runId: "r81b",
+			progress: {
+				type: "progress",
+				kind: "agent_start",
+				agentId: "a1",
+				structuralPath: [],
+			},
+		});
 		expect(getWorkflowRuns()[0].lastActivityAt).toBeGreaterThanOrEqual(t1);
 	});
 
@@ -466,7 +539,44 @@ describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", (
 		);
 		expect(s).toEqual({ elapsedMs: 60_000, tokens: 543_000, costUsd: 1.24 });
 		// Sin lastActivity (running): elapsed hasta now.
-		const s2 = runStats({ startedAt: 1_000, lastActivityAt: undefined, tokens: 0, costUsd: 0 }, 61_000);
+		const s2 = runStats(
+			{ startedAt: 1_000, lastActivityAt: undefined, tokens: 0, costUsd: 0 },
+			61_000,
+		);
 		expect(s2.elapsedMs).toBe(60_000);
+	});
+});
+
+describe("frida-extensible-workflows · fallidos visibles en el panel (#74)", () => {
+	const run = (id: string, over: Record<string, unknown>) =>
+		({
+			runId: id,
+			workflowName: "wf-" + id,
+			state: "running",
+			phase: undefined,
+			phases: [],
+			phaseTimes: {},
+			agents: [],
+			groups: [],
+			tokens: 0,
+			costUsd: 0,
+			...over,
+		}) as Parameters<typeof recentFailed>[0][number];
+
+	it("recentFailed: sólo failed de la sesión, más reciente primero, cap 3", () => {
+		const out = recentFailed([
+			run("live", { state: "running", lastActivityAt: 90 }),
+			run("done", { state: "completed", lastActivityAt: 80 }),
+			run("f1", { state: "failed", error: "uno", lastActivityAt: 50 }),
+			run("f2", { state: "failed", error: "dos", lastActivityAt: 70 }),
+			run("f3", { state: "failed", error: "tres", lastActivityAt: 60 }),
+			run("f4", { state: "failed", error: "cuatro", lastActivityAt: 10 }),
+		]);
+		// Sólo failed, ordenados por última actividad desc, máximo 3.
+		expect(out.map((r) => r.runId)).toEqual(["f2", "f3", "f1"]);
+	});
+
+	it("recentFailed vacío sin fallidos", () => {
+		expect(recentFailed([run("a", { state: "running" })])).toEqual([]);
 	});
 });

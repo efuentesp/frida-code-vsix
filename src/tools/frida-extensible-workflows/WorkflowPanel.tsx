@@ -20,6 +20,7 @@ import {
 	getOrphanRuns,
 	getWorkflowRuns,
 	pathKey,
+	removeWorkflowRun,
 	setOrphanRuns,
 	subscribeOrphanRuns,
 	subscribeWorkflowRuns,
@@ -37,6 +38,7 @@ import {
 	collapsedHeader,
 	formatTokens,
 	runStats,
+	recentFailed,
 	AGENT_ICON,
 	SEGMENT_BG,
 } from "./panel-view";
@@ -77,7 +79,14 @@ function WorkflowPanel(): ReactElement | null {
 		orphans: orphans.length,
 		runs: runs.map((r) => ({ id: r.runId.slice(0, 8), state: r.state })),
 	});
-	if (active.length === 0 && orphans.length === 0) return null; // nada que mostrar
+	// #74: fallidos de la sesión viva — visibles para debuggear, cap 3.
+	const failedRecent = recentFailed(runs);
+	if (
+		active.length === 0 &&
+		failedRecent.length === 0 &&
+		orphans.length === 0
+	)
+		return null; // nada que mostrar
 	return (
 		<CollapsiblePanel
 			collapsed={collapsed}
@@ -89,6 +98,39 @@ function WorkflowPanel(): ReactElement | null {
 			{active.map((r) => (
 				<RunView key={r.runId} run={r} />
 			))}
+			{/* #74: fallidos recientes de la sesión viva — el panel ya no se
+			    auto-oculta cuando un workflow muere rápido; dismiss por card. */}
+			{failedRecent.length > 0 ? (
+				<fbox flexDirection="column" gap={4}>
+					<fbox flexDirection="row" gap={4} alignItems="center">
+						<ficon name="triangle-alert" size={11} color="#f85149" />
+						<ftext bold size={11} color="#f85149">
+							Fallidos recientes
+						</ftext>
+						<ftext size={11} color="#8b949e">
+							({failedRecent.length})
+						</ftext>
+					</fbox>
+					{failedRecent.map((r) => (
+						<fbox
+							key={r.runId}
+							flexDirection="row"
+							gap={4}
+							alignItems="flex-start"
+						>
+							<fbox flex={1} flexDirection="column">
+								<RunView run={r} />
+							</fbox>
+							<fbutton
+								variant="secondary"
+								onClick={() => removeWorkflowRun(r.runId)}
+							>
+								<ficon name="x" size={10} color="#8b949e" />
+							</fbutton>
+						</fbox>
+					))}
+				</fbox>
+			) : null}
 			{orphans.length > 0 ? (
 				<OrphansSection
 					orphans={orphans}
@@ -147,7 +189,8 @@ function OrphansSection(props: {
 							color={o.kind === "stuck" ? "#d29922" : "#8b949e"}
 						/>
 						<ftext color={o.kind === "stuck" ? "#d29922" : "#8b949e"} size={11}>
-							{o.runId.slice(0, 8)} · {o.workflowName} · {o.state} · {Math.floor(o.ageDays)}d
+							{o.runId.slice(0, 8)} · {o.workflowName} · {o.state} ·{" "}
+							{Math.floor(o.ageDays)}d
 						</ftext>
 						<fbutton
 							variant="secondary"
@@ -234,7 +277,6 @@ function belongsTo(
 	}
 	return true;
 }
-
 
 /** Label legible de un agente (último tramo del path, o role, o "agent"). */
 /** Contadores de agentes como iconos lucide + número (#79: sin glifos). */
@@ -404,9 +446,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 							<ficon name="coins" size={10} color="#8b949e" />
 							<ftext size={11} color="#8b949e">
 								∑ {formatTokens(stats.tokens)}
-								{stats.costUsd > 0
-									? ` ($${stats.costUsd.toFixed(2)})`
-									: ""}
+								{stats.costUsd > 0 ? ` ($${stats.costUsd.toFixed(2)})` : ""}
 							</ftext>
 						</>
 					) : null}
@@ -441,20 +481,12 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 										size={11}
 										color={color}
 									/>
-									<ftext
-										size={11}
-										bold={row.state === "current"}
-										color={color}
-									>
+									<ftext size={11} bold={row.state === "current"} color={color}>
 										{row.name}
 									</ftext>
 									{row.state === "current" && counts.running > 0 ? (
 										<fbox flexDirection="row" gap={2} alignItems="center">
-											<ficon
-												name="loader-circle"
-												size={10}
-												cls="spinner"
-											/>
+											<ficon name="loader-circle" size={10} cls="spinner" />
 											<ftext size={11}>{counts.running}</ftext>
 										</fbox>
 									) : null}
@@ -477,20 +509,20 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 													color={STATE_COLOR[a.state]}
 													cls={a.state === "running" ? "spinner" : undefined}
 												/>
-											<ftext size={11} color={STATE_COLOR[a.state]}>
-												{a.label}
-											</ftext>
-											{a.tokens !== undefined && a.tokens > 0 ? (
-												<ftext size={11} color="#8b949e">
-													{formatTokens(a.tokens)}
+												<ftext size={11} color={STATE_COLOR[a.state]}>
+													{a.label}
 												</ftext>
-											) : null}
-											<ftext size={11} color="#8b949e">
-												{formatDuration(a.durationMs)}
-											</ftext>
+												{a.tokens !== undefined && a.tokens > 0 ? (
+													<ftext size={11} color="#8b949e">
+														{formatTokens(a.tokens)}
+													</ftext>
+												) : null}
+												<ftext size={11} color="#8b949e">
+													{formatDuration(a.durationMs)}
+												</ftext>
 											</fbox>
-											))
-										: null}
+										))
+									: null}
 							</fbox>
 						);
 					})}
@@ -549,32 +581,28 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 				const bar = groupBar(g, run.agents);
 				return (
 					<fbox key={pathKey(g.structuralPath)} flexDirection="column" gap={3}>
-							<fbox flexDirection="row" gap={4} alignItems="center">
-								<ftext color="#8b949e" size={11}>
-									{g.name}
-								</ftext>
-								<ftext size={11}>
-									{bar.done}/{bar.total}
-								</ftext>
-								{bar.failed > 0 ? (
-									<fbox flexDirection="row" gap={2} alignItems="center">
-										<ficon name="x" size={10} color={STATE_COLOR.failed} />
-										<ftext size={11} color={STATE_COLOR.failed}>
-											{bar.failed}
-										</ftext>
-									</fbox>
-								) : null}
-								{bar.running > 0 ? (
-									<fbox flexDirection="row" gap={2} alignItems="center">
-										<ficon
-											name="loader-circle"
-											size={10}
-											cls="spinner"
-											/>
-										<ftext size={11}>{bar.running}</ftext>
-									</fbox>
-								) : null}
-							</fbox>
+						<fbox flexDirection="row" gap={4} alignItems="center">
+							<ftext color="#8b949e" size={11}>
+								{g.name}
+							</ftext>
+							<ftext size={11}>
+								{bar.done}/{bar.total}
+							</ftext>
+							{bar.failed > 0 ? (
+								<fbox flexDirection="row" gap={2} alignItems="center">
+									<ficon name="x" size={10} color={STATE_COLOR.failed} />
+									<ftext size={11} color={STATE_COLOR.failed}>
+										{bar.failed}
+									</ftext>
+								</fbox>
+							) : null}
+							{bar.running > 0 ? (
+								<fbox flexDirection="row" gap={2} alignItems="center">
+									<ficon name="loader-circle" size={10} cls="spinner" />
+									<ftext size={11}>{bar.running}</ftext>
+								</fbox>
+							) : null}
+						</fbox>
 						<fbox
 							flexDirection="row"
 							gap={1}
@@ -603,12 +631,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 												? "#58a6ff"
 												: "#8b949e";
 								return (
-									<fbox
-										key={t}
-										flexDirection="row"
-										gap={2}
-										alignItems="center"
-									>
+									<fbox key={t} flexDirection="row" gap={2} alignItems="center">
 										<ficon
 											name={AGENT_ICON[s ?? "queued"]}
 											size={10}
@@ -627,8 +650,8 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 			})}
 
 			{/* Agentes libres (sin grupo) con duración */}
-				{freeAgents.map((a) => (
-					<fbox key={a.agentId} flexDirection="row" gap={6} alignItems="center">
+			{freeAgents.map((a) => (
+				<fbox key={a.agentId} flexDirection="row" gap={6} alignItems="center">
 					<ficon
 						name={AGENT_ICON[a.state]}
 						size={11}
@@ -649,4 +672,3 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 		</fbox>
 	);
 }
-

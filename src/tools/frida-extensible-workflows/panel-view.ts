@@ -131,7 +131,10 @@ export interface PhaseChip {
 
 /** Chips de fases vistas por el run: ✓ las anteriores a la actual, ● la
  * actual, · las vistas posteriores (aún no alcanzadas de nuevo). */
-export function phaseChips(phases: readonly string[], current: string | undefined): PhaseChip[] {
+export function phaseChips(
+	phases: readonly string[],
+	current: string | undefined,
+): PhaseChip[] {
 	if (!current) return phases.map((name) => ({ name, state: "done" as const }));
 	const seen = new Set<string>();
 	const chips: PhaseChip[] = [];
@@ -151,9 +154,7 @@ export function phaseChips(phases: readonly string[], current: string | undefine
 	// pero un replay las produce): quedan como pendientes implícitas.
 	const curIdx = phases.indexOf(current);
 	return chips.map((chip) =>
-		chip.state === "done" &&
-		curIdx >= 0 &&
-		phases.indexOf(chip.name) > curIdx
+		chip.state === "done" && curIdx >= 0 && phases.indexOf(chip.name) > curIdx
 			? { ...chip, state: "pending" }
 			: chip,
 	);
@@ -189,9 +190,10 @@ export function agentDisplayName(a: AgentProgressView): string {
 
 /** Progreso de fases del run (#80): done = índice de la fase activa
  * (la activa aún no cuenta); fase desconocida → done = total. */
-export function phaseProgress(
-	run: Pick<WorkflowRunView, "phases" | "phase">,
-): { done: number; total: number } {
+export function phaseProgress(run: Pick<WorkflowRunView, "phases" | "phase">): {
+	done: number;
+	total: number;
+} {
 	const total = run.phases.length;
 	if (!total) return { done: 0, total: 0 };
 	const idx = run.phases.indexOf(run.phase ?? "");
@@ -209,10 +211,10 @@ export interface CollapsedHeader {
 /** Header del panel contraído (#80): con 1 run activo muestra nombre +
  * barra de fases + fase activa + ⟳N; con varios, agregado sin barra. */
 export function collapsedHeader(
-	runs: readonly (Pick<
+	runs: readonly Pick<
 		WorkflowRunView,
 		"workflowName" | "state" | "phase" | "phases" | "agents"
-	>)[],
+	>[],
 ): CollapsedHeader {
 	const active = runs.filter(
 		(r) => r.state === "running" || r.state === "awaiting",
@@ -258,7 +260,10 @@ export function formatTokens(n: number): string {
 /** Stats agregadas del run para la card (#81). Elapsed = última interacción
  * − inicio (o now si sigue corriendo sin actividad reciente). */
 export function runStats(
-	run: Pick<WorkflowRunView, "startedAt" | "lastActivityAt" | "tokens" | "costUsd">,
+	run: Pick<
+		WorkflowRunView,
+		"startedAt" | "lastActivityAt" | "tokens" | "costUsd"
+	>,
 	now: number,
 ): { elapsedMs: number; tokens: number; costUsd: number } {
 	const start = run.startedAt ?? now;
@@ -267,6 +272,18 @@ export function runStats(
 		tokens: run.tokens,
 		costUsd: run.costUsd,
 	};
+}
+
+/** Runs fallidos recientes de la sesión viva (#74): más reciente primero,
+ * cap 3 — para que un fallo rápido siga visible en el panel y se pueda
+ * debuggear desde la UI (antes el return null los borraba de la pantalla). */
+export function recentFailed(
+		runs: readonly WorkflowRunView[],
+): readonly WorkflowRunView[] {
+		return runs
+				.filter((r) => r.state === "failed")
+				.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
+				.slice(0, 3);
 }
 
 /** ¿El agente cuelga de un grupo parallel/pipeline? (su path lo extiende) */
