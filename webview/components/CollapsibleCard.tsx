@@ -48,7 +48,7 @@ export interface CollapsibleCardProps {
 	/** Apertura inicial (sólo aplica antes de cualquier estado running/auto). */
 	defaultOpen?: boolean;
 	/** Variante visual: ajusta colores/bordes del contenedor y cabecera. */
-	variant?: "tool" | "bash" | "compact" | "thinking";
+	variant?: "tool" | "bash" | "compact" | "thinking" | "flat";
 	/** Icono de cabecera. Si `iconLive`, late mientras running. */
 	icon?: ReactNode;
 	iconLive?: boolean;

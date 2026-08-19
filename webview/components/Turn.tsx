@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { ToolCard, fmtDuration, estimateTokens, fmtTok } from "./ToolCard";
+import { ToolGroup } from "./ToolGroup";
+import { toolRuns } from "../group-stats";
 import { BashCard } from "./BashCard";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { Icon } from "./Icon";
@@ -90,32 +92,73 @@ export function TurnView({
 								</button>
 							)}
 						</div>
-						{turn.segments.map((s, i) =>
-							s.kind === "thinking" ? (
-								!hideThinking && s.text ? (
-									<ThinkingSegment
-										key={i}
-										text={s.text}
-										startedAt={s.startedAt}
-										endedAt={s.endedAt}
-										tokensLLM={s.tokensLLM}
-										isLive={
-											!!live &&
-											i === turn.segments.length - 1 &&
-											s.endedAt === undefined
-										}
-									/>
-								) : null
-							) : s.kind === "text" ? (
-								s.text ? (
-									<div key={i} className="bubble">
-										<Markdown>{s.text}</Markdown>
-									</div>
-								) : null
-							) : (
-								<ToolCard key={i} entry={s} />
-							),
-						)}
+						{(() => {
+							// Agrupación por corridas contiguas (Fase 3 P1): turnos COMPLETADOS
+							// envuelven sus corridas de tools en <ToolGroup> (colapsado por
+							// defecto, autorizado 2026-08-19); turno en vivo → toolRuns() = [] →
+							// filas sueltas (regla §5.0.2). La cronología texto⇄tools se preserva:
+							// sólo las corridas contiguas se agrupan.
+							const runs = toolRuns(turn);
+							let runIdx = 0; // índice de la corrida actual (para memKey y corte)
+							return turn.segments.map((s, i) => {
+								// ¿inicia una corrida agrupada? → pintar el grupo con TODO su rango
+								const run = runs.find((r) => r.startIndex === i);
+								if (run && run.count > 1) {
+									const memKey = { turnId: turn.id, run: runIdx++ };
+									const inner = turn.segments
+										.slice(run.startIndex, run.endIndex + 1)
+										.map((ts, j) =>
+											ts.kind === "tool" ? (
+												<ToolCard key={run.startIndex + j} entry={ts} />
+												) : null,
+										);
+									return (
+										<ToolGroup key={i} summary={run.summary} memKey={memKey}>
+											{inner}
+										</ToolGroup>
+									);
+								}
+								// segment DENTRO de una corrida multi-tool ya pintada → saltar
+								if (
+									runs.some(
+										(r) => r.count > 1 && i > r.startIndex && i <= r.endIndex,
+									)
+								)
+									return null;
+
+								// segmentos normales (turno vivo, corridas de 1, texto, thinking…)
+								if (s.kind === "thinking")
+									return !hideThinking && s.text ? (
+											<ThinkingSegment
+												key={i}
+												text={s.text}
+													startedAt={s.startedAt}
+													endedAt={s.endedAt}
+													tokensLLM={s.tokensLLM}
+													isLive={
+													!!live &&
+													i === turn.segments.length - 1 &&
+													s.endedAt === undefined
+												}
+												/>
+											) : null;
+								if (s.kind === "reasoning_hint")
+									return (
+											// ADR-1003-F3: razonó tokens sin resumen del backend
+											<div key={i} className="reasoning-hint">
+												<Brain size={11} /> razonó {s.tokens.toLocaleString()} tokens · el
+												proveedor no envió el resumen del pensamiento
+											</div>
+										);
+								if (s.kind === "text")
+									return s.text ? (
+											<div key={i} className="bubble">
+												<Markdown>{s.text}</Markdown>
+											</div>
+										) : null;
+								return <ToolCard key={i} entry={s} />;
+							});
+						})()}
 						{turn.bash && <BashCard run={turn.bash} />}
 						{turn.error && (
 							<div className="err">

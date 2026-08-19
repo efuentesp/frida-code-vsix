@@ -18,6 +18,8 @@ import { UiDialog } from "./components/UiDialog";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
+import { Spinner } from "./components/Spinner";
+import { AnimatedLabel } from "./components/AnimatedLabel";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
 import { WorkspaceBar } from "./components/WorkspaceBar";
@@ -39,8 +41,6 @@ import {
 	X,
 } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
-import { Spinner } from "./components/Spinner";
-import { AnimatedLabel } from "./components/AnimatedLabel";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
 import { ModelPanel } from "./components/ModelPanel";
@@ -612,6 +612,10 @@ export function App() {
 						<TriangleAlert size={12} /> {state.providerError}
 					</div>
 				)}
+				{/* REVERSIÓN F5 (decisión del usuario 2026-08-19): el indicador «pensando»
+				    vuelve a su posición original — proc-bar SOBRE el textbox. La prueba en
+				    vivo mostró que en el ContextBar se encimaba con la info de contexto
+				    (errata §10.11 del design doc). El beam del Composer (F4) se conserva. */}
 				{state.isCompacting ? (
 					<div className="proc-bar">
 						<Spinner size={14} />
@@ -651,9 +655,14 @@ export function App() {
 						))}
 				</div>
 				<LensDiagnostics lens={state.lens} />
+				{/* INPUT-STACK (Fase 4 P1, estilo chat-input-stack de VS Code): el panel
+				    pendiente y el Composer forman UNA píldora (esquinas cuadradas donde se
+				    unen). El Composer YA se auto-bloquea con pendingDialog; ahora queda
+				    visible debajo del panel (como Copilot) en vez de desaparecer. */}
+				<div className="input-stack">
+				{/* Confirmación de cambio de proveedor pendiente (red de seguridad):
+				    ocupa el lugar del composer como las aprobaciones. */}
 				{state.modelChanges.length > 0 ? (
-					// Confirmación de cambio de proveedor pendiente (red de seguridad):
-					// ocupa el lugar del composer como las aprobaciones.
 					<div className="approval-inline">
 						{state.modelChanges.map((mc) => (
 							<div key={mc.id} className="model-change-card">
@@ -753,36 +762,41 @@ export function App() {
 							/>
 						))}
 					</div>
-				) : (
-					<Composer
-						onSubmit={(text, mode, images) =>
-							post({ type: "submit", text, mode, images })
-						}
-						onSearch={(q) => post({ type: "search_files", query: q })}
-						files={state.files}
-						commands={commands}
-						models={state.models}
-						active={state.models?.active}
-						thinking={state.thinking}
-						mode={state.mode}
-						busy={state.busy}
-						pendingDialog={state.approvals.length > 0}
-						expanded={composerExpanded}
-						onExpandedChange={setComposerExpanded}
-						insertSignal={state.composerInsert}
-						onAbort={() => {
-							diagLog("botón Detener (Composer) → post {abort}");
-							post({ type: "abort" });
-						}}
-						onSelectModel={(provider, modelId) =>
-							post({ type: "select_model", provider, model: modelId })
-						}
-						onSetThinking={(level) => post({ type: "set_thinking", level })}
-						onCycleMode={() =>
-							post({ type: "set_mode", mode: nextMode(state.mode) })
-						}
-					/>
-				)}
+					) : (
+						<Composer
+							onSubmit={(text, mode, images) =>
+								post({ type: "submit", text, mode, images })
+							}
+							onSearch={(q) => post({ type: "search_files", query: q })}
+							files={state.files}
+							commands={commands}
+							models={state.models}
+							active={state.models?.active}
+							thinking={state.thinking}
+							mode={state.mode}
+							busy={state.busy}
+							pendingDialog={
+								state.approvals.length > 0 ||
+								state.modelChanges.length > 0 ||
+								!!state.questionnaire
+							}
+							expanded={composerExpanded}
+							onExpandedChange={setComposerExpanded}
+							insertSignal={state.composerInsert}
+							onAbort={() => {
+								diagLog("botón Detener (Composer) → post {abort}");
+								post({ type: "abort" });
+							}}
+							onSelectModel={(provider, modelId) =>
+								post({ type: "select_model", provider, model: modelId })
+							}
+							onSetThinking={(level) => post({ type: "set_thinking", level })}
+							onCycleMode={() =>
+								post({ type: "set_mode", mode: nextMode(state.mode) })
+							}
+						/>
+					)}
+				</div>
 				<WorkspaceBar
 					ws={state.workspace}
 					onRename={(name) =>

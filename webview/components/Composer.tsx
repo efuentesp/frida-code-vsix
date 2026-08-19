@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import {
 	Maximize,
 	Minimize2,
-	SendHorizontal,
 	ShieldCheck,
-	Square,
 } from "lucide-react";
 import { Tooltip } from "./Tooltip";
+import { Codicon } from "./Codicon";
 import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
 
 interface Files {
@@ -632,7 +631,10 @@ export function Composer({
 	return (
 		<div
 			className={
-				"bar" + (bashMode ? " bash-mode" : "") + (yolo ? " yolo-mode" : "")
+				"bar input-container" +
+				(bashMode ? " bash-mode" : "") +
+				(yolo ? " yolo-mode" : "") +
+				(busy ? " working" : "") // beam del borde (F4): cometa mientras corre
 			}
 		>
 			{fileOpen && (
@@ -853,6 +855,11 @@ export function Composer({
 						onChange={(e) => onSetThinking?.(e.target.value)}
 						aria-label="Esfuerzo"
 					>
+						{/* Off explícito (ADR-1003-F2): los modelos razonadores lo bajan
+						    al payload (chat: reasoning_effort none vía thinkingLevelMap;
+						    responses: effort none nativo). Sin él, "apagar" no era
+						    alcanzable desde la UI. */}
+						<option value="off">Off</option>
 						<option value="low">Bajo</option>
 						<option value="medium">Medio</option>
 						<option value="high">Alto</option>
@@ -868,31 +875,31 @@ export function Composer({
 						</button>
 					</Tooltip>
 					{busy ? (
-						<Tooltip label="Detener" side="top">
+						<Tooltip label="Detener (doble Esc)" side="top">
 							<button
 								className="bar-send stop"
 								onClick={() => {
 									console.log(
 										"[frida-abort] clic botón Detener (Composer) — busy=" +
-											busy,
+												busy,
 									);
 									onAbort?.();
-								}}
-							>
-								<Square size={15} />
-							</button>
-						</Tooltip>
-					) : (
-						<Tooltip label="Enviar (Enter) · Alt+Enter = seguir" side="top">
-							<button
-								className="bar-send"
-								onClick={sendNow}
-								disabled={!text.trim()}
-							>
-								<SendHorizontal size={16} />
-							</button>
-						</Tooltip>
-					)}
+									}}
+								>
+									<Codicon name="debug-stop" size={14} label="Detener" />
+								</button>
+							</Tooltip>
+						) : (
+							<Tooltip label="Enviar (Enter) · Alt+Enter = seguir" side="top">
+								<button
+									className="bar-send"
+									onClick={sendNow}
+									disabled={!text.trim()}
+								>
+									<Codicon name="arrow-up" size={14} />
+								</button>
+							</Tooltip>
+						)}
 				</div>
 			</div>
 		</div>

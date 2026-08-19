@@ -1205,6 +1205,75 @@ body {
 	margin-top: 0;
 }
 
+/* ── Variante flat (Fila tool plana estilo Copilot — Fase 2 P1) ────────
+   Sin caja: la fila ES el header. Texto gris, chevron fantasma, shimmer del
+   verbo mientras corre. MISMO CollapsibleCard: lógica de apertura/prioridad
+   intacta (DESIGN-SYSTEM-WEBVIEW.md §5.2 + §8 nota final). */
+.card--flat {
+	border: none;
+	background: transparent;
+	margin: 0;
+}
+.card--flat .card-head {
+	padding: 2px 6px 2px 2px;
+	gap: 6px;
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+	border-radius: 3px;
+}
+/* frase Copilot: título+label en gris descripción, sin caja */
+.card--flat .card-title,
+.card--flat .card-label {
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	font-weight: 400;
+	font-family: inherit;
+}
+.card--flat .card-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* mientras corre: el icono latiendo se oculta — brilla el verbo (shimmer) */
+.card--flat .card-icon.live {
+	animation: none;
+	opacity: 0;
+}
+/* estado final: check verde opt-in (sólo con .show-checks) */
+.card--flat .card-icon.tc-ok {
+	display: none;
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.card--flat.show-checks .card-icon.tc-ok {
+	display: inline-flex;
+}
+/* error: ✗ siempre visible */
+.card--flat .card-icon.tc-error {
+	color: var(--vscode-errorForeground);
+}
+/* chevron fantasma: invisible hasta hover/expandido */
+.card--flat .card-chev {
+	opacity: 0;
+}
+.card--flat .card-head:hover .card-chev,
+.card--flat.open .card-chev {
+	opacity: 0.85;
+}
+/* cuerpo sin borde superior (no hay caja que cerrar) */
+.card--flat .card-body {
+	border-top: none;
+}
+/* subtítulo tabular con en-dash (mismo patrón que .tc-sub de Fundaciones) */
+.card--flat .card-sub {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.75;
+	white-space: nowrap;
+}
+.card--flat .card-sub::before {
+	content: " \2013  ";
+}
+
 /* Badges específicos del header de ToolCard (van dentro de .card-badges). */
 .tc-diffstats {
 	display: inline-flex;
@@ -1926,6 +1995,11 @@ button.sec:hover {
 }
 
 /* Indicador de procesamiento fijo (sobre el Composer, no depende del scroll) */
+
+
+/* Indicador de procesamiento fijo (sobre el Composer, no depende del scroll).
+   RESTAURADO 2026-08-19: revertida la F5 (working en ContextBar) — se encimaba
+   con la info de contexto (design doc §10.11); posición original de frida. */
 .proc-bar {
 	display: flex;
 	align-items: center;
@@ -1966,6 +2040,7 @@ button.sec:hover {
 		animation: none;
 	}
 }
+
 .file-popup {
 	position: absolute;
 	left: 12px;
@@ -4642,4 +4717,284 @@ kbd {
 }
 .usage-session-proj {
 	opacity: 0.5;
+}
+
+/* ADR-1003-F3: pista "razonó N tokens" — el modelo gastó reasoning_tokens
+   pero el proveedor no envió el resumen (sin tarjeta thinking). Línea sutil
+   bajo la respuesta; no es contenido sensible, es un contador de uso. */
+.reasoning-hint {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 2px 0 6px;
+	font-size: 11px;
+	opacity: 0.65;
+	font-style: italic;
+}
+
+/* =====================================================================
+   FUNDACIONES COPILOT (DESIGN-SYSTEM-WEBVIEW.md §6 — Fase 1 del ciclo P1)
+   Primitivas visuales compartidas por la fila plana de tools (F2), el grupo
+   por turno (F3), la píldora del footer (F4) y el ContextBar working (F5).
+   Todo con tokens --vscode-* (regla de oro §1.1); reduced-motion SIEMPRE.
+   ===================================================================== */
+
+/* ---- Shimmer: el texto ES el indicador de actividad (chat.css de VS Code).
+   Uso: .tc-shimmer envuelve TODO el label; .tc-shimmer-verb SÓLO el verbo
+   (shimmer parcial: contadores y archivos quedan estáticos). */
+@keyframes tc-thinking-shimmer {
+	0% {
+		background-position: 120% 0;
+	}
+	100% {
+		background-position: -120% 0;
+	}
+}
+.tc-shimmer-verb,
+.tc-shimmer .tc-label {
+	background: linear-gradient(
+		90deg,
+		var(--vscode-descriptionForeground) 0%,
+		var(--vscode-descriptionForeground) 30%,
+		var(--vscode-chat-thinkingShimmer, var(--vscode-textLink-foreground)) 50%,
+		var(--vscode-descriptionForeground) 70%,
+		var(--vscode-descriptionForeground) 100%
+	);
+	background-size: 400% 100%;
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: tc-thinking-shimmer 2s linear infinite;
+	will-change: background-position;
+}
+@media (prefers-reduced-motion: reduce) {
+	.tc-shimmer-verb,
+	.tc-shimmer .tc-label {
+		animation: none;
+		background: none;
+		-webkit-text-fill-color: currentColor;
+	}
+}
+
+/* ---- Subtítulo de fila tool: " – detalle" con dígitos tabulares. El en-dash
+   via ::before para que los <small> del header no lo repitan manualmente. */
+.tc-sub {
+	font-size: 11px;
+	font-weight: 400;
+	opacity: 0.7;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+}
+.tc-sub::before {
+	content: " \2013  "; /* espacio, en-dash, espacio (doc §3) */
+}
+
+/* ---- Base fila plana (variant flat de CollapsibleCard, F2): sin caja. */
+.tool-flat {
+	border: none;
+	background: transparent;
+	margin: 0;
+}
+
+/* ---- Spinner: los codicons traen codicon-spin; aqui sólo el fallback CSS
+   (usado donde no hay glifo, p.ej. Working del ContextBar en F5). */
+@keyframes tc-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.tc-spin {
+	animation: tc-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+	.tc-spin {
+		animation: none;
+	}
+}
+
+/* ── ToolGroup (Fase 3 P1): grupo colapsable de tools del turno completado.
+   Espejo de completed-response-disclosure (chat.css de VS Code). */
+.tool-group {
+	margin: 2px 0 8px;
+}
+.tool-group-summary {
+	all: unset;
+	box-sizing: border-box;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px 2px 6px;
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum";
+	user-select: none;
+}
+.tool-group-summary:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+}
+.tool-group-summary:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+.tool-group-summary .codicon {
+	transition: transform 0.15s ease;
+	color: var(--vscode-icon-foreground);
+}
+.tool-group.open .tool-group-summary .codicon {
+	transform: rotate(90deg);
+}
+.tool-group-summary .tg-count {
+	font-weight: 400;
+}
+/* guía vertical con gradiente que se apaga antes del final */
+.tool-group-rail {
+	margin-left: 10px;
+	padding-left: 12px;
+	border-left: 1px solid var(--vscode-panel-border);
+	border-image: linear-gradient(
+		to bottom,
+		var(--vscode-panel-border) 0 calc(100% - 10px),
+		transparent calc(100% - 10px)
+	) 1;
+}
+
+/* ── INPUT-STACK (Fase 4 P1): paneles dockeados + Composer = UNA píldora
+   (chat-input-stack de VS Code): gap 0, esquinas cuadradas donde se unen,
+   radio sólo en extremos. Los paneles ya existentes (.approval-inline) y el
+   Composer (.bar) son los miembros. */
+.input-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	padding: 0 10px;
+	margin-bottom: 4px;
+}
+.input-stack > * {
+	border-radius: 0;
+}
+.input-stack > .approval-inline,
+.input-stack > .q-panel,
+.input-stack > .model-change-card:first-child {
+	border-radius: 8px 8px 0 0;
+}
+.input-stack > .bar.input-container {
+	border-radius: 0 0 8px 8px;
+}
+/* un solo miembro (sin panel pendiente): composer redondeado completo */
+.input-stack > .bar.input-container:only-child {
+	border-radius: 8px;
+}
+.input-stack > .approval-inline:only-child,
+.input-stack > .q-panel:only-child {
+	border-radius: 8px;
+}
+/* los miembros que se tocan comparten el borde (margin-top negativo colapsa) */
+.input-stack > * + * {
+	margin-top: -1px;
+	border-top-color: transparent;
+}
+
+/* submit circular (chat-submit-button de Copilot): flecha-arriba ↔ stop */
+.bar-send {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	cursor: pointer;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+}
+.bar-send:hover:not(:disabled) {
+	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+}
+.bar-send:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+.bar-send.stop {
+	background: var(--vscode-errorForeground);
+}
+
+/* ── BORDER BEAM (Fase 4): cometa que recorre el borde del input mientras
+   trabaja (chat.css de VS Code, .chat-input-container.working). Dos anillos
+   conic (beam 1px + glow 2px blur) girando via @property; reduced-motion
+   congela a un anillo tenue estático. */
+@property --beam-angle {
+	syntax: "<angle>";
+	inherits: false;
+	initial-value: 135deg;
+}
+@keyframes beam-spin {
+	from {
+		--beam-angle: 135deg;
+	}
+	to {
+		--beam-angle: 495deg;
+	}
+}
+.bar.input-container {
+	position: relative;
+	--beam-color: var(--vscode-focusBorder);
+}
+.bar.input-container.working::before {
+	content: "";
+	position: absolute;
+	inset: -1px;
+	border-radius: inherit;
+	padding: 1px;
+	background: conic-gradient(
+		from var(--beam-angle),
+		transparent 0deg,
+		color-mix(in srgb, var(--beam-color) 90%, transparent) 20deg,
+		var(--beam-color) 30deg,
+		color-mix(in srgb, var(--beam-color) 60%, transparent) 50deg,
+		transparent 90deg,
+		transparent 360deg
+	);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	animation: beam-spin 2.6s linear infinite;
+	pointer-events: none;
+	z-index: 2;
+}
+.bar.input-container.working::after {
+	content: "";
+	position: absolute;
+	inset: -1px;
+	border-radius: inherit;
+	padding: 2px;
+	background: conic-gradient(
+		from var(--beam-angle),
+		transparent 0deg,
+		color-mix(in srgb, var(--beam-color) 60%, transparent) 25deg,
+		color-mix(in srgb, var(--beam-color) 35%, transparent) 50deg,
+		transparent 90deg,
+		transparent 360deg
+	);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	filter: blur(1.5px);
+	animation: beam-spin 2.6s linear infinite;
+	pointer-events: none;
+	z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+	.bar.input-container.working::before,
+	.bar.input-container.working::after {
+		animation: none;
+		opacity: 0.5;
+	}
 }
