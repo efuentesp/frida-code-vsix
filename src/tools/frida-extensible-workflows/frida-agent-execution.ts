@@ -115,12 +115,19 @@ export interface AgentSpawnResult {
 	value: JsonValue;
 	accounting?: AgentAccounting;
 	durationMs?: number;
+	/** #91: diagnóstico cuando value es null (hijo sin texto) — llega al
+	 *  repair prompt y al throw final para que el fallo sea explicable. */
+	nullDiagnostic?: string;
 }
 
 /** Envuelve el valor de un spawn junto con su accounting/duración (spawner real). */
 export function spawnResult(
 	value: JsonValue,
-	extra?: { accounting?: AgentAccounting; durationMs?: number },
+	extra?: {
+		accounting?: AgentAccounting;
+		durationMs?: number;
+		nullDiagnostic?: string;
+	},
 ): AgentSpawnResult {
 	return {
 		[SPAWN_RESULT]: true,
@@ -129,6 +136,9 @@ export function spawnResult(
 		...(extra?.durationMs === undefined
 			? {}
 			: { durationMs: extra.durationMs }),
+		...(extra?.nullDiagnostic
+			? { nullDiagnostic: extra.nullDiagnostic }
+			: {}),
 	};
 }
 
@@ -143,19 +153,24 @@ export function isSpawnResult(value: unknown): value is AgentSpawnResult {
 }
 
 /**
- * Normaliza lo devuelto por un spawner a { value, accounting?, durationMs? }.
- * Un `JsonValue` plano (mocks) se envuelve como `{ value }` sin contabilización.
+ * Normaliza lo devuelto por un spawner a { value, accounting?, durationMs?,
+ * nullDiagnostic? }. Un `JsonValue` plano (mocks) se envuelve como `{ value }`
+ * sin contabilización.
  */
 export function unpackSpawnResult(raw: JsonValue | AgentSpawnResult): {
 	value: JsonValue;
 	accounting?: AgentAccounting;
 	durationMs?: number;
+	nullDiagnostic?: string;
 } {
 	if (isSpawnResult(raw)) {
 		return {
 			value: raw.value,
 			...(raw.accounting ? { accounting: raw.accounting } : {}),
 			...(raw.durationMs === undefined ? {} : { durationMs: raw.durationMs }),
+			...(raw.nullDiagnostic
+				? { nullDiagnostic: raw.nullDiagnostic }
+				: {}),
 		};
 	}
 	return { value: raw };
@@ -269,19 +284,96 @@ export function createWorkflowBridge(
 	};
 }
 
+type AnyMessage = { role?: string; stopReason?: string; content?: unknown };
+
+function sessionMessages(session: AgentSession): AnyMessage[] {
+	return (
+		(session as unknown as {
+			state?: { messages?: AnyMessage[] };
+		}).state?.messages ?? []
+	);
+}
+
+/** Texto de un content: string directo, o bloques "text"/"output_text"
+ *  (el gateway responses usa output_text — Errata-13). null si no hay texto. */
+function contentToValueNew(content: unknown): string | null {
+	if (typeof content === "string") return content;
+	if (Array.isArray(content)) {
+		const texts = content
+			.filter(
+				(c): c is { type: string; text: string } =>
+					typeof c === "object" &&
+					c !== null &&
+					((c as { type?: string }).type === "text" ||
+						(c as { type?: string }).type === "output_text") &&
+					typeof (c as { text?: unknown }).text === "string",
+			)
+			.map((c) => c.text)
+			.filter((t) => t.length > 0);
+		return texts.length ? texts.join("\n") : null;
+	}
+	return null;
+}
+
+/** #91: texto del último assistant CON texto (retrocede sobre trailing
+ *  vacíos — thinking-only o error de auto-retry — hasta hallar la respuesta
+ *  real). null si ningún assistant tiene texto. Puro, exportado para tests. */
+export function lastAssistantText(
+	messages: AnyMessage[] | undefined,
+): string | null {
+	if (!messages) return null;
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i];
+		if (msg?.role === "assistant") {
+			const text = contentToValueNew(msg.content);
+			if (text !== null) return text;
+			// assistant sin texto → sigue retrocediendo (trailing vacío)
+		}
+	}
+	return null;
+}
+
+/** #91: diagnóstico humano del último assistant (para el null): stopReason +
+ *  tipos de bloque + slice del thinking (la pista de lo que el modelo
+ *  razonó pero no emitió como texto). Puro, exportado para tests. */
+export function summarizeLastAssistant(
+	messages: AnyMessage[] | undefined,
+): string {
+	if (!messages) return "sin mensajes en la sesión hija";
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i];
+		if (msg?.role === "assistant") {
+			const blocks = Array.isArray(msg.content) ? msg.content : [];
+			const types = blocks
+				.map((b) =>
+					typeof b === "object" && b
+						? String((b as { type?: string }).type ?? "?")
+						: "?",
+				)
+				.join(",");
+			const thinking = blocks
+				.find(
+					(b): b is { type: string; thinking?: string } =>
+						typeof b === "object" && (b as { type?: string }).type === "thinking",
+				)
+				?.thinking;
+			return (
+				`último assistant: stopReason=${msg.stopReason ?? "?"} bloques=[${types}]` +
+				(thinking ? ` · thinking: «${thinking.slice(0, 200)}»` : "")
+			);
+		}
+	}
+	return "sin mensajes assistant en la sesión hija";
+}
+
 /** Extrae el valor (texto) del último mensaje asistente de la sesión. */
 function lastAssistantValue(session: AgentSession): JsonValue {
 	const messages = (
 		session as unknown as {
 			state?: { messages?: Array<{ role?: string; content?: unknown }> };
 		}
-	).state?.messages;
-	if (!messages) return null;
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const msg = messages[i];
-		if (msg?.role === "assistant") return contentToValue(msg.content);
-	}
-	return null;
+	).state?.messages ?? [];
+	return lastAssistantText(messages);
 }
 
 function contentToValue(content: unknown): JsonValue {
@@ -378,6 +470,13 @@ export function createFridaAgentSpawner(
 			return spawnResult(value, {
 				accounting,
 				durationMs: Date.now() - startedAt,
+				...(value === null
+					? {
+							nullDiagnostic: summarizeLastAssistant(
+								sessionMessages(session),
+							),
+						}
+					: {}),
 			});
 		} finally {
 			signal.removeEventListener("abort", onAbort);

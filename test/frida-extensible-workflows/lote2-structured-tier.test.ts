@@ -232,6 +232,43 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 		).rejects.toThrow(/unlabeled[\s\S]*prosa pura/);
 	});
 
+	// #91 (2ª parte): cuando el hijo termina SIN texto (thinking-only / trailing
+	// vacío), el spawner adjunta nullDiagnostic — el repair y el throw deben
+	// propagarlo (antes: «respuesta: null» sin pista).
+	it("#91: value null CON nullDiagnostic → el throw incluye el diagnóstico", async () => {
+		const wrapped = withStructuredOutput(
+			async () =>
+				spawnResult(null as unknown as JsonValue, {
+					nullDiagnostic:
+					"último assistant: stopReason=stop bloques=[thinking] · thinking: «las historias son…»",
+				}),
+			{ maxRepairAttempts: 0 },
+		);
+		await expect(
+			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+		).rejects.toThrow(/stopReason=stop bloques=\[thinking\]/);
+	});
+
+	it("#91: value null CON nullDiagnostic → el REPAIR prompt también lo incluye", async () => {
+		const prompts: string[] = [];
+		const inner: SpawnAgentFn = async (p) => {
+			prompts.push(p);
+			return spawnResult(
+				(prompts.length === 1 ? null : JSON.stringify({ ok: true })) as unknown as JsonValue,
+				{
+					nullDiagnostic: "último assistant: bloques=[thinking] (sin texto)",
+				},
+			);
+		};
+		const wrapped = withStructuredOutput(inner);
+		const out = (await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident())) as {
+			value: JsonValue;
+		};
+		expect(out.value).toEqual({ ok: true });
+		expect(prompts[1]).toContain("bloques=[thinking]");
+		expect(prompts[1]).toMatch(/respuesta (vacía|empty)/i);
+	});
+
 	it("suma el accounting de todos los intentos (#18)", async () => {
 		const prompts: string[] = [];
 		const inner: SpawnAgentFn = async () => {
@@ -478,7 +515,7 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 		const spawn = spawnReturning({
 			targets: '[{"id":"T1","risk":"P0"},{"id":"T2","risk":"P1"}]',
 		});
-		const out = (await withStructuredOutput(spawn)({}, { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
 			value: unknown;
 		};
 		expect(out.value).toEqual({
@@ -493,7 +530,7 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 		const spawn = spawnReturning(
 			'{"targets": "[{\\"id\\":\\"T1\\",\\"risk\\":\\"P0\\"}]"}',
 		);
-		const out = (await withStructuredOutput(spawn)({}, { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
 			value: unknown;
 		};
 		expect(out.value).toEqual({
@@ -508,7 +545,7 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 			required: ["summary"],
 		};
 		const spawn = spawnReturning({ summary: '{"parece":"json"}' });
-		const out = (await withStructuredOutput(spawn)({}, { outputSchema: SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: SCHEMA } as never, {} as never, {} as never)) as {
 			value: unknown;
 		};
 		// El schema pide string → el contenido json-looking se conserva tal cual.

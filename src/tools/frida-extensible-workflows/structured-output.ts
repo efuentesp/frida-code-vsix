@@ -313,22 +313,37 @@ export function withStructuredOutput(
 			if (text === null) {
 				// El agente ya devolvió un JsonValue no-string (spawn custom):
 				// se normaliza (#82: hijos string-encoded) y se valida tal cual.
+				// #91: si el spawner adjunta nullDiagnostic (hijo sin texto —
+				// thinking-only/trailing vacío), entra como error accionable:
+				// el repair lo ve Y el throw lo explica (antes: "respuesta:
+				// null" sin pista alguna).
+				const nullDiag = (
+					unpacked as { nullDiagnostic?: string }
+				).nullDiagnostic;
 				const normalized = normalizeStructuredValue(unpacked.value, schema);
 				const errors = validateJsonSchemaValue(normalized, schema);
+				const allErrors = nullDiag
+					? [
+							`respuesta vacía del agente (sin texto): ${nullDiag}`,
+							...errors,
+						]
+					: errors;
 				if (!errors.length)
 					return spawnResult(normalized as JsonValue, { accounting, durationMs });
 				if (attempt === maxRepair) {
-					lastErrors = errors;
-					lastOutput = truncateForThrow(
-						JSON.stringify(unpacked.value) ?? String(unpacked.value),
-					);
+					lastErrors = allErrors;
+					lastOutput = nullDiag
+						? `(respuesta vacía) ${nullDiag}`
+						: truncateForThrow(
+								JSON.stringify(unpacked.value) ?? String(unpacked.value),
+							);
 					break;
 				}
 				currentPrompt = repairPrompt(
 					prompt,
 					schema,
 					JSON.stringify(unpacked.value),
-					errors,
+					allErrors,
 				);
 				continue;
 			}
