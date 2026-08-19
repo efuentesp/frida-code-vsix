@@ -63,7 +63,7 @@ Cada INV es verificable en revisión o por test. Las referencias FR/C/R remiten 
 ## 3. Mapa de límites y propiedad
 
 | Módulo | Rol | Es dueño de | Contrato que publica |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `nucleo-compartido` | kernel | Tipos base (`Id`, `Incertidumbre`, `PorciónPráctica`, `Resultado`), blocklist, `Reloj`/`DíaResolver` | Tipos y reglas compartidos; sin estado |
 | `perfil` | dominio | Entidad Perfil (única instancia implícita, A1; modelada como entidad por R7) | Lectura/actualización de perfil y objetivo |
 | `mediciones` | dominio | Serie temporal de Mediciones (append, edición y borrado que preservan la serie) | Consulta de serie por métrica |
@@ -78,6 +78,7 @@ Cada INV es verificable en revisión o por test. Las referencias FR/C/R remiten 
 | `arnes-pruebas` | adaptador driver | Nada | Comandos de verificación de FR (INV-21) |
 
 **Reglas de dependencia** (resumen; INV-11/13 las hacen cumplir):
+
 1. Dominio → solo kernel y contratos publicados de otros módulos de dominio; jamás adaptadores.
 2. `analisis`/`recomendaciones`/`indicadores` → consumen la instantánea de `comidas` y series de `mediciones`; nunca sus internos, ni fotos, ni borradores.
 3. Adaptadores → implementan puertos del dominio; drivers (UI, arnés) → invocan solo servicios de aplicación.
