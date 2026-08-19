@@ -7,6 +7,7 @@ import {
 	type UIEvent,
 } from "react";
 import { Icon } from "./Icon";
+import { Codicon } from "./Codicon";
 import { Tooltip } from "./Tooltip";
 
 /**
@@ -48,7 +49,7 @@ export interface CollapsibleCardProps {
 	/** Apertura inicial (sólo aplica antes de cualquier estado running/auto). */
 	defaultOpen?: boolean;
 	/** Variante visual: ajusta colores/bordes del contenedor y cabecera. */
-	variant?: "tool" | "bash" | "compact" | "thinking";
+	variant?: "tool" | "bash" | "compact" | "thinking" | "flat";
 	/** Icono de cabecera. Si `iconLive`, late mientras running. */
 	icon?: ReactNode;
 	iconLive?: boolean;
@@ -173,6 +174,7 @@ export function CollapsibleCard({
 		}
 	}
 
+	const isFlat = variant === "flat";
 	const containerClass =
 		`card card--${variant}` +
 		(open ? " open" : " collapsed") +
@@ -181,23 +183,37 @@ export function CollapsibleCard({
 	return (
 		<div className={containerClass} ref={rootRef}>
 			<div
-				className={"card-head" + (clickable ? " is-toggle" : "")}
+				className={
+					(isFlat ? "tool-flat" : "card-head") +
+					(clickable ? " is-toggle" : "") +
+					(isFlat && open ? " is-expanded" : "")
+				}
 				onClick={clickable ? toggle : undefined}
 				role={clickable ? "button" : undefined}
 				aria-expanded={clickable ? open : undefined}
 				tabIndex={clickable ? 0 : undefined}
 				onKeyDown={handleKeyDown}
 			>
-				<span className={"card-icon" + (iconLive ? " live" : "")}>{icon}</span>
+				{icon ? (
+					<span className={"card-icon" + (iconLive ? " live" : "")}>{icon}</span>
+				) : null}
 				{leading}
 				{status}
 				{clickable ? (
-					<CardChevron open={open} tooltip={chevronTooltip?.(open)} />
+					<CardChevron
+						open={open}
+						tooltip={chevronTooltip?.(open)}
+						isFlat={isFlat}
+					/>
 				) : null}
 			</div>
 			{open && children != null ? (
 				<div
-					className={"card-body" + (bodyClassName ? " " + bodyClassName : "")}
+					className={
+						"card-body" +
+						(isFlat ? " card-body--flat" : "") +
+						(bodyClassName ? " " + bodyClassName : "")
+					}
 					ref={bodyRef}
 					onScroll={handleBodyScroll}
 				>
@@ -208,10 +224,21 @@ export function CollapsibleCard({
 	);
 }
 
-/** Chevron del header de CollapsibleCard, con tooltip opcional. Componente
- *  aparte para mantener baja la complejidad del cuerpo principal. */
-function CardChevron({ open, tooltip }: { open: boolean; tooltip?: string }) {
-	const chev = (
+/** Chevron del header de CollapsibleCard, con tooltip opcional. */
+function CardChevron({
+	open,
+	tooltip,
+	isFlat,
+}: {
+	open: boolean;
+	tooltip?: string;
+	isFlat?: boolean;
+}) {
+	const chev = isFlat ? (
+		<span className={"tool-flat-chevron" + (open ? " is-expanded" : "")}>
+			<Codicon name="chevron-right" size={14} />
+		</span>
+	) : (
 		<span className={"card-chev" + (open ? "" : " closed")}>
 			<Icon name="chevron" size={12} />
 		</span>

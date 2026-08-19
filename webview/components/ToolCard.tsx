@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import type { SubagentProgressDetails, ToolEntry, ToolState } from "../types";
 import { Icon } from "./Icon";
+import { Codicon } from "./Codicon";
 import { Markdown } from "./Markdown";
 import { Spinner } from "./Spinner";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { Tooltip } from "./Tooltip";
+import { getToolPhrase, type ToolPhrase } from "../tool-phrases";
 import {
 	Compass,
 	FilePen,
@@ -692,9 +694,41 @@ function buildStatus(
 	);
 }
 
+/** Contenido del header plano estilo Copilot (.tool-flat). */
+function buildFlatLeading(entry: ToolEntry, phrase: ToolPhrase): ReactNode {
+	const running = entry.state === "running";
+	const isError = entry.state === "error";
+	const fullPath = (entry.args as Record<string, unknown>)?.path;
+
+	return (
+		<div className="tool-flat-title">
+			{running ? (
+				<Codicon name="loading" size={14} className="tc-icon-running" />
+			) : isError ? (
+				<Codicon name="error" size={14} className="tc-icon-error" />
+			) : (
+				<Codicon name="check" size={14} className="tc-icon-check" />
+			)}
+			<span className={running ? "tc-shimmer-verb" : "tc-verb"}>
+				{phrase.verb}
+			</span>
+			{phrase.arg ? (
+				phrase.isAnchor && fullPath ? (
+					<Tooltip label={String(fullPath)} side="top">
+						<span className="tc-anchor">{phrase.arg}</span>
+					</Tooltip>
+				) : (
+					<span className="tc-arg">{phrase.arg}</span>
+				)
+			) : null}
+			{phrase.detail ? <span className="tc-sub">{phrase.detail}</span> : null}
+		</div>
+	);
+}
+
 export function ToolCard({ entry }: { entry: ToolEntry }) {
 	const running = entry.state === "running";
-	const { icon, name, label, path } = toolCallInfo(entry.tool, entry.args);
+	const phrase = getToolPhrase(entry);
 	const hasResult =
 		!running && (!!(entry.result && entry.result.trim()) || !!entry.diff);
 	// Con la sección Entrada, la tarjeta siempre tiene algo que mostrar (los args),
@@ -709,36 +743,14 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 		running &&
 		((!!entry.partial && !!entry.partial.trim()) || !!entry.partialDetails);
 
-	// Cronómetro: CollapsibleCard re-renderiza cada 250 ms mientras corre, así que
-	// basta con leer Date.now() aquí para que el tiempo avance.
-	const elapsed = (entry.endedAt ?? Date.now()) - entry.startedAt;
-	// Tokens del contenido (resultado/partial) que aporta al contexto. Estimación.
-	const ctxTokens = estimateTokens(entry.result ?? entry.partial);
-	// Badge git de líneas +/- (estilo GitHub) desde el diff, para edit/write.
-	const diffStats = entry.diff ? countDiff(entry.diff) : null;
-	// Conteo de líneas leídas (read) con rango si hubo offset.
-	const lines = readStats(entry);
-	// Status echo del tool `todo` (badge glyph + label, paridad rpiv-todo).
-	const statusEcho = todoStatusEcho(entry);
-
 	return (
 		<CollapsibleCard
 			running={running}
 			startedAt={entry.startedAt}
 			hasPartial={hasPartial}
 			hasContent={hasResult || hasInput}
-			variant="tool"
-			icon={icon}
-			iconLive={running}
-			leading={buildLeading({
-				name,
-				label,
-				path,
-				diffStats,
-				lines,
-				statusEcho,
-			})}
-			status={buildStatus(entry.state, elapsed, ctxTokens, entry.tokensLLM)}
+			variant="flat"
+			leading={buildFlatLeading(entry, phrase)}
 			chevronTooltip={(open) => (open ? "Contraer resultado" : "Ver resultado")}
 		>
 			{renderBody(entry, running)}
