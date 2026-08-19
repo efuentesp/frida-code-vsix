@@ -4640,6 +4640,12 @@ export async function activate(
 				sessionDir: sessionDirPath,
 				approvalLogPath,
 				openPath: pathStr,
+				// #89 (parte 2, repro 20:52–20:54): sin activeModel, el switch
+				// caía al fallback DevEngine SILENCIOSO («sin saved») → BASELINE
+				// divergente → tarjeta AUTO-CHANGE en el primer agent_end («cambió
+				// de proveedor sin pedirlo»). El modelo del host es lo que la UI
+				// muestra: la sesión continuada debe respetarlo.
+				activeModel,
 				getKeyFor: (id: string) => keyCaches[id],
 				onUnauthorized: (id: string) => {
 					delete keyCaches[id];

@@ -21,7 +21,10 @@ import {
 	SOFTTEK_MODELS,
 	SOFTTEK_PROVIDER,
 } from "./providers/softtek-provider";
-import { createProviderAuditHooks } from "./providers/provider-audit";
+import {
+	createProviderAuditHooks,
+	defaultProviderAuditDeps,
+} from "./providers/provider-audit";
 import { resolveActiveModel } from "./resolve-active-model";
 import {
 	buildZaiCatalogOverride,
@@ -539,18 +542,21 @@ export async function createFridaSession(
 					onGatewayDiagnosis: opts.onGatewayDiagnosis,
 				}),
 			},
-			// #86: provider-audit — REQUEST (cada llamada al LLM, modelo REAL del
-			// payload) y HTTP (≥400) a ~/.frida/logs/provider-audit.log. Registrado
-			// como extensión (pi.on) porque los eventos de provider NO son métodos
-			// del AgentSession (regresión 6fed59a: session.on crasheó el arranque).
-			...(opts.providerAudit
-				? [
-						{
-							name: "frida-provider-audit",
-							factory: createProviderAuditHooks(opts.providerAudit),
-						},
-					]
-				: []),
+			// #86/#91: provider-audit — REQUEST (cada llamada al LLM, modelo REAL
+			// del payload) y HTTP (≥400) a ~/.frida/logs/provider-audit.log.
+			// Registrado como extensión (pi.on) porque los eventos de provider NO
+			// son métodos del AgentSession (regresión 6fed59a). DEFAULT-ON (#91,
+			// repro 20:52): el switch de sesión construía sus propios opts y
+			// omitía providerAudit → la sesión continuada (la ACTIVA) corría sin
+			// auditoría. Con default-on ningún call site puede olvidarlo; el host
+			// sigue inyectando sus deps enriquecidos (tag de sesión + onHttpError
+			// para causality de AUTO-CHANGE) cuando los pasa.
+			{
+				name: "frida-provider-audit",
+				factory: createProviderAuditHooks(
+					opts.providerAudit ?? defaultProviderAuditDeps(opts.cwd),
+				),
+			},
 			{
 				name: "z-ai-provider",
 				factory: createZaiProviderHooks({

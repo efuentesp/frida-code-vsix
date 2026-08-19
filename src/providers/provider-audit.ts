@@ -16,8 +16,15 @@
 // Forense best-effort: NADA aquí puede lanzar — una auditoría rota nunca
 // debe tumbar la sesión que intenta diagnosticar.
 
+import { basename } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { forensicLine, formatModelRef } from "../tools/frida-forensics";
+import {
+	createForensicAppender,
+	forensicLine,
+	forensicLogPath,
+	formatModelRef,
+	type ForensicAppender,
+} from "../tools/frida-forensics";
 
 export interface ProviderAuditDeps {
 	/** Sink forense (appender con rotación) — recibe la línea completa. */
@@ -34,6 +41,27 @@ function modelRefOfCtx(ctx: any): { provider?: string; id?: string } {
 	return {
 		provider: typeof m?.provider === "string" ? m.provider : undefined,
 		id: typeof m?.id === "string" ? m.id : undefined,
+	};
+}
+
+/** Appender forense por defecto (cacheado por proceso — la rotación cuenta
+ *  bytes dentro del appender). */
+let defaultAuditAppender: ForensicAppender | undefined;
+
+/** #91: deps por defecto del provider-audit — auditoría DEFAULT-ON para
+ *  cualquier createFridaSession que no inyecte providerAudit (hallazgo del
+ *  repro 20:52: el SWITCH de sesión construía sus propios opts y omitía el
+ *  campo → la sesión continuada corría SIN auditoría: 0 REQUESTs del chat).
+ *  Con default-on, ningún call site puede olvidarlo. */
+export function defaultProviderAuditDeps(cwd: string): ProviderAuditDeps {
+	return {
+		append: (line) => {
+			defaultAuditAppender ??= createForensicAppender({
+				file: forensicLogPath("provider-audit.log"),
+			});
+			defaultAuditAppender.append(line);
+		},
+		tag: () => `ws-${basename(cwd.replace(/\/+$/, "")) || "session"}`,
 	};
 }
 
