@@ -48,6 +48,9 @@ import {
 	createProviderAuditHooks,
 	type ProviderAuditDeps,
 } from "../../providers/provider-audit";
+import { createFridaEnterpriseHooks } from "../../providers/frida-enterprise";
+import { createSofttekProviderHooks } from "../../providers/softtek-provider";
+import { createZaiProviderHooks } from "../../providers/z-ai-provider";
 import {
 	createForensicAppender,
 	forensicLogPath,
@@ -67,18 +70,39 @@ function defaultChildAuditAppender(): ForensicAppender {
 /** #91 E2: extensionFactories para las sesiones HIJAS del workflow. Antes el
  *  DefaultResourceLoader del spawner iba SIN factories → cero hooks → los
  *  REQUESTs/HTTP de los agentes del workflow eran invisibles al provider-audit
- *  (3 runs de aidd-plan fallidos sin un solo request registrado). El tag por
- *  defecto deriva del cwd (wf-<basename>) — mismo namespace que abort.log. */
+ *  (3 runs de aidd-plan fallidos sin un solo request registrado). Además, sin
+ *  los hooks de proveedores (frida-enterprise), las peticiones a modelos
+ *  enterprise salían sin identidad (user_id/email) → 422 del gateway y
+ *  agente terminaba "SIN texto". El tag por defecto deriva del cwd
+ *  (wf-<basename>) — mismo namespace que abort.log. */
 export function createWorkflowChildFactories(
 	cwd: string,
 	providerAudit?: ProviderAuditDeps,
 ): Array<{ name: string; factory: (pi: any) => any }> {
-	const deps: ProviderAuditDeps =
-		providerAudit ?? {
-			append: (line) => defaultChildAuditAppender().append(line),
-			tag: () => `wf-${cwd.split("/").filter(Boolean).pop() ?? "session"}`,
-		};
+	const deps: ProviderAuditDeps = providerAudit ?? {
+		append: (line) => defaultChildAuditAppender().append(line),
+		tag: () => `wf-${cwd.split("/").filter(Boolean).pop() ?? "session"}`,
+	};
 	return [
+		{
+			name: "softtek-provider",
+			factory: createSofttekProviderHooks({
+				getKey: () => undefined,
+				onUnauthorized: () => {},
+			}),
+		},
+		{
+			name: "z-ai-provider",
+			factory: createZaiProviderHooks({
+				onUnauthorized: () => {},
+			}),
+		},
+		{
+			name: "frida-enterprise-provider",
+			factory: createFridaEnterpriseHooks({
+				onUnauthorized: () => {},
+			}),
+		},
 		{
 			name: "frida-provider-audit",
 			factory: createProviderAuditHooks(deps),
@@ -133,12 +157,8 @@ export function spawnResult(
 		[SPAWN_RESULT]: true,
 		value,
 		...(extra?.accounting ? { accounting: extra.accounting } : {}),
-		...(extra?.durationMs === undefined
-			? {}
-			: { durationMs: extra.durationMs }),
-		...(extra?.nullDiagnostic
-			? { nullDiagnostic: extra.nullDiagnostic }
-			: {}),
+		...(extra?.durationMs === undefined ? {} : { durationMs: extra.durationMs }),
+		...(extra?.nullDiagnostic ? { nullDiagnostic: extra.nullDiagnostic } : {}),
 	};
 }
 
@@ -168,9 +188,7 @@ export function unpackSpawnResult(raw: JsonValue | AgentSpawnResult): {
 			value: raw.value,
 			...(raw.accounting ? { accounting: raw.accounting } : {}),
 			...(raw.durationMs === undefined ? {} : { durationMs: raw.durationMs }),
-			...(raw.nullDiagnostic
-				? { nullDiagnostic: raw.nullDiagnostic }
-				: {}),
+			...(raw.nullDiagnostic ? { nullDiagnostic: raw.nullDiagnostic } : {}),
 		};
 	}
 	return { value: raw };
@@ -225,10 +243,8 @@ export function resolveRoleOverrides(
 	const roleName =
 		typeof roleOption === "string" ? roleOption : roleOption?.name;
 	if (!roleName) {
-		const tier =
-			typeof options.tier === "string" ? options.tier : undefined;
-		const tierModel =
-			tier && modelAliases ? modelAliases[tier] : undefined;
+		const tier = typeof options.tier === "string" ? options.tier : undefined;
+		const tierModel = tier && modelAliases ? modelAliases[tier] : undefined;
 		return {
 			...(typeof options.model === "string"
 				? { model: options.model }
@@ -288,9 +304,11 @@ type AnyMessage = { role?: string; stopReason?: string; content?: unknown };
 
 function sessionMessages(session: AgentSession): AnyMessage[] {
 	return (
-		(session as unknown as {
-			state?: { messages?: AnyMessage[] };
-		}).state?.messages ?? []
+		(
+			session as unknown as {
+				state?: { messages?: AnyMessage[] };
+			}
+		).state?.messages ?? []
 	);
 }
 
@@ -351,12 +369,10 @@ export function summarizeLastAssistant(
 						: "?",
 				)
 				.join(",");
-			const thinking = blocks
-				.find(
-					(b): b is { type: string; thinking?: string } =>
-						typeof b === "object" && (b as { type?: string }).type === "thinking",
-				)
-				?.thinking;
+			const thinking = blocks.find(
+				(b): b is { type: string; thinking?: string } =>
+					typeof b === "object" && (b as { type?: string }).type === "thinking",
+			)?.thinking;
 			return (
 				`último assistant: stopReason=${msg.stopReason ?? "?"} bloques=[${types}]` +
 				(thinking ? ` · thinking: «${thinking.slice(0, 200)}»` : "")
@@ -368,29 +384,13 @@ export function summarizeLastAssistant(
 
 /** Extrae el valor (texto) del último mensaje asistente de la sesión. */
 function lastAssistantValue(session: AgentSession): JsonValue {
-	const messages = (
-		session as unknown as {
-			state?: { messages?: Array<{ role?: string; content?: unknown }> };
-		}
-	).state?.messages ?? [];
+	const messages =
+		(
+			session as unknown as {
+				state?: { messages?: Array<{ role?: string; content?: unknown }> };
+			}
+		).state?.messages ?? [];
 	return lastAssistantText(messages);
-}
-
-function contentToValue(content: unknown): JsonValue {
-	if (typeof content === "string") return content;
-	if (Array.isArray(content)) {
-		const texts = content
-			.filter(
-				(c): c is { type: "text"; text: string } =>
-					typeof c === "object" &&
-					c !== null &&
-					(c as { type?: string }).type === "text" &&
-					typeof (c as { text?: unknown }).text === "string",
-			)
-			.map((c) => c.text);
-		return texts.length ? texts.join("\n") : null;
-	}
-	return null;
 }
 
 /**
@@ -400,7 +400,10 @@ function contentToValue(content: unknown): JsonValue {
  */
 export function createFridaAgentSpawner(
 	ctx: ExtensionContext,
-	opts?: { roles?: Readonly<Record<string, AgentDefinition>> },
+	opts?: {
+		roles?: Readonly<Record<string, AgentDefinition>>;
+		extensionFactories?: Array<{ name: string; factory: (pi: any) => any }>;
+	},
 ): SpawnAgentFn {
 	const roles =
 		opts?.roles ?? loadAgentDefinitions(ctx.cwd, fridaDefaultAgentDir(), true);
@@ -413,9 +416,16 @@ export function createFridaAgentSpawner(
 			agentDir,
 			settingsManager,
 			// #91 E2: sin factories las hijas corrían CERO hooks — los REQUESTs/HTTP
-			// de los agentes del workflow eran invisibles al provider-audit.
-			extensionFactories: createWorkflowChildFactories(ctx.cwd),
+			// de los agentes del workflow eran invisibles al provider-audit y las
+			// llamadas a frida-enterprise salían sin user_id/email (422 del gateway).
+			extensionFactories:
+				opts?.extensionFactories ?? createWorkflowChildFactories(ctx.cwd),
 		});
+		// CRÍTICO: DefaultResourceLoader DEBE recargarse explícitamente cuando se
+		// pasa como parámetro propio a createAgentSession (el SDK sólo llama reload
+		// si resourceLoader es undefined). Sin reload(), getExtensions() devuelve
+		// un conjunto vacío y NINGUNA factory se activa.
+		await resourceLoader.reload();
 		// ADR-0010/0022: las API keys de providers con SecretStorage viven en el
 		// runtime del padre; sin propagar modelRuntime, la hija falla con
 		// "No API key found".
@@ -425,10 +435,8 @@ export function createFridaAgentSpawner(
 		// #19 Lote 2: aliases efectivos de settings (tier → modelo). Se leen por
 		// spawn (lectura barata de settings resueltos) para que un cambio en el
 		// archivo aplique sin recargar la sesión.
-		const modelAliases = resolveWorkflowSettings(
-			ctx.cwd,
-			true,
-		).effective.modelAliases;
+		const modelAliases = resolveWorkflowSettings(ctx.cwd, true).effective
+			.modelAliases;
 		const overrides = resolveRoleOverrides(options, roles, modelAliases);
 		const sessionModel = overrides.model ?? ctx.model;
 
@@ -446,6 +454,10 @@ export function createFridaAgentSpawner(
 			...(overrides.tools ? { allowedToolNames: [...overrides.tools] } : {}),
 			excludeTools: WORKFLOW_EXCLUDED_TOOLS,
 		});
+
+		// Paridad con pi-extensible-workflows upstream (agent-execution.ts:342):
+		// enlaza extensiones y emite session_start a los hooks registrados.
+		await (session as any).bindExtensions?.({ mode: "print" });
 
 		// Abort del workflow (señal del tool padre) → abort de la sesión hija.
 		const sessionAbort = session as unknown as {
@@ -472,9 +484,7 @@ export function createFridaAgentSpawner(
 				durationMs: Date.now() - startedAt,
 				...(value === null
 					? {
-							nullDiagnostic: summarizeLastAssistant(
-								sessionMessages(session),
-							),
+							nullDiagnostic: summarizeLastAssistant(sessionMessages(session)),
 						}
 					: {}),
 			});

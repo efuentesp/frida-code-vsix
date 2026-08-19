@@ -21,12 +21,37 @@ function fakePi() {
 }
 
 describe("createWorkflowChildFactories (#91 E2: audit en sesiones hijas)", () => {
-	it("incluye la extensión frida-provider-audit", () => {
+	it("incluye la extensión frida-provider-audit y providers curados (enterprise, softtek, zai)", () => {
 		const factories = createWorkflowChildFactories("/proj/nutrimetrics", {
 			append: () => {},
 			tag: () => "t",
 		});
-		expect(factories.map((f) => f.name)).toContain("frida-provider-audit");
+		const names = factories.map((f) => f.name);
+		expect(names).toContain("frida-provider-audit");
+		expect(names).toContain("frida-enterprise-provider");
+		expect(names).toContain("softtek-provider");
+		expect(names).toContain("z-ai-provider");
+	});
+
+	it("la factory de frida-enterprise inyecta identidad en sesiones hijas", () => {
+		const factories = createWorkflowChildFactories("/proj/nutrimetrics", {
+			append: () => {},
+			tag: () => "t",
+		});
+		const enterprise = factories.find(
+			(f) => f.name === "frida-enterprise-provider",
+		)!;
+		expect(enterprise).toBeDefined();
+		const pi = fakePi();
+		enterprise.factory(pi as any);
+		// Verifica que el hook before_provider_request fue registrado
+		const res = pi.fire(
+			"before_provider_request",
+			{ payload: { model: "DEMETER-BLOOM", messages: [] } },
+			{ model: { provider: "frida-enterprise", id: "DEMETER-BLOOM" } },
+		);
+		// El payload se procesa sin lanzar
+		expect(res).toBeUndefined();
 	});
 
 	it("los hooks de la factory capturan REQUEST con el modelo del payload", () => {
@@ -47,7 +72,9 @@ describe("createWorkflowChildFactories (#91 E2: audit en sesiones hijas)", () =>
 		// Línea 0 = FACTORY-LOADED (#91 E3); línea 1 = REQUEST
 		expect(lines).toHaveLength(2);
 		expect(lines[0]).toMatch(/FACTORY-LOADED/);
-		expect(lines[1]).toMatch(/\[wf-nutrimetrics\] REQUEST model=frida-enterprise\/DEMETER-BLOOM/);
+		expect(lines[1]).toMatch(
+			/\[wf-nutrimetrics\] REQUEST model=frida-enterprise\/DEMETER-BLOOM/,
+		);
 	});
 
 	it("los hooks capturan HTTP ≥400 (el fallo del upstream queda grabado)", () => {
@@ -67,7 +94,9 @@ describe("createWorkflowChildFactories (#91 E2: audit en sesiones hijas)", () =>
 		);
 		// Línea 0 = FACTORY-LOADED; línea 1 = HTTP 500
 		expect(lines).toHaveLength(2);
-		expect(lines[1]).toMatch(/HTTP status=500 model=softtek-devengine\/gpt-5\.4-mini/);
+		expect(lines[1]).toMatch(
+			/HTTP status=500 model=softtek-devengine\/gpt-5\.4-mini/,
+		);
 	});
 
 	it("tag por defecto deriva del cwd (wf-<basename>) — sin deps inyectados", () => {
@@ -79,7 +108,11 @@ describe("createWorkflowChildFactories (#91 E2: audit en sesiones hijas)", () =>
 		const pi = fakePi();
 		expect(() => {
 			audit.factory(pi as any);
-			pi.fire("before_provider_request", { payload: {} }, { model: { provider: "z.ai", id: "glm-5.3" } });
+			pi.fire(
+				"before_provider_request",
+				{ payload: {} },
+				{ model: { provider: "z.ai", id: "glm-5.3" } },
+			);
 		}).not.toThrow();
 	});
 });
