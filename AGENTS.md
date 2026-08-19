@@ -46,3 +46,22 @@ manual ocurre al final del paso 4.
 
 Excepción: issues puramente internos (tooling, docs, refactor sin UX visible)
 sí pueden cerrarse tras la verificación del agente, sin validación del usuario.
+
+## Diagnóstico de defectos en extensiones portadas de Pi
+
+Cada vez que se detecte un defecto o comportamiento anómalo en alguna extensión
+de Frida (p. ej. `frida-extensible-workflows`, `frida-todo`,
+`frida-ask-user-questions`, `frida-agent-browser`, `frida-subagents`,
+`frida-permission-system`, etc.), el agente debe **revisar primero el código
+fuente de la extensión original de Pi** (ubicadas habitualmente en
+`~/.pi/agent/npm/node_modules/` o en `@earendil-works/pi-coding-agent`) antes de
+proponer o ensayar soluciones.
+
+Objetivo:
+
+1. Comparar la estructura original, firmas, ciclo de vida (`reload`,
+   `bindExtensions`, etc.) y manejo de estado contra la adaptación en Frida.
+2. Identificar de raíz si el fallo proviene de omisiones o divergencias
+   introducidas al portar la funcionalidad.
+3. Evitar ciclos de prueba y error basados en suposiciones cuando el upstream
+   ya resuelve el caso de forma probada.
