@@ -17,6 +17,64 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.24.0] - 2026-08-19
+### Añadido
+
+- **forensics** — diagnóstico de stop (#85) y provider-audit (#86)
+- **workflows** — visibilidad forzada del panel + rehidratación de awaiting
+- **tea** — gates de artefacto deterministas tras cada fase productora
+- **workflows** — ⏱ tiempo total + ∑ tokens/costo del run en el panel
+- **workflows** — header contraído con progreso (#80)
+- **workflows** — panel v3 — timeline vertical de fases + label real por agente
+- **aidd** — status.yaml de avance del plan (patrón sprint-status)
+- **workflows** — WorkflowPanel v2 — cards con pills de estado e iconos lucide
+- **workflows** — workflow_gc — recolector de runs huérfanos de sesiones muertas
+- **aidd** — hardening v2 del plan — contrato de salida primero, gate de specs, checkpoint pre-fanout y resume idempotente
+- **aidd** — reintento informado del gate de artefacto + expediente de diagnóstico
+- **todo** — verify gate determinista — contrato 'Done when' por tarea (R1)
+- **todo-web** — conciliación de todos contra la realidad — nudge agent_settled + botón ↻
+- **frida-extensible-workflows** — checkpoints visibles en el panel — estado awaiting + botones Aprobar/Rechazar
+- **devengine** — suite de pruebas + mitigador de 500 opacos H-2/H-3 (Refs #59)
+
+### Corregido
+
+- **resources** — incluir skills empaquetadas en ResourceSummary para autocompletado
+- **workflows** — reload loader y curar extensiones provider en sesiones hijas
+- **session** — switch de sesión sin activeModel/providerAudit (#89/#91)
+- **workflows** — extractor resiliente + diagnóstico cuando el hijo responde vacío (#91)
+- **workflows** — evidencia forense en fallas de outputSchema (#91)
+- **abort** — re-abort del run escapado — Detener sí corta el ciclo tool→LLM (#90)
+- **session** — nunca cambiar de proveedor sin que el usuario lo pida (#89)
+- **forensics** — provider-audit como extensión — session.on no existe (#86)
+- **enterprise** — clamp contexto a 200k — upstream Anthropic rechaza >200k
+- **forensics** — conectar provider-audit.log en extension.ts (#85/#86)
+- **cc-plugins** — red del oficial ya no bloquea plugins del equipo (#88)
+- **tests** — suite desactualizada tras cambios intencionales (#87)
+- **workflows** — outputSchema tolera string-encoded anidado (double-encoding GLM)
+- **workflows** — panel muestra fallidos recientes de sesión viva
+- **aidd** — lie-detector inmune a filenames no-ASCII (core.quotepath=false)
+- **scripts** — smoke.ts al día con el API actual (provider config + session options)
+- **workflows** — tool workflow decodifica args string-JSON (double-encoded)
+- **kb** — kb_search etiqueta id vs path — el id OKF no es una ruta
+- **aidd** — expediente diagnostica al agente silencioso (provider 500)
+- **hermes** — auto-review funcional OOB con providers de extensión (override automático)
+- **aidd** — el workflow garantiza su directorio de artefactos (mkdir -p al arranque)
+- **frida-aidd** — gate de artefacto por stage — la cadena no continúa con artefactos fantasma
+- **webview** — warning/error y provider_error persisten hasta cierre manual
+- **frida-hermes-memory** — retarget del prebuild de better-sqlite3 al Electron del extension host
+- **extension** — mensaje de error fantasma antes del auto-retry — fallback respeta willRetry
+
+### Interno
+
+- **handoff** — registrar handoff de pruebas aidd y corrección estructural de subagentes
+- **plan** — hoja de ruta para rediseño gradual UI/UX inspirado en Copilot Chat
+- agregar regla en AGENTS.md para consultar fuentes upstream de Pi ante defectos
+- **aidd** — formato markdown de tabla en architecture.md
+- **aidd** — actualizar spine con stack Expo web decidido
+- **enterprise** — centinela live del límite de contexto upstream (clamp-200k)
+- **frida-enterprise** — conformance 34 tools + matriz tools ×4 modelos SELECTED
+- **devengine** — suite extendida — 36 tools + matriz completa × 4 modelos (Refs #59)
+
 ## [0.23.0] - 2026-08-18
 ### Añadido
 
