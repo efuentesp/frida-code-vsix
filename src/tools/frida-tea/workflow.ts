@@ -294,6 +294,9 @@ const planSummary = await agent(
 	]),
 	{ label: "test-design plan" }
 )
+// #83: gate de artefacto — el plan prometido existe en disco (claim ≠ archivo).
+const planGate = await shell("test -s ${TEA_ARTIFACTS_DIR}/test-design.md")
+if (planGate.exitCode !== 0) throw new Error("tea-test-design: plan no escribió ${TEA_ARTIFACTS_DIR}/test-design.md — el agente reportó éxito pero el archivo no existe (gate de artefacto #83). Revisa el summary del agente.")
 
 phase("extract targets")
 const extracted = await agent(
@@ -363,6 +366,10 @@ const setup = await agent(
 	{ label: "setup " + survey.framework, outputSchema: SETUP_SCHEMA }
 )
 log("tea-framework: example=" + setup.exampleStatus + " (" + setup.examplePath + ")")
+// #83: gate de artefacto — configFiles/examplePath son claims; verificar en disco.
+const fwPaths = (setup.configFiles || []).concat([setup.examplePath]).filter(Boolean).join(" ")
+const fwGate = await shell('for f in ' + fwPaths + '; do test -s "$f" || { echo "$f"; exit 1; }; done')
+if (fwGate.exitCode !== 0) throw new Error("tea-framework: setup no escribió " + ((fwGate.stdout || fwGate.stderr || "").trim()) + " — el agente reportó ejemplo " + setup.exampleStatus + " pero falta el archivo (gate de artefacto #83). Revisa el summary del agente.")
 
 phase("gate")
 const gate = await agent(
@@ -562,6 +569,9 @@ const setup = await agent(
 	{ label: "pipeline " + survey.platform, outputSchema: SETUP_SCHEMA }
 )
 log("tea-ci: " + setup.pipelineFile + " localVerification=" + setup.localVerification)
+// #83: gate de artefacto — pipelineFile es un claim; verificar en disco.
+const ciGate = await shell("test -s " + setup.pipelineFile)
+if (ciGate.exitCode !== 0) throw new Error("tea-ci: pipeline no escribió " + setup.pipelineFile + " — el agente reportó localVerification=" + setup.localVerification + " pero el archivo no existe (gate de artefacto #83). Revisa el summary del agente.")
 
 phase("gate")
 const gate = await agent(
@@ -736,6 +746,9 @@ const scenariosSummary = await agent(
 	]),
 	{ label: "scenarios" }
 )
+// #83: gate de artefacto — el contrato existe en disco antes del checkpoint.
+const scGate = await shell("test -s ${TEA_ARTIFACTS_DIR}/atdd-scenarios.md")
+if (scGate.exitCode !== 0) throw new Error("tea-atdd: scenarios no escribió ${TEA_ARTIFACTS_DIR}/atdd-scenarios.md — el agente reportó éxito pero el archivo no existe (gate de artefacto #83). Revisa el summary del agente.")
 
 if (review === "manual") {
 	const cp = await checkpoint({ name: "scenarios", prompt: "Escenarios ATDD listos en ${TEA_ARTIFACTS_DIR}/atdd-scenarios.md. Revísalos/edítalos (son el contrato) y aprueba para pasar a la fase roja (o rechaza con notas).", context: { artifact: "${TEA_ARTIFACTS_DIR}/atdd-scenarios.md", feature: feature.slice(0, 80) } })
@@ -754,6 +767,9 @@ const red = await agent(
 	{ label: "red phase", outputSchema: RED_SCHEMA }
 )
 log("tea-atdd: red phase status=" + red.testStatus + " level=" + red.level + " scenarios=" + red.scenariosCovered)
+// #83: gate de artefacto — el checklist existe en disco.
+const redGate = await shell("test -s ${TEA_ARTIFACTS_DIR}/atdd-checklist.md")
+if (redGate.exitCode !== 0) throw new Error("tea-atdd: red phase no escribió ${TEA_ARTIFACTS_DIR}/atdd-checklist.md — el agente reportó status=" + red.testStatus + " pero el archivo no existe (gate de artefacto #83). Revisa el summary del agente.")
 
 if (review === "manual") {
 	const cp = await checkpoint({ name: "red-phase", prompt: "Fase roja lista: " + red.files.length + " archivos de test (" + red.testStatus + ", nivel " + red.level + ", " + red.scenariosCovered + " escenarios). Checklist en " + red.checklistPath + ". ¿Apruebas para terminar?", context: { status: red.testStatus, files: red.files, checklist: red.checklistPath } })

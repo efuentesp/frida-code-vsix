@@ -6,7 +6,7 @@
 // patrón que los e2e de frida-aidd (#38).
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -45,6 +45,14 @@ afterEach(() => {
 	rmSync(home, { recursive: true, force: true });
 	rmSync(cwd, { recursive: true, force: true });
 });
+
+/** Escribe un artefacto en el cwd del test (#83: los mocks honran el contrato
+ * de "el agente escribe el archivo" como los agentes reales con file tools). */
+function writeArtifact(rel: string, content = "# artifact\n"): void {
+	const p = join(cwd, rel);
+	mkdirSync(join(p, ".."), { recursive: true });
+	writeFileSync(p, content);
+}
 
 /** Mock del spawner con anclas por encabezado de skill (orden importa). Los
  * extractores de test-design y automate producen texto idéntico en runtime —
@@ -92,6 +100,7 @@ const makeSpawn = (seen: string[], extract?: unknown) =>
 		}
 		// Pipeline de CI (encabezado del skill ci).
 		if (prompt.includes("CI Pipeline Setup")) {
+			writeArtifact(".github/workflows/test.yml", "name: CI\n");
 			return {
 				pipelineFile: ".github/workflows/test.yml",
 				jobs: ["test"],
@@ -132,10 +141,12 @@ const makeSpawn = (seen: string[], extract?: unknown) =>
 		// ATDD — escenarios (role A). Ancla: bloque runtime "## Your role"
 		// (NO el texto del skill, que describe ambos roles y colisionaría).
 		if (prompt.includes("## Your role\nA — scenarios")) {
+			writeArtifact("docs/tea/atdd-scenarios.md", "# Escenarios\n");
 			return "escenarios escritos en docs/tea/atdd-scenarios.md";
 		}
 		// ATDD — fase roja (role B), mismo criterio de ancla.
 		if (prompt.includes("## Your role\nB — red phase")) {
+			writeArtifact("docs/tea/atdd-checklist.md", "# Checklist\n");
 			return {
 				level: "component",
 				files: ["tests/login.atdd.test.ts"],
@@ -214,6 +225,7 @@ const makeSpawn = (seen: string[], extract?: unknown) =>
 		}
 		// Plan de test-design.
 		if (prompt.includes("Test Design & Risk Assessment")) {
+			writeArtifact("docs/tea/test-design.md", "# Plan de pruebas\n");
 			return "plan escrito en docs/tea/test-design.md";
 		}
 		// Reporte de test-review.
@@ -523,3 +535,49 @@ async function waitUntil(cond: () => boolean, ms = 10000): Promise<void> {
 		await new Promise((r) => setTimeout(r, 20));
 	}
 }
+
+// ── #83: gates de artefacto deterministas — el mentiroso no pasa ──────────
+describe("frida-tea · gate de artefacto tras fase productora (#83)", () => {
+	it("tea-ci: pipeline agent que claims pipelineFile sin escribirlo → el run falla", async () => {
+		const script = TEA_CI_PATTERN.resolve({ review: "auto" }, { cwd });
+		const seen: string[] = [];
+		const lyingSpawn = (async (prompt: string) => {
+			seen.push(prompt);
+			if (prompt.includes("Survey this repository to configure CI")) {
+				return {
+					platform: "github-actions",
+					testCommand: "npm test",
+					framework: "vitest",
+					packageManager: "npm",
+					nodeVersion: "22",
+				};
+			}
+			if (prompt.includes("CI Pipeline Setup")) {
+				// LA MENTIRA (#67 redux): claim de éxito sin archivo en disco.
+				return {
+					pipelineFile: ".github/workflows/test.yml",
+					jobs: ["test"],
+					localVerification: "green",
+					notes: "claim sin archivo",
+				};
+			}
+			if (prompt.includes("Release Gate Audit")) {
+				return { decision: "PASS", findings: [], notes: "gate cómplice" };
+			}
+			return `echo: ${prompt.slice(0, 40)}`;
+		}) as unknown as SpawnAgentFn;
+
+		const promise = runWorkflowInStore({
+			name: "tea-ci",
+			script,
+			args: { review: "auto" },
+			cwd,
+			sessionId: "sess-tea-83",
+			spawnAgent: lyingSpawn,
+			home,
+			runId: randomUUID(),
+			foreground: false,
+		});
+		await expect(promise).rejects.toThrow(/no escribió.*\.github\/workflows\/test\.yml|test\.yml.*no escribió/);
+	}, 30000);
+});
