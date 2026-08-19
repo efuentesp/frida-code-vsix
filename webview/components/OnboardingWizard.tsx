@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-	ArrowLeft,
-	ArrowRight,
-	Bot,
-	Check,
-	PartyPopper,
-	Settings,
-} from "lucide-react";
+import { Bot } from "lucide-react"; // marca Frida, queda
+import { Codicon } from "./Codicon";
 import type { ProviderOption } from "../types";
 import { providerMeta } from "../providers-registry";
 import { ProviderConfig } from "./ProviderConfig";
@@ -52,7 +46,7 @@ export function OnboardingWizard({
 			<div className="onb-card">
 				<div className="onb-brand">
 					<span className="avatar ai">
-						<Bot size={16} />
+						<Bot size={16} /> {/* marca Frida */}
 					</span>{" "}
 					Frida Code
 				</div>
@@ -71,10 +65,10 @@ export function OnboardingWizard({
 						</ul>
 						<div className="onb-actions">
 							<button className="primary-btn" onClick={() => setStep("choose")}>
-								Empezar <ArrowRight size={14} />
+								Empezar <Codicon name="arrow-right" size={14} />
 							</button>
 							<button className="onb-link-btn" onClick={onOpenSettings}>
-								<Settings size={13} /> Abrir Configuración
+								<Codicon name="settings-gear" size={13} /> Abrir Configuración
 							</button>
 						</div>
 					</div>
@@ -107,7 +101,7 @@ export function OnboardingWizard({
 													: (meta.keyHint ?? "API key")}
 											</div>
 										</div>
-										<ArrowRight size={14} />
+										<Codicon name="arrow-right" size={14} />
 									</button>
 								);
 							})}
@@ -117,7 +111,7 @@ export function OnboardingWizard({
 								className="onb-link-btn"
 								onClick={() => setStep("welcome")}
 							>
-								<ArrowLeft size={13} /> Atrás
+								<Codicon name="arrow-left" size={13} /> Atrás
 							</button>
 						</div>
 					</div>
@@ -130,7 +124,7 @@ export function OnboardingWizard({
 								className="onb-link-btn"
 								onClick={() => setStep("choose")}
 							>
-								<ArrowLeft size={13} /> Atrás
+								<Codicon name="arrow-left" size={13} /> Atrás
 							</button>
 							<h2>Configura {providerMeta(chosen.id, chosen.oauth).name}</h2>
 						</div>
@@ -150,18 +144,18 @@ export function OnboardingWizard({
 
 				{step === "done" && chosen && (
 					<div className="onb-step onb-done">
-						<PartyPopper size={28} className="onb-done-icon" />
+						<Codicon name="smiley" size={28} className="onb-done-icon" />
 						<h2>¡Conectado!</h2>
 						<p className="onb-intro">
-							<Check size={13} /> {providerMeta(chosen.id, chosen.oauth).name}{" "}
+							<Codicon name="check" size={13} /> {providerMeta(chosen.id, chosen.oauth).name}{" "}
 							está listo. Ya puedes chatear con Frida.
 						</p>
 						<div className="onb-actions">
 							<button className="primary-btn" onClick={onDone}>
-								Empezar a chatear <ArrowRight size={14} />
+								Empezar a chatear <Codicon name="arrow-right" size={14} />
 							</button>
 							<button className="onb-link-btn" onClick={onOpenSettings}>
-								<Settings size={13} /> Configuración
+								<Codicon name="settings-gear" size={13} /> Configuración
 							</button>
 						</div>
 					</div>

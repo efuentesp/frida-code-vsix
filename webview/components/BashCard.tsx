@@ -1,7 +1,7 @@
 import type { BashRun } from "../types";
 import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
-import { TriangleAlert } from "lucide-react";
+import { Codicon } from "./Codicon";
 import { CollapsibleCard } from "./CollapsibleCard";
 
 // Tarjeta para un atajo de bash del usuario (!command / !!command).
@@ -52,7 +52,7 @@ export function BashCard({ run }: { run: BashRun }) {
 			) : null}
 			{run.truncated && run.fullOutputPath && (
 				<div className="bash-trunc">
-					<TriangleAlert size={12} /> Salida truncada. Output completo:{" "}
+					<Codicon name="warning" size={12} /> Salida truncada. Output completo:{" "}
 					{run.fullOutputPath}
 				</div>
 			)}

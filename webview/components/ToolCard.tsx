@@ -16,29 +16,7 @@ type ToolArgs = Record<string, unknown>;
 
 /** String seguro: undefined → "". */
 const str = (v: unknown): string => String(v ?? "");
-import {
-	Compass,
-	FilePen,
-	FileText,
-	Folder,
-	Gauge,
-	ListChecks,
-	MessageCircleQuestion,
-	PencilLine,
-	ScanSearch,
-	Search,
-	Terminal,
-	UserCheck,
-	Circle,
-	CircleCheck,
-	CircleDot,
-	CircleX,
-	Users,
-	Wrench,
-	Globe,
-	Library,
-	BookOpen,
-} from "lucide-react";
+// Fase 1 P3: imports lucide eliminados (huérfanos tras tool-phrases P1/P2).
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
 export function fmtDuration(ms: number): string {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { UiRequest } from "../types";
-import { HelpCircle, Send, X } from "lucide-react";
+import { Codicon } from "./Codicon";
 
 // Renderiza un diálogo data-oriented del ExtensionUIContext (pi.ui.select/input/
 // confirm). Son los diálogos que las extensiones nativas en modo RPC usan cuando
@@ -65,7 +65,7 @@ export function UiDialog({
 								className="ui-dialog-send"
 								disabled={!text.trim()}
 							>
-								<Send size={14} /> Enviar
+								<Codicon name="send" size={14} /> Enviar
 							</button>
 						</div>
 					</form>
@@ -97,7 +97,7 @@ export function UiDialog({
 	return (
 		<div className="ui-dialog">
 			<div className="ui-dialog-head">
-				<HelpCircle size={16} />
+				<Codicon name="question" size={16} />
 				<span className="ui-dialog-title">
 					{/* El título del select ya trae opciones/previews plegados (rpiv). */}
 					{request.title}
@@ -109,7 +109,7 @@ export function UiDialog({
 						title="Cancelar"
 						onClick={cancel}
 					>
-						<X size={14} />
+						<Codicon name="close" size={14} />
 					</button>
 				)}
 			</div>

@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-	Check,
-	ExternalLink,
-	KeyRound,
-	LogIn,
-	Pencil,
-	Sparkles,
-	Trash2,
-} from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { ProviderOption } from "../types";
 import type { ProviderMeta } from "../providers-registry";
 
@@ -54,20 +46,20 @@ export function ProviderConfig({
 		onLogout(provider.id);
 	};
 
-	const Icon = meta.authType === "oauth" ? Sparkles : KeyRound;
+	const iconName = meta.authType === "oauth" ? "sparkle" : "key";
 
 	return (
 		<div className="pc-card">
 			<div className="pc-head">
 				<span className="pc-icon">
-					<Icon size={15} />
+					<Codicon name={iconName} size={15} />
 				</span>
 				<div className="pc-titles">
 					<div className="pc-name">
 						{meta.name}
 						{provider.authed && (
 							<span className="pc-badge ok">
-								<Check size={11} /> conectado
+								<Codicon name="check" size={11} /> conectado
 							</span>
 						)}
 					</div>
@@ -89,7 +81,7 @@ export function ProviderConfig({
 								Cancelar
 							</button>
 							<button className="pc-danger" onClick={forget}>
-								<Trash2 size={12} /> Olvidar
+								<Codicon name="trash" size={12} /> Olvidar
 							</button>
 						</div>
 					</div>
@@ -101,13 +93,13 @@ export function ProviderConfig({
 								title="Cambiar API key"
 								onClick={() => setEditing(true)}
 							>
-								<Pencil size={13} />
+								<Codicon name="edit" size={13} />
 							</button>
 							<button
 								className="pc-link-btn"
 								onClick={() => setConfirmForget(true)}
 							>
-								<Trash2 size={12} /> Olvidar API key
+								<Codicon name="trash" size={12} /> Olvidar API key
 							</button>
 						</div>
 					) : (
@@ -144,7 +136,7 @@ export function ProviderConfig({
 										target="_blank"
 										rel="noreferrer"
 									>
-										Obtener key <ExternalLink size={11} />
+										Obtener key <Codicon name="link-external" size={11} />
 									</a>
 								)}
 							</div>
@@ -156,7 +148,7 @@ export function ProviderConfig({
 							className="pc-link-btn"
 							onClick={() => setConfirmForget(true)}
 						>
-							<Trash2 size={12} /> Olvidar acceso
+							<Codicon name="trash" size={12} /> Olvidar acceso
 						</button>
 					</div>
 				) : deviceCode ? (
@@ -177,7 +169,7 @@ export function ProviderConfig({
 					</div>
 				) : (
 					<button className="pc-save" onClick={() => onLogin(provider.id)}>
-						<LogIn size={13} /> Iniciar sesión
+						<Codicon name="sign-in" size={13} /> Iniciar sesión
 					</button>
 				)}
 			</div>

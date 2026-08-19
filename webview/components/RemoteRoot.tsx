@@ -1,31 +1,22 @@
 import type { ReactNode, CSSProperties } from "react";
 import type { WebNode } from "../types";
 import { Markdown } from "./Markdown";
-import {
-	Check,
-	ChevronDown,
-	ChevronRight,
-	Circle,
-	CircleStop,
-	LoaderCircle,
-	RotateCw,
-	Square,
-	X,
-} from "lucide-react";
+import type { LucideIcon } from "lucide-react"; // tipo para el contrato del host
+import { Codicon } from "./Codicon";
 
-import type { LucideIcon } from "lucide-react";
-
-/** Registro nombre-lucide (kebab) → componente. `ficon` lo consulta por `name`. */
-const F_ICONS: Record<string, LucideIcon> = {
-	circle: Circle,
-	"loader-circle": LoaderCircle,
-	check: Check,
-	x: X,
-	"circle-stop": CircleStop,
-	square: Square,
-	"chevron-down": ChevronDown,
-	"chevron-right": ChevronRight,
-	"rotate-cw": RotateCw,
+/** Registro nombre-lucide (kebab) → nombre codicon. `ficon` lo consulta por `name`.
+ * Fase 1 P3: migrado de lucide-react a Codicon; se conserva el tipo LucideIcon
+ * para el contrato serializado del host (web-renderer.ts). */
+const F_ICON_MAP: Record<string, string> = {
+	circle: "circle-outline",
+	"loader-circle": "loading",
+	check: "check",
+	x: "close",
+	"circle-stop": "debug-stop",
+	square: "primitive-square",
+	"chevron-down": "chevron-down",
+	"chevron-right": "chevron-right",
+	"rotate-cw": "refresh",
 };
 
 // Renderer espejo de Remote React (opción A). Recibe el árbol WebNode serializado
@@ -245,8 +236,8 @@ function renderNode(
 			// el webview es quien tiene lucide-react y materializa el SVG. `cls` se
 			// aplica como className (ej. "spinner" para rotar el loader-circle).
 			const name = typeof node.props.name === "string" ? node.props.name : "";
-			const Icon = F_ICONS[name];
-			if (!Icon) return null;
+			const codiconName = F_ICON_MAP[name];
+			if (!codiconName) return null;
 			const ip: {
 				size?: number;
 				color?: string;
@@ -262,7 +253,7 @@ function renderNode(
 					? node.props.cls
 					: "";
 			if (cls) ip.className = cls;
-			return <Icon {...ip} />;
+			return <Codicon name={codiconName} {...ip} />;
 		}
 		default:
 			return (

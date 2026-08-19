@@ -1,16 +1,7 @@
 import type { ProviderOption } from "../types";
 import { Tooltip } from "./Tooltip";
-import {
-	Brain,
-	Check,
-	Dot,
-	Image,
-	KeyRound,
-	LogIn,
-	LogOut,
-	RefreshCw,
-	X,
-} from "lucide-react";
+import { Brain } from "lucide-react"; // marca Frida, queda
+import { Codicon } from "./Codicon";
 
 /** Formatea tokens legibles: 200000 → "200K", 1000000 → "1M". */
 function fmtTokens(n: number): string {
@@ -52,7 +43,7 @@ export function ModelPanel({
 					<span>Modelos y proveedores</span>
 					<Tooltip label="Cerrar" side="top">
 						<button className="icon-btn" onClick={onClose}>
-							<X size={15} />
+							<Codicon name="close" size={15} />
 						</button>
 					</Tooltip>
 				</div>
@@ -77,7 +68,7 @@ export function ModelPanel({
 
 				{refreshing && (
 					<div className="refresh-status">
-						<RefreshCw size={12} className="spinner" /> Refrescando catálogos…
+						<Codicon name="loading" size={12} className="spinner" /> Refrescando catálogos…
 					</div>
 				)}
 				{!refreshing && refreshErrors && refreshErrors.length > 0 && (
@@ -103,7 +94,7 @@ export function ModelPanel({
 									>
 										{p.authed ? (
 											<>
-												<Check size={12} /> conectado
+												<Codicon name="check" size={12} /> conectado
 											</>
 										) : (
 											"sin conexión"
@@ -116,7 +107,7 @@ export function ModelPanel({
 													className="icon-btn"
 													onClick={() => onLogout(p.id)}
 												>
-													<LogOut size={14} />
+													<Codicon name="sign-out" size={14} />
 												</button>
 											</Tooltip>
 										) : (
@@ -125,7 +116,7 @@ export function ModelPanel({
 													className="icon-btn primary"
 													onClick={() => onLogin(p.id)}
 												>
-													<LogIn size={14} /> Iniciar sesión
+													<Codicon name="sign-in" size={14} /> Iniciar sesión
 												</button>
 											</Tooltip>
 										))}
@@ -141,7 +132,7 @@ export function ModelPanel({
 													className="icon-btn"
 													onClick={() => onSetKey(p.id)}
 												>
-													<KeyRound size={14} />
+													<Codicon name="key" size={14} />
 												</button>
 											</Tooltip>
 											{p.id === "zai" && (
@@ -153,7 +144,7 @@ export function ModelPanel({
 														className="icon-btn"
 														onClick={() => onDiscoverModels(p.id)}
 													>
-														<RefreshCw size={14} />
+														<Codicon name="refresh" size={14} />
 													</button>
 												</Tooltip>
 											)}
@@ -177,7 +168,7 @@ export function ModelPanel({
 												onClick={() => onSelect(p.id, mm.id)}
 											>
 												<span className="model-radio">
-													{selected && <Dot size={16} />}
+													{selected && <Codicon name="circle-filled" size={16} />}
 												</span>
 												<span className="model-name">{mm.name}</span>
 												{(mm.contextWindow ||
@@ -193,13 +184,13 @@ export function ModelPanel({
 														{mm.reasoning ? (
 															<>
 																{" · "}
-																<Brain size={11} /> thinking
+																<Brain size={11} /> thinking {/* marca Frida */}
 															</>
 														) : null}
 														{mm.input?.includes("image") ? (
 															<>
 																{" · "}
-																<Image size={11} />
+																<Codicon name="file-media" size={11} />
 															</>
 														) : null}
 													</span>

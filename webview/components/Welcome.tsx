@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Brain, Key, Lightbulb, RotateCw } from "lucide-react";
+import { Brain } from "lucide-react"; // marca Frida, queda
+import { Codicon } from "./Codicon";
 import logo from "../assets/frida-logo.png";
 
 // Cada característica se renderiza como JSX (no markdown) para resaltar atajos con <code>/<kbd>.
@@ -79,7 +80,7 @@ const FEATURES: Feature[] = [
 			<>
 				elige proveedor/modelo en el selector (Softtek o GitHub Copilot, con{" "}
 				<code>/login</code> para suscripciones); botón API key (
-				<Key size={12} />) para rotarla. Copia cualquier turno con su icono.{" "}
+				<Codicon name="key" size={12} />) para rotarla. Copia cualquier turno con su icono.{" "}
 				<code>/fork</code> y <code>/clone</code> bifurcan la conversación.
 			</>
 		),
@@ -154,7 +155,7 @@ export function Welcome() {
 			<div className="tip-day">
 				<div className="tip-day-label">
 					<span>
-						<Lightbulb size={12} /> Tip del día
+						<Codicon name="lightbulb" size={12} /> Tip del día
 					</span>
 					<button
 						className="tip-day-refresh"
@@ -162,7 +163,7 @@ export function Welcome() {
 						title="Ver otro tip"
 						aria-label="Ver otro tip"
 					>
-						<RotateCw size={13} />
+						<Codicon name="refresh" size={13} />
 					</button>
 				</div>
 				<p className="tip-day-body">

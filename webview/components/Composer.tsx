@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-	Maximize,
-	Minimize2,
-	ShieldCheck,
-} from "lucide-react";
+// Fase 1 P3: lucide-react eliminado (migrado a Codicon)
 import { Tooltip } from "./Tooltip";
 import { Codicon } from "./Codicon";
 import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
@@ -769,7 +765,7 @@ export function Composer({
 							else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
 						}}
 					>
-						{expanded ? <Minimize2 size={15} /> : <Maximize size={15} />}
+						{expanded ? <Codicon name="screen-normal" size={15} /> : <Codicon name="screen-full" size={15} />}
 					</button>
 				</Tooltip>
 			</div>
@@ -871,7 +867,7 @@ export function Composer({
 							className={"bar-ico mode-" + (mode ?? "manual")}
 							onClick={() => onCycleMode?.()}
 						>
-							<ShieldCheck size={15} />
+							<Codicon name="verified-filled" size={15} />
 						</button>
 					</Tooltip>
 					{busy ? (

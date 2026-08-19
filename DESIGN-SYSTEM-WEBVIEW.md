@@ -447,13 +447,13 @@ P1 = mayor impacto visual, P2 = complementa, P3 = pulido.
 | 4 | Toolbars del composer | selects + modo + enviar en `bar-controls` (ya abajo ✓) | anillo de contexto EN el ContextBar junto al % (no toolbar — decisión Edgar 2026-08-19) + popup de detalles (§5.5); mantener selects reales · **HECHO F4 2026-08-19 (ContextRing + SessionInfo)** | P2 |
 | 5 | Todo | solo filas ToolCard con status echo | widget persistente dock en input-stack (primer miembro) + filas todo FUERA del transcript (sólo widget) (§5.4) · **AMBOS movimientos AUTORIZADOS 2026-08-19 (Edgar); HECHO F5 (widget NATIVO nuevo: panel remoto TodoWebPanel desmontado por decisión del usuario)** | P2 |
 | 6 | SettingsHub | `cfg-panel` fullscreen (`inset:0`) | scrim + panel centrado radius 10, tabs subrayadas (§5.6) · **HECHO F3 2026-08-19 (+codicons, lucide 19)** | P2 |
-| 7 | SessionsPanel | overlay quickInput (ya es overlay ✓) | alinear radios/sombras/badges al sistema; mantener interacción (§5.6) | P3 |
+| 7 | SessionsPanel | overlay quickInput (ya es overlay ✓) | alinear radios/sombras/badges al sistema; mantener interacción (§5.6) · **HECHO F2 P3 (2026-08-19)** | P3 |
 | 8 | Followups | no existe | links de sugerencia sobre el input (§5.3.1) | P3 |
-| 9 | Switch knob `#fff` | hardcode | `--vscode-button-foreground` | P3 |
+| 9 | Switch knob `#fff` | hardcode | `--vscode-button-foreground` · **HECHO F3 P3 (2026-08-19)** | P3 |
 | 10 | Thinking | caja `card--thinking` con borde azul link | fila colapsable Copilot (brain azul, shimmer en vivo), misma lógica de CollapsibleCard · **HECHO F1 2026-08-19** | P2 |
 | 11 | Salidas de tool | `pre` máx 320px | codeblock bordeado máx ~13 líneas + ver-más + diff coloreado (§5.2) · **HECHO F2 2026-08-19 (output-blocks.ts TDD)** | P2 |
 | 12 | ContextBar | barra fija (identidad frida) | conservar + niveles low/mid/high por tokens · **working descartado tras F5: se encimaba con la info de contexto (revertido 2026-08-19, §10.10)** | P1 |
-| 13 | Iconografía | `lucide-react` en ~20 componentes | Codicons (`@vscode/codicons`) con wrapper `<Codicon>` (§4); marca Frida en SVG inline; migración por slices verificando `grep -rn 'from "lucide-react"' webview` → sólo decrece | P2 |
+| 13 | Iconografía | `lucide-react` en ~20 componentes | Codicons (`@vscode/codicons`) con wrapper `<Codicon>` (§4); marca Frida en SVG inline (Bot/Brain lucide quedan como excepción) · **HECHO F1 P3 (2026-08-19): 19 archivos migrados; 6 archivos conservan imports lucide SÓLO para Bot/Brain/type LucideIcon** | P2 |
 
 Notas: la **lógica de interacción ya resuelta se conserva siempre** (auto-apertura
 con umbral/parcial, prioridad del usuario, stick-to-bottom, zonas de teclado del

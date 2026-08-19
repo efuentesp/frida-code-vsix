@@ -1,5 +1,5 @@
 import type { CompactionEntry } from "../types";
-import { Archive } from "lucide-react";
+import { Codicon } from "./Codicon";
 import { SummaryCard } from "./SummaryCard";
 
 // Wrapper de SummaryCard para la compactación de contexto. Mantiene el export
@@ -11,7 +11,7 @@ export function CompactionCard({ entry }: { entry: CompactionEntry }) {
 			subtitle={`Compactado desde ${entry.tokensBefore.toLocaleString()} tokens`}
 			summary={entry.summary}
 			intro={`Compactado desde ${entry.tokensBefore.toLocaleString()} tokens`}
-			icon={<Archive size={14} />}
+			icon={<Codicon name="archive" size={14} />}
 		/>
 	);
 }

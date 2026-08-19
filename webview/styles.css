@@ -2067,7 +2067,7 @@ button.sec:hover {
 .sessions-overlay {
 	position: fixed;
 	inset: 0;
-	background: rgba(0, 0, 0, 0.5);
+	background: rgba(0, 0, 0, 0.45);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -2083,9 +2083,9 @@ button.sec:hover {
 		--vscode-quickInput-background,
 		var(--vscode-editor-background)
 	);
-	border: 1px solid var(--vscode-focusBorder);
-	border-radius: 8px;
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+	border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+	border-radius: 10px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 	overflow: hidden;
 }
 .sessions-head {
@@ -3875,7 +3875,7 @@ kbd {
 	width: 12px;
 	height: 12px;
 	border-radius: 50%;
-	background: #fff;
+	background: var(--vscode-button-foreground, #fff);
 	transition: left 0.15s ease;
 }
 .switch.on::after {

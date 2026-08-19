@@ -1,36 +1,23 @@
-import {
-	Check,
-	CheckCheck,
-	ChevronRight,
-	Circle,
-	Link,
-	Pencil,
-	Search,
-	Terminal,
-	TriangleAlert,
-	Wrench,
-	X,
-	type LucideIcon,
-} from "lucide-react";
+import { Codicon } from "./Codicon";
 
-// Iconos centralizados sobre lucide-react. Se conserva la API por nombre para no
-// tener que tocar los puntos de uso (<Icon name="check" />) al cambiar de librería.
-const ICONS: Record<string, LucideIcon> = {
-	check: Check,
-	checkcheck: CheckCheck,
-	x: X,
-	chevron: ChevronRight,
-	circle: Circle,
-	link: Link,
-	search: Search,
-	alert: TriangleAlert,
-	term: Terminal,
-	edit: Pencil,
-	wrench: Wrench,
+// Iconos centralizados (Fase 1 P3: migrado de lucide-react a Codicon). Se
+// conserva la API por nombre para no tocar los puntos de uso (<Icon name="check" />).
+const ICON_MAP: Record<string, string> = {
+	check: "check",
+	checkcheck: "pass", // o "check-all" si existe
+	x: "close",
+	chevron: "chevron-right",
+	circle: "circle-outline",
+	link: "link",
+	search: "search",
+	alert: "warning",
+	term: "terminal",
+	edit: "edit",
+	wrench: "wrench",
 };
 
 export function Icon({ name, size = 14 }: { name: string; size?: number }) {
-	const Cmp = ICONS[name];
-	if (!Cmp) return null;
-	return <Cmp size={size} className="icon" aria-hidden />;
+	const codiconName = ICON_MAP[name];
+	if (!codiconName) return null;
+	return <Codicon name={codiconName} size={size} className="icon" aria-hidden />;
 }

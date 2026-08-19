@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { WorkspaceInfo } from "../types";
 import { Tooltip } from "./Tooltip";
-import { CircleDot, Folder, GitBranch } from "lucide-react";
+import { Codicon } from "./Codicon";
 
 // Pinta la carpeta de trabajo y el branch git (con sync ↑↓ y conteo de cambios
 // +N ~N -N). Siempre visible en el footer, para saber exactamente dónde opera el
@@ -63,7 +63,7 @@ export function WorkspaceBar({
 		<div className="ws-bar">
 			<Tooltip label={ws?.cwd ?? "Carpeta de trabajo"} side="top">
 				<span className="ws-cwd">
-					<Folder size={13} />
+					<Codicon name="folder" size={13} />
 					<code>{ws ? shortCwd(ws.cwd) : "…"}</code>
 				</span>
 			</Tooltip>
@@ -100,7 +100,7 @@ export function WorkspaceBar({
 			{ws?.branch && (
 				<Tooltip label={branchTooltip(ws)} side="top">
 					<span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>
-						<GitBranch size={13} />
+						<Codicon name="git-branch" size={13} />
 						{ws.branch}
 						{/* Conteo de cambios +N ~N -N */}
 						{ws.diff &&
@@ -132,7 +132,7 @@ export function WorkspaceBar({
 						)}
 						{ws.dirty && (
 							<span className="ws-dirty">
-								<CircleDot size={12} />
+								<Codicon name="circle-filled" size={12} />
 							</span>
 						)}
 					</span>

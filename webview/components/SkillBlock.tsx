@@ -4,7 +4,7 @@
 // expande bajo clic para no inundar el transcript con el SKILL.md completo.
 
 import { useState } from "react";
-import { GraduationCap, Copy, Check } from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { SkillBlock } from "../skill-block";
 import { Markdown } from "./Markdown";
 import { Icon } from "./Icon";
@@ -41,7 +41,7 @@ export function SkillBlockCard({
 				onClick={() => setOpen((v) => !v)}
 				title={open ? "Contraer skill" : "Expandir skill"}
 			>
-				<GraduationCap
+				<Codicon name="mortar-board"
 					size={13}
 					className={"skill-icon" + (live ? " live" : "")}
 				/>
@@ -68,7 +68,7 @@ export function SkillBlockCard({
 								onClick={copy}
 								title={cmd}
 							>
-								{copied ? <Check size={12} /> : <Copy size={12} />}
+								{copied ? <Codicon name="check" size={12} /> : <Codicon name="copy" size={12} />}
 								{copied ? "Copiado" : `Copiar /skill:${block.name}`}
 							</button>
 						</div>

@@ -1,6 +1,7 @@
 import type { Turn } from "../types";
 import { useEffect, useState } from "react";
-import { Bot, Brain, Copy, TriangleAlert, UserRound } from "lucide-react";
+import { Bot, Brain } from "lucide-react"; // marca Frida, quedan
+import { Codicon } from "./Codicon";
 import { Markdown } from "./Markdown";
 import { ToolCard, fmtDuration, estimateTokens, fmtTok } from "./ToolCard";
 import { ToolGroup } from "./ToolGroup";
@@ -44,7 +45,7 @@ export function TurnView({
 		<div className="turn">
 			<div className="row">
 				<span className="avatar user">
-					<UserRound size={15} />
+					<Codicon name="account" size={15} />
 				</span>
 				<div className="body">
 					<div className="who">Tú</div>
@@ -87,7 +88,7 @@ export function TurnView({
 									title="Copiar respuesta"
 									onClick={() => onCopy(assistantText)}
 								>
-									<Copy size={12} />
+									<Codicon name="copy" size={12} />
 								</button>
 							)}
 						</div>
@@ -168,7 +169,7 @@ export function TurnView({
 						{turn.bash && <BashCard run={turn.bash} />}
 						{turn.error && (
 							<div className="err">
-								<TriangleAlert size={12} /> {turn.error}
+								<Codicon name="warning" size={12} /> {turn.error}
 							</div>
 						)}
 					</div>
