@@ -12,9 +12,16 @@ import {
 import { dbg } from "./runtime";
 import type { FridaEnvVars } from "./oauth";
 
-/** Rango de clase para ordenar bloques: grande(0) → mediano(1) → compacto(2). */
+/** Rango de clase para ordenar bloques: grande(0) → mediano(1) → compacto(2).
+ *  Basado en ID (estable) en vez de contextWindow (ahora clampeado a 200k —
+ *  DEMETER-BLOOM/TITAN-CROWN/model-router quedarían todos "mediano" si
+ *  clasificáramos por contexto numérico). */
 function classRank(id: string, contextWindow: number): number {
 	if (id === "model-router") return 3;
+	if (id === "DEMETER-BLOOM") return 0; // grande (gateway anuncia 1M)
+	if (id === "TITAN-CROWN") return 1; // mediano (gateway anuncia 400k)
+	if (id === "MIDAS-GOLD") return 2; // compacto (128k)
+	// Fallback genérico por contexto (para futuros modelos):
 	if (contextWindow >= 1_000_000) return 0;
 	if (contextWindow >= 200_000) return 1;
 	return 2;
@@ -143,26 +150,30 @@ export async function fetchFridaEnterpriseModels(
  *  MODEL1..4 (AEOLUS/NIKE/TIRESIAS/SELENE) hacía ver modelos viejos que
  *  ya no deben aparecer. Metadatos medidos en la matriz live (ctx real del
  *  gateway; todos razonan vía /v1/responses, reporte-reasoning.md). Vacío
- *  sin envVars (pre-login no hay nada conocido). */
+ *  sin envVars (pre-login no hay nada conocido).
+ *  Los valores de contextWindow están clampeados a EFFECTIVE_CONTEXT_CEILING
+ *  (200k) para coincidir con el clamp de toProviderModel — el gateway anuncia
+ *  1M/400k pero el upstream Anthropic rechaza prompts >200k con 400
+ *  (incidente 2025-08-19). */
 const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 	{
 		id: "DEMETER-BLOOM",
-		name: "⭐ DEMETER-BLOOM (responses, grande 1M)",
+		name: "⭐ DEMETER-BLOOM (responses, grande 200k)",
 		api: "openai-responses",
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 1_000_000,
+		contextWindow: 200_000, // clamp: gateway anuncia 1M, upstream acepta 200k
 		maxTokens: 128_000,
 	},
 	{
 		id: "TITAN-CROWN",
-		name: "⭐ TITAN-CROWN (responses, mediano 400k)",
+		name: "⭐ TITAN-CROWN (responses, mediano 200k)",
 		api: "openai-responses",
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 400_000,
+		contextWindow: 200_000, // clamp: gateway anuncia 400k, upstream acepta 200k
 		maxTokens: 128_000,
 	},
 	{
@@ -172,7 +183,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 128_000,
+		contextWindow: 128_000, // sin clamp: ya está por debajo del ceiling
 		maxTokens: 128_000,
 	},
 	{
@@ -182,7 +193,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 1_000_000,
+		contextWindow: 200_000, // clamp: gateway anuncia 1M, upstream acepta 200k
 		maxTokens: 128_000,
 	},
 ];

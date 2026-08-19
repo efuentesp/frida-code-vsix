@@ -298,6 +298,18 @@ export interface FridaEnterpriseModelConfig {
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
 export const DEFAULT_MAX_TOKENS = 128_000;
 
+/** Tope EFECTIVO de contexto del gateway: los upstream (Anthropic…)
+ *  rechazan prompts >200k tokens aunque el gateway anuncie 1M/400k.
+ *  Incidente verificado: 2025-08-19 (400 "prompt is too long: 215974 > 200000").
+ *  Sin clamp, el editor no compacta a tiempo y las sesiones mueren con 400.
+ *  Remover cuando Frida Platform corrija el upstream para honrar 1M.
+ *  (Refs: pi-frida-enterprise/adapter.ts L45-50, VALIDACION-E2E.md). */
+export const EFFECTIVE_CONTEXT_CEILING = 200_000;
+
+function clampContextWindow(announced: number): number {
+	return Math.min(announced, EFFECTIVE_CONTEXT_CEILING);
+}
+
 /** Entrada cruda de /v1/models → ProviderModelConfig listo para pi-ai, con
  *  baseUrl = raíz + "/v1" (Errata-4). Devuelve undefined para modelos que
  *  no sirven por chat/completions (se filtran del catálogo). */
@@ -345,13 +357,19 @@ export function toProviderModel(
 		: [];
 	if (!caps.includes("chat")) return undefined;
 	const api = apiForCapabilities(caps)!;
-	const contextWindow =
+	// #clamp-200k: separamos el valor ANUNCIADO del EFECTIVO. El tier
+	// (grande/mediano/compacto) se clasifica por el anunciado — el gateway
+	// sigue distinguiendo sus modelos por 1M/400k/128k — pero el contexto
+	// EFECTIVO (lo que ve pi-ai para compactar y lo que muestra el statusbar)
+	// queda clampeado a 200k: el upstream Anthropic rechaza >200k (400).
+	const announced =
 		typeof (raw as any).context_window_tokens === "number"
 			? (raw as any).context_window_tokens
 			: DEFAULT_CONTEXT_WINDOW;
+	const contextWindow = clampContextWindow(announced);
 	// Anotaciones del selector: capability responses + clase de tamaño
-	// (grande/mediano/compacto/meta) con contexto humano.
-	const klass = modelClass(raw.id, contextWindow);
+	// (grande/mediano/compacto/meta) con contexto humano EFECTIVO.
+	const klass = modelClass(raw.id, announced);
 	const tags: string[] = [];
 	if (caps.includes("responses")) tags.push("responses");
 	tags.push(

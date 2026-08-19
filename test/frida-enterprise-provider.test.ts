@@ -2,7 +2,7 @@
 // flujo OAuth/login con fetch global mockeado. Los endpoints reales no se tocan
 // aquí (la prueba de integración es el VSIX auto-modificado contra el SSO real).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
 	makePkcePair,
 	parseCallbackInput,
@@ -105,8 +105,8 @@ describe("buildFallbackCatalog (F3-d: offline muestra SÓLO los ⭐ medidos)", (
 				"model-router",
 			]);
 			expect(cat.map((m) => m.name)).toEqual([
-				"\u2b50 DEMETER-BLOOM (responses, grande 1M)",
-				"\u2b50 TITAN-CROWN (responses, mediano 400k)",
+				"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
+				"\u2b50 TITAN-CROWN (responses, mediano 200k)",
 				"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
 				"model-router (responses, meta)",
 			]);
@@ -197,7 +197,10 @@ describe("fetchFridaEnterpriseModels", () => {
 			expect(models[0]).toMatchObject({
 				id: "DEMETER-BLOOM",
 				reasoning: true,
-				contextWindow: 1000000,
+				// clamp-200k: el gateway anuncia 1M pero el contexto EFECTIVO es 200k
+				// (upstream Anthropic rechaza >200k con 400 — incidente 2025-08-19).
+				// El tier del NOMBRE sigue siendo "grande" (clasificado por el anunciado).
+				contextWindow: 200000,
 				maxTokens: 128000,
 			});
 			expect(models[1]).toMatchObject({
@@ -241,8 +244,8 @@ describe("fetchFridaEnterpriseModels", () => {
 			);
 			// Contenido EXACTO del combo: 4 options en orden grande→mediano→compacto→meta
 			expect(models.map((m) => m.name)).toEqual([
-				"\u2b50 DEMETER-BLOOM (responses, grande 1M)",
-				"\u2b50 TITAN-CROWN (responses, mediano 400k)",
+				"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
+				"\u2b50 TITAN-CROWN (responses, mediano 200k)",
 				"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
 				"model-router (meta)",
 			]);
@@ -277,8 +280,8 @@ describe("fetchFridaEnterpriseModels", () => {
 			]);
 			// y los badges quedan visibles en el nombre
 			expect(models.map((m) => m.name)).toEqual([
-				"\u2b50 DEMETER-BLOOM (responses, grande 1M)",
-				"\u2b50 TITAN-CROWN (responses, mediano 400k)",
+				"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
+				"\u2b50 TITAN-CROWN (responses, mediano 200k)",
 				"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
 				"model-router (meta)",
 			]);
@@ -312,11 +315,52 @@ describe("fetchFridaEnterpriseModels", () => {
 			// (GAIA-FLARE, SELENE-CIPHER, PUCK-SWIFT, NIKE-VICTORY) no llegan
 			// al combo aunque estén en VERIFIED (F3-c).
 			expect(models.map((m) => m.name)).toEqual([
-				"\u2b50 DEMETER-BLOOM (responses, grande 1M)",
-				"\u2b50 TITAN-CROWN (responses, mediano 400k)",
+				"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
+				"\u2b50 TITAN-CROWN (responses, mediano 200k)",
 				"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
 				"model-router (meta)",
 			]);
+		} finally {
+			globalThis.fetch = orig;
+		}
+	});
+
+	it("clamp-200k: el contexto EFECTIVO se clampa aunque el gateway anuncie 1M/400k (incidente 2025-08-19)", async () => {
+		// El gateway anuncia context_window_tokens 1M/400k/262k pero el upstream
+		// Anthropic RECHAZA prompts >200k con 400 "prompt is too long". Sin clamp,
+		// el IDE cree que hay margen, no compacta a tiempo y la sesión muere con
+		// 400. Con clamp: el statusbar muestra 200k y pi-ai compacta a tiempo.
+		// El tier del NOMBRE sigue clasificándose por el anunciado (grande/mediano).
+		const orig = globalThis.fetch;
+		(globalThis as any).fetch = async () =>
+			new Response(
+				JSON.stringify({
+				data: [
+					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
+					{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 },
+					{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 },
+					{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 },
+				],
+				}),
+				{ status: 200 },
+			);
+		try {
+			const models = await fetchFridaEnterpriseModels(
+				"https://gateway.example/",
+				"IDTOKEN",
+			);
+			const byId = new Map(models.map((m) => [m.id, m]));
+			// 1M anunciado → 200k efectivo
+			expect(byId.get("DEMETER-BLOOM")?.contextWindow).toBe(200000);
+			// 400k anunciado → 200k efectivo
+			expect(byId.get("TITAN-CROWN")?.contextWindow).toBe(200000);
+			// 128k anunciado (bajo el ceiling) → 128k intacto
+			expect(byId.get("MIDAS-GOLD")?.contextWindow).toBe(128000);
+			// 1M anunciado (meta) → 200k efectivo
+			expect(byId.get("model-router")?.contextWindow).toBe(200000);
+			// El tier del nombre sigue clasificado por el ANUNCIADO
+			expect(byId.get("DEMETER-BLOOM")?.name).toContain("grande");
+			expect(byId.get("TITAN-CROWN")?.name).toContain("mediano");
 		} finally {
 			globalThis.fetch = orig;
 		}

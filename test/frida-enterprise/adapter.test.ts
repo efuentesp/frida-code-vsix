@@ -150,7 +150,7 @@ describe("buildFridaPayload: role developer → system (Errata-8)", () => {
 			],
 		};
 		const frozen = JSON.parse(JSON.stringify(input));
-		const out = buildFridaPayload(input, identity);
+		const out = buildFridaPayload(input, identity) as typeof input;
 		expect(out.messages[0].role).toBe("system");
 		expect(out.messages[0].content).toBe("Eres frida code…");
 		expect(out.messages[1].role).toBe("user");
@@ -163,8 +163,10 @@ describe("buildFridaPayload: role developer → system (Errata-8)", () => {
 			{ role: "assistant", content: "b" },
 			{ role: "tool", tool_call_id: "c1", content: "r" },
 		];
-		const out = buildFridaPayload({ model: "M", messages }, identity);
-		expect(out.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "tool"]);
+		const out = buildFridaPayload({ model: "M", messages }, identity) as {
+			messages: typeof messages;
+		};
+		expect(out.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool"]);
 		expect(out.messages[2]).toBe(messages[2]); // misma referencia si no cambia
 	});
 
@@ -205,7 +207,9 @@ describe("toProviderModel", () => {
 		expect(m).toMatchObject({
 			id: "model-a",
 			reasoning: true,
-			contextWindow: 256000,
+			// clamp-200k: 256k anunciado → 200k efectivo (upstream Anthropic
+			// rechaza >200k; incidente 2025-08-19)
+			contextWindow: 200000,
 			maxTokens: 65536,
 			baseUrl: "https://gw.example/v1",
 		});
@@ -213,32 +217,33 @@ describe("toProviderModel", () => {
 
 	it("anota la CLASE de tamaño en el nombre (grande/mediano/compacto/meta)", () => {
 		const root = "https://gw.example";
-		// 1M+ → grande (con ctx humano)
+		// 1M+ → grande (con ctx humano EFECTIVO — el tier se clasifica por el
+		// anunciado pero el número mostrado es el clampeado a 200k)
 		expect(
 			toProviderModel(
 				{ id: "M1", capabilities: ["chat"], context_window_tokens: 1000000 },
 				root,
 			)?.name,
-		).toBe("M1 (grande 1M)");
+		).toBe("M1 (grande 200k)");
 		expect(
 			toProviderModel(
 				{ id: "M2", capabilities: ["chat"], context_window_tokens: 1050000 },
 				root,
 			)?.name,
-		).toBe("M2 (grande 1.1M)");
+		).toBe("M2 (grande 200k)");
 		// 200k..1M → mediano
 		expect(
 			toProviderModel(
 				{ id: "M3", capabilities: ["chat"], context_window_tokens: 262144 },
 				root,
 			)?.name,
-		).toBe("M3 (mediano 262k)");
+		).toBe("M3 (mediano 200k)");
 		expect(
 			toProviderModel(
 				{ id: "M4", capabilities: ["chat"], context_window_tokens: 400000 },
 				root,
 			)?.name,
-		).toBe("M4 (mediano 400k)");
+		).toBe("M4 (mediano 200k)");
 		// < 200k → compacto
 		expect(
 			toProviderModel(
@@ -283,13 +288,13 @@ describe("toProviderModel", () => {
 				{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
 				root,
 			)?.name,
-		).toBe("\u2b50 DEMETER-BLOOM (responses, grande 1M)");
+		).toBe("⭐ DEMETER-BLOOM (responses, grande 200k)");
 		expect(
 			toProviderModel(
 				{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 },
 				root,
 			)?.name,
-		).toBe("\u2b50 TITAN-CROWN (responses, mediano 400k)");
+		).toBe("⭐ TITAN-CROWN (responses, mediano 200k)");
 	});
 
 	it("chat+responses anota '(responses, …)' combinado con la clase", () => {
