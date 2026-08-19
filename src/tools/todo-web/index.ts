@@ -158,16 +158,24 @@ export function createTodoWeb() {
 	};
 }
 
-/** Monta (o re-monta) el panel si el ctx trae UI con fridaWebMount. */
+/** Monta (o re-monta) el panel si el ctx trae UI con fridaWebMount.
+ * F5 P2 (2026-08-19, AUTORIZADO): el webview ahora tiene un widget nativo
+ * (TodoWidget en el input-stack, webview/todo-state.ts) y NO renderiza filas
+ * todo en el transcript — este panel remoto NO se monta para no duplicar la
+ * superficie. El store reactivo de acá sigue siendo la fuente del tool; sólo
+ * se apaga la UI remota. Para revertir: restaurar el return de abajo. */
 function mountPanel(
 	ctx: { hasUI: boolean; ui: unknown },
 	current: { unmount: () => void } | undefined,
 ): { unmount: () => void } | undefined {
+	current?.unmount();
+	// F5 P2: NO montar (ver comentario de la función). Flag de un solo uso
+	// para revertir sin buscar historial: TODO_REMOTE_PANEL=false.
+	const TODO_REMOTE_PANEL = false;
+	if (!TODO_REMOTE_PANEL) return undefined;
 	if (!ctx.hasUI) return current;
 	const ui = ctx.ui as unknown as Partial<FridaWebMountUI>;
-	if (typeof ui?.fridaWebMount !== "function") return current;
-	current?.unmount();
-	// "footer": el panel vive en el footer del webview (entre proc-bar y Composer),
-	// no como overlay en el cuerpo (que es para diálogos efímeros como ask_user_question).
-	return ui.fridaWebMount(() => createTodoWebPanelElement(), "footer");
+	const mount = ui?.fridaWebMount;
+	if (typeof mount !== "function") return current;
+	return mount(() => createTodoWebPanelElement(), "footer");
 }

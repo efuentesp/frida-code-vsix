@@ -7,7 +7,6 @@ import { ToolGroup } from "./ToolGroup";
 import { toolRuns } from "../group-stats";
 import { BashCard } from "./BashCard";
 import { CollapsibleCard } from "./CollapsibleCard";
-import { Icon } from "./Icon";
 import { Spinner } from "./Spinner";
 import { parseSkillBlock } from "../skill-block";
 import { SkillBlockCard } from "./SkillBlock";
@@ -93,19 +92,26 @@ export function TurnView({
 							)}
 						</div>
 						{(() => {
+							// F5 P2 (AUTORIZADO): el tool `todo` NO se renderiza en el
+							// transcript — el widget del input-stack es su única superficie.
+							// Se filtra ANTES de toolRuns para que los conteos de los grupos
+							// no cuenten filas invisibles.
+							const segs = turn.segments.filter(
+								(s) => !(s.kind === "tool" && s.tool === "todo"),
+							);
 							// Agrupación por corridas contiguas (Fase 3 P1): turnos COMPLETADOS
 							// envuelven sus corridas de tools en <ToolGroup> (colapsado por
 							// defecto, autorizado 2026-08-19); turno en vivo → toolRuns() = [] →
 							// filas sueltas (regla §5.0.2). La cronología texto⇄tools se preserva:
 							// sólo las corridas contiguas se agrupan.
-							const runs = toolRuns(turn);
+							const runs = toolRuns({ status: turn.status, segments: segs });
 							let runIdx = 0; // índice de la corrida actual (para memKey y corte)
-							return turn.segments.map((s, i) => {
+							return segs.map((s, i) => {
 								// ¿inicia una corrida agrupada? → pintar el grupo con TODO su rango
 								const run = runs.find((r) => r.startIndex === i);
 								if (run && run.count > 1) {
 									const memKey = { turnId: turn.id, run: runIdx++ };
-									const inner = turn.segments
+									const inner = segs
 										.slice(run.startIndex, run.endIndex + 1)
 										.map((ts, j) =>
 											ts.kind === "tool" ? (
@@ -208,26 +214,31 @@ function ThinkingSegment({
 			running={isLive}
 			hasPartial={!!text}
 			hasContent={!!text}
-			variant="thinking"
+			variant="flat"
+			className="thinking-row"
 			icon={<Brain size={13} />}
-			iconLive={isLive}
-			leading={<span className="card-title">Razonamiento</span>}
+			leading={
+				<>
+					{isLive ? (
+						// en vivo: shimmer del verbo (§5.2); el Brain azul queda fijo a la izq
+						<span className="card-title">
+							<span className="tc-shimmer-verb">Razonando…</span>
+						</span>
+					) : (
+						// completado: pasado + detalle tabular en el subtítulo (patrón fila tool)
+						<span className="card-title">Razonó {fmtDuration(elapsed)}</span>
+					)}
+					{!isLive && (ctxStr || llmStr) ? (
+						<span className="card-sub">
+							{[ctxStr, llmStr].filter(Boolean).join("").replace(/^ · /, "")}
+						</span>
+					) : null}
+				</>
+			}
 			status={
-				hasTimer ? (
-					<span className={"card-status " + (isLive ? "running" : "done")}>
-						{isLive ? (
-							<>
-								<Spinner size={13} /> {fmtDuration(elapsed)}
-								{ctxStr}
-								{llmStr}
-							</>
-						) : (
-							<>
-								<Icon name="check" size={13} /> {fmtDuration(elapsed)}
-								{ctxStr}
-								{llmStr}
-							</>
-						)}
+				hasTimer && isLive ? (
+					<span className="card-status running">
+						<Spinner size={13} /> {fmtDuration(elapsed)}
 					</span>
 				) : null
 			}

@@ -1,4 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import {
+	buildOutputBlocks,
+	type OutputBlock,
+} from "../output-blocks";
 import type { SubagentProgressDetails, ToolEntry, ToolState } from "../types";
 import { Icon } from "./Icon";
 import { Markdown } from "./Markdown";
@@ -81,78 +85,57 @@ function renderSubagentLive(d: SubagentProgressDetails) {
 }
 
 // Render del resultado según el tipo de tool (estilo TUI: diff, código, terminal).
+// F2 P2: diff/terminal/code pasan por output-blocks (clamp 13 + ver-más);
+// los tools de prosa markdown (read/write/agent/web) conservan su render rico.
 function renderResult(entry: ToolEntry) {
-	if (entry.diff) {
-		const lines = entry.diff.split("\n");
-		return (
-			<pre className="diff-out">
-				{lines.map((ln, i) => {
-					const cls = ln.startsWith("+")
-						? "add"
-						: ln.startsWith("-")
-							? "del"
-							: "ctx";
-					return (
-						<span key={i} className={"diff-line " + cls}>
-							{ln || " "}
-						</span>
-					);
-				})}
-			</pre>
-		);
+	// tools de prosa markdown: render rico SIN clamp de líneas (§5.2: el clamp
+	// es para salidas de código/log; la prosa se lee completa con scroll suave)
+	if (!entry.diff && entry.result?.trim()) {
+		if (entry.tool === "read" || entry.tool === "write") {
+			const path = String((entry.args as any)?.path ?? "");
+			const ext = (path.split(".").pop() || "").toLowerCase();
+			const fence = "```";
+			return (
+				<div className="tool-result md">
+					<Markdown>{`${fence}${ext}\n${entry.result}\n${fence}`}</Markdown>
+				</div>
+			);
+		}
+		if (entry.tool === "agent") {
+			return (
+				<div className="tool-result md">
+					<Markdown>{entry.result}</Markdown>
+				</div>
+			);
+		}
+		if (entry.tool === "get_subagent_result") {
+			const md = entry.result
+				.replace(/^Agente: /m, "**Agente:** ")
+				.replace(/^Estado: /m, "**Estado:** ")
+				.replace(/^Resultado: /m, "\n")
+				.replace(/^Error: /m, "\n> **Error:** ");
+			return (
+				<div className="tool-result md">
+					<Markdown>{md}</Markdown>
+				</div>
+			);
+		}
+		if (
+				entry.tool === "web_fetch_md" ||
+			entry.tool === "web_docs_search" ||
+			entry.tool === "web_docs_fetch"
+		) {
+			return (
+				<div className="tool-result md">
+					<Markdown>{entry.result}</Markdown>
+				</div>
+			);
+		}
 	}
-	if (!entry.result?.trim()) return null;
-	// read/write → bloque de código con resaltado según extensión.
-	if (entry.tool === "read" || entry.tool === "write") {
-		const path = String((entry.args as any)?.path ?? "");
-		const ext = (path.split(".").pop() || "").toLowerCase();
-		const fence = "```";
-		return (
-			<div className="tool-result md">
-				<Markdown>{`${fence}${ext}\n${entry.result}\n${fence}`}</Markdown>
-			</div>
-		);
-	}
-	// agent → resultado markdown del sub-agente (su resumen final; en background
-	// es un mensaje de estado, que también renderiza bien como párrafo).
-	if (entry.tool === "agent") {
-		return (
-			<div className="tool-result md">
-				<Markdown>{entry.result}</Markdown>
-			</div>
-		);
-	}
-	// get_subagent_result → metadatos (Agente:/Estado:/Error:) + contenido markdown
-	// del sub-agente tras "Resultado:". Se formatea: etiquetas en negrita y el
-	// contenido libre (tras una línea en blanco) para que encabezados/listas
-	// rendericen (sin esto, "Resultado: ## X" no se parsea como encabezado).
-	if (entry.tool === "get_subagent_result") {
-		const md = entry.result
-			.replace(/^Agente: /m, "**Agente:** ")
-			.replace(/^Estado: /m, "**Estado:** ")
-			.replace(/^Resultado: /m, "\n")
-			.replace(/^Error: /m, "\n> **Error:** ");
-		return (
-			<div className="tool-result md">
-				<Markdown>{md}</Markdown>
-			</div>
-		);
-	}
-	// frida-supi-web: web_fetch_md / web_docs_search / web_docs_fetch devuelven
-	// Markdown (la página convertida o la tabla de Context7). Renderizar como tal.
-	if (
-		entry.tool === "web_fetch_md" ||
-		entry.tool === "web_docs_search" ||
-		entry.tool === "web_docs_fetch"
-	) {
-		return (
-			<div className="tool-result md">
-				<Markdown>{entry.result}</Markdown>
-			</div>
-		);
-	}
-	// bash / grep / default → terminal plano.
-	return <pre className="tool-result">{entry.result}</pre>;
+	// diff / terminal / code genérico → bloques clampados (13 líneas + ver más)
+	const blocks = buildOutputBlocks(entry);
+	if (blocks.length > 0) return <BlocksView blocks={blocks} />;
+	return null;
 }
 
 /** Construye el cuerpo (children) de la tarjeta según el estado de la tool:
@@ -164,6 +147,86 @@ function renderResult(entry: ToolEntry) {
 // ---- Secciones Entrada / Salida ------------------------------------------
 // Cada tarjeta se divide en dos secciones claras: qué se solicitó (args) y
 // qué se devolvió (result/diff). Reutilizamos renderResult para la Salida.
+
+/** Vista de un bloque clampado con «ver más» (F2 P2, §5.2): muestra las
+ *  primeras líneas (fade inferior) y expande al click. El fade desaparece
+ *  expandido; reduced-motion lo mantiene estático (es decorativo). */
+function ClampedLines({
+	lines,
+	total,
+	render,
+}: {
+	lines: string[];
+	total: number;
+	render: (lines: string[] | undefined) => ReactNode; // undefined = expandido
+}) {
+	const [expanded, setExpanded] = useState(false);
+	const more = total > lines.length;
+	return (
+		<div className={"tc-clamp" + (expanded ? " open" : "")}>
+			{render(expanded ? undefined : lines)}
+			{more ? (
+				<button
+					type="button"
+					className="tc-more"
+					onClick={() => setExpanded((v) => !v)}
+				>
+					{expanded
+						? "Ver menos"
+						: `Ver más (${total - lines.length} líneas)`}
+				</button>
+			) : null}
+		</div>
+	);
+}
+
+/** Render de bloques output-blocks (code/diff/terminal) con clamp §5.2. */
+function BlocksView({ blocks }: { blocks: OutputBlock[] }) {
+	return (
+		<>
+			{blocks.map((b, i) => (
+				<ClampedLines
+					key={i}
+					lines={b.lines}
+					total={b.totalLines}
+					render={(visible: string[] | undefined) => {
+						const shown = visible ?? b.full; // undefined = expandido (todas)
+						if (b.kind === "diff") {
+							return (
+								<pre className="diff-out tc-block">
+									{shown.map((ln, j) => {
+										const cls = ln.startsWith("+")
+											? "add"
+											: ln.startsWith("-")
+												? "del"
+												: "ctx";
+										return (
+											<span key={j} className={"diff-line " + cls}>
+												{ln || " "}
+											</span>
+										);
+									})}
+								</pre>
+								);
+							}
+							if (b.kind === "terminal") {
+								return (
+									<pre className="tool-result tc-block tc-terminal">
+										{shown.join("\n")}
+								</pre>
+								);
+							}
+							return (
+								<pre className="tool-result tc-block tc-code">
+									{shown.join("\n")}
+							</pre>
+							);
+						}}
+				/>
+			))}
+		</>
+	);
+}
 
 function ToolSection({
 	label,

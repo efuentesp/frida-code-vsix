@@ -289,6 +289,7 @@ body {
 	}
 }
 .status-bar {
+	position: relative; /* ancla del popup session-info (F4 P2) */
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -626,37 +627,23 @@ body {
 	opacity: 1 !important;
 	color: var(--vscode-foreground);
 }
-/* Variante thinking (Razonamiento): borde azul textLink en los 4 lados + fondo
-   blockquote, conservando el look del antiguo <details class="thinking">. El
-   Brain late vía .card-icon.live (→ thinkingPulse de abajo). Hereda de
-   CollapsibleCard el auto-expand mientras razona, el stick-to-bottom y la altura
-   limitada del cuerpo. */
-.card--thinking {
-	border: 1px solid var(--vscode-textLink-foreground, #4daafc);
-	background: var(
-		--vscode-textBlockQuote-background,
-		rgba(127, 127, 127, 0.06)
-	);
-	font-size: 12px;
-}
-.card--thinking .card-icon {
+/* ── Thinking fila plana (Fase 1 P2, §5.2): reemplaza a .card--thinking.
+   Brain azul fijo a la izquierda (marca), shimmer del verbo en vivo, pasado
+   + subtítulo tabular al completar. MISMO CollapsibleCard (auto-apertura,
+   stick-to-bottom, prioridad manual). */
+.card--flat.thinking-row .card-icon {
 	color: var(--vscode-textLink-foreground, #4daafc);
+	opacity: 0.9;
 }
-.card--thinking .card-title {
-	color: var(--vscode-foreground);
+.card--flat.thinking-row .card-icon.live {
+	opacity: 0.9; /* no se oculta como en las tools: el Brain es identidad */
+	animation: none;
 }
-.card--thinking .card-status.running {
-	color: var(--vscode-textLink-foreground, #4daafc);
-}
-.card--thinking .card-status.done {
-	color: var(--vscode-descriptionForeground);
-}
-.card--thinking .card-body {
-	border-top: none;
-	padding: 2px 10px 8px;
-	font-size: 12px;
+.card--flat.thinking-row .card-body {
+	padding: 0 8px 4px 22px; /* alineado bajo el Brain */
 	opacity: 0.85;
 }
+
 /* Brain "vivo" mientras el modelo razona en vivo (o un tool se ejecuta): latido
    con escala + brillo del color de acento. Lo reutiliza .card-icon.live (tanto
    el Brain del Razonamiento como el icono de un tool en ejecución). Respeta
@@ -3795,13 +3782,26 @@ kbd {
 }
 
 /* Vista de Configuración (toggles de tools). */
-.cfg-panel {
+/* ── SettingsHub overlay (F3 P2, §5.6): scrim + panel centrado ── */
+.cfg-overlay {
 	position: absolute;
 	inset: 0;
 	z-index: 80;
 	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.45);
+}
+.cfg-panel {
+	display: flex;
 	flex-direction: column;
-	background: var(--vscode-sideBar-background);
+	width: min(540px, calc(100% - 32px));
+	max-height: min(560px, 80vh);
+	border-radius: 10px;
+	border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+	background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+	overflow: hidden;
 }
 .cfg-head {
 	display: flex;
@@ -4246,8 +4246,8 @@ kbd {
 }
 .cfg-tab.active {
 	background: none;
-	color: var(--vscode-textLink-foreground, #4daafc);
-	border-bottom-color: var(--vscode-textLink-foreground, #4daafc);
+	color: var(--vscode-foreground);
+	border-bottom-color: var(--vscode-focusBorder, #4daafc);
 }
 .cfg-stub {
 	font-size: 12px;
@@ -4723,13 +4723,22 @@ kbd {
    pero el proveedor no envió el resumen (sin tarjeta thinking). Línea sutil
    bajo la respuesta; no es contenido sensible, es un contador de uso. */
 .reasoning-hint {
+	/* F1-P2: fila tenue alineada con la fila thinking-flat (sin borde, misma
+	   tipografía); Brain azul apagado como identidad. */
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	margin: 2px 0 6px;
+	margin: 2px 0 2px 2px;
+	padding: 0 6px 0 2px;
 	font-size: 11px;
-	opacity: 0.65;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.75;
 	font-style: italic;
+}
+.reasoning-hint svg {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	opacity: 0.6;
 }
 
 /* =====================================================================
@@ -4997,4 +5006,282 @@ kbd {
 		animation: none;
 		opacity: 0.5;
 	}
+}
+
+/* ── Salidas de tool: codeblock Copilot (Fase 2 P2, §5.2) ──────────────
+   output-blocks.ts clasifica code/diff/terminal; aquí el skin: bloque
+   bordeado, clamp 13 líneas con fade inferior, «ver más» discreto y fondo
+   de terminal para bash. La prosa markdown conserva su scroll propio. */
+.tc-clamp {
+	position: relative;
+}
+.tc-block {
+	border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+	border-radius: 4px;
+	background: var(--vscode-editor-background);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.tc-block.diff-out,
+.diff-out.tc-block {
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+	border-radius: 4px;
+}
+.tc-terminal {
+	background: var(--vscode-terminal-background, var(--vscode-editor-background));
+}
+/* fade inferior sólo cuando hay más contenido (clamped, no expandido) */
+.tc-clamp:not(.open)::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 22px;
+	height: 26px;
+	background: linear-gradient(
+		to bottom,
+		transparent,
+		var(--vscode-editor-background)
+	);
+	pointer-events: none;
+}
+/* botón «ver más»: texto discreto, no caja */
+.tc-more {
+	margin-top: 4px;
+	padding: 1px 6px;
+	font-size: 11px;
+	color: var(--vscode-textLink-foreground);
+	background: none;
+	border: none;
+	cursor: pointer;
+	border-radius: 4px;
+}
+.tc-more:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+/* el cuerpo de la fila flat ya no necesita el tope genérico: el contenido se
+   auto-limita por bloques (13 líneas) o por el md propio */
+.card--flat .card-body {
+	max-height: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	/* el fade es estático (gradiente), no animación: sin cambios */
+}
+
+/* ── Anillo de contexto + Session Info (F4 P2, §5.5 AUTORIZADA) ────────
+   El anillo vive EN el ContextBar junto al % (decisión Edgar 2026-08-19).
+   Botón 18×18 con SVG 14: fondo descriptionForeground op .5 + arco por
+   nivel (normal/warning≥70/error≥90), mismo semáforo del strip. */
+.ctx-ring {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: none;
+	cursor: pointer;
+	color: var(--vscode-icon-foreground);
+}
+.ctx-ring:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.ctx-ring:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+.ctx-ring .progress-bg {
+	fill: none;
+	stroke: var(--vscode-descriptionForeground);
+	stroke-width: 2;
+	opacity: 0.5;
+}
+.ctx-ring .progress-arc {
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	transform: rotate(-90deg);
+	transform-origin: center;
+	transition: stroke-dasharray 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.ctx-ring.warning .progress-arc {
+	stroke: var(--vscode-editorWarning-foreground, #cca700);
+}
+.ctx-ring.error .progress-arc {
+	stroke: var(--vscode-errorForeground);
+}
+
+/* Popup Session Info: editorWidget radius 8, anclado arriba del strip */
+.session-info {
+	position: absolute;
+	right: 10px;
+	bottom: calc(100% + 6px);
+	z-index: 60;
+	min-width: 240px;
+	max-width: 300px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-input-border, rgba(127, 127, 127, 0.35));
+	background: var(
+		--vscode-editorWidget-background,
+		var(--vscode-sideBar-background)
+	);
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+	font-size: 11px;
+}
+.si-title {
+	font-size: 12px;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+.si-cost {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--vscode-textLink-foreground);
+	margin-bottom: 6px;
+}
+.si-usage-bar {
+	position: relative;
+	display: flex;
+	height: 4px;
+	border-radius: 2px;
+	overflow: hidden;
+	background: var(--vscode-inputOption-activeBorder, rgba(127, 127, 127, 0.3));
+}
+.si-usage-fill {
+	height: 100%;
+	background: var(--vscode-icon-foreground);
+}
+/* buffer de salida: rayado -45° (§5.5) */
+.si-usage-buffer {
+	height: 100%;
+	background: repeating-linear-gradient(
+		-45deg,
+		var(--vscode-icon-foreground) 0 2px,
+		transparent 2px 4px
+	);
+}
+.si-usage-meta {
+	margin-top: 4px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+}
+.si-breakdown {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	margin-top: 6px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+}
+.si-quality {
+	margin-top: 8px;
+	padding-top: 6px;
+	border-top: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+	line-height: 1.4;
+}
+/* ── Widget persistente de tareas (F5 P2, §5.4 AUTORIZADO) ─────────────
+   Primer miembro del input-stack (píldora). Colapsado: dot azul pulsante +
+   tarea en curso (activeForm) + (done/total). Expandido: lista con
+   done(tachado)/running(azul)/pending. El panel remoto TodoWebPanel queda
+   OCULTO (decisión 2026-08-19: widget nativo = única superficie). */
+.todo-widget {
+	border-bottom: 1px solid transparent;
+}
+.todo-head {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	width: 100%;
+	padding: 5px 10px;
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+	text-align: left;
+}
+.todo-head:hover {
+	background: var(--vscode-list-hoverBackground);
+	border-radius: 4px;
+}
+.todo-current {
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-variant-numeric: tabular-nums;
+}
+.todo-chev {
+	color: var(--vscode-descriptionForeground);
+	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.todo-chev.open {
+	transform: rotate(90deg);
+}
+.todo-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--vscode-descriptionForeground);
+	flex: none;
+}
+.todo-dot.run,
+.todo-item .todo-dot {
+	background: var(--vscode-textLink-foreground, #4daafc);
+}
+.todo-dot.run {
+	animation: todo-pulse 1.2s ease-in-out infinite;
+}
+@keyframes todo-pulse {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.45;
+		transform: scale(0.8);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.todo-dot.run {
+		animation: none;
+	}
+}
+.todo-list {
+	list-style: none;
+	margin: 0;
+	padding: 2px 10px 6px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.todo-item {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+.todo-item.completed .todo-item-subject {
+	text-decoration: line-through;
+	color: var(--vscode-descriptionForeground);
+}
+.todo-item.pending {
+	color: var(--vscode-descriptionForeground);
+}
+.todo-item.pending .todo-dot {
+	background: var(--vscode-descriptionForeground);
+	opacity: 0.6;
+}
+.todo-item-mark {
+	display: inline-flex;
+	align-items: center;
+	color: var(--vscode-testing-iconPassed, #3fb950);
 }

@@ -18,6 +18,8 @@ import { UiDialog } from "./components/UiDialog";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
 import { ContextBar } from "./components/ContextBar";
+import { TodoWidget } from "./components/TodoWidget";
+import { todoSnapshot } from "./todo-state";
 import { Spinner } from "./components/Spinner";
 import { AnimatedLabel } from "./components/AnimatedLabel";
 import { SessionsPanel } from "./components/SessionsPanel";
@@ -261,6 +263,9 @@ export function App() {
 		}, 250);
 		return () => clearInterval(id);
 	}, [state.retry]);
+
+	// Snapshot de tareas para el widget del input-stack (F5 P2; puro, memo por render)
+	const todoSnap = todoSnapshot(state.turns);
 
 	const procLabel = (() => {
 		if (state.retry) {
@@ -660,6 +665,12 @@ export function App() {
 				    unen). El Composer YA se auto-bloquea con pendingDialog; ahora queda
 				    visible debajo del panel (como Copilot) en vez de desaparecer. */}
 				<div className="input-stack">
+				{/* Widget persistente de tareas (F5 P2, AUTORIZADO 2026-08-19): primer
+				    miembro de la píldora mientras haya tareas; el transcript YA no
+				    renderiza filas todo (Turn.tsx filtra el tool). El panel remoto
+				    TodoWebPanel (.web-footer) se oculta vía CSS (decisión: widget
+				    nativo único). */}
+				{todoSnap ? <TodoWidget snap={todoSnap} /> : null}
 				{/* Confirmación de cambio de proveedor pendiente (red de seguridad):
 				    ocupa el lugar del composer como las aprobaciones. */}
 				{state.modelChanges.length > 0 ? (

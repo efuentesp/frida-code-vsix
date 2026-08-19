@@ -358,7 +358,8 @@ fantasma con hover list-hover.
    rama con +N ~N −N (Passed/Info/Failed) · ↑ahead.
 5. **ContextBar**: strip fino con label «Contexto» + barra de nivel (low verde /
    mid gradiente / high errorForeground) + `89k / 143k` + métricas ↑↓R·W·CH·$ —
-   y aquí vive el estado «Escribiendo respuesta…» + Cancelar (NO en barra aparte).
+   y el estado vivo «pensando» vive en la proc-bar SOBRE el textbox (revertido
+  P1; §10.10 — NO en el ContextBar).
 
 ### 5.4 Paneles dockeados (cajas `editorWidget`, borde `input-border`, radius 8)
 - **Preguntas** (question carousel): header (título semibold + paso N/M + colapsar
@@ -366,18 +367,24 @@ fantasma con hover list-hover.
   input libreform · footer con flechas + estado («falta: X»). La interacción de
   teclado por zonas del `QuestionsPanel` actual se conserva.
 - **Tareas (todo)**: **widget persistente** siempre visible mientras haya tareas —
+  dock como PRIMER miembro del input-stack (AUTORIZADO 2026-08-19, Edgar):
   colapsado «● tarea actual (2/4)» con dot azul pulsante; expandido «Tareas (2/4)»
   con ítems done(tachado)/run(azul)/pendiente; botón Limpiar deshabilitado si hay
-  tarea corriendo. Las filas tool `todo` del transcript solo actualizan el widget.
+  tarea corriendo. Las filas tool `todo` NO se renderizan en el transcript — el
+  widget es la única superficie (AUTORIZADO 2026-08-19, estilo Copilot).
 - **Aprobaciones / workflow**: caja plan-review con header + cuerpo (comandos
   numerados mono, o pasos con estados) + botones Continuar / Permitir «patrón» /
   Cancelar.
 
-### 5.5 Anillo de contexto (toolbar del composer)
+### 5.5 Anillo de contexto (ContextBar — AUTORIZADO 2026-08-19, Edgar)
+**Ubicación decidida por el usuario:** vive EN el ContextBar junto al % — NO en
+la toolbar del composer (ubicación original de este doc, descartada). Coherente
+con §10.10: el ContextBar es strip de LECTURA y el anillo es lectura (nivel +
+popup), no estado mutable.
 SVG 14×14: círculo fondo (descriptionForeground op .5) + arco que llena en sentido
 horario desde arriba (`stroke-dasharray/dashoffset`, rotate -90°). Estados normal
-→ warning (≥70%) → error (≥90%). El % se revela en hover (label colapsada
-max-width 0→4em, 100ms). Click → popup «Session Info»: costo · barra horizontal 4px
+→ warning (≥70%) → error (≥90%), mismos colores que los niveles low/mid/high
+del strip. Click → popup «Session Info»: costo · barra horizontal 4px
 con uso sólido + **buffer de salida rayado** (repeating-linear-gradient -45°) ·
 desglose por categorías · aviso de calidad.
 
@@ -437,14 +444,14 @@ P1 = mayor impacto visual, P2 = complementa, P3 = pulido.
 | 1 | `ToolCard` | caja `.card` con borde/fondo, icono lucide 13 pulsante (`thinkingPulse`), título+label+status derecha | fila plana Copilot: sin caja, shimmer del verbo corriendo (sin icono), pasado al terminar, ✗ en error, subtítulo `– detalle` tabular, chevron fantasma (§5.2) · **HECHO F2 2026-08-19** | P1 |
 | 2 | Agrupación | las tool cards van sueltas en el turno | grupo colapsable «N herramientas · duración» con guía vertical al completar el turno; sueltas mientras corre (§5.2) · **AUTORIZADO 2026-08-19 (Edgar); HECHO F3 2026-08-19** | P1 |
 | 3 | Footer estructura | `proc-bar` separada + cajas dock flotantes + submit rectangular | input-stack píldora + submit circular ↑↔■ + beam (§5.3) · **HECHO F4 2026-08-19. F5 (working en ContextBar) REVERTIDA el mismo día por el usuario: el indicador se encimaba con la info de contexto → proc-bar vuelve a su posición original sobre el textbox (§10.10)** | P1 |
-| 4 | Toolbars del composer | selects + modo + enviar en `bar-controls` (ya abajo ✓) | añadir anillo de contexto + popup de detalles (§5.5); mantener selects reales | P2 |
-| 5 | Todo | solo filas ToolCard con status echo | widget persistente dockeado + sincronización filas→widget (§5.4) | P2 |
-| 6 | SettingsHub | `cfg-panel` fullscreen (`inset:0`) | scrim + panel centrado radius 10, tabs subrayadas (§5.6) | P2 |
+| 4 | Toolbars del composer | selects + modo + enviar en `bar-controls` (ya abajo ✓) | anillo de contexto EN el ContextBar junto al % (no toolbar — decisión Edgar 2026-08-19) + popup de detalles (§5.5); mantener selects reales · **HECHO F4 2026-08-19 (ContextRing + SessionInfo)** | P2 |
+| 5 | Todo | solo filas ToolCard con status echo | widget persistente dock en input-stack (primer miembro) + filas todo FUERA del transcript (sólo widget) (§5.4) · **AMBOS movimientos AUTORIZADOS 2026-08-19 (Edgar); HECHO F5 (widget NATIVO nuevo: panel remoto TodoWebPanel desmontado por decisión del usuario)** | P2 |
+| 6 | SettingsHub | `cfg-panel` fullscreen (`inset:0`) | scrim + panel centrado radius 10, tabs subrayadas (§5.6) · **HECHO F3 2026-08-19 (+codicons, lucide 19)** | P2 |
 | 7 | SessionsPanel | overlay quickInput (ya es overlay ✓) | alinear radios/sombras/badges al sistema; mantener interacción (§5.6) | P3 |
 | 8 | Followups | no existe | links de sugerencia sobre el input (§5.3.1) | P3 |
 | 9 | Switch knob `#fff` | hardcode | `--vscode-button-foreground` | P3 |
-| 10 | Thinking | caja `card--thinking` con borde azul link | fila colapsable Copilot (brain azul, shimmer en vivo), misma lógica de CollapsibleCard | P2 |
-| 11 | Salidas de tool | `pre` máx 320px | codeblock bordeado máx ~13 líneas + ver-más + diff coloreado (§5.2) | P2 |
+| 10 | Thinking | caja `card--thinking` con borde azul link | fila colapsable Copilot (brain azul, shimmer en vivo), misma lógica de CollapsibleCard · **HECHO F1 2026-08-19** | P2 |
+| 11 | Salidas de tool | `pre` máx 320px | codeblock bordeado máx ~13 líneas + ver-más + diff coloreado (§5.2) · **HECHO F2 2026-08-19 (output-blocks.ts TDD)** | P2 |
 | 12 | ContextBar | barra fija (identidad frida) | conservar + niveles low/mid/high por tokens · **working descartado tras F5: se encimaba con la info de contexto (revertido 2026-08-19, §10.10)** | P1 |
 | 13 | Iconografía | `lucide-react` en ~20 componentes | Codicons (`@vscode/codicons`) con wrapper `<Codicon>` (§4); marca Frida en SVG inline; migración por slices verificando `grep -rn 'from "lucide-react"' webview` → sólo decrece | P2 |
 
@@ -524,6 +531,16 @@ la propia fila de §8.
     strips de estado inferiores son de LECTURA (contexto); lo mutable/en vivo
     va arriba del input, donde no compite con métricas.
 11. **Métricas de grep consistentes**: comparar archivos (`-l`) con archivos,
+    líneas (`-n`) con líneas — contar líneas con el criterio de archivos da
+    falsas alarmas (recurrió DOS veces en este ciclo: 20 vs 19).
+12. **Filtrar segmentos ANTES de computar agregaciones**: si un render filtra
+    items dentro del map, los índices/conteos derivados (toolRuns: «N
+    herramientas») cuentan filas invisibles. Filtrar primero, computar después
+    (F5: segs = segments.filter(…) → toolRuns(segs)).
+13. **Panel remoto vs widget nativo**: cuando una superficie ya existe como
+    Remote React del host (fridaWebMount, id UUID no targeteable por CSS),
+    «añadir la versión nativa» exige desmontar la remota en el HOST (flag en
+    mountPanel), no ocultarla por CSS. Presentar la disyuntiva al usuario.
    líneas (`-n`) con líneas — el criterio "lucide no crece" del plan se definió
    en archivos; contar líneas da otro número y falsas alarmas.
 

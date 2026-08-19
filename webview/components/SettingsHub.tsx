@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-	BarChart3,
-	Library,
-	Plug,
-	RotateCw,
-	SlidersHorizontal,
-	Wrench,
-	X,
-} from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { OutMessage, State } from "../types";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
@@ -25,13 +17,13 @@ export type SettingsTab =
 	| "tools"
 	| "usage";
 
-const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
-	{ id: "providers", label: "Proveedores", icon: Plug },
-	{ id: "models", label: "Modelos", icon: SlidersHorizontal },
-	{ id: "approval", label: "Auto-Aprobación", icon: SlidersHorizontal },
-	{ id: "resources", label: "Recursos", icon: Library },
-	{ id: "tools", label: "Herramientas", icon: Wrench },
-	{ id: "usage", label: "Uso", icon: BarChart3 },
+const TABS: { id: SettingsTab; label: string; icon: string }[] = [
+	{ id: "providers", label: "Proveedores", icon: "plug" },
+	{ id: "models", label: "Modelos", icon: "settings" },
+	{ id: "approval", label: "Auto-Aprobación", icon: "settings" },
+	{ id: "resources", label: "Recursos", icon: "library" },
+	{ id: "tools", label: "Herramientas", icon: "wrench" },
+	{ id: "usage", label: "Uso", icon: "graph" },
 ];
 
 export function SettingsHub({
@@ -54,27 +46,40 @@ export function SettingsHub({
 		if (tab === "resources") post({ type: "list_resources" });
 	}, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+	// Esc cierra el overlay (§5.6); click en el scrim también (onClose en wrapper).
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") onClose();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [onClose]);
+
 	return (
-		<div className="cfg-panel">
+		<div className="cfg-overlay" onClick={onClose}>
+			<div
+				className="cfg-panel"
+				onClick={(e) => e.stopPropagation()}
+				role="dialog"
+				aria-modal="true"
+				aria-label="Configuración"
+			>
 			<div className="cfg-head">
 				<span className="cfg-title">Configuración</span>
 				<button className="ico" onClick={onClose}>
-					<X size={15} />
+					<Codicon name="close" size={15} label="Cerrar" />
 				</button>
 			</div>
 			<div className="cfg-tabs">
-				{TABS.map((t) => {
-					const Icon = t.icon;
-					return (
-						<button
-							key={t.id}
-							className={"cfg-tab" + (tab === t.id ? " active" : "")}
-							onClick={() => setTab(t.id)}
-						>
-							<Icon size={13} /> {t.label}
-						</button>
-					);
-				})}
+				{TABS.map((t) => (
+					<button
+						key={t.id}
+						className={"cfg-tab" + (tab === t.id ? " active" : "")}
+						onClick={() => setTab(t.id)}
+					>
+						<Codicon name={t.icon} size={13} /> {t.label}
+					</button>
+				))}
 			</div>
 			<div className="cfg-body">
 				{tab === "providers" && (
@@ -110,7 +115,7 @@ export function SettingsHub({
 								onClick={() => post({ type: "reload" })}
 								disabled={state.busy}
 							>
-								<RotateCw size={13} /> Recargar extensiones y recursos
+									<Codicon name="refresh" size={13} /> Recargar extensiones y recursos
 							</button>
 						</div>
 						{state.resources ? (
@@ -153,6 +158,7 @@ export function SettingsHub({
 
 				{tab === "usage" && <UsageDashboard state={state} post={post} />}
 			</div>
+		</div>
 		</div>
 	);
 }
