@@ -496,12 +496,17 @@ describe("#50 / team settings + auto-update", () => {
 
 		const pi = fakePi();
 		const states: { notice?: string }[] = [];
+		// #88: onLog capturado — cuando el poll expira, el mensaje de error REAL
+		// de addMarketplace/instalación aparece en el assertion (antes moría
+		// invisible: 'expected [] to include m' sin pista).
+		const logs: string[] = [];
 		await createFridaCcPlugins({
 			agentDir,
 			cwd: workDir,
 			extraMarketplaces: [mktDir],
 			enabledPlugins: { "p1@m": true },
 			onStateChange: (s) => states.push(s),
+			onLog: (line) => logs.push(line),
 		})(asApi(pi));
 		await (pi.events.get("resources_discover") ?? [])[0]?.(
 			{ cwd: workDir },
@@ -518,7 +523,9 @@ describe("#50 / team settings + auto-update", () => {
 			await new Promise((r) => setTimeout(r, 25));
 		}
 		const merged = mergeLayers(loadLayers(agentDir, workDir));
-		expect(Object.keys(merged.marketplaces)).toContain("m");
+		expect(Object.keys(merged.marketplaces), `logs de instalación: ${JSON.stringify(logs)}`).toContain(
+			"m",
+		);
 		expect(merged.plugins.find((p) => p.name === "p1")).toBeTruthy();
 		expect(states.some((s) => /del equipo/.test(s.notice ?? ""))).toBe(true);
 	});

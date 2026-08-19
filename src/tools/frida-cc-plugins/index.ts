@@ -37,7 +37,6 @@ import {
 	addMarketplace,
 	installPlugin,
 	listAvailable,
-	listInstalled,
 	pluginCatalogInfo,
 	removeMarketplace,
 	setPluginEnabled,
@@ -45,7 +44,7 @@ import {
 	pluginLastUpdated,
 } from "./installer";
 import { validateMarketplaceDir } from "./validate";
-import { readMarketplaceCatalog, type RenameMap } from "./readers";
+import { readMarketplaceCatalog } from "./readers";
 import {
 	marketplaceDirOf,
 	resolveRename,
@@ -209,7 +208,7 @@ function formatList(agentDir: string, cwd: string): string {
 		const parts = [
 			`${p.name}@${p.rec.marketplace}`,
 			p.rec.version ? `v${p.rec.version}` : undefined,
-			p.scope !== "user" ? `[${p.scope}]` : undefined,
+			p.scope === "user" ? undefined : `[${p.scope}]`,
 			p.rec.enabled ? undefined : "(deshabilitado)",
 		].filter(Boolean);
 		lines.push(`• ${parts.join(" ")}`);
@@ -255,28 +254,12 @@ async function backgroundSetup(
 			/* best-effort */
 		}
 	};
-	let reg = loadRegistry(agentDir);
-	// Bootstrap auto (intento único flag bootstrapped).
-	if (!reg.bootstrapped) {
-		reg.bootstrapped = true;
-		if (Object.keys(reg.marketplaces).length === 0) {
-			try {
-				const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
-					cwd,
-					deps: opts.deps,
-					reg,
-				});
-				reg = loadRegistry(agentDir);
-				notifyBg(
-					`cc-plugins: marketplace oficial '${res.name}' agregado automáticamente (${res.plugins} plugins). /ccplugin list --available para explorar; /ccplugin marketplace remove ${res.name} si no lo quieres.`,
-				);
-			} catch (e: any) {
-				onLog?.(`[cc-plugins] bootstrap auto falló: ${e?.message ?? e}`);
-			}
-		} else {
-			saveRegistry(agentDir, reg);
-		}
-	}
+	// #88: PRIMERO la configuración explícita del equipo (extraMarketplaces /
+	// enabledPlugins — típicamente paths locales, sin red) y DESPUÉS el
+	// bootstrap del marketplace oficial. Antes el orden inverso hacía que un
+	// git clone lento/caído del oficial BLOQUEARA los plugins del equipo: el
+	// poll expiraba con marketplaces vacíos (flaky en red variable, dominante
+	// sin red). Config explícita > default implícito.
 	// Team marketplaces (settings del equipo).
 	for (const ref of opts.extraMarketplaces ?? []) {
 		try {
@@ -285,7 +268,7 @@ async function backgroundSetup(
 				deps: opts.deps,
 			});
 			notifyBg(
-				`cc-plugins: marketplace del equipo '${res.name}' agregado desde settings (${res.plugins} plugins).`,
+					`cc-plugins: marketplace del equipo '${res.name}' agregado desde settings (${res.plugins} plugins).`,
 			);
 		} catch (e: any) {
 			onLog?.(`[cc-plugins] extraMarketplace '${ref}' falló: ${e?.message ?? e}`);
@@ -307,6 +290,31 @@ async function backgroundSetup(
 			);
 		} catch (e: any) {
 			onLog?.(`[cc-plugins] enabledPlugin '${ref}' falló: ${e?.message ?? e}`);
+		}
+	}
+	// Bootstrap auto del marketplace oficial (#88: ahora DESPUÉS de la config
+	// del equipo — ya no la bloquea. Si el equipo ya proveyó marketplaces, el
+	// default implícito se salta: config explícita > default).
+	{
+		const reg = loadRegistry(agentDir);
+		if (!reg.bootstrapped) {
+			reg.bootstrapped = true;
+			if (Object.keys(reg.marketplaces).length === 0) {
+				try {
+					const res = await addMarketplace(agentDir, OFFICIAL_MARKETPLACE, {
+						cwd,
+						deps: opts.deps,
+						reg,
+					});
+					notifyBg(
+							`cc-plugins: marketplace oficial '${res.name}' agregado automáticamente (${res.plugins} plugins). /ccplugin list --available para explorar; /ccplugin marketplace remove ${res.name} si no lo quieres.`,
+					);
+				} catch (e: any) {
+						onLog?.(`[cc-plugins] bootstrap auto falló: ${e?.message ?? e}`);
+				}
+			} else {
+				saveRegistry(agentDir, reg);
+			}
 		}
 	}
 	// Auto-update al final (con su delay propio).
@@ -487,7 +495,7 @@ function buildInstalledRows(
 			);
 			return ({
 			ref: `${p.name}@${p.rec.marketplace}`,
-			label: p.scope !== "user" ? `${p.name} [${p.scope}]` : p.name,
+			label: p.scope === "user" ? p.name : `${p.name} [${p.scope}]`,
 			version: p.rec.version,
 			status: p.rec.enabled ? "installed" : "disabled",
 			markdown: installedRowMarkdown(p, installPath),
