@@ -25,6 +25,10 @@
         "title": "Frida: Abrir panel"
       },
       {
+        "command": "frida.showWorkflows",
+        "title": "Frida: Mostrar panel de workflows"
+      },
+      {
         "command": "frida.openHelp",
         "title": "Frida: Abrir ayuda"
       },

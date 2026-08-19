@@ -127,6 +127,96 @@ export function getWorkflowRuns(): readonly WorkflowRunView[] {
 	return current;
 }
 
+// ── #84: visibilidad forzada del panel (comando/paleta, status bar, pin) ─────
+
+let panelPinned = false;
+let panelShowRequested = false;
+const panelVisibilityListeners = new Set<() => void>();
+
+function emitPanelVisibility(): void {
+	for (const listener of panelVisibilityListeners) listener();
+}
+
+/** Comando/status bar (#84): pide que el panel se muestre y expanda aunque no
+ * haya contenido. One-shot — se consume en el render. También emite a los
+ * listeners de runs para re-renderizar el panel aunque esté en null. */
+export function requestPanelShow(): void {
+	panelShowRequested = true;
+	emit();
+	emitPanelVisibility();
+}
+
+/** One-shot: true una sola vez por request (#84). */
+export function consumePanelShowRequest(): boolean {
+	const was = panelShowRequested;
+	panelShowRequested = false;
+	return was;
+}
+
+export function isPanelPinned(): boolean {
+	return panelPinned;
+}
+
+/** Fija el panel visible aunque no haya runs (#84). También emite a runs. */
+export function setPanelPinned(pinned: boolean): void {
+	if (panelPinned === pinned) return;
+	panelPinned = pinned;
+	emit();
+	emitPanelVisibility();
+}
+
+export function subscribePanelVisibility(listener: () => void): () => void {
+	panelVisibilityListeners.add(listener);
+	return () => {
+		panelVisibilityListeners.delete(listener);
+	};
+}
+
+/** Sólo tests. */
+export function _resetPanelVisibility(): void {
+	panelPinned = false;
+	panelShowRequested = false;
+	panelVisibilityListeners.clear();
+}
+
+/** Vista mínima de un run persistido, para rehidratar el panel (#84). */
+export interface RehydratedRun {
+	runId: string;
+	workflowName: string;
+	state: WorkflowRunState;
+	checkpointName?: string;
+}
+
+/** #84: revive runs running/awaiting leídos de disco (nacieron antes del
+ * montaje del panel, p.ej. checkpoint pendiente pre-F5). El store de memoria
+ * GANA: nunca pisa lo ya presente. */
+export function rehydrateRuns(runs: readonly RehydratedRun[]): void {
+	const known = new Set(current.map((r) => r.runId));
+	let changed = false;
+	for (const r of runs) {
+		if (known.has(r.runId)) continue;
+		current = [
+			...current,
+			{
+				runId: r.runId,
+				workflowName: r.workflowName,
+				state: r.state,
+				...(r.checkpointName
+					? { checkpointName: r.checkpointName }
+					: {}),
+				phases: [],
+				phaseTimes: {},
+				agents: [],
+				groups: [],
+				tokens: 0,
+				costUsd: 0,
+			},
+		];
+		changed = true;
+	}
+	if (changed) emit();
+}
+
 // ── Huérfanos de sesiones previas (#69) ─────────────────────────────────────
 // Vista serializable de un run huérfano para el panel (host-side: incluye
 // runDir para [Ver journal] sin re-escanear).

@@ -14,16 +14,21 @@ import { useSyncExternalStore, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 import { resolveCheckpointFromUi } from "./frida-delivery";
-import { purgeOrphans, readOrphanJournal, scanOrphans } from "./gc";
+import { purgeOrphans, readOrphanJournal, readLiveRuns, scanOrphans } from "./gc";
 import { wfLog } from "./telemetry";
 import {
 	getOrphanRuns,
 	getWorkflowRuns,
 	pathKey,
+	rehydrateRuns,
 	removeWorkflowRun,
 	setOrphanRuns,
+	subscribePanelVisibility,
 	subscribeOrphanRuns,
 	subscribeWorkflowRuns,
+	consumePanelShowRequest,
+	isPanelPinned,
+	setPanelPinned,
 	type AgentProgressState,
 	type AgentProgressView,
 	type GroupProgressView,
@@ -39,6 +44,7 @@ import {
 	formatTokens,
 	runStats,
 	recentFailed,
+	hasPanelContent,
 	AGENT_ICON,
 	SEGMENT_BG,
 } from "./panel-view";
@@ -57,13 +63,30 @@ function WorkflowPanel(): ReactElement | null {
 		(r) => r.state === "running" || r.state === "awaiting",
 	);
 	const [collapsed, setCollapsed] = useState(false);
+	// #84: visibilidad forzada — pin reactivo + request one-shot del comando.
+	const pinned = useSyncExternalStore(subscribePanelVisibility, isPanelPinned);
+	const [showForced, setShowForced] = useState(false);
+	useEffect(() => {
+		if (consumePanelShowRequest()) setShowForced(true);
+		return subscribePanelVisibility(() => {
+			if (consumePanelShowRequest()) setShowForced(true);
+		});
+	}, []);
+	useEffect(() => {
+		if (showForced) setCollapsed(false); // mostrar = también expandir
+	}, [showForced]);
 	// #69: journal expandido de un huérfano ([Ver journal]).
 	const [journal, setJournal] = useState<{ runId: string; text: string } | null>(
 		null,
 	);
 	// #69: scan de huérfanos al montar el panel (la sesión viva queda excluida
 	// por su lease owner.json — no necesita excludeSessionIds).
+	// #84: rehidrata runs running/awaiting de sesiones VIVAS leídos de disco —
+	// checkpoints nacidos antes de este montaje vuelven a ser visibles.
 	useEffect(() => {
+		readLiveRuns()
+			.then(rehydrateRuns)
+			.catch(() => undefined);
 		scanOrphans()
 			.then(setOrphanRuns)
 			.catch(() => undefined);
@@ -81,12 +104,11 @@ function WorkflowPanel(): ReactElement | null {
 	});
 	// #74: fallidos de la sesión viva — visibles para debuggear, cap 3.
 	const failedRecent = recentFailed(runs);
-	if (
-		active.length === 0 &&
-		failedRecent.length === 0 &&
-		orphans.length === 0
-	)
-		return null; // nada que mostrar
+	const empty =
+		active.length === 0 && failedRecent.length === 0 && orphans.length === 0;
+	// #84: pin fijado o comando «mostrar» fuerzan visibilidad incluso vacío.
+	if (!hasPanelContent(runs, orphans, { pinned, showRequested: showForced }))
+		return null; // nada que mostrar ni visibilidad forzada
 	return (
 		<CollapsiblePanel
 			collapsed={collapsed}
@@ -94,7 +116,24 @@ function WorkflowPanel(): ReactElement | null {
 			padding={6}
 			gap={4}
 			header={<HeaderSummary runs={runs} collapsed={collapsed} />}
+			actions={
+				<fbutton
+					variant="secondary"
+				onClick={() => setPanelPinned(!pinned)}
+				>
+					<ficon
+						name={pinned ? "pin" : "pin-off"}
+						size={10}
+						color={pinned ? "#58a6ff" : "8b949e"}
+					/>
+				</fbutton>
+			}
 		>
+			{empty ? (
+				<ftext size={11} color="#8b949e">
+					{"Sin runs — usa /wf o workflow(…) para lanzar uno. El pin lo mantiene visible; quítalo para auto-ocultar."}
+				</ftext>
+			) : null}
 			{active.map((r) => (
 				<RunView key={r.runId} run={r} />
 			))}

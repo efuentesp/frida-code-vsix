@@ -25,6 +25,9 @@ export interface CollapsiblePanelProps {
 	/** Contenido del header, a la derecha del chevron: título, count, indicador.
 	 *  Lo arma cada panel con sus propios ftext/fbox. */
 	header: ReactNode;
+	/** Controles fuera de la zona clicable del header (#84) — el click no
+	 *  burbujea al toggle (p.ej. botón pin del panel de workflows). */
+	actions?: ReactNode;
 	/** Cuerpo del panel. Sólo se renderiza (y serializa al webview) cuando NO
 	 *  está colapsado — al colapsar, el subárbol completo deja de viajar, lo que
 	 *  reduce commits y libera el espacio vertical del footer. */
@@ -41,6 +44,7 @@ export function CollapsiblePanel({
 	collapsed,
 	onToggle,
 	header,
+	actions,
 	children,
 	padding,
 	gap,
@@ -50,17 +54,24 @@ export function CollapsiblePanel({
 		<fbox flexDirection="column" padding={padding} gap={gap} cls={cls}>
 			<fbox
 				flexDirection="row"
-				gap={4}
 				alignItems="center"
-				onClick={onToggle}
-				cls="panel-header"
+				justifyContent="space-between"
 			>
-			<ficon
-				name={collapsed ? "chevron-right" : "chevron-down"}
-				size={11}
-				color="#8b949e"
-			/>
-			{header}
+				<fbox
+					flexDirection="row"
+					gap={4}
+					alignItems="center"
+					onClick={onToggle}
+					cls="panel-header"
+				>
+					<ficon
+						name={collapsed ? "chevron-right" : "chevron-down"}
+						size={11}
+						color="#8b949e"
+					/>
+					{header}
+				</fbox>
+				{actions}
 			</fbox>
 			{collapsed ? null : children}
 		</fbox>

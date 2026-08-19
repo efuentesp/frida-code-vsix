@@ -117,7 +117,7 @@ export async function scanOrphans(
 
 	let projects: string[] = [];
 	try {
-		projects = (await readdir(join(home, ".frida", "projects"), {
+		projects = (await readdir(join(home, ".frida", "workflows", "projects"), {
 			withFileTypes: true,
 		}))
 			.filter((e) => e.isDirectory())
@@ -127,7 +127,14 @@ export async function scanOrphans(
 	}
 
 	for (const project of projects) {
-		const sessionsDir = join(home, ".frida", "projects", project, "sessions");
+		const sessionsDir = join(
+			home,
+			".frida",
+			"workflows",
+			"projects",
+			project,
+			"sessions",
+		);
 		let sessions: string[] = [];
 		try {
 			sessions = (await readdir(sessionsDir, { withFileTypes: true }))
@@ -157,6 +164,104 @@ export async function scanOrphans(
 		}
 	}
 	return orphans;
+}
+
+/** Vista de un run vivo para rehidratar el panel (#84). */
+export interface LiveRunSnapshot {
+	runId: string;
+	workflowName: string;
+	state: "running" | "awaiting";
+	checkpointName?: string;
+}
+
+/** Runs running/awaiting de sesiones VIVAS (lease con pid activo) bajo la
+ * raíz REAL (~/.frida/workflows/projects — misma que runsDirectory). Si el
+ * host se reinició y el hijo murió, el lease caduca → quedan para scanOrphans
+ * como huérfanos, NO aquí: jamás rehidratamos zombies (#84). */
+export async function readLiveRuns(
+	options: ScanOptions = {},
+): Promise<LiveRunSnapshot[]> {
+	const home = options.home ?? homedir();
+	const out: LiveRunSnapshot[] = [];
+	let projects: string[] = [];
+	try {
+		projects = (
+			await readdir(join(home, ".frida", "workflows", "projects"), {
+				withFileTypes: true,
+			})
+		).map((e) => e.name);
+	} catch {
+		return out;
+	}
+	for (const project of projects) {
+		const sessionsDir = join(
+			home,
+			".frida",
+			"workflows",
+			"projects",
+			project,
+			"sessions",
+		);
+		let sessions: string[] = [];
+		try {
+			sessions = (await readdir(sessionsDir, { withFileTypes: true }))
+				.filter((e) => e.isDirectory() && !e.name.startsWith("."))
+				.map((e) => e.name);
+		} catch {
+			continue;
+		}
+		for (const session of sessions) {
+			const sessionDir = join(sessionsDir, session);
+			if (!(await sessionAlive(sessionDir))) continue; // muerta → orphans
+			let runIds: string[] = [];
+			try {
+				runIds = (await readdir(join(sessionDir, "runs"), { withFileTypes: true }))
+					.filter((e) => e.isDirectory() && !e.name.startsWith("."))
+					.map((e) => e.name);
+			} catch {
+				continue;
+			}
+			for (const runId of runIds) {
+				const runDir = join(sessionDir, "runs", runId);
+				try {
+					const st = JSON.parse(
+						await readFile(join(runDir, "state.json"), "utf8"),
+					) as {
+						id?: unknown;
+						workflowName?: unknown;
+						state?: unknown;
+					};
+					const state =
+						typeof st.state === "string" ? st.state : "";
+					if (state !== "running" && state !== "awaiting") continue;
+					let checkpointName: string | undefined;
+					if (state === "awaiting") {
+						try {
+							const journal = JSON.parse(
+								await readFile(join(runDir, "journal.json"), "utf8"),
+							) as { awaiting?: Record<string, unknown> };
+							const key = Object.keys(journal.awaiting ?? {})[0] ?? "";
+							const m = key.match(/^checkpoint\/(.+)$/);
+							if (m) checkpointName = m[1];
+						} catch {
+							/* journal opcional */
+						}
+					}
+					out.push({
+						runId: typeof st.id === "string" ? st.id : runId,
+						workflowName:
+							typeof st.workflowName === "string"
+								? st.workflowName
+								: runId,
+						state,
+						...(checkpointName ? { checkpointName } : {}),
+					});
+				} catch {
+				}
+			}
+		}
+	}
+	return out;
 }
 
 /** Lee summary.json de un run y lo clasifica; null si no es legible. */

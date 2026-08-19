@@ -19,12 +19,20 @@ import {
 	formatTokens,
 	runStats,
 	recentFailed,
+	hasPanelContent,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
 	getWorkflowRuns,
 	upsertWorkflowRun,
 	_resetWorkflowRuns,
+	_resetPanelVisibility,
+	consumePanelShowRequest,
+	requestPanelShow,
+	isPanelPinned,
+	setPanelPinned,
+	subscribePanelVisibility,
+	rehydrateRuns,
 	type AgentProgressView,
 	type GroupProgressView,
 } from "../../src/tools/frida-extensible-workflows/store";
@@ -578,5 +586,60 @@ describe("frida-extensible-workflows · fallidos visibles en el panel (#74)", ()
 
 	it("recentFailed vacío sin fallidos", () => {
 		expect(recentFailed([run("a", { state: "running" })])).toEqual([]);
+	});
+});
+
+describe("frida-extensible-workflows · visibilidad forzada del panel (#84)", () => {
+	beforeEach(() => {
+		_resetWorkflowRuns();
+		_resetPanelVisibility();
+	});
+
+	it("requestPanelShow one-shot: true al pedir, se consume al leer", () => {
+		expect(consumePanelShowRequest()).toBe(false);
+		requestPanelShow();
+		expect(consumePanelShowRequest()).toBe(true);
+		expect(consumePanelShowRequest()).toBe(false);
+	});
+
+	it("pin reactivo: toggle + notifica listeners", () => {
+		let fires = 0;
+		const off = subscribePanelVisibility(() => { fires += 1; });
+		expect(isPanelPinned()).toBe(false);
+		setPanelPinned(true);
+		expect(isPanelPinned()).toBe(true);
+		expect(fires).toBe(1);
+		off();
+	});
+
+	it("rehydrateRuns: revive awaiting de disco sin pisar los ya presentes", () => {
+		upsertWorkflowRun({ runId: "vivo", workflowName: "wf-vivo", state: "running" });
+		rehydrateRuns([
+			{
+				runId: "vivo",
+				workflowName: "wf-vivo-DELDISCO",
+				state: "running",
+			},
+			{
+				runId: "checkpointed",
+				workflowName: "tea-atdd-demo",
+				state: "awaiting",
+				checkpointName: "scenarios",
+			},
+		]);
+		const runs = getWorkflowRuns();
+		// El vivo NO se pisa (el store de memoria gana).
+		expect(runs.find((r) => r.runId === "vivo")?.workflowName).toBe("wf-vivo");
+		// El awaiting de disco revivió con su checkpoint para el banner #64.
+		const revived = runs.find((r) => r.runId === "checkpointed");
+		expect(revived?.state).toBe("awaiting");
+		expect(revived?.checkpointName).toBe("scenarios");
+	});
+
+	it("hasPanelContent: pinned/showRequest fuerzan; sin nada y sin fijar → false", () => {
+		const empty: never[] = [];
+		expect(hasPanelContent([], empty, { pinned: false })).toBe(false);
+		expect(hasPanelContent([], empty, { pinned: true })).toBe(true);
+		expect(hasPanelContent([], empty, { showRequested: true })).toBe(true);
 	});
 });

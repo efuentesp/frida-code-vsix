@@ -286,6 +286,17 @@ export function recentFailed(
 				.slice(0, 3);
 }
 
+/** ¿Hay algo que pintar en el panel? (#84) — contenido real (runs/huérfanos)
+ * o visibilidad forzada (pin fijado / request del comando). */
+export function hasPanelContent(
+	runs: readonly unknown[],
+	orphans: readonly unknown[],
+	flags: { pinned?: boolean; showRequested?: boolean } = {},
+): boolean {
+	if (flags.pinned || flags.showRequested) return true;
+	return runs.length > 0 || orphans.length > 0;
+}
+
 /** ¿El agente cuelga de un grupo parallel/pipeline? (su path lo extiende) */
 function hangsFromGroup(
 	a: AgentProgressView,

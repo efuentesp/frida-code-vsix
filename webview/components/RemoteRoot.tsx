@@ -16,6 +16,8 @@ import {
 	FileText,
 	Hourglass,
 	LoaderCircle,
+	Pin,
+	PinOff,
 	RotateCw,
 	Square,
 	Trash2,
@@ -45,6 +47,8 @@ const F_ICONS: Record<string, LucideIcon> = {
 	coins: Coins,
 	"file-text": FileText,
 	hourglass: Hourglass,
+	pin: Pin,
+	"pin-off": PinOff,
 	"trash-2": Trash2,
 	"triangle-alert": TriangleAlert,
 };

@@ -100,6 +100,11 @@ import type {
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
 import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
 import {
+	getWorkflowRuns,
+	requestPanelShow,
+	subscribeWorkflowRuns,
+} from "./tools/frida-extensible-workflows/store";
+import {
 	computePipelineStatus,
 	formatPipelineStatus,
 	wirePipelinePanel,
@@ -5115,6 +5120,43 @@ export async function activate(
 			// para la vista contribuida). Si la cerraron, se vuelve a resolver.
 			vscode.commands.executeCommand("frida.codeView.focus");
 		}),
+		vscode.commands.registerCommand("frida.showWorkflows", () => {
+			// #84: visibilidad forzada — pide el render (empty state «Sin runs» si
+			// hace falta) y enfoca el webview.
+			requestPanelShow();
+			void vscode.commands.executeCommand("frida.codeView.focus");
+		}),
+		// #84: ancla permanente — conteo vivo de runs; click = mostrar el panel.
+		(() => {
+			const item = vscode.window.createStatusBarItem(
+				vscode.StatusBarAlignment.Right,
+				97,
+			);
+			item.name = "Frida Workflows";
+			item.command = "frida.showWorkflows";
+			item.tooltip = "Frida Workflows — clic para mostrar el panel";
+			const render = () => {
+				const rs = getWorkflowRuns();
+				const act = rs.filter(
+					(r) => r.state === "running" || r.state === "awaiting",
+				);
+				const running = rs.reduce(
+					(n, r) =>
+						n + r.agents.filter((a) => a.state === "running").length,
+					0,
+				);
+				item.text = act.length
+					? `$(${running > 0 ? "sync~spin" : "play"}) wf ${act.length}`
+					: "$(circle-outline) wf";
+				item.show();
+			};
+			render();
+			const off = subscribeWorkflowRuns(render);
+			return new vscode.Disposable(() => {
+				off();
+				item.dispose();
+			});
+		})(),
 		vscode.commands.registerCommand("frida.openHelp", async () => {
 			// /help desde la paleta: picker de README + herramientas.
 			type HelpItem = vscode.QuickPickItem & { rel?: string };

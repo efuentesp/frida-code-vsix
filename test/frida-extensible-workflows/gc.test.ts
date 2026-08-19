@@ -1,7 +1,7 @@
 // frida-extensible-workflows · workflow_gc (#69) — núcleo de clasificación y
 // purga de runs huérfanos.
 //
-// Un run huérfano vive en disco (~/.frida/projects/<proj>/<session>/runs/) sin
+// Un run huérfano vive en disco (~/.frida/workflows/projects/<proj>/<session>/runs/) sin
 // handle vivo: su sesión murió (F5, host reiniciado, sesión borrada) con el run
 // running/awaiting. workflow_stop ya no lo alcanza (registry por sesión) y el
 // checkpoint nunca se aprobará. Este módulo los detecta, clasifica y purga con
@@ -24,21 +24,21 @@ const ALIVE_PID = process.pid;
 
 let home: string;
 
-/** Crea un árbol temporal falso: <home>/.frida/projects/<projKey>/<sess>/runs/<runId>/. */
+/** Crea un árbol temporal falso: <home>/.frida/workflows/projects/<projKey>/<sess>/runs/<runId>/. */
 function seedTree(): void {
 	const projKey = makeProjKey();
-	const base = join(home, ".frida/projects", projKey, "sessions");
+	const base = join(home, ".frida/workflows/projects", projKey, "sessions");
 	mkdirSync(base, { recursive: true });
 }
 
 function makeProjKey(): string {
 	// Imita projectStorageKey: <slug>-<hash12>. El GC no debe depender del
-	// formato exacto (escanea todo ~/.frida/projects/*/sessions/*).
+	// formato exacto (escanea todo ~/.frida/workflows/projects/*/sessions/*).
 	return "frida-llops-abc123def456";
 }
 
 function seedSession(sess: string, ownerPid: number | null): void {
-	const dir = join(home, ".frida/projects", makeProjKey(), "sessions", sess);
+	const dir = join(home, ".frida/workflows/projects", makeProjKey(), "sessions", sess);
 	mkdirSync(join(dir, "runs"), { recursive: true });
 	if (ownerPid !== null) {
 		writeFileSync(
@@ -56,7 +56,7 @@ function seedRun(
 ): void {
 	const dir = join(
 		home,
-		".frida/projects",
+		".frida/workflows/projects",
 		makeProjKey(),
 		"sessions",
 		sess,
@@ -175,7 +175,7 @@ describe("frida-extensible-workflows · workflow_gc purge (#69)", () => {
 		expect(r.purged.map((p) => p.runId)).toEqual(["run-muerto"]);
 		// El vivo sigue en disco.
 		expect(
-			readFileSync(join(home, ".frida/projects", makeProjKey(), "sessions/sess-viva/runs/run-vivo-viejo/summary.json"), "utf8"),
+			readFileSync(join(home, ".frida/workflows/projects", makeProjKey(), "sessions/sess-viva/runs/run-vivo-viejo/summary.json"), "utf8"),
 		).toContain("run-vivo-viejo");
 	}, 15000);
 
