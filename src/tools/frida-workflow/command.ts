@@ -55,6 +55,8 @@ export interface WfSlashDeps {
 	cwd: string;
 	/** agentDir (~/.frida) — capa de usuario. */
 	agentDir: string;
+	/** Nombres de patrones agénticos o workflows adicionales para sugerir si no se encuentra. */
+	availablePatterns?: string[];
 	/** Path al bundle DSL (dist/frida-workflow.js) para que los configs importen
 	 *  el DSL vía alias jiti. Omitir → sólo plain-data. */
 	dslBundlePath?: string;
@@ -83,7 +85,10 @@ export async function handleWfSlash(
 		builtIns: listWorkflows(),
 	});
 	const wfs = loaded.workflows;
-	const wfNames = [...wfs.keys()];
+	const wfNames = [
+		...wfs.keys(),
+		...(deps.availablePatterns ?? []),
+	];
 
 	// /wf check — valida TODO y presenta los issues (abrir archivo:línea). Se sirve
 	// ANTES del abort por errores de carga: justamente los muestra.

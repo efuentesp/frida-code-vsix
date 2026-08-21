@@ -108,6 +108,10 @@ import type {
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
 import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
 import {
+	findBuiltinPattern,
+	builtinPatternsCatalog,
+} from "./tools/frida-extensible-workflows/builtin-patterns";
+import {
 	getWorkflowRuns,
 	requestPanelShow,
 	subscribeWorkflowRuns,
@@ -3748,10 +3752,58 @@ export async function activate(
 		}
 	}
 
-	// /wf: lanza un workflow (ADR-0020/D32). Corre en sesiones hijas desprendidas; el
-	// chat sigue usable y notifica por toast al terminar (panel llega en Fase 5).
+	// /wf: lanza un workflow (ADR-0020/D32 y ADR-0050/ADR-0051). Soporta tanto workflows
+	// estáticos de frida-workflow (build, vet, polish) como patrones agénticos
+	// de frida-extensible-workflows (aidd-plan, aidd-ship, tea-*, etc.).
 	async function postWfCommand(arg: string): Promise<void> {
 		const s = await ensureSession();
+		const trimmed = arg.trim();
+
+		// Si el comando especifica un patrón agéntico directamente (/wf aidd-plan ..., /wf aidd-ship, etc.)
+		if (trimmed && !trimmed.startsWith("@") && trimmed !== "check") {
+			const [first, ...rest] = trimmed.split(/\s+/);
+			const pattern = findBuiltinPattern(first);
+			if (pattern) {
+				let input = rest.join(" ").trim();
+				let promptText = "";
+				if (pattern.name === "aidd-plan") {
+					if (!input) {
+						const entered = await vscode.window.showInputBox({
+							title: "aidd-plan (AiDD Planning Phase)",
+							prompt: "¿Cuál es la idea del producto que deseas planificar?",
+							placeHolder: "Ej. Aplicación de seguimiento nutricional...",
+						});
+						if (!entered || !entered.trim()) return;
+						input = entered.trim();
+					}
+					promptText = `Ejecuta el workflow '${pattern.name}' con la siguiente idea de producto:\n${input}`;
+				} else if (pattern.name === "aidd-ship") {
+					promptText = input
+						? `Ejecuta el workflow '${pattern.name}' con los siguientes argumentos:\n${input}`
+						: `Ejecuta el workflow '${pattern.name}'`;
+				} else {
+					if (!input && (pattern.args.includes("string no vacío") || pattern.args.includes("obligatoria"))) {
+						const entered = await vscode.window.showInputBox({
+							title: `Workflow ${pattern.name}`,
+							prompt: `Argumentos para ${pattern.name}: ${pattern.args}`,
+						});
+						if (entered === undefined) return;
+						input = entered.trim();
+					}
+					promptText = input
+						? `Ejecuta el workflow '${pattern.name}' con: ${input}`
+						: `Ejecuta el workflow '${pattern.name}'`;
+				}
+				post({
+					type: "info",
+					text: `▶ Lanzando patrón agéntico '${pattern.name}'…`,
+					level: "info",
+				});
+				await s.session.prompt(promptText);
+				return;
+			}
+		}
+
 		// Fase 5: montar el WorkflowPanel (footer) + registrar el lifecycle listener
 		// (idempotente). Antes de handleWfSlash para que los fire del runner lo pueblen.
 		wireWorkflowPanel(s.webBridge);
@@ -3760,25 +3812,27 @@ export async function activate(
 			cwd: workspaceCwd(),
 			notify: (message, level) => post({ type: "info", text: message, level }),
 		});
+		const availablePatterns = builtinPatternsCatalog().map((p) => p.name);
 		await handleWfSlash(arg, {
 			host,
 			runsDirBase: path.join(context.globalStorageUri.fsPath, "workflows"),
 			cwd: workspaceCwd(),
 			agentDir: defaultAgentDir(),
 			dslBundlePath: path.join(context.extensionPath, "dist", "frida-workflow.js"),
+			availablePatterns,
 			pickWorkflow,
 			checkWorkflows,
 		});
 	}
 
-	// /wf sola → QuickPick agrupado (Internos/Globales/Proyecto). Los workflows con
-	// error de validación se marcan ⚠ (no se ocultan). Al elegir → InputBox (input).
+	// /wf sola → QuickPick agrupado (Patrones agénticos / Internos / Globales / Proyecto).
 	async function pickWorkflow(
 		loaded: LoadedWorkflows,
 	): Promise<{ name: string; input: string } | undefined> {
 		type WfPickItem = vscode.QuickPickItem & {
 			name?: string;
 			broken?: boolean;
+			isPattern?: boolean;
 		};
 		const GROUP: Record<WorkflowOrigin, string> = {
 			builtin: "Internos (extensión)",
@@ -3793,6 +3847,25 @@ export async function activate(
 			byOrigin.set(o, arr);
 		}
 		const items: WfPickItem[] = [];
+
+		// Patrones agénticos de frida-extensible-workflows (AiDD, TEA, Code Review, etc.)
+		const patterns = builtinPatternsCatalog();
+		if (patterns.length > 0) {
+			items.push({
+				label: "Patrones agénticos (AiDD / TEA / Review / Audit)",
+				kind: vscode.QuickPickItemKind.Separator,
+			});
+			for (const p of patterns) {
+				items.push({
+					name: p.name,
+					label: `⚡ ${p.name}`,
+					description: p.description,
+					detail: p.args,
+					isPattern: true,
+				});
+			}
+		}
+
 		for (const o of ["builtin", "user", "project"] as WorkflowOrigin[]) {
 			const list = byOrigin.get(o);
 			if (!list || list.length === 0) continue;
@@ -3814,13 +3887,13 @@ export async function activate(
 		}
 		if (items.length === 0) {
 			vscode.window.showInformationMessage(
-				"No hay workflows. Crea .frida/workflows/config.ts.",
+				"No hay workflows disponibles.",
 			);
 			return undefined;
 		}
 		const pick = await vscode.window.showQuickPick(items, {
 			title: "Workflows · selecciona",
-			placeHolder: "Elige un workflow para ejecutar",
+			placeHolder: "Elige un workflow o patrón agéntico para ejecutar",
 			matchOnDescription: true,
 			matchOnDetail: true,
 		});
@@ -3831,6 +3904,43 @@ export async function activate(
 			);
 			return undefined;
 		}
+
+		// Si seleccionó un patrón agéntico, pedir datos apropiados y despachar al agente
+		if (pick.isPattern) {
+			const s = await ensureSession();
+			let input = "";
+			let promptText = "";
+			if (pick.name === "aidd-plan") {
+				const entered = await vscode.window.showInputBox({
+					title: "aidd-plan (AiDD Planning Phase)",
+					prompt: "¿Cuál es la idea del producto que deseas planificar?",
+					placeHolder: "Ej. Aplicación de seguimiento nutricional...",
+				});
+				if (!entered || !entered.trim()) return undefined;
+				input = entered.trim();
+				promptText = `Ejecuta el workflow '${pick.name}' con la siguiente idea de producto:\n${input}`;
+			} else if (pick.name === "aidd-ship") {
+				promptText = `Ejecuta el workflow '${pick.name}'`;
+			} else {
+				const entered = await vscode.window.showInputBox({
+					title: `Workflow ${pick.name}`,
+					prompt: pick.detail ? `Argumentos: ${pick.detail}` : "¿Qué deseas procesar?",
+				});
+				if (entered === undefined) return undefined;
+				input = entered.trim();
+				promptText = input
+					? `Ejecuta el workflow '${pick.name}' con: ${input}`
+					: `Ejecuta el workflow '${pick.name}'`;
+			}
+			post({
+				type: "info",
+				text: `▶ Lanzando patrón agéntico '${pick.name}'…`,
+				level: "info",
+			});
+			await s.session.prompt(promptText);
+			return undefined; // Ya despachado al motor agéntico
+		}
+
 		const input = await vscode.window.showInputBox({
 			title: `Input para ${pick.name}`,
 			prompt: "¿Qué quieres que haga el workflow?",
