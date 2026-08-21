@@ -1,26 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-	BarChart3,
-	Database,
-	Library,
-	Plug,
-	RotateCw,
-	SlidersHorizontal,
-	Wrench,
-	X,
-} from "lucide-react";
 import type { ModuleResources, OutMessage, State } from "../types";
-import { Icon } from "./Icon";
+import { Codicon } from "./Codicon";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { IndexTab } from "./IndexTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
 import { UsageDashboard } from "./UsageDashboard";
 
-// Hub de Configuración (se abre con el engrane ⚙ o desde el onboarding). Pestañas:
-// Proveedores · Modelos · Auto-Aprobación · Herramientas. Reemplaza al viejo
-// cfg-panel de un sólo bloque. Modelos y Auto-Aprobación quedan como stubs por
-// ahora (alcance: onboarding + proveedores primero).
 export type SettingsTab =
 	| "providers"
 	| "models"
@@ -30,14 +16,14 @@ export type SettingsTab =
 	| "usage"
 	| "codebaseIndex";
 
-const TABS: { id: SettingsTab; label: string; icon: typeof Plug }[] = [
-	{ id: "providers", label: "Proveedores", icon: Plug },
-	{ id: "models", label: "Modelos", icon: SlidersHorizontal },
-	{ id: "approval", label: "Auto-Aprobación", icon: SlidersHorizontal },
-	{ id: "resources", label: "Recursos", icon: Library },
-	{ id: "tools", label: "Herramientas", icon: Wrench },
-	{ id: "usage", label: "Uso", icon: BarChart3 },
-	{ id: "codebaseIndex", label: "Index", icon: Database },
+const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
+	{ id: "providers", label: "Proveedores", iconName: "plug" },
+	{ id: "models", label: "Modelos", iconName: "sliders" },
+	{ id: "approval", label: "Auto-Aprobación", iconName: "shield" },
+	{ id: "resources", label: "Recursos", iconName: "library" },
+	{ id: "tools", label: "Herramientas", iconName: "tools" },
+	{ id: "usage", label: "Uso", iconName: "graph" },
+	{ id: "codebaseIndex", label: "Index", iconName: "database" },
 ];
 
 export function SettingsHub({
@@ -67,23 +53,20 @@ export function SettingsHub({
 		<div className="cfg-panel">
 			<div className="cfg-head">
 				<span className="cfg-title">Configuración</span>
-				<button className="ico" onClick={onClose}>
-					<X size={15} />
+				<button className="ico" onClick={onClose} aria-label="Cerrar">
+					<Codicon name="close" size={15} />
 				</button>
 			</div>
 			<div className="cfg-tabs">
-				{TABS.map((t) => {
-					const Icon = t.icon;
-					return (
-						<button
-							key={t.id}
-							className={"cfg-tab" + (tab === t.id ? " active" : "")}
-							onClick={() => setTab(t.id)}
-						>
-							<Icon size={13} /> {t.label}
-						</button>
-					);
-				})}
+				{TABS.map((t) => (
+					<button
+						key={t.id}
+						className={"cfg-tab" + (tab === t.id ? " active" : "")}
+						onClick={() => setTab(t.id)}
+					>
+						<Codicon name={t.iconName} size={13} /> {t.label}
+					</button>
+				))}
 			</div>
 			<div className="cfg-body">
 				{tab === "providers" && (
@@ -113,7 +96,7 @@ export function SettingsHub({
 								onClick={() => post({ type: "reload" })}
 								disabled={state.busy}
 							>
-								<RotateCw size={13} /> Recargar extensiones y recursos
+								<Codicon name="refresh" size={13} /> Recargar extensiones y recursos
 							</button>
 						</div>
 						{state.resources ? (
@@ -272,7 +255,7 @@ function ToolAccordionRow({
 					aria-label={open ? "Colapsar" : "Expandir"}
 					onClick={() => setOpen(!open)}
 				>
-					<Icon name="chevron" size={12} />
+					<Codicon name={open ? "chevron-down" : "chevron-right"} size={12} />
 				</button>
 				<button
 					className="tool-acc-info"

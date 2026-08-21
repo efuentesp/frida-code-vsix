@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SessionItem } from "../types";
 import { fmtTokens, formatDuration } from "../format";
 import { Tooltip } from "./Tooltip";
-import { Check, Dot, Pencil, Trash2, X } from "lucide-react";
+import { Codicon } from "./Codicon";
 
 interface Sessions {
 	items: SessionItem[];
@@ -119,10 +119,10 @@ export function SessionsPanel({
 												setEditing(null);
 											}}
 										>
-											<Check size={14} />
+											<Codicon name="check" size={14} />
 										</button>
 										<button className="sec" onClick={() => setEditing(null)}>
-											<X size={14} />
+											<Codicon name="close" size={14} />
 										</button>
 									</div>
 								) : confirming === s.path ? (
@@ -153,7 +153,7 @@ export function SessionsPanel({
 											<div className="session-title">
 												{isCurrent && (
 													<span className="dot">
-														<Dot size={16} />
+														<Codicon name="circle-filled" size={10} />
 													</span>
 												)}
 												{title}
@@ -192,7 +192,7 @@ export function SessionsPanel({
 													setDraft(s.name || "");
 												}}
 											>
-												<Pencil size={13} />
+												<Codicon name="edit" size={13} />
 											</button>
 										</Tooltip>
 										<Tooltip
@@ -208,7 +208,7 @@ export function SessionsPanel({
 												disabled={isCurrent}
 												onClick={() => setConfirming(s.path)}
 											>
-												<Trash2 size={13} />
+												<Codicon name="trash" size={13} />
 											</button>
 										</Tooltip>
 									</>

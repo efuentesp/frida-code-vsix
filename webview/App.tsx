@@ -441,7 +441,7 @@ export function App() {
 							onClick={() => post({ type: "new_session" })}
 							disabled={state.busy}
 						>
-							<Plus size={15} />
+							<Codicon name="add" size={15} />
 						</button>
 					</Tooltip>
 					<Tooltip label="Sesiones anteriores" side="bottom">
@@ -452,7 +452,7 @@ export function App() {
 								post({ type: "list_sessions", scope: sessionScope });
 							}}
 						>
-							<History size={15} />
+							<Codicon name="history" size={15} />
 						</button>
 					</Tooltip>
 				</span>
@@ -473,7 +473,7 @@ export function App() {
 								state.busy || state.isCompacting || state.turns.length === 0
 							}
 						>
-							<ListChevronsDownUp size={15} />
+							<Codicon name="collapse-all" size={15} />
 						</button>
 					</Tooltip>
 					<Tooltip
@@ -494,7 +494,7 @@ export function App() {
 				<span className="tb-group">
 					<Tooltip label="Configuración" side="bottom">
 						<button className="ico" onClick={() => setConfigOpen(true)}>
-							<Settings size={15} />
+							<Codicon name="settings-gear" size={15} />
 						</button>
 					</Tooltip>
 				</span>
