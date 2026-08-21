@@ -63,9 +63,7 @@ export function SettingsHub({
 					p.name.toLowerCase().includes(q) ||
 					p.id.toLowerCase().includes(q) ||
 					p.models.some(
-						(m) =>
-							m.name.toLowerCase().includes(q) ||
-							m.id.toLowerCase().includes(q),
+						(m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
 					),
 			)
 		: [];
@@ -145,10 +143,7 @@ export function SettingsHub({
 					<button
 						key={t.id}
 						type="button"
-						className={
-							"cfg-tab" +
-							(tab === t.id && !hasQuery ? " active" : "")
-						}
+						className={"cfg-tab" + (tab === t.id && !hasQuery ? " active" : "")}
 						onClick={() => {
 							setTab(t.id);
 							if (searchQuery) setSearchQuery("");
@@ -191,15 +186,9 @@ export function SettingsHub({
 										<ProveedoresTab
 											providers={matchedProviders}
 											deviceCode={state.oauthDeviceCode}
-											onSetKey={(id, key) =>
-												post({ type: "set_key", provider: id, key })
-											}
-											onLogin={(id) =>
-												post({ type: "login_provider", provider: id })
-											}
-											onLogout={(id) =>
-												post({ type: "logout_provider", provider: id })
-											}
+											onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
+											onLogin={(id) => post({ type: "login_provider", provider: id })}
+											onLogout={(id) => post({ type: "logout_provider", provider: id })}
 										/>
 									</div>
 								)}
@@ -221,9 +210,7 @@ export function SettingsHub({
 																post({
 																	type: "set_tool_toggle",
 																	key: m.module,
-																	enabled: !(
-																		state.toolToggles?.[m.module] ?? true
-																	),
+																	enabled: !(state.toolToggles?.[m.module] ?? true),
 																})
 														: undefined
 												}
@@ -235,9 +222,7 @@ export function SettingsHub({
 
 								{matchedSkills.length > 0 && (
 									<div className="cfg-search-group">
-										<div className="cfg-section">
-											Skills ({matchedSkills.length})
-										</div>
+										<div className="cfg-section">Skills ({matchedSkills.length})</div>
 										<div className="cfg-skills-list">
 											{matchedSkills.map((s) => (
 												<div key={s.name} className="cfg-res-card">
@@ -264,9 +249,7 @@ export function SettingsHub({
 														<Codicon name="terminal" size={13} />
 														<span className="cfg-res-name">/{c.name}</span>
 														{c.argumentHint && (
-															<span className="cfg-res-hint">
-																{c.argumentHint}
-															</span>
+															<span className="cfg-res-hint">{c.argumentHint}</span>
 														)}
 													</div>
 													<div className="cfg-res-desc">{c.description}</div>
@@ -285,22 +268,16 @@ export function SettingsHub({
 							<ProveedoresTab
 								providers={providers}
 								deviceCode={state.oauthDeviceCode}
-								onSetKey={(id, key) =>
-									post({ type: "set_key", provider: id, key })
-								}
-								onLogin={(id) =>
-									post({ type: "login_provider", provider: id })
-								}
-								onLogout={(id) =>
-									post({ type: "logout_provider", provider: id })
-								}
+								onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
+								onLogin={(id) => post({ type: "login_provider", provider: id })}
+								onLogout={(id) => post({ type: "logout_provider", provider: id })}
 							/>
 						)}
 
 						{tab === "models" && (
 							<div className="cfg-stub">
-								La selección rápida de modelo está en el botón de modelo de la
-								barra superior. Próximamente: gestión completa de modelos aquí.
+								La selección rápida de modelo está en el botón de modelo de la barra
+								superior. Próximamente: gestión completa de modelos aquí.
 							</div>
 						)}
 
@@ -314,8 +291,7 @@ export function SettingsHub({
 										onClick={() => post({ type: "reload" })}
 										disabled={state.busy}
 									>
-										<Codicon name="refresh" size={13} /> Recargar extensiones y
-										recursos
+										<Codicon name="refresh" size={13} /> Recargar extensiones y recursos
 									</button>
 								</div>
 								{state.resources ? (
@@ -363,12 +339,10 @@ export function SettingsHub({
 											}
 										/>
 									))}
-								{(state.resources?.modules ?? []).filter((m) => !m.toggleable)
-									.length > 0 && (
+								{(state.resources?.modules ?? []).filter((m) => !m.toggleable).length >
+									0 && (
 									<>
-										<div className="cfg-section">
-											Módulos base (siempre activos)
-										</div>
+										<div className="cfg-section">Módulos base (siempre activos)</div>
 										{(state.resources?.modules ?? [])
 											.filter((m) => !m.toggleable)
 											.map((m) => (

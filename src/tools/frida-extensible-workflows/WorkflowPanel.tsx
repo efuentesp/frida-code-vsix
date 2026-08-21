@@ -45,6 +45,7 @@ import {
 	runStats,
 	recentFailed,
 	hasPanelContent,
+	pipelineGraph,
 	AGENT_ICON,
 	SEGMENT_BG,
 } from "./panel-view";
@@ -495,6 +496,74 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 			{/* Contadores agregados de agentes (iconos lucide, no glifos) */}
 			{hasCounts ? <CountsRow counts={counts} /> : null}
 
+			{/* Propuesta 1: Pipeline Graph (DAG) conectado horizontalmente */}
+			{run.phases.length > 1 ? (
+				<fbox
+					cls="wf-graph"
+					flexDirection="row"
+					gap={4}
+					alignItems="center"
+					padding={4}
+				>
+					{pipelineGraph(run, now).map((node) => {
+						const isCurrent = node.state === "current";
+						const isDone = node.state === "done";
+						const color = isCurrent
+							? "#58a6ff"
+							: isDone
+								? STATE_COLOR.completed
+								: "#8b949e";
+						const bg = isCurrent
+							? "#58a6ff22"
+							: isDone
+								? "#3fb9501a"
+								: "transparent";
+						return (
+							<fbox
+								key={node.name}
+								flexDirection="row"
+								gap={4}
+								alignItems="center"
+							>
+								<fbox
+									cls={`wf-node ${node.state}`}
+									flexDirection="row"
+									gap={4}
+									alignItems="center"
+									padding={3}
+									background={bg}
+									bordered
+								>
+									<ficon
+										name={
+											isDone
+												? "check"
+												: isCurrent
+													? "loader-circle"
+													: "circle"
+										}
+										size={10}
+										color={color}
+										cls={isCurrent ? "spinner" : undefined}
+									/>
+									<ftext size={11} bold={isCurrent} color={color}>
+										{node.name}
+									</ftext>
+									{node.agentCount && node.agentCount > 0 ? (
+										<ftext size={10} color={color}>
+											({node.agentCount})
+										</ftext>
+									) : null}
+								</fbox>
+								{node.isLast ? null : (
+									<ficon name="arrow-right" size={10} color="#8b949e" />
+								)}
+							</fbox>
+						);
+					})}
+				</fbox>
+			) : null}
+
 			{/* #79: timeline vertical — una fila por fase vista; la activa expandida
 			    con sus agentes anidados (label humano + duración). */}
 			{timeline.length > 0 ? (
@@ -537,10 +606,13 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 									? row.agents.map((a) => (
 											<fbox
 												key={a.agentId}
+												cls="wf-agent-card"
 												flexDirection="row"
-												gap={4}
+												gap={6}
 												alignItems="center"
 												paddingLeft={14}
+												padding={4}
+												bordered
 											>
 												<ficon
 													name={AGENT_ICON[a.state]}
@@ -548,16 +620,21 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 													color={STATE_COLOR[a.state]}
 													cls={a.state === "running" ? "spinner" : undefined}
 												/>
-												<ftext size={11} color={STATE_COLOR[a.state]}>
+												<ftext size={11} bold color={STATE_COLOR[a.state]}>
 													{a.label}
 												</ftext>
-												{a.tokens !== undefined && a.tokens > 0 ? (
-													<ftext size={11} color="#8b949e">
-														{formatTokens(a.tokens)}
+												{a.role ? (
+													<ftext size={10} color="#8b949e">
+														[{a.role}]
 													</ftext>
 												) : null}
-												<ftext size={11} color="#8b949e">
-													{formatDuration(a.durationMs)}
+												{a.tokens !== undefined && a.tokens > 0 ? (
+													<ftext size={10} color="#8b949e">
+														∑ {formatTokens(a.tokens)}
+													</ftext>
+												) : null}
+												<ftext size={10} color="#8b949e">
+													⏱ {formatDuration(a.durationMs)}
 												</ftext>
 											</fbox>
 										))
@@ -584,34 +661,54 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 				<fbox
 					cls="wf-checkpoint"
 					background="#d2992221"
-					flexDirection="row"
-					gap={8}
-					alignItems="center"
+					flexDirection="column"
+					gap={6}
 					padding={8}
+					bordered
 				>
-					<ftext color="#d29922" size={12}>
-						Esperando tu aprobación: <ftext bold>{run.checkpointName}</ftext>
-					</ftext>
-					<fbutton
-						variant="primary"
-						onClick={() =>
-							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", true)
-						}
-					>
-						<fbox flexDirection="row" gap={4} alignItems="center">
-							<ficon name="check" size={11} /> <ftext size={11}>Aprobar</ftext>
-						</fbox>
-					</fbutton>
-					<fbutton
-						variant="danger"
-						onClick={() =>
-							resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", false)
-						}
-					>
-						<fbox flexDirection="row" gap={4} alignItems="center">
-							<ficon name="x" size={11} /> <ftext size={11}>Rechazar</ftext>
-						</fbox>
-					</fbutton>
+					<fbox flexDirection="row" gap={6} alignItems="center">
+						<ficon name="shield-alert" size={13} color="#d29922" />
+						<ftext color="#d29922" size={12} bold>
+							Esperando aprobación de checkpoint:
+						</ftext>
+						<ftext color="#d29922" size={12}>
+							{run.checkpointName}
+						</ftext>
+					</fbox>
+					<fbox flexDirection="row" gap={6} alignItems="center">
+						<fbutton
+							variant="primary"
+							onClick={() =>
+								resolveCheckpointFromUi(
+									run.runId,
+									run.checkpointName ?? "",
+									true,
+								)
+							}
+						>
+							<fbox flexDirection="row" gap={4} alignItems="center">
+								<ficon name="check" size={11} />
+								<ftext size={11} bold>
+									Aprobar y Continuar
+								</ftext>
+							</fbox>
+						</fbutton>
+						<fbutton
+							variant="danger"
+							onClick={() =>
+								resolveCheckpointFromUi(
+									run.runId,
+									run.checkpointName ?? "",
+									false,
+								)
+							}
+						>
+							<fbox flexDirection="row" gap={4} alignItems="center">
+								<ficon name="x" size={11} />
+								<ftext size={11}>Rechazar / Detener</ftext>
+							</fbox>
+						</fbutton>
+					</fbox>
 				</fbox>
 			) : null}
 

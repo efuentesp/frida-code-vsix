@@ -6236,7 +6236,10 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	white-space: nowrap;
-	transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+	transition:
+		background 0.1s ease,
+		color 0.1s ease,
+		border-color 0.1s ease;
 }
 .cfg-tab:hover {
 	background: var(--vscode-list-hoverBackground);
@@ -7211,7 +7214,7 @@ kbd {
 	}
 }
 
-/* ── WorkflowPanel v2 (#71): cards con pills de estado ────────────────── */
+/* ── WorkflowPanel v2 (Propuesta 1: Copilot Pipeline Graph & Live Task Runner) ── */
 /* El panel corre host-side (Remote React); las clases viajan por cls y se
    materializan acá. fbox bordered ya aporta borde+radio+fondo de tarjeta. */
 .wf-pill {
@@ -7225,6 +7228,45 @@ kbd {
 }
 .wf-checkpoint {
 	border-radius: 6px;
+	border: 1px solid var(--vscode-editorWarning-foreground, #d2992255) !important;
+	background: var(--vscode-inputValidation-warningBackground, rgba(210, 153, 34, 0.12)) !important;
+}
+.wf-graph {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.05));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+.wf-node {
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 11px;
+	font-weight: 500;
+	transition: all 0.15s ease;
+}
+.wf-node.done {
+	border-color: var(--vscode-testing-iconPassed, #3fb95044) !important;
+}
+.wf-node.current {
+	border-color: var(--vscode-textLink-foreground, #58a6ff) !important;
+	box-shadow: 0 0 0 1px var(--vscode-textLink-foreground, #58a6ff33);
+}
+.wf-node.pending {
+	border-color: var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15)) !important;
+	opacity: 0.7;
+}
+.wf-agent-card {
+	border-radius: 4px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.06));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	transition: border-color 0.1s ease;
+}
+.wf-agent-card:hover {
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
 }
 
 /* ── Fundaciones Visuales y Primitivas Copilot (Fase 1) ───────────────── */

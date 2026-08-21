@@ -160,6 +160,47 @@ export function phaseChips(
 	);
 }
 
+// ── Propuesta 1: Copilot Pipeline Graph (DAG) ────────────────────────────────
+
+export interface PipelineGraphNode {
+	name: string;
+	state: "done" | "current" | "pending";
+	agentCount?: number;
+	durationMs?: number;
+	isLast: boolean;
+}
+
+/** Nodos del grafo horizontal del pipeline (Propuesta 1). Muestra todas las
+ * fases conectadas con estado semántico (done/current/pending), conteo de
+ * agentes y duración acumulada. */
+export function pipelineGraph(
+	run: Pick<WorkflowRunView, "phases" | "phase" | "phaseTimes" | "agents">,
+	now: number,
+): readonly PipelineGraphNode[] {
+	const total = run.phases.length;
+	return run.phases.map((name, index) => {
+		const timing = run.phaseTimes[name];
+		const isCurrent = run.phase === name;
+		const startedAt = timing?.startedAt;
+		const endedAt = timing?.endedAt;
+		const state: PipelineGraphNode["state"] = isCurrent
+			? "current"
+			: startedAt === undefined
+				? "pending"
+				: "done";
+		const agentCount = run.agents.filter((a) => a.phase === name).length;
+		const durationMs =
+			startedAt === undefined ? 0 : (endedAt ?? now) - startedAt;
+		return {
+			name,
+			state,
+			agentCount: agentCount > 0 ? agentCount : undefined,
+			durationMs: durationMs > 0 ? durationMs : undefined,
+			isLast: index === total - 1,
+		};
+	});
+}
+
 // ── #79: timeline vertical + label humano ─────────────────────────────────────
 
 /** Agente anidado bajo su fase en el timeline (#79): el AgentProgressView

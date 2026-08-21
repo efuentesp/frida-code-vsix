@@ -20,6 +20,7 @@ import {
 	runStats,
 	recentFailed,
 	hasPanelContent,
+	pipelineGraph,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -534,7 +535,7 @@ describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", (
 				structuralPath: [],
 			},
 		});
-		expect(getWorkflowRuns()[0].lastActivityAt).toBeGreaterThanOrEqual(t1);
+		expect(getWorkflowRuns()[0].lastActivityAt ?? 0).toBeGreaterThanOrEqual(t1 ?? 0);
 	});
 
 	it("formatTokens legible; runStats elapsed con lastActivity", () => {
@@ -641,5 +642,74 @@ describe("frida-extensible-workflows · visibilidad forzada del panel (#84)", ()
 		expect(hasPanelContent([], empty, { pinned: false })).toBe(false);
 		expect(hasPanelContent([], empty, { pinned: true })).toBe(true);
 		expect(hasPanelContent([], empty, { showRequested: true })).toBe(true);
+	});
+});
+
+describe("frida-extensible-workflows · pipelineGraph (Propuesta 1)", () => {
+	it("genera nodos conectados con estados done, current y pending más conteo de agentes", () => {
+		const nodes = pipelineGraph(
+			{
+				phase: "research",
+				phases: ["discovery", "research", "plan", "review"],
+				phaseTimes: {
+					discovery: { startedAt: 0, endedAt: 15_000 },
+					research: { startedAt: 15_000 },
+				},
+				agents: [
+					{
+						agentId: "a1",
+						structuralPath: ["root"],
+						label: "Codebase Analyzer",
+						phase: "research",
+						state: "running",
+						startedAt: 16_000,
+					},
+					{
+						agentId: "a2",
+						structuralPath: ["root"],
+						label: "Domain Modeler",
+						phase: "research",
+						state: "running",
+						startedAt: 18_000,
+					},
+					{
+						agentId: "a0",
+						structuralPath: ["root"],
+						label: "Scope Tracer",
+						phase: "discovery",
+						state: "completed",
+						startedAt: 1_000,
+						endedAt: 14_000,
+					},
+				],
+			},
+			35_000,
+		);
+
+		expect(nodes).toHaveLength(4);
+		expect(nodes[0]).toMatchObject({
+			name: "discovery",
+			state: "done",
+			durationMs: 15_000,
+			agentCount: 1,
+			isLast: false,
+		});
+		expect(nodes[1]).toMatchObject({
+			name: "research",
+			state: "current",
+			durationMs: 20_000,
+			agentCount: 2,
+			isLast: false,
+		});
+		expect(nodes[2]).toMatchObject({
+			name: "plan",
+			state: "pending",
+			isLast: false,
+		});
+		expect(nodes[3]).toMatchObject({
+			name: "review",
+			state: "pending",
+			isLast: true,
+		});
 	});
 });
