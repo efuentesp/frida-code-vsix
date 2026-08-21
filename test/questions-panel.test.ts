@@ -114,7 +114,7 @@ describe("QuestionsPanel (Propuesta 2: Flujo Conversacional con Historial de Res
 					{
 						label: "JSON",
 						description: "Formato estructurado.",
-						preview: "```json\n{\n  \"version\": \"3.8\"\n}\n```",
+						preview: '```json\n{\n  "version": "3.8"\n}\n```',
 					},
 				],
 			},

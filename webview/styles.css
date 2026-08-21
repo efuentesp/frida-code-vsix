@@ -4075,7 +4075,8 @@ button.danger:hover {
 	flex-direction: column;
 	gap: 4px;
 	padding-bottom: 6px;
-	border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-bottom: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .q-step-chip {
 	display: flex;
@@ -4215,7 +4216,8 @@ button.danger:hover {
 }
 .q-review-row + .q-review-row {
 	padding-top: 8px;
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .q-review-head {
 	display: flex;
@@ -4292,14 +4294,19 @@ button.danger:hover {
 	background: var(--vscode-editor-background);
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 	cursor: pointer;
-	transition: background 0.1s ease, border-color 0.1s ease;
+	transition:
+		background 0.1s ease,
+		border-color 0.1s ease;
 }
 .q-opt:hover {
 	background: var(--vscode-list-hoverBackground);
 	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
 }
 .q-opt.selected {
-	background: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.12));
+	background: var(
+		--vscode-list-activeSelectionBackground,
+		rgba(0, 122, 204, 0.12)
+	);
 	border-color: var(--vscode-focusBorder, #007acc);
 }
 .q-opt.focused {
@@ -4460,7 +4467,8 @@ button.danger:hover {
 	padding: 4px 4px 0;
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 	margin-top: 2px;
 }
 .q-keys kbd {
@@ -4469,11 +4477,16 @@ button.danger:hover {
 	font-family: var(--vscode-editor-font-family, monospace);
 	font-size: 10px;
 	line-height: 1.2;
-	background: var(--vscode-keybindingLabel-background, rgba(128, 128, 128, 0.17));
+	background: var(
+		--vscode-keybindingLabel-background,
+		rgba(128, 128, 128, 0.17)
+	);
 	color: var(--vscode-keybindingLabel-foreground, var(--vscode-foreground));
-	border: 1px solid var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.3));
+	border: 1px solid
+		var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.3));
 	border-radius: 3px;
-	box-shadow: inset 0 -1px 0 var(--vscode-keybindingLabel-bottomBorder, rgba(0, 0, 0, 0.2));
+	box-shadow: inset 0 -1px 0
+		var(--vscode-keybindingLabel-bottomBorder, rgba(0, 0, 0, 0.2));
 }
 .model-change-card {
 	border: 1px solid var(--vscode-focusBorder, #454545);
@@ -5696,7 +5709,7 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 }
 
-/* Vista de Configuración (toggles de tools). */
+/* Vista de Configuración (Settings Editor Nativo de VS Code, Propuesta 1). */
 .cfg-panel {
 	position: absolute;
 	inset: 0;
@@ -5710,13 +5723,67 @@ kbd {
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	padding: 8px 12px;
-	border-bottom: 1px solid var(--vscode-panel-border);
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+.cfg-head-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.cfg-head-icon {
+	color: var(--vscode-foreground);
 }
 .cfg-title {
 	font-weight: 600;
-	font-size: 12px;
+	font-size: 13px;
+	color: var(--vscode-foreground);
 }
+
+/* Barra de búsqueda global nativa */
+.cfg-search-bar {
+	position: relative;
+	display: flex;
+	align-items: center;
+	padding: 8px 12px 6px;
+}
+.cfg-search-icon {
+	position: absolute;
+	left: 20px;
+	color: var(--vscode-input-placeholderForeground, rgba(128, 128, 128, 0.7));
+	pointer-events: none;
+}
+.cfg-search-input {
+	width: 100%;
+	height: 28px;
+	padding: 4px 26px 4px 28px;
+	font-size: 12px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	outline: none;
+}
+.cfg-search-input:focus {
+	border-color: var(--vscode-focusBorder);
+}
+.cfg-search-clear {
+	position: absolute;
+	right: 18px;
+	background: none;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	padding: 2px;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.cfg-search-clear:hover {
+	color: var(--vscode-foreground);
+}
+
 .cfg-body {
 	flex: 1;
 	overflow-y: auto;
@@ -5724,10 +5791,11 @@ kbd {
 }
 .cfg-section {
 	font-size: 11px;
+	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	color: var(--vscode-descriptionForeground);
-	margin: 4px 0 2px;
+	margin: 6px 0 3px;
 }
 .cfg-row {
 	display: flex;
@@ -6146,41 +6214,129 @@ kbd {
 	margin-top: 4px;
 }
 
-/* Hub de Configuración: pestañas. */
+/* Hub de Configuración: pestañas y chips por categorías. */
 .cfg-tabs {
 	display: flex;
-	gap: 2px;
-	border-bottom: 1px solid var(--vscode-panel-border);
-	margin-bottom: 12px;
-	flex-wrap: wrap;
+	gap: 4px;
+	padding: 2px 12px 8px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+	overflow-x: auto;
+	scrollbar-width: thin;
 }
 .cfg-tab {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 7px 10px;
-	font-size: 12px;
-	background: none;
-	border: none;
-	border-bottom: 2px solid transparent;
+	padding: 4px 10px;
+	font-size: 11.5px;
+	font-weight: 500;
+	border-radius: 4px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.08));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
-	margin-bottom: -1px;
+	white-space: nowrap;
+	transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
 }
 .cfg-tab:hover {
-	background: var(--vscode-list-activeSelectionBackground);
-	color: var(--vscode-list-activeSelectionForeground);
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.3));
 }
 .cfg-tab.active {
-	background: none;
-	color: var(--vscode-textLink-foreground, #4daafc);
-	border-bottom-color: var(--vscode-textLink-foreground, #4daafc);
+	background: var(--vscode-button-background, #007acc);
+	color: var(--vscode-button-foreground, #ffffff);
+	border-color: transparent;
+	font-weight: 600;
 }
 .cfg-stub {
 	font-size: 12px;
 	opacity: 0.7;
 	padding: 10px 2px;
 	line-height: 1.6;
+}
+
+/* Resultados de búsqueda global */
+.cfg-search-results {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.cfg-search-group {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.cfg-search-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 36px 16px;
+	text-align: center;
+	gap: 8px;
+}
+.cfg-empty-icon {
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.6;
+	margin-bottom: 4px;
+}
+.cfg-empty-title {
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+}
+.cfg-empty-desc {
+	font-size: 12px;
+	color: var(--vscode-descriptionForeground);
+	max-width: 280px;
+}
+.cfg-empty-btn {
+	margin-top: 6px;
+	padding: 4px 12px;
+	font-size: 12px;
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	border: 1px solid var(--vscode-button-border, transparent);
+	border-radius: 4px;
+	cursor: pointer;
+}
+.cfg-empty-btn:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}
+.cfg-res-card {
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.cfg-res-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.cfg-res-name {
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+.cfg-res-hint {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+.cfg-res-desc {
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+}
+.cfg-skills-list,
+.cfg-commands-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
 /* ProviderConfig: estado autenticado + confirmación de olvido. */

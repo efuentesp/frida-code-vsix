@@ -379,9 +379,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							<div key={i} className="q-step-chip">
 								<Codicon name="pass-filled" size={13} className="q-step-pass" />
 								<span className="q-step-num">{i + 1}.</span>
-								<span className="q-step-name">
-									{qq.header || `Paso ${i + 1}`}:
-								</span>
+								<span className="q-step-name">{qq.header || `Paso ${i + 1}`}:</span>
 								<span className="q-step-val">{value}</span>
 								<button
 									type="button"
@@ -411,15 +409,11 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							const answered = isAnswered(i);
 							let value: string;
 							if (!d || !answered) value = "(sin responder)";
-							else if (d.kind === "multi")
-								value = (d.selected ?? []).join(", ");
+							else if (d.kind === "multi") value = (d.selected ?? []).join(", ");
 							else if (d.kind === "custom") value = `(escrito) ${d.answer}`;
 							else value = d.answer ?? "";
 							return (
-								<div
-									key={i}
-									className={`q-review-row${answered ? " ok" : " missing"}`}
-								>
+								<div key={i} className={`q-review-row${answered ? " ok" : " missing"}`}>
 									<div className="q-review-head">
 										<span className="q-review-idx">{`Paso ${i + 1}`}</span>
 										<Codicon
@@ -492,10 +486,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							</div>
 						</div>
 					) : (
-						<div
-							className="q-options"
-							onMouseLeave={() => setHoverLabel(undefined)}
-						>
+						<div className="q-options" onMouseLeave={() => setHoverLabel(undefined)}>
 							{q!.options.map(renderOption)}
 						</div>
 					)}
