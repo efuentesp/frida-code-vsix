@@ -2808,24 +2808,38 @@ button.sec:hover {
 }
 
 .statusline-ctx-bar {
-	width: 36px;
-	height: 4px;
-	background: var(--vscode-progressBar-background, rgba(128, 128, 128, 0.25));
-	border-radius: 2px;
+	width: 42px;
+	height: 6px;
+	background: rgba(0, 0, 0, 0.45);
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-editorWidget-border, rgba(255, 255, 255, 0.18))
+		);
+	border-radius: 3px;
 	overflow: hidden;
 	display: inline-flex;
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+	flex-shrink: 0;
+}
+
+.vscode-light .statusline-ctx-bar {
+	background: rgba(0, 0, 0, 0.12);
+	border-color: rgba(0, 0, 0, 0.22);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .statusline-ctx-fill {
 	height: 100%;
-	background: var(--vscode-textLink-foreground, #4daafc);
+	background: #388bfd; /* Azul cian de alto contraste con el fondo neutro */
 	transition: width 0.2s ease;
+	border-radius: 1px;
 }
 .statusline-ctx-fill.mid {
-	background: var(--vscode-editorWarning-foreground, #cca700);
+	background: #d29922; /* Ámbar / amarillo alerta */
 }
 .statusline-ctx-fill.high {
-	background: var(--vscode-errorForeground, #f85149);
+	background: #f85149; /* Rojo peligro */
 }
 
 .statusline-ctx-tokens {

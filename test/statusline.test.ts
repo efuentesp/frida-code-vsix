@@ -4,11 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Statusline } from "../webview/components/Statusline";
 
 describe("Statusline component (Propuesta 1: VS Code Native Statusline)", () => {
-	it("renderiza carpeta de trabajo y rama git con diff", () => {
+	it("renderiza carpeta de trabajo con tooltip de ruta completa y rama git con diff", () => {
 		const html = renderToStaticMarkup(
 			React.createElement(Statusline, {
 				ws: {
-					cwd: "/Users/dev/project",
+					cwd: "/Users/dev/project/subfolder",
 					branch: "main",
 					dirty: true,
 					diff: { added: 3, modified: 1, deleted: 0 },
@@ -16,7 +16,8 @@ describe("Statusline component (Propuesta 1: VS Code Native Statusline)", () => 
 			}),
 		);
 		expect(html).toContain("statusline");
-		expect(html).toContain("project");
+		expect(html).toContain("subfolder");
+		expect(html).toContain('title="/Users/dev/project/subfolder"');
 		expect(html).toContain("main");
 		expect(html).toContain("+3 ~1");
 	});
@@ -75,6 +76,7 @@ describe("Statusline component (Propuesta 1: VS Code Native Statusline)", () => 
 		);
 		expect(html).toContain("Sesión Refactor");
 		expect(html).toContain("statusline-ctx");
+		expect(html).toContain("25k/200k");
 		expect(html).toContain("13%");
 		expect(html).toContain("$0.015");
 	});

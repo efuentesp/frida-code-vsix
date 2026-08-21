@@ -51,7 +51,8 @@ function fmtNum(n: number): string {
 function ctxTooltip(usage: Usage, pct: number, unknown: boolean): string {
 	const lines: string[] = [];
 	const curToks = usage.contextTokens > 0 ? fmtNum(usage.contextTokens) : "0";
-	const maxToks = usage.contextWindow > 0 ? fmtNum(usage.contextWindow) : "200,000";
+	const maxToks =
+		usage.contextWindow > 0 ? fmtNum(usage.contextWindow) : "200,000";
 	lines.push(
 		`Ventana de contexto: ${curToks} / ${maxToks} tokens (${unknown ? "?" : `${pct}%`})`,
 	);
@@ -135,8 +136,8 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 		<footer className="statusline">
 			<div className="statusline-left">
 				{ws && (
-					<Tooltip label={ws.cwd} side="top">
-						<span className="statusline-item">
+					<Tooltip label={ws.cwd} side="top-right" wide>
+						<span className="statusline-item" title={ws.cwd}>
 							<Codicon name="folder" size={12} />
 							<span className="statusline-txt">{shortCwd(ws.cwd)}</span>
 						</span>
@@ -144,8 +145,11 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 				)}
 
 				{ws?.branch && (
-					<Tooltip label={branchTooltip(ws)} side="top">
-						<span className={"statusline-item" + (ws.dirty ? " is-dirty" : "")}>
+					<Tooltip label={branchTooltip(ws)} side="top-right" wide>
+						<span
+							className={"statusline-item" + (ws.dirty ? " is-dirty" : "")}
+							title={branchTooltip(ws)}
+						>
 							<Codicon name="git-branch" size={12} />
 							<span className="statusline-txt">{ws.branch}</span>
 							{diffSummary ? (
@@ -156,8 +160,15 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 				)}
 
 				{ws?.worktreeName && (
-					<Tooltip label={`Worktree: ${ws.worktreeName} (${ws.cwd})`} side="top">
-						<span className="statusline-item statusline-wt">
+					<Tooltip
+						label={`Worktree: ${ws.worktreeName} (${ws.cwd})`}
+						side="top-right"
+						wide
+					>
+						<span
+							className="statusline-item statusline-wt"
+							title={`Worktree: ${ws.worktreeName} (${ws.cwd})`}
+						>
 							<Codicon name="repo-forked" size={12} />
 							<span>wt:{ws.worktreeName}</span>
 						</span>
@@ -165,12 +176,17 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 				)}
 
 				{goal && (
-					<Tooltip label={`Meta: ${goal.text} (${goal.status})`} side="top">
+					<Tooltip
+						label={`Meta: ${goal.text} (${goal.status})`}
+						side="top-right"
+						wide
+					>
 						<span
 							className={
 								"statusline-item statusline-goal " +
 								(goal.status === "active" ? "active" : "")
 							}
+							title={`Meta: ${goal.text} (${goal.status})`}
 						>
 							<Codicon name="target" size={12} />
 							<span>{goalLabel(goal)}</span>
@@ -213,10 +229,7 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 			<div className="statusline-right">
 				{usage && (
 					<Tooltip label={ctxTooltip(usage, pct, unknown)} side="top-left" wide>
-						<div
-							className="statusline-ctx"
-							title={ctxTooltip(usage, pct, unknown)}
-						>
+						<div className="statusline-ctx" title={ctxTooltip(usage, pct, unknown)}>
 							<span className="statusline-ctx-bar">
 								<span
 									className={"statusline-ctx-fill " + level}
@@ -226,11 +239,13 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 								/>
 							</span>
 							<span className="statusline-ctx-tokens">
-								{usage.contextTokens > 0 ? fmt(usage.contextTokens) : ""}
+								{usage.contextWindow > 0
+									? `${usage.contextTokens > 0 ? fmt(usage.contextTokens) : "0"}/${fmt(usage.contextWindow)}`
+									: usage.contextTokens > 0
+										? fmt(usage.contextTokens)
+										: ""}
 							</span>
-							<span className="statusline-ctx-pct">
-								{unknown ? "?" : `${pct}%`}
-							</span>
+							<span className="statusline-ctx-pct">{unknown ? "?" : `${pct}%`}</span>
 							{usage.cost > 0 && (
 								<span className="statusline-cost">${usage.cost.toFixed(3)}</span>
 							)}
