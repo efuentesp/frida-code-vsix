@@ -50,6 +50,8 @@ import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
+import { Followups } from "./components/Followups";
+import { getContextualFollowups } from "./followup-rules";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -116,6 +118,11 @@ export function App() {
 	const [retrySecs, setRetrySecs] = useState<number | null>(null);
 	const lastEscRef = useRef(0);
 	const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const followups = useMemo(
+		() => getContextualFollowups(state.turns, state.busy),
+		[state.turns, state.busy],
+	);
 
 	useEffect(() => {
 		const vscode = getVsCode();
@@ -733,6 +740,10 @@ export function App() {
 					onMove={(id, dir) => post({ type: "queue_move", id, dir })}
 				/>
 				<LensDiagnostics lens={state.lens} />
+				<Followups
+					items={followups}
+					onSelect={(text) => post({ type: "submit", text, mode: "steer" })}
+				/>
 				{state.modelChanges.length > 0 ? (
 					// Confirmación de cambio de proveedor pendiente (red de seguridad):
 					// ocupa el lugar del composer como las aprobaciones.

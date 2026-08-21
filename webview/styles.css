@@ -2457,6 +2457,49 @@ button.sec:hover {
 	z-index: 1;
 }
 
+/* Followups Copilot (.chat-followups) */
+.chat-followups {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 4px 12px 6px;
+}
+
+.chat-followup-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 8px;
+	border-radius: 12px;
+	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.2))
+		);
+	color: var(--vscode-textLink-foreground, #4daafc);
+	font-size: 11.5px;
+	line-height: 1.4;
+	cursor: pointer;
+	text-align: left;
+	user-select: none;
+	transition:
+		background-color 0.12s ease,
+		border-color 0.12s ease,
+		transform 0.1s ease;
+}
+
+.chat-followup-btn:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.16));
+	border-color: var(--vscode-textLink-foreground, #4daafc);
+	transform: translateY(-1px);
+}
+
+.chat-followup-btn .followup-icon {
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.8;
+}
+
 /* Aprobación pendiente en el lugar del Composer (input oculto):
    mismo padding horizontal que .bar; la tarjeta .approval pierde su
    margin propio aquí para no duplicar espaciado. */
