@@ -90,6 +90,16 @@ export function buildFridaPayload(
 	// muere en 500, así que no se pierde nada que funcionara). Removible:
 	// cuando el gateway acepte la forma estándar, borrar este bloque y el
 	// T1 de live-multiturn.e2e seguirá verde (prueba la cadena real).
+	//
+	// Errata-14 (2026-08-21): tras filtrar los bloques vacíos puede quedar un
+	// mensaje assistant SIN contenido (turno solo-tools: pi-ai abre cada turno
+	// con un bloque text ""). Ese item se OMITE completo — NO se rellena con
+	// texto sintético: el 400 del upstream Anthropic solo ocurre con bloques
+	// text:"" PRESENTES, no con su ausencia, y un placeholder ("✓", usado
+	// brevemente) contamina el few-shot: el modelo imitaba "✓" tras cada tool
+	// call y esas burbujas huérfanas aparecían en el transcript. Los items
+	// fc/fc_out viajan SEPARADOS en input, así que el historial de tools queda
+	// íntegro sin el mensaje vacío.
 	if (Array.isArray(out.input)) {
 		let changed = false;
 		const input: unknown[] = [];
@@ -128,13 +138,9 @@ export function buildFridaPayload(
 							}
 							return true;
 						});
-					input.push({
-						...m,
-						content:
-							filteredContent.length > 0
-								? filteredContent
-								: [{ type: "input_text", text: "✓" }],
-					});
+					// Errata-14: sin contenido → item omitido (sin placeholder sintético)
+					if (filteredContent.length > 0)
+						input.push({ ...m, content: filteredContent });
 					continue;
 				}
 			}

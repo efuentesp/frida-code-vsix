@@ -742,6 +742,66 @@ describe("buildFridaPayload: traducción Errata-13 (output_text→input_text, dr
 		expect((out.input as any[])[2]).toEqual(fco);
 	});
 
+	// ─── Errata-14: mensaje assistant sin contenido se OMITE (sin placeholder) ─
+
+	it("assistant con SOLO texto vacío se omite completo — sin placeholder sintético (Errata-14)", () => {
+		const out = buildFridaPayload(
+			{
+				input: [
+					{ role: "user", content: [{ type: "input_text", text: "u" }] },
+					{
+						type: "message",
+						role: "assistant",
+						content: [{ type: "output_text", text: "", annotations: [] }],
+						status: "completed",
+						id: "msg_empty",
+					},
+					{
+						type: "function_call",
+						call_id: "c1",
+						name: "get_weather",
+						arguments: "{}",
+					},
+					{
+						type: "function_call_output",
+						call_id: "c1",
+						output: '{"temp":22}',
+					},
+				],
+			},
+			ID,
+		);
+		const types = (out.input as any[]).map((i) => i.type ?? i.role);
+		// el mensaje vacío desaparece; fc/fc_out viajan íntegros
+		expect(types).toEqual(["user", "function_call", "function_call_output"]);
+		// y NINGÚN bloque de texto sintético (“✓”) se inyecta (el modelo lo
+		// imitaba por few-shot y aparecía como burbujas huérfanas en el transcript)
+		const serialized = JSON.stringify(out.input);
+		expect(serialized).not.toContain("✓");
+	});
+
+	it("assistant con texto mixto (vacío + real) conserva solo el real", () => {
+		const out = buildFridaPayload(
+			{
+				input: [
+					{ role: "user", content: [{ type: "input_text", text: "u" }] },
+					{
+						type: "message",
+						role: "assistant",
+						content: [
+							{ type: "output_text", text: "   ", annotations: [] },
+							{ type: "output_text", text: "Hace 22°C.", annotations: [] },
+						],
+					},
+				],
+			},
+			ID,
+		);
+		const ast = (out.input as any[]).find((i) => i.role === "assistant");
+		expect(ast.content).toHaveLength(1);
+		expect(ast.content[0].text).toBe("Hace 22°C.");
+	});
+
 	it("developer→system (Errata-8) sigue aplicando JUNTO a la traducción", () => {
 		const out = buildFridaPayload(
 			{
