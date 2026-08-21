@@ -28,11 +28,9 @@ function loadLib(): {
 		{},
 		{ codeGeneration: { strings: false, wasm: false } },
 	);
-	vm.runInContext(
-		SPRINT_STATUS_LIB.replace(/^\n/, ""),
-		context,
-		{ filename: "sprint-status-lib.js" },
-	);
+	vm.runInContext(SPRINT_STATUS_LIB.replace(/^\n/, ""), context, {
+		filename: "sprint-status-lib.js",
+	});
 	return context as never;
 }
 
@@ -150,7 +148,9 @@ stories:
 				},
 			},
 		});
-		expect(text).toContain("blockedReason: lie-detector: claims sin diff: src/x.ts");
+		expect(text).toContain(
+			"blockedReason: lie-detector: claims sin diff: src/x.ts",
+		);
 		const back = lib.sprintParseStatus(text) as never;
 		expect(lib.sprintSerializeStatus(back)).toBe(text);
 	});
@@ -170,9 +170,7 @@ stories:
 			["review", "blocked"],
 			["blocked", "pending"],
 			["deferred", "pending"],
-			...SPRINT_STORY_STATUSES.map(
-				(s): [string, string] => [s, s],
-			),
+			...SPRINT_STORY_STATUSES.map((s): [string, string] => [s, s]),
 		];
 		for (const [from, to] of legal) {
 			expect(lib.sprintCanTransition(from, to), `${from}→${to}`).toBe(true);
@@ -180,13 +178,9 @@ stories:
 		// Ilegales: todo lo demás (done terminal, regresiones, saltos raros).
 		for (const from of SPRINT_STORY_STATUSES) {
 			for (const to of SPRINT_STORY_STATUSES) {
-				const isLegal = legal.some(
-					([f, t]) => f === from && t === to,
-				);
+				const isLegal = legal.some(([f, t]) => f === from && t === to);
 				if (!isLegal) {
-					expect(lib.sprintCanTransition(from, to), `${from}→${to}`).toBe(
-						false,
-					);
+					expect(lib.sprintCanTransition(from, to), `${from}→${to}`).toBe(false);
 				}
 			}
 		}
@@ -196,9 +190,17 @@ stories:
 		const lib = loadLib();
 		const status = lib.sprintParseStatus(
 			"sprint: 1\nstories:\n  E1-S1:\n    title: x\n    spec: s.md\n    status: blocked\n    attempts: 2\n    blockedReason: API caída\n",
-		) as { stories: Record<string, { status: string; attempts?: number; blockedReason?: string }> };
+		) as {
+			stories: Record<
+				string,
+				{ status: string; attempts?: number; blockedReason?: string }
+			>;
+		};
 		const next = lib.sprintApplyTransition(status, "E1-S1", "pending") as {
-			stories: Record<string, { status: string; attempts?: number; blockedReason?: string }>;
+			stories: Record<
+				string,
+				{ status: string; attempts?: number; blockedReason?: string }
+			>;
 		};
 		// El original no mutó.
 		expect(status.stories["E1-S1"]!.status).toBe("blocked");
@@ -214,19 +216,24 @@ stories:
 		);
 		const done = lib.sprintApplyTransition(base, "E1-S1", "done");
 		expect(
-			(done as { stories: Record<string, { status: string }> }).stories[
-				"E1-S1"
-			]!.status,
+			(done as { stories: Record<string, { status: string }> }).stories["E1-S1"]!
+				.status,
 		).toBe("done");
 		// done es terminal.
 		expect(() => lib.sprintApplyTransition(done, "E1-S1", "pending")).toThrow(
 			/transicion ilegal/,
 		);
 		// blocked sin razón → default explícito.
-		const blocked = lib.sprintApplyTransition(base, "E1-S1", "blocked", "tests rojos");
+		const blocked = lib.sprintApplyTransition(
+			base,
+			"E1-S1",
+			"blocked",
+			"tests rojos",
+		);
 		expect(
-			(blocked as { stories: Record<string, { blockedReason?: string }> })
-				.stories["E1-S1"]!.blockedReason,
+			(blocked as { stories: Record<string, { blockedReason?: string }> }).stories[
+				"E1-S1"
+			]!.blockedReason,
 		).toBe("tests rojos");
 	});
 

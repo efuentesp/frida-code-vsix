@@ -15,29 +15,29 @@
 
 /** Estados de una historia. done es terminal (never-regress). */
 export const SPRINT_STORY_STATUSES = [
-	"pending",
-	"in_progress",
-	"review",
-	"done",
-	"blocked",
-	"deferred",
+  "pending",
+  "in_progress",
+  "review",
+  "done",
+  "blocked",
+  "deferred",
 ] as const;
 
 export type SprintStoryStatus = (typeof SPRINT_STORY_STATUSES)[number];
 
 export interface SprintStory {
-	title: string;
-	spec: string;
-	status: SprintStoryStatus;
-	/** Intentos de rework consumidos (review CONCERNS / lie-detector fail). */
-	attempts?: number;
-	/** Motivo del bloqueo (status=blocked). */
-	blockedReason?: string;
+  title: string;
+  spec: string;
+  status: SprintStoryStatus;
+  /** Intentos de rework consumidos (review CONCERNS / lie-detector fail). */
+  attempts?: number;
+  /** Motivo del bloqueo (status=blocked). */
+  blockedReason?: string;
 }
 
 export interface SprintStatus {
-	sprint: string;
-	stories: Record<string, SprintStory>;
+  sprint: string;
+  stories: Record<string, SprintStory>;
 }
 
 /** Ruta del archivo (relativa al cwd del proyecto). */

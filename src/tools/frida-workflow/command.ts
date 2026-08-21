@@ -85,10 +85,7 @@ export async function handleWfSlash(
 		builtIns: listWorkflows(),
 	});
 	const wfs = loaded.workflows;
-	const wfNames = [
-		...wfs.keys(),
-		...(deps.availablePatterns ?? []),
-	];
+	const wfNames = [...wfs.keys(), ...(deps.availablePatterns ?? [])];
 
 	// /wf check — valida TODO y presenta los issues (abrir archivo:línea). Se sirve
 	// ANTES del abort por errores de carga: justamente los muestra.
@@ -276,10 +273,7 @@ function notifyResult(host: WorkflowHost, wfName: string) {
 				"info",
 			);
 		} else {
-			host.notify(
-				`✗ ${wfName} falló: ${r.error ?? "error desconocido"}`,
-				"error",
-			);
+			host.notify(`✗ ${wfName} falló: ${r.error ?? "error desconocido"}`, "error");
 		}
 	};
 }

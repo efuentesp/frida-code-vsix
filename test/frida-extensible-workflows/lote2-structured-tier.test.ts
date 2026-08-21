@@ -41,7 +41,7 @@ describe("structured-output · parseJsonLoose (#19 G1)", () => {
 	});
 	it("quita fences ```json", () => {
 		expect(parseJsonLoose('```json\n{"a":true}\n```')).toEqual({ a: true });
-		expect(parseJsonLoose('```\n[1]\n```')).toEqual([1]);
+		expect(parseJsonLoose("```\n[1]\n```")).toEqual([1]);
 	});
 	it("recorta prosa alrededor del JSON embebido", () => {
 		expect(
@@ -113,9 +113,7 @@ describe("structured-output · validateJsonSchemaValue (#19 G1)", () => {
 		// missing required se reporta a nivel del ÍTEM ($.candidates[0]), no
 		// de la propiedad ausente.
 		expect(
-			errors.some(
-				(e) => e.includes("$.candidates[0]") && e.includes('"line"'),
-			),
+			errors.some((e) => e.includes("$.candidates[0]") && e.includes('"line"')),
 		).toBe(true);
 	});
 	it("enum rechaza valores fuera de la lista", () => {
@@ -160,7 +158,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			return spawnResult("texto plano");
 		};
 		const wrapped = withStructuredOutput(inner);
-		const out = (await wrapped("haz algo", {}, new AbortController().signal, ident())) as {
+		const out = (await wrapped(
+			"haz algo",
+			{},
+			new AbortController().signal,
+			ident(),
+		)) as {
 			value: JsonValue;
 		};
 		// Passthrough: devuelve el envelope spawnResult del inner TAL CUAL.
@@ -170,7 +173,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 
 	it("con schema parsea el JSON del texto y valida", async () => {
 		const wrapped = withStructuredOutput(scriptedSpawn(['{"ok":true}']));
-		const out = (await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident())) as {
+		const out = (await wrapped(
+			"decide",
+			{ outputSchema: schema },
+			new AbortController().signal,
+			ident(),
+		)) as {
 			value: JsonValue;
 		};
 		expect(out.value).toEqual({ ok: true });
@@ -185,7 +193,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			);
 		};
 		const wrapped = withStructuredOutput(inner);
-		const out = (await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident())) as {
+		const out = (await wrapped(
+			"decide",
+			{ outputSchema: schema },
+			new AbortController().signal,
+			ident(),
+		)) as {
 			value: JsonValue;
 		};
 		expect(prompts).toHaveLength(2);
@@ -200,7 +213,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			maxRepairAttempts: 0,
 		});
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/outputSchema no satisfecho/);
 	});
 
@@ -209,20 +227,33 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 	// real: 3 runs de aidd-plan fallidos sin poder saber el output del agente).
 	it("#91 E1: el throw incluye los ERRORES de validación del último intento", async () => {
 		const wrapped = withStructuredOutput(
-			scriptedSpawn(["{\"ok\":\"texto\"}"]), // ok esperaba boolean
+			scriptedSpawn(['{"ok":"texto"}']), // ok esperaba boolean
 			{ maxRepairAttempts: 0 },
 		);
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/\$\.ok: expected boolean, got string/);
 	});
 
 	it("#91 E1: el throw incluye el OUTPUT crudo que produjo el modelo (JSON inválido)", async () => {
-		const wrapped = withStructuredOutput(scriptedSpawn(["Basándome en el documento…"]), {
-			maxRepairAttempts: 0,
-		});
+		const wrapped = withStructuredOutput(
+			scriptedSpawn(["Basándome en el documento…"]),
+			{
+				maxRepairAttempts: 0,
+			},
+		);
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/Basándome en el documento/);
 	});
 
@@ -232,11 +263,21 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			maxRepairAttempts: 0,
 		});
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/x{0,900}x\.{3}... \(truncado\)|x{1000}/);
 		// el mensaje NO contiene los 5000 chars completos
 		try {
-			await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident());
+			await wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			);
 		} catch (e) {
 			expect((e as Error).message.length).toBeLessThan(2000);
 		}
@@ -247,7 +288,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			maxRepairAttempts: 0,
 		});
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/unlabeled[\s\S]*prosa pura/);
 	});
 
@@ -259,12 +305,17 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			async () =>
 				spawnResult(null as unknown as JsonValue, {
 					nullDiagnostic:
-					"último assistant: stopReason=stop bloques=[thinking] · thinking: «las historias son…»",
+						"último assistant: stopReason=stop bloques=[thinking] · thinking: «las historias son…»",
 				}),
 			{ maxRepairAttempts: 0 },
 		);
 		await expect(
-			wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident()),
+			wrapped(
+				"decide",
+				{ outputSchema: schema },
+				new AbortController().signal,
+				ident(),
+			),
 		).rejects.toThrow(/stopReason=stop bloques=\[thinking\]/);
 	});
 
@@ -273,14 +324,21 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 		const inner: SpawnAgentFn = async (p) => {
 			prompts.push(p);
 			return spawnResult(
-				(prompts.length === 1 ? null : JSON.stringify({ ok: true })) as unknown as JsonValue,
+				(prompts.length === 1
+					? null
+					: JSON.stringify({ ok: true })) as unknown as JsonValue,
 				{
 					nullDiagnostic: "último assistant: bloques=[thinking] (sin texto)",
 				},
 			);
 		};
 		const wrapped = withStructuredOutput(inner);
-		const out = (await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident())) as {
+		const out = (await wrapped(
+			"decide",
+			{ outputSchema: schema },
+			new AbortController().signal,
+			ident(),
+		)) as {
 			value: JsonValue;
 		};
 		expect(out.value).toEqual({ ok: true });
@@ -304,7 +362,12 @@ describe("structured-output · withStructuredOutput (#19 G1)", () => {
 			});
 		};
 		const wrapped = withStructuredOutput(inner);
-		const raw = (await wrapped("decide", { outputSchema: schema }, new AbortController().signal, ident())) as {
+		const raw = (await wrapped(
+			"decide",
+			{ outputSchema: schema },
+			new AbortController().signal,
+			ident(),
+		)) as {
 			value: JsonValue;
 			accounting?: { input: number; cost: number };
 			durationMs?: number;
@@ -534,7 +597,12 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 		const spawn = spawnReturning({
 			targets: '[{"id":"T1","risk":"P0"},{"id":"T2","risk":"P1"}]',
 		});
-		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)(
+			"decide",
+			{ outputSchema: TARGETS_SCHEMA } as never,
+			{} as never,
+			{} as never,
+		)) as {
 			value: unknown;
 		};
 		expect(out.value).toEqual({
@@ -549,7 +617,12 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 		const spawn = spawnReturning(
 			'{"targets": "[{\\"id\\":\\"T1\\",\\"risk\\":\\"P0\\"}]"}',
 		);
-		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: TARGETS_SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)(
+			"decide",
+			{ outputSchema: TARGETS_SCHEMA } as never,
+			{} as never,
+			{} as never,
+		)) as {
 			value: unknown;
 		};
 		expect(out.value).toEqual({
@@ -564,7 +637,12 @@ describe("structured-output · tolerancia outputSchema (#82: double-encoding GLM
 			required: ["summary"],
 		};
 		const spawn = spawnReturning({ summary: '{"parece":"json"}' });
-		const out = (await withStructuredOutput(spawn)("decide", { outputSchema: SCHEMA } as never, {} as never, {} as never)) as {
+		const out = (await withStructuredOutput(spawn)(
+			"decide",
+			{ outputSchema: SCHEMA } as never,
+			{} as never,
+			{} as never,
+		)) as {
 			value: unknown;
 		};
 		// El schema pide string → el contenido json-looking se conserva tal cual.

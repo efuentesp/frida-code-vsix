@@ -14,51 +14,51 @@
 import { SPRINT_STATUS_LIB } from "./sprint-status";
 
 export interface AiddShipArgs {
-	sprint?: string;
-	review?: "manual" | "auto";
-	/** Sweeps máximos sobre el ledger deferred (default 2). */
-	maxSweeps?: number;
+  sprint?: string;
+  review?: "manual" | "auto";
+  /** Sweeps máximos sobre el ledger deferred (default 2). */
+  maxSweeps?: number;
 }
 
 /** Escape de backslash/backtick/${ para interpolar en template literal. */
 function lit(value: string): string {
-	return value
-		.replaceAll("\\", "\\\\")
-		.replaceAll("`", "\\`")
-		.replaceAll("${", "\\${");
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("`", "\\`")
+    .replaceAll("${", "\\${");
 }
 
 export function validateAiddShipArgs(args: unknown): AiddShipArgs {
-	const record =
-		args && typeof args === "object" && !Array.isArray(args)
-			? (args as Record<string, unknown>)
-			: {};
-	if (
-		record.review !== undefined &&
-		record.review !== "manual" &&
-		record.review !== "auto"
-	) {
-		throw new Error(
-			'Patrón "aidd-ship": args.review debe ser "manual" o "auto".',
-		);
-	}
-	if (record.maxSweeps !== undefined) {
-		const m = record.maxSweeps;
-		if (typeof m !== "number" || !Number.isInteger(m) || m < 0 || m > 5) {
-			throw new Error(
-				'Patrón "aidd-ship": args.maxSweeps debe ser entero 0-5.',
-			);
-		}
-	}
-	return {
-		...(typeof record.sprint === "string" && record.sprint.trim()
-			? { sprint: record.sprint }
-			: {}),
-		...(record.review ? { review: record.review as "manual" | "auto" } : {}),
-		...(typeof record.maxSweeps === "number"
-			? { maxSweeps: record.maxSweeps }
-			: {}),
-	};
+  const record =
+    args && typeof args === "object" && !Array.isArray(args)
+      ? (args as Record<string, unknown>)
+      : {};
+  if (
+    record.review !== undefined &&
+    record.review !== "manual" &&
+    record.review !== "auto"
+  ) {
+    throw new Error(
+      'Patrón "aidd-ship": args.review debe ser "manual" o "auto".',
+    );
+  }
+  if (record.maxSweeps !== undefined) {
+    const m = record.maxSweeps;
+    if (typeof m !== "number" || !Number.isInteger(m) || m < 0 || m > 5) {
+      throw new Error(
+        'Patrón "aidd-ship": args.maxSweeps debe ser entero 0-5.',
+      );
+    }
+  }
+  return {
+    ...(typeof record.sprint === "string" && record.sprint.trim()
+      ? { sprint: record.sprint }
+      : {}),
+    ...(record.review ? { review: record.review as "manual" | "auto" } : {}),
+    ...(typeof record.maxSweeps === "number"
+      ? { maxSweeps: record.maxSweeps }
+      : {}),
+  };
 }
 
 const DEV_PROMPT = `You are the DEV agent of an AiDD ship loop (BMAD adapted; you run headless in a disposable session). Implement the story spec below with your file tools, in the repository at the session cwd.
@@ -87,7 +87,7 @@ const TRIAGE_PROMPT = `You are the sweep triage agent of an AiDD ship loop. Give
 
 /** Genera el script del workflow `aidd-ship`. */
 export function generateAiddShipWorkflow(): string {
-	return `// Patrón curado: aidd-ship (frida-aidd #38, Lote 2 — fase ship).
+  return `// Patrón curado: aidd-ship (frida-aidd #38, Lote 2 — fase ship).
 // Loop determinista por historia: dev → lie-detector → review acotado →
 // verify determinista → commit del orquestador. sprint-status.yaml tiene un
 // ÚNICO writer (este script) con transiciones never-regress; el deferred

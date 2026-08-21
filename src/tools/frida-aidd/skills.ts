@@ -33,9 +33,7 @@ export const AIDD_PLANNING_DIR = "docs/aidd/planning";
  * del stage; el generador les antepone el contexto runtime (idea, artefactos
  * previos, rutas absolutas) antes de pasárselos a agent().
  */
-export const DEFAULT_STAGE_PROMPTS: Readonly<
-	Record<AiddPlanStage, string>
-> = {
+export const DEFAULT_STAGE_PROMPTS: Readonly<Record<AiddPlanStage, string>> = {
 	"product-brief": `# Product Brief — Business Analyst (Mary)
 
 You are Mary, the Business Analyst. Adapted from BMAD-METHOD's bmad-agent-analyst (MIT).
@@ -159,9 +157,7 @@ export function buildStageContext(args: {
 	previousArtifacts: string[];
 }): string {
 	const prev = args.previousArtifacts.length
-		? args.previousArtifacts
-				.map((p) => `- ${p}`)
-				.join("\n")
+		? args.previousArtifacts.map((p) => `- ${p}`).join("\n")
 		: "- (none — you are the first stage)";
 	return [
 		"## Runtime context",

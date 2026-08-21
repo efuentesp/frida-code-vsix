@@ -141,12 +141,7 @@ export function validateJsonSchemaValue(
 	schema: JsonSchema | undefined,
 	path = "$",
 ): string[] {
-	if (
-		!schema ||
-		typeof schema !== "object" ||
-		Array.isArray(schema)
-	)
-		return [];
+	if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
 	const errors: string[] = [];
 	const t = schema.type;
 	if (typeof t === "string") {
@@ -165,11 +160,7 @@ export function validateJsonSchemaValue(
 		}
 	}
 	if (Array.isArray(schema.enum)) {
-		if (
-			!schema.enum.some(
-				(e) => JSON.stringify(e) === JSON.stringify(value),
-			)
-		) {
+		if (!schema.enum.some((e) => JSON.stringify(e) === JSON.stringify(value))) {
 			errors.push(
 				`${path}: value ${JSON.stringify(value)} not in enum [${schema.enum
 					.map((e) => JSON.stringify(e))
@@ -203,11 +194,7 @@ export function validateJsonSchemaValue(
 			}
 		}
 	}
-	if (
-		Array.isArray(value) &&
-		schema.items &&
-		typeof schema.items === "object"
-	) {
+	if (Array.isArray(value) && schema.items && typeof schema.items === "object") {
 		value.forEach((item, i) => {
 			errors.push(
 				...validateJsonSchemaValue(
@@ -278,11 +265,7 @@ export function normalizeStructuredValue(
 		return value;
 	}
 
-	if (
-		Array.isArray(value) &&
-		schema.items &&
-		typeof schema.items === "object"
-	) {
+	if (Array.isArray(value) && schema.items && typeof schema.items === "object") {
 		let changed = false;
 		const next = value.map((item) => {
 			const nv = normalizeStructuredValue(
@@ -354,7 +337,8 @@ export function withStructuredOutput(
 	const maxRepair = opts.maxRepairAttempts ?? DEFAULT_MAX_REPAIR_ATTEMPTS;
 	return async (prompt, options, signal, identity) => {
 		const schema = options.outputSchema as JsonSchema | undefined;
-		if (!schema || typeof schema !== "object") return spawn(prompt, options, signal, identity);
+		if (!schema || typeof schema !== "object")
+			return spawn(prompt, options, signal, identity);
 
 		let currentPrompt = structuredPrompt(prompt, schema);
 		let accounting: AgentAccounting | undefined;
@@ -366,18 +350,14 @@ export function withStructuredOutput(
 		let lastOutput = "";
 
 		for (let attempt = 0; attempt <= maxRepair; attempt++) {
-			const raw = (await spawn(
-				currentPrompt,
-				options,
-				signal,
-				identity,
-			)) as JsonValue | AgentSpawnResult;
+			const raw = (await spawn(currentPrompt, options, signal, identity)) as
+				| JsonValue
+				| AgentSpawnResult;
 			const unpacked = unpackSpawnResult(raw);
 			accounting = sumAccounting(accounting, unpacked.accounting);
 			durationMs += unpacked.durationMs ?? 0;
 
-			const text =
-				typeof unpacked.value === "string" ? unpacked.value : null;
+			const text = typeof unpacked.value === "string" ? unpacked.value : null;
 			if (text === null) {
 				// El agente ya devolvió un JsonValue no-string (spawn custom):
 				// se normaliza (#82: hijos string-encoded) y se valida tal cual.
@@ -385,16 +365,11 @@ export function withStructuredOutput(
 				// thinking-only/trailing vacío), entra como error accionable:
 				// el repair lo ve Y el throw lo explica (antes: "respuesta:
 				// null" sin pista alguna).
-				const nullDiag = (
-					unpacked as { nullDiagnostic?: string }
-				).nullDiagnostic;
+				const nullDiag = (unpacked as { nullDiagnostic?: string }).nullDiagnostic;
 				const normalized = normalizeStructuredValue(unpacked.value, schema);
 				const errors = validateJsonSchemaValue(normalized, schema);
 				const allErrors = nullDiag
-					? [
-							`respuesta vacía del agente (sin texto): ${nullDiag}`,
-							...errors,
-						]
+					? [`respuesta vacía del agente (sin texto): ${nullDiag}`, ...errors]
 					: errors;
 				if (!errors.length)
 					return spawnResult(normalized as JsonValue, { accounting, durationMs });
@@ -421,8 +396,7 @@ export function withStructuredOutput(
 					schema,
 				) as JsonValue;
 				const errors = validateJsonSchemaValue(parsed, schema);
-				if (!errors.length)
-					return spawnResult(parsed, { accounting, durationMs });
+				if (!errors.length) return spawnResult(parsed, { accounting, durationMs });
 				if (attempt === maxRepair) {
 					lastErrors = errors;
 					lastOutput = truncateForThrow(text);
@@ -437,14 +411,9 @@ export function withStructuredOutput(
 					lastOutput = truncateForThrow(text);
 					break;
 				}
-				currentPrompt = repairPrompt(
-					prompt,
-					schema,
-					text,
-					[
-						`invalid JSON: ${e instanceof Error ? e.message : String(e)}`,
-					],
-				);
+				currentPrompt = repairPrompt(prompt, schema, text, [
+					`invalid JSON: ${e instanceof Error ? e.message : String(e)}`,
+				]);
 			}
 		}
 

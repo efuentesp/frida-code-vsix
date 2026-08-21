@@ -3782,7 +3782,11 @@ export async function activate(
 						? `Ejecuta el workflow '${pattern.name}' con los siguientes argumentos:\n${input}`
 						: `Ejecuta el workflow '${pattern.name}'`;
 				} else {
-					if (!input && (pattern.args.includes("string no vacío") || pattern.args.includes("obligatoria"))) {
+					if (
+						!input &&
+						(pattern.args.includes("string no vacío") ||
+							pattern.args.includes("obligatoria"))
+					) {
 						const entered = await vscode.window.showInputBox({
 							title: `Workflow ${pattern.name}`,
 							prompt: `Argumentos para ${pattern.name}: ${pattern.args}`,
@@ -3886,9 +3890,7 @@ export async function activate(
 			}
 		}
 		if (items.length === 0) {
-			vscode.window.showInformationMessage(
-				"No hay workflows disponibles.",
-			);
+			vscode.window.showInformationMessage("No hay workflows disponibles.");
 			return undefined;
 		}
 		const pick = await vscode.window.showQuickPick(items, {
@@ -3924,7 +3926,9 @@ export async function activate(
 			} else {
 				const entered = await vscode.window.showInputBox({
 					title: `Workflow ${pick.name}`,
-					prompt: pick.detail ? `Argumentos: ${pick.detail}` : "¿Qué deseas procesar?",
+					prompt: pick.detail
+						? `Argumentos: ${pick.detail}`
+						: "¿Qué deseas procesar?",
 				});
 				if (entered === undefined) return undefined;
 				input = entered.trim();
