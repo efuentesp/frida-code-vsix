@@ -19,8 +19,24 @@ export type TurnBlock =
 	  };
 
 /**
+ * Texto "eco" sin valor narrativo: bloques que el asistente emite entre
+ * tool calls con solo glifos de confirmación o espacios (Errata-14: el modelo
+ * imitaba por few-shot el placeholder "✓" que el adapter inyectó brevemente
+ * en el historial; esos bloques quedaban como burbujas huérfanas de 1 carácter
+ * en el transcript). Delimitado a SOLO esos glifos: "✓ Hola" sí es texto real
+ * y se renderiza normal.
+ */
+const ECHO_NOISE_RE = /^[\s✓✔☑✅]*$/u;
+
+/** true si el bloque de texto es puro eco (vacío o solo glifos de confirmación). */
+export function isEchoNoiseText(text: string | undefined | null): boolean {
+	return !text || ECHO_NOISE_RE.test(text);
+}
+
+/**
  * Agrupa segmentos contiguos de tipo "tool" en un único bloque "tools".
- * Preserva el orden cronológico estricto de thinking y texto.
+ * Preserva el orden cronológico estricto de thinking y texto. Los bloques de
+ * texto de puro eco (solo "✓"/espacios) se omiten (Errata-14).
  */
 export function groupSegments(segments: readonly Segment[]): TurnBlock[] {
 	const blocks: TurnBlock[] = [];
@@ -45,7 +61,7 @@ export function groupSegments(segments: readonly Segment[]): TurnBlock[] {
 			}
 			if (s.kind === "thinking") {
 				blocks.push({ kind: "thinking", segment: s, index: i });
-			} else if (s.kind === "text") {
+			} else if (s.kind === "text" && !isEchoNoiseText(s.text)) {
 				blocks.push({ kind: "text", segment: s, index: i });
 			}
 		}

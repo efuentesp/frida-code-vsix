@@ -3,6 +3,7 @@ import {
 	groupSegments,
 	summarizeToolGroup,
 	extractLastThought,
+	isEchoNoiseText,
 } from "../webview/turn-grouping";
 import type { Segment, ToolEntry } from "../webview/types";
 
@@ -151,6 +152,71 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 			const summary = summarizeToolGroup([tool]);
 			expect(summary.count).toBe(1);
 			expect(summary.label).toBe("1 herramienta usada");
+		});
+	});
+
+	// ─── Errata-14: bloques de texto de puro eco se omiten ────────────────────
+
+	describe("groupSegments · eco \"✓\" (Errata-14)", () => {
+		it("omite el bloque de texto que es solo \"✓\" (eco few-shot del placeholder)", () => {
+			const segments: Segment[] = [
+				{ kind: "text", text: "Voy a verificar" },
+				{ kind: "text", text: "✓" },
+				{ kind: "text", text: "Ahora actualizo" },
+			];
+			const blocks = groupSegments(segments);
+			expect(blocks).toHaveLength(2);
+			expect(
+				blocks.map((b) => (b.kind === "text" ? b.segment.text : b.kind)),
+			).toEqual(["Voy a verificar", "Ahora actualizo"]);
+		});
+
+		it("omite también variantes de glifos y espacios (✓✓, ✅, tabs)", () => {
+			const segments: Segment[] = [
+				{ kind: "text", text: "✓ ✓" },
+				{ kind: "text", text: "\t \n" },
+				{ kind: "text", text: "✅" },
+			];
+			expect(groupSegments(segments)).toEqual([]);
+		});
+
+		it("NO omite texto real que simplemente empieza con ✓", () => {
+			const segments: Segment[] = [{ kind: "text", text: "✓ Listo, todo aplicado" }];
+			const blocks = groupSegments(segments);
+			expect(blocks).toHaveLength(1);
+			expect(blocks[0].kind).toBe("text");
+		});
+
+		it("el eco no rompe la agrupación de tools contiguas a su alrededor", () => {
+			const t1 = makeTool();
+			const t2 = makeTool({ tool: "edit" });
+			const segments: Segment[] = [
+				{ kind: "text", text: "✓" },
+				t1,
+				t2,
+				{ kind: "text", text: "✓" },
+			];
+			const blocks = groupSegments(segments);
+			expect(blocks).toHaveLength(1);
+			expect(blocks[0].kind).toBe("tools");
+			expect(blocks[0].kind === "tools" && blocks[0].tools).toHaveLength(2);
+		});
+	});
+
+	describe("isEchoNoiseText", () => {
+		it("clasifica eco: vacío, espacios y solo glifos de confirmación", () => {
+			expect(isEchoNoiseText(undefined)).toBe(true);
+			expect(isEchoNoiseText("")).toBe(true);
+			expect(isEchoNoiseText(" \t\n ")).toBe(true);
+			expect(isEchoNoiseText("✓")).toBe(true);
+			expect(isEchoNoiseText("✓✔")).toBe(true);
+			expect(isEchoNoiseText("✅")).toBe(true);
+		});
+
+		it("NO clasifica texto narrativo como eco", () => {
+			expect(isEchoNoiseText("✓ Listo")).toBe(false);
+			expect(isEchoNoiseText("Perfecto, listo.")).toBe(false);
+			expect(isEchoNoiseText("·")).toBe(false);
 		});
 	});
 
