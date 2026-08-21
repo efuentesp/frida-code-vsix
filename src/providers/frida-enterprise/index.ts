@@ -15,7 +15,10 @@ export { patchFridaSideChannels, type FridaSideChannelDeps } from "./side-channe
 import type { FridaEnterpriseRuntime } from "./runtime";
 import { buildFridaEnterpriseProviderConfig as buildProviderConfigInner } from "./provider";
 import { createFridaEnterpriseHooks as createHooksInner } from "./hooks";
-import { buildFridaEnterpriseOAuth as buildOAuthInner } from "./oauth";
+import {
+	buildFridaEnterpriseOAuth as buildOAuthInner,
+	FRIDA_ENTERPRISE_PROVIDER,
+} from "./oauth";
 
 // Semilla del gate Errata-7: los 32 verificados conocidos desde el arranque.
 const runtime = createFridaEnterpriseRuntime(VERIFIED_MODEL_IDS);
@@ -26,7 +29,8 @@ const runtime = createFridaEnterpriseRuntime(VERIFIED_MODEL_IDS);
 export function patchFridaSideChannelsOn(modelRuntime: any): void {
 	patchFridaSideChannels(modelRuntime, {
 		runtime,
-		isFridaModel: (m: any) => runtime.knowsModel(m?.id),
+		isFridaModel: (m: any) =>
+			m?.provider === FRIDA_ENTERPRISE_PROVIDER || runtime.knowsModel(m?.id),
 	});
 }
 // Prueba de vida del bundle: aparece al cargar la extensión.

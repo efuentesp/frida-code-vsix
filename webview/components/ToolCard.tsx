@@ -183,8 +183,7 @@ function browserCallInfo(a: ToolArgs): ToolInfo {
 			? a.url
 			: Array.isArray(a.args)
 				? String(
-						(a.args as unknown[]).find((x) => /^https?:\/\//.test(String(x))) ??
-							"",
+						(a.args as unknown[]).find((x) => /^https?:\/\//.test(String(x))) ?? "",
 					)
 				: "";
 	return { icon: <Compass size={13} />, name: "agent_browser", label: url };
@@ -458,9 +457,7 @@ function InputRows({ rows }: { rows: [string, string][] }) {
 function inputRowsFor(tool: string, a: ToolArgs): [string, string][] {
 	const rows: ([string, string] | null)[] = [];
 	const push = (k: string, v: unknown) =>
-		rows.push(
-			v === undefined || v === null || v === "" ? null : [k, String(v)],
-		);
+		rows.push(v === undefined || v === null || v === "" ? null : [k, String(v)]);
 	switch (tool) {
 		case "read":
 			push("ruta", a.path);
@@ -546,9 +543,7 @@ function renderInput(entry: ToolEntry): ReactNode {
 							<dd>{str(a.description)}</dd>
 						</div>
 					) : null}
-					{a.prompt ? (
-						<pre className="tc-input-prompt">{str(a.prompt)}</pre>
-					) : null}
+					{a.prompt ? <pre className="tc-input-prompt">{str(a.prompt)}</pre> : null}
 				</div>
 			);
 		case "ask_user_question": {
@@ -604,12 +599,8 @@ function renderBody(entry: ToolEntry, running: boolean): ReactNode {
 	if (!inputNode && !outputNode) return null;
 	return (
 		<div className="tc-sections">
-			{inputNode ? (
-				<ToolSection label="Entrada">{inputNode}</ToolSection>
-			) : null}
-			{outputNode ? (
-				<ToolSection label="Salida">{outputNode}</ToolSection>
-			) : null}
+			{inputNode ? <ToolSection label="Entrada">{inputNode}</ToolSection> : null}
+			{outputNode ? <ToolSection label="Salida">{outputNode}</ToolSection> : null}
 		</div>
 	);
 }

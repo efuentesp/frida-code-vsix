@@ -96,7 +96,10 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 		const shortCmd = cmd.length > 50 ? `${cmd.slice(0, 47)}…` : cmd;
 		let detail: string | undefined;
 		if (!running) {
-			const dur = entry.endedAt && entry.startedAt ? fmtDuration(entry.endedAt - entry.startedAt) : "";
+			const dur =
+				entry.endedAt && entry.startedAt
+					? fmtDuration(entry.endedAt - entry.startedAt)
+					: "";
 			detail = isError ? "exit 1" : dur ? `exit 0 (${dur})` : "exit 0";
 		}
 		return {
@@ -110,22 +113,36 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 	// 3. Búsqueda (ffgrep, grep, fffind, find, ls)
 	if (tool === "ffgrep" || tool === "grep") {
 		const pattern = String(args.pattern ?? "");
-		const resLines = entry.result ? entry.result.trim().split("\n").filter(Boolean).length : 0;
+		const resLines = entry.result
+			? entry.result.trim().split("\n").filter(Boolean).length
+			: 0;
 		return {
 			verb: running ? "Buscando texto" : isError ? "Error en búsqueda" : "Buscó",
 			arg: pattern ? `"${pattern}"` : undefined,
-			detail: !running && !isError ? `${resLines} coincidencia${resLines === 1 ? "" : "s"}` : undefined,
+			detail:
+				!running && !isError
+					? `${resLines} coincidencia${resLines === 1 ? "" : "s"}`
+					: undefined,
 			iconName: "search",
 		};
 	}
 
 	if (tool === "fffind" || tool === "find" || tool === "ls") {
 		const pat = String(args.pattern ?? args.path ?? "");
-		const resCount = entry.result ? entry.result.trim().split("\n").filter(Boolean).length : 0;
+		const resCount = entry.result
+			? entry.result.trim().split("\n").filter(Boolean).length
+			: 0;
 		return {
-			verb: running ? "Buscando archivos" : isError ? "Error al buscar" : "Encontró",
+			verb: running
+				? "Buscando archivos"
+				: isError
+					? "Error al buscar"
+					: "Encontró",
 			arg: pat || undefined,
-			detail: !running && !isError ? `${resCount} archivo${resCount === 1 ? "" : "s"}` : undefined,
+			detail:
+				!running && !isError
+					? `${resCount} archivo${resCount === 1 ? "" : "s"}`
+					: undefined,
 			iconName: "file-submodule",
 		};
 	}
@@ -133,24 +150,49 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 	// 4. Diagnósticos e Inspección AST (lens_diagnostics, lsp_diagnostics, ast_grep)
 	if (tool === "lens_diagnostics" || tool === "lsp_diagnostics") {
 		return {
-			verb: running ? "Comprobando diagnósticos" : isError ? "Error de diagnóstico" : "Diagnosticó",
-			detail: !running && !isError ? (entry.result ? "completado" : "0 problemas") : undefined,
+			verb: running
+				? "Comprobando diagnósticos"
+				: isError
+					? "Error de diagnóstico"
+					: "Diagnosticó",
+			detail:
+				!running && !isError
+					? entry.result
+						? "completado"
+						: "0 problemas"
+					: undefined,
 			iconName: "pulse",
 		};
 	}
 
 	if (tool.startsWith("ast_grep") || tool === "lsp_navigation") {
 		return {
-			verb: running ? "Inspeccionando AST" : isError ? "Error en AST" : "Inspeccionó AST",
+			verb: running
+				? "Inspeccionando AST"
+				: isError
+					? "Error en AST"
+					: "Inspeccionó AST",
 			iconName: "code",
 		};
 	}
 
 	// 5. Símbolos y Navegación (symbol_search, module_report, read_symbol, read_enclosing)
-	if (tool === "symbol_search" || tool === "module_report" || tool === "read_symbol" || tool === "read_enclosing" || tool === "project_report") {
-		const sym = String(args.symbol ?? args.query ?? args.path ?? args.focus ?? "");
+	if (
+		tool === "symbol_search" ||
+		tool === "module_report" ||
+		tool === "read_symbol" ||
+		tool === "read_enclosing" ||
+		tool === "project_report"
+	) {
+		const sym = String(
+			args.symbol ?? args.query ?? args.path ?? args.focus ?? "",
+		);
 		return {
-			verb: running ? "Analizando código" : isError ? "Error en análisis" : "Analizó",
+			verb: running
+				? "Analizando código"
+				: isError
+					? "Error en análisis"
+					: "Analizó",
 			arg: sym ? `"${sym}"` : undefined,
 			iconName: "symbol-class",
 		};
@@ -160,16 +202,27 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 	if (tool === "Agent") {
 		const type = String(args.subagent_type ?? "agente");
 		const desc = String(args.description ?? "");
-		const dur = entry.endedAt && entry.startedAt ? fmtDuration(entry.endedAt - entry.startedAt) : "";
+		const dur =
+			entry.endedAt && entry.startedAt
+				? fmtDuration(entry.endedAt - entry.startedAt)
+				: "";
 		return {
-			verb: running ? "Lanzando sub-agente" : isError ? "Sub-agente falló" : "Sub-agente completó",
+			verb: running
+				? "Lanzando sub-agente"
+				: isError
+					? "Sub-agente falló"
+					: "Sub-agente completó",
 			arg: desc ? `[${type}] ${desc}` : `[${type}]`,
 			detail: !running && !isError && dur ? dur : undefined,
 			iconName: "hubot",
 		};
 	}
 
-	if (tool === "get_subagent_result" || tool === "steer_subagent" || tool === "subagent_gate") {
+	if (
+		tool === "get_subagent_result" ||
+		tool === "steer_subagent" ||
+		tool === "subagent_gate"
+	) {
 		return {
 			verb: running ? "Coordinando subagentes" : "Subagentes coordinados",
 			iconName: "organization",
@@ -180,7 +233,11 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 	if (tool === "workflow" || tool.startsWith("workflow_")) {
 		const wfName = String(args.name ?? "workflow");
 		return {
-			verb: running ? "Ejecutando workflow" : isError ? "Workflow falló" : "Workflow finalizado",
+			verb: running
+				? "Ejecutando workflow"
+				: isError
+					? "Workflow falló"
+					: "Workflow finalizado",
 			arg: wfName ? `"${wfName}"` : undefined,
 			iconName: "play-circle",
 		};
@@ -222,7 +279,11 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 		const q = String(args.query ?? args.url ?? "");
 		const shortQ = q.length > 40 ? `${q.slice(0, 37)}…` : q;
 		return {
-			verb: running ? "Buscando en la web" : isError ? "Búsqueda fallida" : "Búsqueda web",
+			verb: running
+				? "Buscando en la web"
+				: isError
+					? "Búsqueda fallida"
+					: "Búsqueda web",
 			arg: shortQ || undefined,
 			iconName: "search",
 		};
@@ -231,7 +292,11 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 	if (tool.startsWith("web_docs")) {
 		const lib = String(args.library_name ?? args.library_id ?? "docs");
 		return {
-			verb: running ? "Consultando docs" : isError ? "Error en docs" : "Docs consultados",
+			verb: running
+				? "Consultando docs"
+				: isError
+					? "Error en docs"
+					: "Docs consultados",
 			arg: lib,
 			iconName: "book",
 		};
@@ -258,7 +323,11 @@ export function getToolPhrase(entry: ToolEntry): ToolPhrase {
 
 	// Fallback genérico para herramientas personalizadas o de terceros
 	return {
-		verb: running ? `Ejecutando ${tool}` : isError ? `Falló ${tool}` : `Ejecutó ${tool}`,
+		verb: running
+			? `Ejecutando ${tool}`
+			: isError
+				? `Falló ${tool}`
+				: `Ejecutó ${tool}`,
 		iconName: "tools",
 	};
 }

@@ -5972,7 +5972,11 @@ kbd {
 	padding: 6px 10px;
 	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
 	border-radius: 4px;
-	border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.15)));
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.15))
+		);
 }
 
 .tool-flat-title {
@@ -5995,7 +5999,10 @@ kbd {
 }
 
 .tool-flat-title .tc-icon-check {
-	color: var(--vscode-testing-iconPassed, var(--vscode-gitDecoration-addedResourceForeground, #89d185));
+	color: var(
+		--vscode-testing-iconPassed,
+		var(--vscode-gitDecoration-addedResourceForeground, #89d185)
+	);
 	flex-shrink: 0;
 }
 

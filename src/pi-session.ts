@@ -35,6 +35,7 @@ import {
 import {
 	buildFridaEnterpriseProviderConfig,
 	createFridaEnterpriseHooks,
+	patchFridaSideChannelsOn,
 	FRIDA_ENTERPRISE_PROVIDER,
 } from "./providers/frida-enterprise";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
@@ -417,6 +418,10 @@ export async function createFridaSession(
 		FRIDA_ENTERPRISE_PROVIDER,
 		buildFridaEnterpriseProviderConfig() as any,
 	);
+	// Errata-9: el compact/branch-summary llama streamSimple/completeSimple sin
+	// onPayload (el SDK no pasa onPayload en ese canal). Instala el patch lateral
+	// para inyectar identidad (user_id/email) y role developer→system en Enterprise.
+	patchFridaSideChannelsOn(modelRuntime);
 	// Z.ai es un provider BUILT-IN de pi-ai (`providers/zai`): NO se registra aquí.
 	// El ModelRuntime ya lo carga con baseUrl, modelos oficiales (glm-4.5-air / 4.7 /
 	// 5.x) y compat.thinkingFormat:"zai" (el SDK inyecta el `thinking` de GLM → el
