@@ -2219,43 +2219,89 @@ body {
 	color: var(--vscode-button-secondaryForeground, inherit);
 }
 
-/* Aprobaciones */
+/* Aprobaciones estilo VS Code QuickPick / Copilot Edits (Propuesta 2) */
 .approval {
 	border: 1px solid
 		var(
 			--vscode-widget-border,
-			var(--vscode-panel-border, rgba(128, 128, 128, 0.25))
+			var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25))
 		);
 	border-radius: 8px;
 	padding: 10px 12px;
 	margin: 6px 0;
 	background: var(
 		--vscode-editorWidget-background,
-		var(--vscode-input-background)
+		var(--vscode-sideBar-background, #252526)
 	);
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 .approval .ttl {
 	display: flex;
 	align-items: center;
-	gap: 7px;
+	gap: 8px;
 	font-weight: 600;
-	margin-bottom: 4px;
+	font-size: 12.5px;
+	color: var(--vscode-foreground);
+	margin-bottom: 6px;
+	user-select: none;
 }
-.approval .ttl .ic {
-	color: var(--vscode-textLink-foreground);
+.approval .ap-shield-badge {
+	color: var(--vscode-charts-yellow, #d29922);
 	display: flex;
+	align-items: center;
+}
+.approval .ap-kind-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	display: flex;
+	align-items: center;
+}
+.approval .ap-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .approval .cmd {
 	background: var(--vscode-editor-background);
 	padding: 8px;
 	border-radius: 6px;
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.18));
 	margin: 6px 0;
-	/* Antes era <pre> (monospace por defecto); ahora es <div> CmdBlock → fijamos
-	   el font monospace y el line-height para que max-height calcule bien. */
 	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
 	font-size: var(--vscode-editor-font-size, 12px);
 	line-height: 1.6;
+}
+.approval .cmd-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 6px;
+	padding-bottom: 4px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+}
+.approval .cmd-header-title {
+	font-size: 10.5px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--vscode-descriptionForeground);
+}
+.approval .cmd-copy-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: transparent;
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 4px;
+	padding: 2px 6px;
+	font-size: 11px;
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	transition: background 0.1s ease;
+}
+.approval .cmd-copy-btn:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
 }
 /* Cuerpo con scroll: acota a CMD_LINE_LIMIT (10) líneas (10 × line-height). */
 .approval .cmd-scroll {
@@ -2292,18 +2338,25 @@ body {
 }
 .approval .hint {
 	font-size: 12px;
-	opacity: 0.8;
+	opacity: 0.9;
 	text-align: left;
 	margin: 6px 0;
 	padding: 6px 8px;
 	border-left: 2px solid var(--vscode-textLink-foreground, #4daafc);
 	background: var(--vscode-editor-background);
 	border-radius: 4px;
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+.approval .hint .ic {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	display: flex;
 }
 .approval .warning {
 	display: flex;
 	gap: 6px;
-	align-items: flex-start;
+	align-items: center;
 	font-size: 12px;
 	margin: 6px 0;
 	padding: 6px 8px;
@@ -2316,72 +2369,124 @@ body {
 }
 .approval .warning .ic {
 	color: #d29922;
-	font-weight: 700;
-	line-height: 1.2;
+	display: flex;
 }
-/* Menú de aprobación vertical navegable (réplica del selector de
-   pi-permission-system). Cada ítem es una fila: bullet ❯ + label + letra de
-   atajo. El ítem activo resalta con fondo (list-hoverBackground) y marca
-   lateral (activeSelectionForeground). Mouse: clic ejecuta, hover mueve el
-   foco para que teclado y ratón estén sincronizados. */
+/* Menú estilo QuickPick de VS Code */
 .approval .ap-menu {
 	display: flex;
 	flex-direction: column;
+	gap: 2px;
 	margin-top: 8px;
+	background: var(--vscode-list-dropBackground, rgba(0, 0, 0, 0.15));
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 6px;
+	padding: 4px;
 }
 .approval .ap-item {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
 	width: 100%;
 	text-align: left;
-	padding: 5px 8px;
+	padding: 6px 10px;
 	border-radius: 4px;
 	background: transparent;
 	color: var(--vscode-foreground);
-	font-size: 13px;
+	font-size: 12.5px;
 	border: none;
 	cursor: pointer;
+	transition: background 0.1s ease;
 }
 .approval .ap-item:hover,
 .approval .ap-item.active {
-	background: var(--vscode-list-hoverBackground);
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
 }
 .approval .ap-item.active {
-	box-shadow: inset 2px 0 0
-		var(--vscode-list-activeSelectionForeground, var(--vscode-focusBorder));
+	box-shadow: inset 3px 0 0 var(--vscode-focusBorder, #007acc);
 }
-.approval .ap-bullet {
-	width: 10px;
-	color: var(--vscode-textLink-foreground, #4daafc);
-	flex: none;
-	font-weight: 700;
+.approval .ap-item.is-primary .ap-icon {
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.approval .ap-item.is-danger .ap-icon {
+	color: var(--vscode-errorForeground, #f85149);
+}
+.approval .ap-icon {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	color: var(--vscode-foreground);
+	opacity: 0.9;
 }
 .approval .ap-label {
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
-.approval .ap-letter {
-	font-size: 11px;
-	opacity: 0.6;
+.approval .ap-shortcut-badge {
+	font-size: 10.5px;
+	font-variant-numeric: tabular-nums;
+	padding: 1px 6px;
+	border-radius: 3px;
+	background: var(--vscode-keybindingLabel-background, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-keybindingLabel-foreground, var(--vscode-foreground));
+	border: 1px solid
+		var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.3));
+	box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 	font-family: var(--vscode-editor-font-family, monospace);
-	flex: none;
+	flex-shrink: 0;
+}
+.approval .ap-key-chip {
+	display: inline-block;
+	padding: 0 4px;
+	font-size: 10px;
+	border-radius: 2px;
+	background: var(
+		--vscode-keybindingLabel-background,
+		rgba(128, 128, 128, 0.18)
+	);
+	border: 1px solid
+		var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.25));
+	font-family: var(--vscode-editor-font-family, monospace);
 }
 /* Input inline del motivo (opción "No, indicar motivo"): reemplaza el menú. */
 .approval .ap-reason {
 	margin-top: 8px;
+	padding: 8px;
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+}
+.approval .ap-reason-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	margin-bottom: 6px;
 }
 .approval .ap-reason-input {
 	width: 100%;
 	padding: 6px 8px;
 	border-radius: 4px;
-	font-size: 13px;
+	font-size: 12.5px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-focusBorder);
+	outline: none;
+	box-sizing: border-box;
 }
 /* Pista de teclas bajo el menú / input. */
 .approval .ap-keys {
 	font-size: 11px;
-	opacity: 0.6;
+	color: var(--vscode-descriptionForeground);
 	margin-top: 6px;
-	padding: 0 8px;
+	padding: 2px 4px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
 button {
 	background: var(--vscode-button-background);

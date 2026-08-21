@@ -1,6 +1,6 @@
 import type { ApprovalRequest } from "../types";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "./Icon";
+import { Codicon } from "./Codicon";
 import { Diff } from "./Diff";
 
 // Clasificación del tool para el hint del ApprovalCard: distinguimos las tools
@@ -57,12 +57,15 @@ interface MenuItem {
 	key: ItemKey;
 	label: string;
 	letter: string;
+	shortcut: string;
+	icon: string;
+	tone?: "primary" | "secondary" | "danger";
 }
 
-// Icono de cabecera según el tipo de approval (sin ternarios anidados).
+// Icono de cabecera según el tipo de approval (con Codicons nativos de VS Code).
 const ICON_BY_KIND: Record<ApprovalRequest["kind"], string> = {
-	bash: "term",
-	tool: "wrench",
+	bash: "terminal",
+	tool: "tools",
 	diff: "edit",
 };
 
@@ -79,15 +82,37 @@ function approvalLabel(a: ApprovalRequest): string {
  *  apruebe a ciegas un comando largo). */
 const CMD_LINE_LIMIT = 10;
 
-/** Recuadro del comando a ejecutar, con numeración de líneas y scroll vertical
- *  acotado a CMD_LINE_LIMIT. Patrón de Diff.tsx: divide el comando en líneas y
- *  renderiza cada una con su número a la izquierda (tenue, no seleccionable).
- *  Sin zebra striping — el número basta como guía visual. */
+/** Recuadro del comando a ejecutar, con numeración de líneas, botón de copiar
+ *  y scroll vertical acotado a CMD_LINE_LIMIT. */
 function CmdBlock({ command }: { command: string }) {
+	const [copied, setCopied] = useState(false);
 	const lines = command.replace(/\n+$/, "").split("\n");
 	const overflow = Math.max(0, lines.length - CMD_LINE_LIMIT);
+
+	async function copyCmd() {
+		try {
+			await navigator.clipboard.writeText(command);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1500);
+		} catch {
+			// ignore
+		}
+	}
+
 	return (
 		<div className="cmd">
+			<div className="cmd-header">
+				<span className="cmd-header-title">Comando</span>
+				<button
+					type="button"
+					className="cmd-copy-btn"
+					onClick={copyCmd}
+					title="Copiar comando al portapapeles"
+				>
+					<Codicon name={copied ? "check" : "copy"} size={12} />
+					<span>{copied ? "Copiado" : "Copiar"}</span>
+				</button>
+			</div>
 			<div className="cmd-scroll">
 				{lines.map((ln, i) => (
 					<div className="cmd-line" key={i}>
@@ -102,7 +127,7 @@ function CmdBlock({ command }: { command: string }) {
 }
 
 /**
- * Menú de aprobación navegable (réplica del selector de pi-permission-system).
+ * Menú de aprobación navegable estilo QuickPick de VS Code (Propuesta 2).
  * 4 opciones en el orden canónico: Sí · Sí+patrón · No · No+motivo. Navegación
  * con ↑↓ + Enter + Esc, atajos de letra (Y/P/N/M) y mouse (clic / hover). La
  * opción "No, indicar motivo" reemplaza el menú por un input inline; el motivo
@@ -131,20 +156,49 @@ export function ApprovalCard({
 	// Opciones visibles: "Sí+patrón" sólo si el gate sugirió un patrón.
 	const items = useMemo<MenuItem[]>(
 		() => [
-			{ key: "yes", label: "Sí", letter: "Y" },
+			{
+				key: "yes",
+				label:
+					approval.kind === "bash"
+						? "Permitir ejecución de comando"
+						: approval.kind === "diff"
+							? "Permitir edición de archivo"
+							: `Permitir herramienta ${approval.toolName ?? ""}`.trim(),
+				letter: "Y",
+				shortcut: "Y",
+				icon: "check",
+				tone: "primary",
+			},
 			...(approval.suggestedPattern
 				? [
 						{
 							key: "pattern" as ItemKey,
-							label: `Sí, permitir «${approval.suggestedPattern}» esta sesión`,
+							label: `Permitir siempre «${approval.suggestedPattern}» esta sesión`,
 							letter: "P",
+							shortcut: "P",
+							icon: "pass",
+							tone: "secondary" as const,
 						},
 					]
 				: []),
-			{ key: "no", label: "No", letter: "N" },
-			{ key: "reason", label: "No, indicar motivo", letter: "M" },
+			{
+				key: "no",
+				label: "Rechazar",
+				letter: "N",
+				shortcut: "N / Esc",
+				icon: "close",
+				tone: "danger",
+			},
+			{
+				key: "reason",
+				label: "Rechazar e indicar corrección al modelo",
+				letter: "M",
+				shortcut: "M",
+				icon: "edit",
+				tone: "secondary",
+			},
 		],
-		[approval.suggestedPattern],
+		[approval.kind, approval.toolName, approval.suggestedPattern],
 	);
 
 	const [sel, setSel] = useState(0);
@@ -216,11 +270,19 @@ export function ApprovalCard({
 				onClick={() => setCollapsed((c) => !c)}
 				title={collapsed ? "Expandir" : "Colapsar"}
 			>
-				<span className="ap-chev">{collapsed ? "▶" : "▼"}</span>
-				<span className="ic">
-					<Icon name={icon} />
+				<span className="ap-chev">
+					<Codicon
+						name={collapsed ? "chevron-right" : "chevron-down"}
+						size={13}
+					/>
 				</span>
-				<span>{label}</span>
+				<span className="ap-shield-badge">
+					<Codicon name="shield" size={13} />
+				</span>
+				<span className="ap-kind-icon">
+					<Codicon name={icon} size={13} />
+				</span>
+				<span className="ap-title">{label}</span>
 			</div>
 			{!collapsed && (
 				<>
@@ -229,13 +291,16 @@ export function ApprovalCard({
 					{approval.warning && (
 						<p className="warning">
 							<span className="ic">
-								<Icon name="alert" />
+								<Codicon name="warning" size={13} />
 							</span>{" "}
 							{approval.warning}
 						</p>
 					)}
 					{isTool && (
 						<p className="hint">
+							<span className="ic">
+								<Codicon name="info" size={13} />
+							</span>{" "}
 							{READONLY_TOOLS.has(approval.toolName)
 								? "Herramienta de sólo lectura/análisis (no modifica archivos). Revisa la acción antes de aceptar."
 								: FRIDA_INTERNAL_TOOLS.has(approval.toolName)
@@ -246,10 +311,14 @@ export function ApprovalCard({
 
 					{reasonOpen ? (
 						<div className="ap-reason">
+							<div className="ap-reason-header">
+								<Codicon name="edit" size={13} />
+								<span>Indicar motivo o corrección al modelo:</span>
+							</div>
 							<input
 								ref={reasonRef}
 								className="ap-reason-input"
-								placeholder="Escribe el motivo y presiona Enter…"
+								placeholder="Escribe el motivo o instrucción alternativa y presiona Enter…"
 								value={reasonText}
 								onChange={(e) => setReasonText(e.target.value)}
 								onKeyDown={(e) => {
@@ -263,7 +332,8 @@ export function ApprovalCard({
 								}}
 							/>
 							<div className="ap-keys">
-								⏎ rechazar con motivo · Esc volver al menú
+								<span className="ap-key-chip">⏎ Enter</span> confirmar rechazo ·{" "}
+								<span className="ap-key-chip">Esc</span> volver al menú
 							</div>
 						</div>
 					) : (
@@ -273,19 +343,39 @@ export function ApprovalCard({
 									key={it.key}
 									type="button"
 									role="option"
-									className={"ap-item" + (i === sel ? " active" : "")}
+									className={
+										"ap-item" +
+										(i === sel ? " active" : "") +
+										` is-${it.tone ?? "secondary"}`
+									}
 									onClick={() => choose(it.key)}
 									onMouseEnter={() => setSel(i)}
 									aria-selected={i === sel}
 								>
-									<span className="ap-bullet">{i === sel ? "❯" : ""}</span>
+									<span className="ap-icon">
+										<Codicon name={it.icon} size={14} />
+									</span>
 									<span className="ap-label">{it.label}</span>
-									<span className="ap-letter">{it.letter}</span>
+									<span className="ap-shortcut-badge">{it.shortcut}</span>
 								</button>
 							))}
 							<div className="ap-keys">
-								↑↓ navegar · ⏎ confirmar · Esc cancelar
-								{active ? " · Y/P/N/M" : ""}
+								<span>
+									<span className="ap-key-chip">↑↓</span> navegar ·{" "}
+									<span className="ap-key-chip">⏎</span> confirmar ·{" "}
+									<span className="ap-key-chip">Esc</span> cancelar
+									{active ? " · atajos directos " : ""}
+									{active && (
+										<>
+											<span className="ap-key-chip">Y</span>{" "}
+											{approval.suggestedPattern && (
+												<span className="ap-key-chip">P</span>
+											)}{" "}
+											<span className="ap-key-chip">N</span>{" "}
+											<span className="ap-key-chip">M</span>
+										</>
+									)}
+								</span>
 							</div>
 						</div>
 					)}
