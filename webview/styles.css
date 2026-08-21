@@ -2391,6 +2391,72 @@ button.sec:hover {
 .bar {
 	padding: 8px 12px 12px;
 }
+
+/* Chat Input Stack Copilot (.chat-input-stack) */
+@keyframes border-beam-spin {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+.chat-input-stack {
+	position: relative;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.25));
+	border-radius: 8px;
+	padding: 6px 8px;
+	box-sizing: border-box;
+	overflow: hidden;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+
+.chat-input-stack:focus-within {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.chat-input-stack.yolo-mode {
+	border-color: var(--vscode-testing-iconFailed, #f85149) !important;
+}
+
+.chat-input-stack.working::before {
+	content: "";
+	position: absolute;
+	inset: -50%;
+	width: 200%;
+	height: 200%;
+	background: conic-gradient(
+		from 0deg,
+		transparent 0deg,
+		var(--vscode-progressBar-background, var(--vscode-focusBorder, #007fd4)) 45deg,
+		var(--vscode-textLink-foreground, #4daafc) 90deg,
+		transparent 140deg,
+		transparent 360deg
+	);
+	animation: border-beam-spin 3s linear infinite;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.chat-input-stack.working::after {
+	content: "";
+	position: absolute;
+	inset: 1px;
+	background: var(--vscode-input-background);
+	border-radius: 7px;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.chat-input-stack > * {
+	position: relative;
+	z-index: 1;
+}
+
 /* Aprobación pendiente en el lugar del Composer (input oculto):
    mismo padding horizontal que .bar; la tarjeta .approval pierde su
    margin propio aquí para no duplicar espaciado. */
@@ -2408,20 +2474,20 @@ button.sec:hover {
 	resize: none;
 	min-height: 28px;
 	max-height: 140px;
-	padding: 8px 10px;
-	background: var(--vscode-input-background);
+	padding: 4px 6px;
+	background: transparent;
 	color: var(--vscode-input-foreground);
-	border: 1px solid var(--vscode-input-border, transparent);
-	border-radius: 6px;
+	border: none;
+	border-radius: 4px;
 	font-family: inherit;
 	font-size: 13px;
 	outline: none;
-	line-height: 1.4;
+	line-height: 1.45;
 }
 .input-row {
 	display: flex;
-	align-items: flex-end;
-	gap: 8px;
+	align-items: flex-start;
+	gap: 6px;
 }
 .input-row .input {
 	flex: 1;
@@ -5109,13 +5175,19 @@ kbd {
 	padding: 0;
 }
 
-/* Composer — fila 2 (estilo Kilocode): selects a la izq, íconos + enviar a la der. */
+/* Composer — controles integrados en el Input Stack (estilo Copilot Chat) */
 .bar-controls {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
-	margin-top: 8px;
+	gap: 6px;
+	margin-top: 4px;
+	padding-top: 4px;
+	border-top: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.12))
+		);
 	flex-wrap: wrap;
 }
 .bar-left,
@@ -5125,27 +5197,33 @@ kbd {
 	gap: 6px;
 	flex-wrap: wrap;
 }
-/* Selects compactos (proveedor / modelo / esfuerzo). */
+/* Selects compactos integrados (proveedor / modelo / esfuerzo). */
 .bar-select {
-	padding: 3px 8px;
-	font-size: 12px;
-	line-height: 1.5;
+	padding: 2px 6px;
+	font-size: 11px;
+	line-height: 1.4;
 	color: var(--vscode-descriptionForeground);
-	background: var(--vscode-input-background);
-	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-	border-radius: 6px;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
 	cursor: pointer;
 	outline: none;
 	max-width: 170px;
+	transition:
+		background-color 0.1s ease,
+		color 0.1s ease,
+		border-color 0.1s ease;
 }
 .bar-select:hover {
 	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
 	border-color: var(
 		--vscode-inputOption-activeBorder,
-		var(--vscode-focusBorder)
+		var(--vscode-focusBorder, transparent)
 	);
 }
 .bar-select:focus {
+	color: var(--vscode-foreground);
 	border-color: var(--vscode-focusBorder);
 }
 /* Combos deshabilitados mientras se procesa una petición (busy): el valor
@@ -5154,20 +5232,23 @@ kbd {
 	opacity: 0.5;
 	cursor: default;
 }
-/* Íconos planos (editor ampliado, modo aprobación): mismo morado que el toolbar. */
+/* Íconos planos (editor ampliado, modo aprobación). */
 .bar-ico {
-	padding: 5px;
+	padding: 4px;
 	line-height: 0;
 	background: none;
 	border: none;
-	color: var(--vscode-button-background);
+	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	display: inline-flex;
 	border-radius: 4px;
+	transition:
+		background-color 0.1s ease,
+		color 0.1s ease;
 }
 .bar-ico:hover {
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
-	color: var(--vscode-button-background);
+	color: var(--vscode-foreground);
 }
 .bar-ico:disabled {
 	opacity: 0.4;
@@ -5176,7 +5257,7 @@ kbd {
 /* Botón de barra "pulsado"/activo (p.ej. editor expandido). */
 .bar-ico.active {
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
-	outline: 1px solid var(--vscode-button-background);
+	color: var(--vscode-button-background);
 }
 /* Acento según el modo de aprobación (sólo ícono, sin texto).
    Degradado de peligro: Normal (neutro) → Auto-edit (ámbar) → YOLO (rojo). */
@@ -5186,7 +5267,54 @@ kbd {
 .bar-ico.mode-auto-edit {
 	color: var(--vscode-editorWarning-foreground, #d29922);
 }
-/* Botón Enviar / Detener: círculo de 32×32 (padding=0 + tamaño fijo). */
+
+/* Botón Circular Submit / Abort Copilot (.chat-submit-btn) */
+.chat-submit-btn {
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: var(--vscode-button-background, #0078d4);
+	color: var(--vscode-button-foreground, #ffffff);
+	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		transform 0.1s ease,
+		opacity 0.15s ease;
+	flex-shrink: 0;
+	padding: 0;
+}
+
+.chat-submit-btn:hover:not(:disabled) {
+	background: var(--vscode-button-hoverBackground, #026ec1);
+}
+
+.chat-submit-btn:active:not(:disabled) {
+	transform: scale(0.92);
+}
+
+.chat-submit-btn:disabled {
+	opacity: 0.35;
+	cursor: default;
+	background: var(--vscode-descriptionForeground, #717171);
+}
+
+.chat-submit-btn.stop {
+	background: var(--vscode-button-secondaryBackground, #3a3d41);
+	color: var(--vscode-button-secondaryForeground, #ffffff);
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+}
+
+.chat-submit-btn.stop:hover {
+	background: var(--vscode-button-secondaryHoverBackground, #45494e);
+	color: var(--vscode-errorForeground, #f85149);
+	border-color: var(--vscode-errorForeground, #f85149);
+}
+
+/* Botón Enviar / Detener legacy: círculo de 32×32 (padding=0 + tamaño fijo). */
 .bar-send {
 	flex: none;
 	width: 32px;

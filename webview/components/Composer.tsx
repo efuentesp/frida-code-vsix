@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import {
 	Maximize,
 	Minimize2,
-	SendHorizontal,
 	ShieldCheck,
-	Square,
 } from "lucide-react";
+import { Codicon } from "./Codicon";
 import { Tooltip } from "./Tooltip";
 import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
 
@@ -723,176 +722,186 @@ export function Composer({
 					))}
 				</div>
 			)}
-			<div className="input-row">
-				<textarea
-					ref={ref}
-					className={
-						"input" +
-						(expanded ? " input-expanded" : "") +
-						(pendingDialog ? " input-blocked" : "")
-					}
-					rows={1}
-					placeholder={
-						pendingDialog
-							? "Frida espera tu respuesta en la tarjeta de arriba (o pulsa Detener para cancelarla)…"
-							: bashMode
-								? "$ ejecuta bash…"
-								: "Escribe un mensaje… (Enter envía, Shift+Enter nueva línea)"
-					}
-					value={text}
-					readOnly={pendingDialog}
-					onChange={(e) => {
-						setText(e.target.value);
-						recompute(e.target);
-					}}
-					onPaste={onPaste}
-					onKeyUp={(e) => recompute(e.target as HTMLTextAreaElement)}
-					onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
-					onKeyDown={onKeyDown}
-				/>
-				<Tooltip
-					label={expanded ? "Contraer editor" : "Expandir editor"}
-					side="top"
-				>
-					<button
-						className={"bar-ico" + (expanded ? " active" : "")}
-						disabled={pendingDialog}
-						onClick={() => {
-							const next = !expanded;
-							onExpandedChange?.(next);
-							const el = ref.current;
-							if (!el) return;
-							if (next)
-								el.style.height = ""; // deja que .input-expanded fije la altura
-							else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
+			<div
+				className={
+					"chat-input-stack" +
+					(busy ? " working" : "") +
+					(expanded ? " expanded" : "") +
+					(yolo ? " yolo-mode" : "") +
+					(bashMode ? " bash-mode" : "")
+				}
+			>
+				<div className="input-row">
+					<textarea
+						ref={ref}
+						className={
+							"input" +
+							(expanded ? " input-expanded" : "") +
+							(pendingDialog ? " input-blocked" : "")
+						}
+						rows={1}
+						placeholder={
+							pendingDialog
+								? "Frida espera tu respuesta en la tarjeta de arriba (o pulsa Detener para cancelarla)…"
+								: bashMode
+									? "$ ejecuta bash…"
+									: "Escribe un mensaje… (Enter envía, Shift+Enter nueva línea)"
+						}
+						value={text}
+						readOnly={pendingDialog}
+						onChange={(e) => {
+							setText(e.target.value);
+							recompute(e.target);
 						}}
+						onPaste={onPaste}
+						onKeyUp={(e) => recompute(e.target as HTMLTextAreaElement)}
+						onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
+						onKeyDown={onKeyDown}
+					/>
+					<Tooltip
+						label={expanded ? "Contraer editor" : "Expandir editor"}
+						side="top"
 					>
-						{expanded ? <Minimize2 size={15} /> : <Maximize size={15} />}
-					</button>
-				</Tooltip>
-			</div>
-			{atFiles.length > 0 && (
-				<div className="chips">
-					{atFiles.map((f, i) => (
-						<span className="chip" key={i}>
-							<span className="chip-name">{f.rel}</span>
-							<button
-								className="chip-x"
-								onClick={() => removeAt(f.full)}
-								title="Quitar"
-							>
-								×
-							</button>
-						</span>
-					))}
-				</div>
-			)}
-			{images.length > 0 && (
-				<div className="img-chips">
-					{images.map((im, i) => (
-						<span className="img-chip" key={i}>
-							<img
-								className="img-thumb"
-								src={`data:${im.mimeType};base64,${im.data}`}
-								alt=""
-							/>
-							<button
-								className="chip-x"
-								onClick={() => removeImage(i)}
-								title="Quitar imagen"
-							>
-								×
-							</button>
-						</span>
-					))}
-				</div>
-			)}
-			<div className="bar-controls">
-				<div className="bar-left">
-					{provs.length > 0 && (
-						<select
-							className="bar-select"
-							disabled={busy}
-							value={active?.provider ?? ""}
-							onChange={(e) => {
-								const p = provs.find((x) => x.id === e.target.value);
-								const first = p?.models[0]?.id;
-								if (p && first) onSelectModel?.(p.id, first);
-							}}
-							aria-label="Proveedor"
-						>
-							{provs.map((p) => (
-								<option key={p.id} value={p.id}>
-									{p.name}
-								</option>
-							))}
-						</select>
-					)}
-					{modelOptions.length > 0 && (
-						<select
-							className="bar-select"
-							disabled={busy}
-							value={active?.modelId ?? ""}
-							onChange={(e) =>
-								active?.provider &&
-								onSelectModel?.(active.provider, e.target.value)
-							}
-							aria-label="Modelo"
-						>
-							{modelOptions.map((m) => (
-								<option key={m.id} value={m.id}>
-									{m.name}
-								</option>
-							))}
-						</select>
-					)}
-					<select
-						className="bar-select"
-						disabled={busy}
-						value={thinking ?? "medium"}
-						onChange={(e) => onSetThinking?.(e.target.value)}
-						aria-label="Esfuerzo"
-					>
-						<option value="low">Bajo</option>
-						<option value="medium">Medio</option>
-						<option value="high">Alto</option>
-					</select>
-				</div>
-				<div className="bar-right">
-					<Tooltip label={`Modo: ${modeLabel} (clic para ciclar)`} side="top">
 						<button
-							className={"bar-ico mode-" + (mode ?? "manual")}
-							onClick={() => onCycleMode?.()}
+							className={"bar-ico" + (expanded ? " active" : "")}
+							disabled={pendingDialog}
+							onClick={() => {
+								const next = !expanded;
+								onExpandedChange?.(next);
+								const el = ref.current;
+								if (!el) return;
+								if (next)
+									el.style.height = ""; // deja que .input-expanded fije la altura
+								else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
+							}}
 						>
-							<ShieldCheck size={15} />
+							{expanded ? <Minimize2 size={15} /> : <Maximize size={15} />}
 						</button>
 					</Tooltip>
-					{busy ? (
-						<Tooltip label="Detener" side="top">
-							<button
-								className="bar-send stop"
-								onClick={() => {
-									console.log(
-										"[frida-abort] clic botón Detener (Composer) — busy=" +
-											busy,
-									);
-									onAbort?.();
+				</div>
+				{atFiles.length > 0 && (
+					<div className="chips">
+						{atFiles.map((f, i) => (
+							<span className="chip" key={i}>
+								<span className="chip-name">{f.rel}</span>
+								<button
+									className="chip-x"
+									onClick={() => removeAt(f.full)}
+									title="Quitar"
+								>
+									×
+								</button>
+							</span>
+						))}
+					</div>
+				)}
+				{images.length > 0 && (
+					<div className="img-chips">
+						{images.map((im, i) => (
+							<span className="img-chip" key={i}>
+								<img
+									className="img-thumb"
+									src={`data:${im.mimeType};base64,${im.data}`}
+									alt=""
+								/>
+								<button
+									className="chip-x"
+									onClick={() => removeImage(i)}
+									title="Quitar imagen"
+								>
+									×
+								</button>
+							</span>
+						))}
+					</div>
+				)}
+				<div className="bar-controls">
+					<div className="bar-left">
+						{provs.length > 0 && (
+							<select
+								className="bar-select"
+								disabled={busy}
+								value={active?.provider ?? ""}
+								onChange={(e) => {
+									const p = provs.find((x) => x.id === e.target.value);
+									const first = p?.models[0]?.id;
+									if (p && first) onSelectModel?.(p.id, first);
 								}}
+								aria-label="Proveedor"
 							>
-								<Square size={15} />
-							</button>
-						</Tooltip>
-					) : (
-						<Tooltip label="Enviar (Enter) · Alt+Enter = seguir" side="top">
+								{provs.map((p) => (
+									<option key={p.id} value={p.id}>
+										{p.name}
+									</option>
+								))}
+							</select>
+						)}
+						{modelOptions.length > 0 && (
+							<select
+								className="bar-select"
+								disabled={busy}
+								value={active?.modelId ?? ""}
+								onChange={(e) =>
+									active?.provider &&
+									onSelectModel?.(active.provider, e.target.value)
+								}
+								aria-label="Modelo"
+							>
+								{modelOptions.map((m) => (
+									<option key={m.id} value={m.id}>
+										{m.name}
+									</option>
+								))}
+							</select>
+						)}
+						<select
+							className="bar-select"
+							disabled={busy}
+							value={thinking ?? "medium"}
+							onChange={(e) => onSetThinking?.(e.target.value)}
+							aria-label="Esfuerzo"
+						>
+							<option value="low">Bajo</option>
+							<option value="medium">Medio</option>
+							<option value="high">Alto</option>
+						</select>
+					</div>
+					<div className="bar-right">
+						<Tooltip label={`Modo: ${modeLabel} (clic para ciclar)`} side="top">
 							<button
-								className="bar-send"
-								onClick={sendNow}
-								disabled={!text.trim()}
+								className={"bar-ico mode-" + (mode ?? "manual")}
+								onClick={() => onCycleMode?.()}
 							>
-								<SendHorizontal size={16} />
+								<ShieldCheck size={15} />
 							</button>
 						</Tooltip>
-					)}
+						{busy ? (
+							<Tooltip label="Detener (Stop)" side="top">
+								<button
+									className="chat-submit-btn stop"
+									onClick={() => {
+										console.log(
+											"[frida-abort] clic botón Detener (Composer) — busy=" +
+												busy,
+										);
+										onAbort?.();
+									}}
+								>
+									<Codicon name="debug-stop" size={14} />
+								</button>
+							</Tooltip>
+						) : (
+							<Tooltip label="Enviar (Enter) · Alt+Enter = seguir" side="top">
+								<button
+									className="chat-submit-btn"
+									onClick={sendNow}
+									disabled={!text.trim()}
+								>
+									<Codicon name="arrow-up" size={16} />
+								</button>
+							</Tooltip>
+						)}
+					</div>
 				</div>
 			</div>
 		</div>
