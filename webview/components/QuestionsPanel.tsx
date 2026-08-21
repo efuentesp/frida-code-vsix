@@ -29,13 +29,14 @@ import type {
 interface Props {
 	questions: WebQuestionSpec[];
 	onResult: (r: { answers: WebQuestionAnswer[]; cancelled: boolean }) => void;
+	initialTab?: number;
 }
 
 type Zone = "options" | "input" | "buttons";
 
-export function QuestionsPanel({ questions, onResult }: Props) {
+export function QuestionsPanel({ questions, onResult, initialTab }: Props) {
 	// tab: 0..questions.length-1 = pregunta · questions.length = pestaña "Enviar" (review)
-	const [tab, setTab] = useState(0);
+	const [tab, setTab] = useState(initialTab ?? 0);
 	const [drafts, setDrafts] = useState<Record<number, WebQuestionAnswer>>({});
 	const [customText, setCustomText] = useState<Record<number, string>>({});
 	const [hoverLabel, setHoverLabel] = useState<string | undefined>();
@@ -50,8 +51,22 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	const isLastQuestion = tab === questions.length - 1;
 	const draft = drafts[tab];
 
+	// Estado de respuestas para navegación y pestaña "Enviar" (review).
+	function isAnswered(i: number): boolean {
+		const d = drafts[i];
+		if (!d) return false;
+		return d.kind === "multi" ? (d.selected?.length ?? 0) > 0 : !!d.answer;
+	}
+	const allAnswered = questions.every((_, i) => isAnswered(i));
+	const answeredCount = questions.filter((_, i) => isAnswered(i)).length;
+	const firstMissingIndex = questions.findIndex((_, i) => !isAnswered(i));
+	const missing = questions
+		.map((qq, i) => ({ qq, i }))
+		.filter(({ i }) => !isAnswered(i))
+		.map(({ qq, i }) => qq.header || `Paso ${i + 1}`);
+
 	// Botones de navegación visibles según el tab. Se recalculan en cada render
-	// para que sus actions capturen el estado fresco.
+	// para que sus actions capturen el estado fresco (Opción B: Flexible con confirmación de omisión).
 	type NavBtn = {
 		key: string;
 		label: string;
@@ -66,7 +81,30 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					cls: "q-btn secondary",
 					action: () => goToTab(questions.length - 1),
 				},
-				{ key: "submit", label: "Enviar ✓", cls: "q-btn", action: submit },
+				...(allAnswered
+					? [
+							{
+								key: "submit",
+								label: "Enviar respuestas ✓",
+								cls: "q-btn",
+								action: submit,
+							},
+						]
+					: [
+							{
+								key: "complete",
+								label: "Completar pendientes →",
+								cls: "q-btn",
+								action: () =>
+									goToTab(firstMissingIndex >= 0 ? firstMissingIndex : 0),
+							},
+							{
+								key: "skipSubmit",
+								label: `Omitir restantes y enviar (${answeredCount}/${questions.length})`,
+								cls: "q-btn secondary q-btn-skip",
+								action: submit,
+							},
+						]),
 				{
 					key: "cancel",
 					label: "Cancelar",
@@ -121,18 +159,6 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 		? undefined
 		: (q!.options.find((o) => o.label === hoverLabel && withPreview(o)) ??
 			q!.options.find((o) => o.label === selectedLabel && withPreview(o)));
-
-	// Estado de respuestas para la pestaña "Enviar" (review).
-	function isAnswered(i: number): boolean {
-		const d = drafts[i];
-		if (!d) return false;
-		return d.kind === "multi" ? (d.selected?.length ?? 0) > 0 : !!d.answer;
-	}
-	const allAnswered = questions.every((_, i) => isAnswered(i));
-	const missing = questions
-		.map((qq, i) => ({ qq, i }))
-		.filter(({ i }) => !isAnswered(i))
-		.map(({ qq, i }) => qq.header || `Q${i + 1}`);
 
 	// reset foco al cambiar de pestaña
 	useEffect(() => {
@@ -234,7 +260,11 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					}
 				} else if (k === "Enter" && e.shiftKey) {
 					e.preventDefault();
-					submit();
+					if (allAnswered || isReviewTab) {
+						submit();
+					} else {
+						goToTab(questions.length);
+					}
 				} else if (k === "Escape") {
 					e.preventDefault();
 					if ((customText[tab] ?? "").trim().length > 0) setZone("options");
@@ -276,7 +306,11 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 				}
 			} else if (k === "Enter" && e.shiftKey) {
 				e.preventDefault();
-				submit();
+				if (allAnswered || isReviewTab) {
+					submit();
+				} else {
+					goToTab(questions.length);
+				}
 			} else if (k === "Enter" || k === " ") {
 				e.preventDefault();
 				if (zone === "options" && q) {
@@ -441,10 +475,30 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							);
 						})}
 					</div>
+					{!allAnswered && (
+						<div className="q-review-warn-box">
+							<div className="q-review-warn-head">
+								<Codicon
+									name="warning"
+									size={13}
+									className="q-review-warn-icon"
+								/>
+								<span className="q-review-warn-title">
+									Faltan por responder ({questions.length - answeredCount} de{" "}
+									{questions.length})
+								</span>
+							</div>
+							<div className="q-review-warn-desc">
+								Preguntas pendientes: <strong>{missing.join(", ")}</strong>.
+								Puedes completar las preguntas pendientes para mayor precisión o
+								confirmar la omisión con el botón secundario.
+							</div>
+						</div>
+					)}
 					<div className={`q-review-status ${allAnswered ? "ok" : "warn"}`}>
 						{allAnswered
 							? "✓ Respuestas completas. Presiona Enviar para confirmar."
-							: `Faltan: ${missing.join(", ")}`}
+							: `Faltan por responder: ${missing.join(", ")}`}
 					</div>
 				</div>
 			) : (

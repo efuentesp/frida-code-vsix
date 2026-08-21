@@ -153,4 +153,41 @@ describe("QuestionsPanel (Propuesta 2: Flujo Conversacional con Historial de Res
 		expect(html).toContain("q-input");
 		expect(html).toContain("O escribe tu propia respuesta…");
 	});
+
+	it("renderiza la pestaña de revisión con aviso de preguntas incompletas y botón explícito de omitir (Opción B)", () => {
+		const questions: WebQuestionSpec[] = [
+			{
+				question: "¿Qué motor de base de datos?",
+				header: "Base de datos",
+				options: [
+					{ label: "PostgreSQL", description: "Relacional." },
+					{ label: "SQLite", description: "Embebida." },
+				],
+			},
+			{
+				question: "¿Qué framework de estilos?",
+				header: "Estilos",
+				options: [
+					{ label: "Tailwind", description: "Utility classes." },
+					{ label: "CSS Modules", description: "Scoped CSS." },
+				],
+			},
+		];
+		const onResult = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(QuestionsPanel, {
+				questions,
+				onResult,
+				initialTab: 2, // Pestaña de revisión
+			}),
+		);
+
+		expect(html).toContain("q-review");
+		expect(html).toContain("Listo para enviar");
+		expect(html).toContain("Faltan por responder");
+		expect(html).toContain("Base de datos");
+		expect(html).toContain("Estilos");
+		expect(html).toContain("Omitir restantes y enviar");
+		expect(html).toContain("Completar pendientes");
+	});
 });
