@@ -26,7 +26,9 @@ describe("webview/activity-formatter", () => {
 		});
 
 		it("destaca basename y carpeta padre", () => {
-			expect(formatPathTarget("src/providers/frida-enterprise/adapter.ts")).toEqual({
+			expect(
+				formatPathTarget("src/providers/frida-enterprise/adapter.ts"),
+			).toEqual({
 				file: "adapter.ts",
 				parent: "(providers/frida-enterprise)",
 			});

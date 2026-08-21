@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "./Markdown";
+import { Codicon } from "./Codicon";
 import type {
 	WebQuestionAnswer,
 	WebQuestionOption,
@@ -319,9 +320,7 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 	function renderOption(opt: WebQuestionOption, i: number) {
 		const selected = isOptionSelected(opt.label);
 		const focused = zone === "options" && i === focusOpt;
-		let indicator: string;
-		if (q!.multiSelect) indicator = selected ? "☑" : "☐";
-		else indicator = selected ? "◉" : "○";
+		const isShortNumeric = i < 9;
 		return (
 			<div
 				key={`${opt.label}-${i}`}
@@ -335,14 +334,29 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					else chooseSingle(opt.label);
 				}}
 			>
-				<span className="q-opt-marker">{indicator}</span>
+				{isShortNumeric && <span className="q-opt-badge">{i + 1}</span>}
+				<Codicon
+					name={
+						q!.multiSelect
+							? selected
+								? "check"
+								: "circle-outline"
+							: selected
+								? "circle-filled"
+								: "circle-outline"
+					}
+					size={13}
+					className={`q-opt-icon${selected ? " is-selected" : ""}`}
+				/>
 				<div className="q-opt-body">
 					<div className="q-opt-label">
 						<Markdown>{opt.label}</Markdown>
 					</div>
-					<div className="q-opt-desc">
-						<Markdown>{opt.description}</Markdown>
-					</div>
+					{opt.description && (
+						<div className="q-opt-desc">
+							<Markdown>{opt.description}</Markdown>
+						</div>
+					)}
 				</div>
 			</div>
 		);
@@ -350,47 +364,47 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 
 	return (
 		<div className="q-panel">
-			{/* Tab bar (sólo 2+ preguntas): una pestaña por pregunta + "✓ Enviar". */}
-			{isMulti ? (
-				<div className="q-tabs">
+			{/* Historial de pasos previos completados (Propuesta 2: Inline Step Flow) */}
+			{isMulti && (
+				<div className="q-history-list">
 					{questions.map((qq, i) => {
 						const answered = isAnswered(i);
+						if (i === tab || !answered) return null;
+						const d = drafts[i];
+						let value = "";
+						if (d?.kind === "multi") value = (d.selected ?? []).join(", ");
+						else if (d?.kind === "custom") value = `(escrito) ${d.answer}`;
+						else value = d?.answer ?? "";
 						return (
-							<button
-								key={i}
-								type="button"
-								tabIndex={-1}
-								className={
-									"q-tab" +
-									(i === tab ? " active" : "") +
-									(answered ? " answered" : "")
-								}
-								onClick={() => goToTab(i)}
-							>
-								{answered ? "● " : "○ "}
-								{qq.header || `Q${i + 1}`}
-							</button>
+							<div key={i} className="q-step-chip">
+								<Codicon name="pass-filled" size={13} className="q-step-pass" />
+								<span className="q-step-num">{i + 1}.</span>
+								<span className="q-step-name">
+									{qq.header || `Paso ${i + 1}`}:
+								</span>
+								<span className="q-step-val">{value}</span>
+								<button
+									type="button"
+									className="q-step-edit"
+									onClick={() => goToTab(i)}
+									title={`Modificar paso ${i + 1}`}
+								>
+									<Codicon name="edit" size={11} />
+									<span>Cambiar</span>
+								</button>
+							</div>
 						);
 					})}
-					<button
-						type="button"
-						tabIndex={-1}
-						className={
-							"q-tab review" +
-							(isReviewTab ? " active" : "") +
-							(allAnswered ? " answered" : "")
-						}
-						onClick={() => goToTab(questions.length)}
-					>
-						✓ Enviar
-					</button>
 				</div>
-			) : null}
+			)}
 
 			{isReviewTab ? (
 				/* Pestaña "Enviar": resumen de respuestas + estado (parity pi "Submit"). */
 				<div className="q-review">
-					<div className="q-header">Listo para enviar</div>
+					<div className="q-review-header">
+						<Codicon name="checklist" size={14} className="q-review-icon" />
+						<span>Listo para enviar</span>
+					</div>
 					<div className="q-review-list">
 						{questions.map((qq, i) => {
 							const d = drafts[i];
@@ -407,13 +421,24 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 									className={`q-review-row${answered ? " ok" : " missing"}`}
 								>
 									<div className="q-review-head">
-										<span className="q-review-idx">{`Q${i + 1}`}</span>
-										<span className="q-review-state">
-											{answered ? "✓" : "○"}
-										</span>
+										<span className="q-review-idx">{`Paso ${i + 1}`}</span>
+										<Codicon
+											name={answered ? "pass-filled" : "circle-outline"}
+											size={12}
+											className="q-review-state"
+										/>
 										<span className="q-review-label">
-											{qq.header || `Q${i + 1}`}
+											{qq.header || `Pregunta ${i + 1}`}
 										</span>
+										<button
+											type="button"
+											className="q-review-edit-link"
+											onClick={() => goToTab(i)}
+											title={`Editar paso ${i + 1}`}
+										>
+											<Codicon name="edit" size={11} />
+											<span>Cambiar</span>
+										</button>
 									</div>
 									<div className="q-review-value">
 										<Markdown>{value}</Markdown>
@@ -424,17 +449,23 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 					</div>
 					<div className={`q-review-status ${allAnswered ? "ok" : "warn"}`}>
 						{allAnswered
-							? "✓ Enter para enviar"
+							? "✓ Respuestas completas. Presiona Enviar para confirmar."
 							: `Faltan: ${missing.join(", ")}`}
 					</div>
 				</div>
 			) : (
-				<>
-					{!isMulti && q!.header ? (
-						<div className="q-header">
-							<Markdown>{q!.header}</Markdown>
-						</div>
-					) : null}
+				<div className="q-active-card">
+					<div className="q-active-header">
+						<Codicon name="question" size={14} className="q-active-icon" />
+						<span className="q-active-title">
+							{isMulti
+								? `Paso ${tab + 1} de ${questions.length}${q!.header ? `: ${q!.header}` : ""}`
+								: q!.header || "Pregunta"}
+						</span>
+						{q!.multiSelect && (
+							<span className="q-multiselect-badge">Selección múltiple</span>
+						)}
+					</div>
 					<div className="q-question">
 						<Markdown>{q!.question}</Markdown>
 					</div>
@@ -444,9 +475,12 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 							<div className="q-options">{q!.options.map(renderOption)}</div>
 							<div className="q-preview">
 								<div className="q-preview-title">
-									{activePreviewOpt
-										? `Preview · ${activePreviewOpt.label}`
-										: "Vista previa"}
+									<Codicon name="eye" size={12} />
+									<span>
+										{activePreviewOpt
+											? `Vista previa · ${activePreviewOpt.label}`
+											: "Vista previa"}
+									</span>
 								</div>
 								{activePreviewOpt ? (
 									<Markdown>{activePreviewOpt.preview ?? ""}</Markdown>
@@ -466,19 +500,21 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 						</div>
 					)}
 
-					<textarea
-						ref={inputRef}
-						className="q-input"
-						placeholder="O escribe tu propia respuesta… (Shift+Enter para enviar)"
-						value={customText[tab] ?? ""}
-						rows={Math.min(
-							4,
-							Math.max(1, (customText[tab] ?? "").split("\n").length),
-						)}
-						onChange={(e) => onCustomChange(e.target.value)}
-						onFocus={() => setZone("input")}
-					/>
-				</>
+					<div className="q-input-wrap">
+						<textarea
+							ref={inputRef}
+							className="q-input"
+							placeholder="O escribe tu propia respuesta… (Shift+Enter para enviar)"
+							value={customText[tab] ?? ""}
+							rows={Math.min(
+								4,
+								Math.max(1, (customText[tab] ?? "").split("\n").length),
+							)}
+							onChange={(e) => onCustomChange(e.target.value)}
+							onFocus={() => setZone("input")}
+						/>
+					</div>
+				</div>
 			)}
 
 			{/* Navegación: tabIndex={-1} (el foco lo gestiona el handler por zona). */}
@@ -500,6 +536,25 @@ export function QuestionsPanel({ questions, onResult }: Props) {
 						{b.label}
 					</button>
 				))}
+			</div>
+
+			{/* Barra de atajos de teclado (estilo Copilot / ApprovalCard) */}
+			<div className="q-keys">
+				<span>
+					<kbd>↑↓</kbd> Navegar
+				</span>
+				<span>
+					<kbd>1-9</kbd> Seleccionar
+				</span>
+				<span>
+					<kbd>Tab</kbd> Zonas
+				</span>
+				<span>
+					<kbd>⏎</kbd> {isReviewTab || isLastQuestion ? "Enviar" : "Siguiente"}
+				</span>
+				<span>
+					<kbd>Esc</kbd> Cancelar
+				</span>
 			</div>
 		</div>
 	);

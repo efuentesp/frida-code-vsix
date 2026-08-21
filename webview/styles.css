@@ -4055,29 +4055,120 @@ button.danger:hover {
 	gap: 8px;
 }
 
-/* === QuestionsPanel (ask_user_question nativo, ADR-0027) ===
-   Contenedor, opciones (q-opt), foco de teclado, header, preview, input, nav.
-   Reemplaza al WebQuestionnaire sobre Remote React; reutiliza las clases
-   .q-options/.q-opt-body/.q-opt-label/.q-opt-desc/.q-with-preview/.q-preview
-   de arriba y añade las que el árbol del host pintaba vía fbox flex. */
+/* === QuestionsPanel (ask_user_question nativo, Propuesta 2: Inline Step Flow) ===
+   Contenedor conversacional, chips de pasos respondidos, tarjeta de paso activo,
+   opciones con codicons y badges numéricos, y barra de atajos estilo Copilot. */
 .q-panel {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	padding: 10px;
+	gap: 10px;
+	padding: 10px 12px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
-.q-header {
+
+/* Historial de pasos completados (chips compactos con botón Cambiar) */
+.q-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+.q-step-chip {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px;
+	border-radius: 4px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.08));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.12));
+	font-size: 11.5px;
+	line-height: 1.3;
+}
+.q-step-pass {
+	color: var(--vscode-testing-iconPassed, #3fb950);
+	flex-shrink: 0;
+}
+.q-step-num {
 	font-weight: 700;
-	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+}
+.q-step-name {
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+}
+.q-step-val {
+	color: var(--vscode-foreground);
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+}
+.q-step-edit {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	background: none;
+	border: none;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	font-size: 10.5px;
+	cursor: pointer;
+	padding: 1px 4px;
+	border-radius: 3px;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+.q-step-edit:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-textLink-activeForeground, #70baff);
+}
+
+/* Tarjeta de pregunta activa */
+.q-active-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.q-active-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.q-active-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	flex-shrink: 0;
+}
+.q-active-title {
+	font-weight: 700;
+	font-size: 12.5px;
+	color: var(--vscode-foreground);
+}
+.q-multiselect-badge {
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.18));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	margin-left: auto;
 }
 .q-question {
 	font-size: 13px;
+	line-height: 1.4;
+	color: var(--vscode-foreground);
 }
-/* Markdown en QuestionsPanel (issue #15): el label/header compactos y el valor
-   de respuesta son de una línea → sin margen de <p>; la pregunta y la
-   descripción son bloques → quitar sólo el margen externo (preserva el interno). */
+
+/* Markdown en QuestionsPanel */
 .q-opt-label .md p,
-.q-header .md p,
+.q-active-title .md p,
 .q-review-value .md p {
 	margin: 0;
 }
@@ -4089,37 +4180,47 @@ button.danger:hover {
 .q-opt-desc .md > p:last-child {
 	margin-bottom: 0;
 }
-/* Pestaña "Enviar" (review): resumen de respuestas + estado (parity pi). */
+
+/* Pestaña "Enviar" (review): resumen de respuestas + estado */
 .q-review {
 	display: flex;
 	flex-direction: column;
+	gap: 8px;
+}
+.q-review-header {
+	display: flex;
+	align-items: center;
 	gap: 6px;
+	font-weight: 700;
+	font-size: 13px;
+	color: var(--vscode-foreground);
+}
+.q-review-icon {
+	color: var(--vscode-testing-iconPassed, #3fb950);
 }
 .q-review-list {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
-	padding: 10px 12px;
+	gap: 8px;
+	padding: 8px 10px;
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
 	border-radius: 6px;
 	background: var(--vscode-editor-background);
-	font-size: 13px;
+	font-size: 12.5px;
 }
-/* Cada respuesta: cabeza (Qn · estado · header) + valor debajo (issue #5). */
 .q-review-row {
 	display: flex;
 	flex-direction: column;
-	gap: 1px;
+	gap: 2px;
 }
 .q-review-row + .q-review-row {
-	padding-top: 10px;
-	border-top: 1px solid
-		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	padding-top: 8px;
+	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .q-review-head {
 	display: flex;
 	flex-direction: row;
-	align-items: baseline;
+	align-items: center;
 	gap: 6px;
 }
 .q-review-idx {
@@ -4127,12 +4228,8 @@ button.danger:hover {
 	font-weight: 700;
 	color: var(--vscode-descriptionForeground);
 	font-variant-numeric: tabular-nums;
-	opacity: 0.85;
 }
 .q-review-state {
-	font-size: 12px;
-}
-.q-review-row.ok .q-review-state {
 	color: var(--vscode-testing-iconPassed, #3fb950);
 }
 .q-review-row.missing .q-review-state {
@@ -4143,10 +4240,27 @@ button.danger:hover {
 	font-weight: 600;
 	color: var(--vscode-descriptionForeground);
 }
+.q-review-edit-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	background: none;
+	border: none;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	font-size: 10.5px;
+	cursor: pointer;
+	padding: 1px 4px;
+	border-radius: 3px;
+	margin-left: auto;
+}
+.q-review-edit-link:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-textLink-activeForeground, #70baff);
+}
 .q-review-value {
 	color: var(--vscode-foreground);
 	font-weight: 500;
-	padding-left: 30px;
+	padding-left: 20px;
 }
 .q-review-row.missing .q-review-value {
 	font-style: italic;
@@ -4162,75 +4276,159 @@ button.danger:hover {
 .q-review-status.warn {
 	color: var(--vscode-editorWarning-foreground, #d29922);
 }
-/* Contenedor de opción (radio ◉/○ o checkbox ☑/☐ + cuerpo). */
+
+/* Opciones seleccionables (q-opt) */
+.q-options {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
 .q-opt {
 	display: flex;
 	align-items: flex-start;
-	gap: 7px;
-	padding: 6px 8px;
+	gap: 8px;
+	padding: 6px 10px;
 	border-radius: 6px;
 	background: var(--vscode-editor-background);
-	border: 1px solid transparent;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 	cursor: pointer;
+	transition: background 0.1s ease, border-color 0.1s ease;
 }
 .q-opt:hover {
 	background: var(--vscode-list-hoverBackground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
 }
 .q-opt.selected {
-	border-color: var(
-		--vscode-inputOption-activeBorder,
-		var(--vscode-focusBorder)
-	);
+	background: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.12));
+	border-color: var(--vscode-focusBorder, #007acc);
 }
-/* Foco de teclado (navegación ↑↓). Distinto del hover y del selected. */
 .q-opt.focused {
 	border-color: var(--vscode-focusBorder);
 	box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
-.q-opt-marker {
+
+/* Badge numérico [1], [2] para selección rápida */
+.q-opt-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 17px;
+	height: 17px;
+	padding: 0 4px;
+	border-radius: 3px;
+	font-size: 10px;
+	font-weight: 700;
+	font-family: var(--vscode-editor-font-family, monospace);
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.18));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
 	flex-shrink: 0;
-	font-size: 14px;
-	line-height: 1.3;
+	margin-top: 1px;
+}
+.q-opt-icon {
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+.q-opt-icon.is-selected {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.q-opt-body {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	flex: 1;
+}
+.q-opt-label {
+	font-weight: 600;
+	font-size: 12.5px;
+	color: var(--vscode-foreground);
+}
+.q-opt-desc {
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.35;
+}
+
+/* Previews markdown side-by-side */
+.q-with-preview {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	align-items: flex-start;
+}
+.q-with-preview .q-options {
+	flex: 1 1 50%;
+	min-width: 180px;
+}
+.q-preview {
+	flex: 1 1 45%;
+	min-width: 200px;
+	max-height: 260px;
+	overflow: auto;
+	padding: 8px 10px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	font-size: 12px;
 }
 .q-preview-title {
+	display: flex;
+	align-items: center;
+	gap: 5px;
 	font-weight: 600;
-	font-size: 12px;
-	margin-bottom: 4px;
+	font-size: 11.5px;
+	margin-bottom: 6px;
+	color: var(--vscode-descriptionForeground);
+}
+.q-preview-empty {
+	color: var(--vscode-descriptionForeground);
+	font-size: 11.5px;
+	font-style: italic;
+}
+
+/* Entrada de respuesta personalizada */
+.q-input-wrap {
+	margin-top: 2px;
 }
 .q-input {
 	width: 100%;
 	resize: vertical;
 	min-height: 32px;
-	padding: 6px 8px;
+	padding: 6px 10px;
 	border-radius: 6px;
 	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
 	background: var(--vscode-input-background);
 	color: var(--vscode-input-foreground);
 	font: inherit;
-	font-size: 13px;
+	font-size: 12px;
+	line-height: 1.35;
 }
 .q-input:focus {
 	border-color: var(--vscode-focusBorder);
 	outline: none;
 }
+
+/* Botones de navegación */
 .q-nav {
 	display: flex;
 	gap: 6px;
 	align-items: center;
+	padding-top: 4px;
 }
 .q-btn {
-	padding: 5px 12px;
-	border-radius: 6px;
+	padding: 4px 12px;
+	border-radius: 4px;
 	border: 1px solid var(--vscode-button-border, transparent);
 	background: var(--vscode-button-background);
 	color: var(--vscode-button-foreground);
 	cursor: pointer;
 	font-size: 12px;
+	font-weight: 500;
 }
 .q-btn:hover {
 	background: var(--vscode-button-hoverBackground);
 }
-/* Foco de teclado en botones (zona "buttons"). */
 .q-btn.focused {
 	outline: 2px solid var(--vscode-focusBorder);
 	outline-offset: -1px;
@@ -4251,6 +4449,31 @@ button.danger:hover {
 .q-btn.danger:hover {
 	background: var(--vscode-errorForeground);
 	color: var(--vscode-button-foreground);
+}
+
+/* Barra de atajos de teclado (estilo ApprovalCard) */
+.q-keys {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+	padding: 4px 4px 0;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	margin-top: 2px;
+}
+.q-keys kbd {
+	display: inline-block;
+	padding: 1px 4px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	line-height: 1.2;
+	background: var(--vscode-keybindingLabel-background, rgba(128, 128, 128, 0.17));
+	color: var(--vscode-keybindingLabel-foreground, var(--vscode-foreground));
+	border: 1px solid var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.3));
+	border-radius: 3px;
+	box-shadow: inset 0 -1px 0 var(--vscode-keybindingLabel-bottomBorder, rgba(0, 0, 0, 0.2));
 }
 .model-change-card {
 	border: 1px solid var(--vscode-focusBorder, #454545);
