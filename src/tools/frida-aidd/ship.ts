@@ -65,7 +65,9 @@ const DEV_PROMPT = `You are the DEV agent of an AiDD ship loop (BMAD adapted; yo
 
 Rules:
 - The SPEC is FROZEN: implement exactly what it says. Do NOT edit anything under docs/aidd/ (specs, planning, sprint-status, deferred-ledger) — the orchestrator owns those files and verifies their integrity.
-- Keep changes minimal and consistent with the codebase conventions.
+- You MUST create or modify ALL files explicitly listed in §Artifacts (Output) of the spec at their exact paths. The reviewer verifies these files 1:1 against the git diff and will fail the story if any required output artifact is missing.
+- Keep changes minimal, robust, and consistent with existing codebase conventions.
+- Ensure the codebase continues to compile cleanly (no new TypeScript or compilation errors).
 - If you hit a NON-BLOCKING impediment (pre-existing unrelated breakage, missing upstream piece), CONTINUE the story and report it under deferred — do not expand scope.
 - If you truly cannot complete the story, set storyComplete=false and explain why in summary (with deferred entries if applicable).
 
@@ -77,7 +79,7 @@ const REVIEW_PROMPT = `You are a senior code reviewer in an AiDD ship loop. Revi
 
 Verdict APPROVE only if the diff satisfies the spec's capabilities while respecting its constraints and non-goals. Otherwise CONCERNS with concrete, actionable notes (file:line). Scope creep beyond the spec and spec violations are CONCERNS. Be strict but do not invent requirements the spec does not make.`;
 
-const REVIEW_FIX_PROMPT = `Address the reviewer's concerns for this story with minimal changes. The SPEC is FROZEN (do not edit anything under docs/aidd/). After fixing, report via the structured output as the dev agent.`;
+const REVIEW_FIX_PROMPT = `Address the reviewer's concerns for this story with minimal changes. Verify that all files listed in §Artifacts (Output) are present in the git diff. The SPEC is FROZEN (do not edit anything under docs/aidd/). After fixing, report via the structured output as the dev agent.`;
 
 const BOOTSTRAP_PROMPT = `Read the AiDD planning artifacts of this repository and return the story roster: for each story in the epics-and-stories artifact, its id (e.g. E1-S2), title (single line, WITHOUT ':' or '#' characters), spec (path to its spec file, relative to the repo root), and verifyCommands (the exact shell commands from the spec's Verify section that prove completion; empty array if the spec has none). List every story — the orchestrator, not you, decides what runs.`;
 

@@ -111,7 +111,9 @@ A story is a vertical slice a developer can complete in ONE session. Every story
 - Lists DO / DONT' T constraints (what the dev must/must not touch)
 - Names its verify commands (tests, typecheck, lint — real commands of this repo
   if it can detect them)
-- Records artifacts-in / artifacts-out (files it reads, files it must produce)
+- Records artifacts-in / artifacts-out (files it reads, files it must produce).
+  CRITICAL: Ground all paths in the real repository structure (e.g. existing src/ and test/ directories). NEVER invent fictional folder names.
+- Ensure stories are strictly incremental and self-contained so that intermediate stories do not leave the project in a broken TypeScript/compilation state.
 
 Story IDs are stable: E1-S1, E1-S2, E2-S1 ...
 Do not exceed 12 stories total; if the PRD needs more, raise P2 scope to a
@@ -136,7 +138,11 @@ Write in MARKDOWN with the five-field kernel:
 - Non-goals: what this story deliberately does NOT do
 - Success signal: the exact command(s)/artifact(s) that prove completion
 
-Plus: Artifacts (in/out) and Verify commands.
+Plus:
+- Artifacts:
+  - Input: files the dev must read
+  - Output: exact file paths the dev MUST create or modify. CRITICAL: Use real directory paths matching repository conventions. NEVER hallucinate non-existent folder hierarchies.
+- Verify commands: exact commands (e.g. npm run typecheck, test suites) that test completion without breaking the project.
 End with: <!-- aidd: stage=spec story={storyId} -->`,
 };
 
