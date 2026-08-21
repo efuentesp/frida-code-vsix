@@ -293,7 +293,10 @@ body {
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	opacity: 0.75;
-	transition: background 0.1s ease, color 0.1s ease, opacity 0.1s ease;
+	transition:
+		background 0.1s ease,
+		color 0.1s ease,
+		opacity 0.1s ease;
 }
 
 .info-toast-btn:hover {
@@ -6139,13 +6142,17 @@ kbd {
 	margin-bottom: 6px;
 }
 
-/* Proveedores: tarjetas de config (ProviderConfig). */
+/* Proveedores: tarjetas de config (ProviderConfig, Propuesta 1: Accounts & Model Hub). */
 .pc-card {
-	border: 1px solid var(--vscode-panel-border);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
 	border-radius: 8px;
-	padding: 12px;
-	margin-bottom: 10px;
-	background: var(--vscode-editorHoverWidget-background, transparent);
+	padding: 12px 14px;
+	margin-bottom: 12px;
+	background: var(--vscode-editor-background);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 }
 .pc-head {
 	display: flex;
@@ -6154,8 +6161,8 @@ kbd {
 }
 .pc-icon {
 	display: inline-flex;
-	width: 26px;
-	height: 26px;
+	width: 28px;
+	height: 28px;
 	align-items: center;
 	justify-content: center;
 	border-radius: 6px;
@@ -6167,28 +6174,92 @@ kbd {
 	flex: 1;
 	min-width: 0;
 }
-.pc-name {
-	font-weight: 600;
-	font-size: 13px;
+.pc-name-row {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	gap: 8px;
+	flex-wrap: wrap;
+}
+.pc-name {
+	font-weight: 700;
+	font-size: 13px;
+	color: var(--vscode-foreground);
 }
 .pc-badge {
-	font-size: 10px;
-	padding: 1px 7px;
-	border-radius: 9px;
-	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-weight: 600;
 }
 .pc-badge.ok {
 	color: var(--vscode-testing-iconPassed, #3fb950);
 	background: rgba(63, 185, 80, 0.12);
+	border: 1px solid rgba(63, 185, 80, 0.25);
+}
+.pc-badge.off {
+	color: var(--vscode-descriptionForeground);
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.12));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
 }
 .pc-blurb {
-	font-size: 11px;
-	opacity: 0.7;
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
 	margin-top: 2px;
+	line-height: 1.35;
 }
+
+/* Catálogo de modelos aportados por el proveedor */
+.pc-models-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.06));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+.pc-models-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-descriptionForeground);
+}
+.pc-models-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+}
+.pc-model-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.14));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-foreground);
+}
+.pc-model-chip.active {
+	border-color: var(--vscode-focusBorder, #007acc);
+	background: rgba(0, 122, 204, 0.15);
+	font-weight: 600;
+}
+.pc-model-active-tag {
+	font-size: 9.5px;
+	padding: 0 4px;
+	border-radius: 3px;
+	background: var(--vscode-badge-background, #007acc);
+	color: #fff;
+	font-weight: 700;
+}
+
 .pc-act {
 	background: none;
 	border: none;
@@ -6202,21 +6273,46 @@ kbd {
 	background: var(--vscode-list-hoverBackground);
 }
 .pc-body {
-	margin-top: 10px;
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 }
+.pc-input-wrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+}
 .pc-input {
 	width: 100%;
 	box-sizing: border-box;
-	padding: 7px 9px;
+	padding: 6px 30px 6px 9px;
 	font-size: 12px;
 	font-family: var(--vscode-editor-font-family, monospace);
 	border-radius: 5px;
-	border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
 	background: var(--vscode-input-background);
 	color: var(--vscode-input-foreground);
+}
+.pc-input:focus {
+	border-color: var(--vscode-focusBorder);
+	outline: none;
+}
+.pc-reveal-btn {
+	position: absolute;
+	right: 6px;
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	padding: 3px;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.pc-reveal-btn:hover {
+	color: var(--vscode-foreground);
 }
 .pc-actions {
 	display: flex;
@@ -6228,17 +6324,17 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	padding: 6px 12px;
+	padding: 5px 12px;
 	font-size: 12px;
 	font-weight: 600;
-	border-radius: 5px;
+	border-radius: 4px;
 	border: none;
-	background: var(--vscode-button-background, #4daafc);
+	background: var(--vscode-button-background, #007acc);
 	color: var(--vscode-button-foreground, #fff);
 	cursor: pointer;
 }
 .pc-save:hover:not(:disabled) {
-	background: var(--vscode-button-hoverBackground, #3a8fd9);
+	background: var(--vscode-button-hoverBackground, #0062a3);
 }
 .pc-save:disabled {
 	opacity: 0.5;
@@ -6248,7 +6344,7 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	font-size: 11px;
+	font-size: 11.5px;
 	color: var(--vscode-textLink-foreground, #4daafc);
 	text-decoration: none;
 }
@@ -6424,19 +6520,34 @@ kbd {
 .pc-iconbtn {
 	display: inline-flex;
 	align-items: center;
-	justify-content: center;
-	width: 26px;
-	height: 26px;
-	padding: 0;
-	border-radius: 5px;
-	border: 1px solid var(--vscode-panel-border);
-	background: none;
-	color: var(--vscode-descriptionForeground);
+	gap: 5px;
+	padding: 4px 10px;
+	font-size: 11.5px;
+	font-weight: 500;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25)));
+	background: var(--vscode-button-secondaryBackground, transparent);
+	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
 	cursor: pointer;
 }
 .pc-iconbtn:hover {
-	color: var(--vscode-textLink-foreground, #4daafc);
-	border-color: var(--vscode-textLink-foreground, #4daafc);
+	background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+	color: var(--vscode-foreground);
+}
+.pc-link-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11.5px;
+	cursor: pointer;
+	padding: 4px 6px;
+	border-radius: 4px;
+}
+.pc-link-btn:hover {
+	color: var(--vscode-errorForeground, #f85149);
 	background: var(--vscode-list-hoverBackground);
 }
 .pc-confirm {
@@ -6459,9 +6570,9 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 6px 12px;
+	padding: 5px 12px;
 	font-size: 12px;
-	border-radius: 5px;
+	border-radius: 4px;
 	border: 1px solid var(--vscode-panel-border);
 	background: none;
 	color: var(--vscode-foreground);
@@ -6474,10 +6585,10 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 6px 12px;
+	padding: 5px 12px;
 	font-size: 12px;
 	font-weight: 600;
-	border-radius: 5px;
+	border-radius: 4px;
 	border: none;
 	background: var(--vscode-errorForeground, #f14c4c);
 	color: #fff;
@@ -6485,6 +6596,29 @@ kbd {
 }
 .pc-danger:hover {
 	filter: brightness(1.1);
+}
+
+.oauth-code-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 6px 0;
+}
+.oauth-copy-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+	cursor: pointer;
+}
+.oauth-copy-btn:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
 }
 
 /* Pestaña "Recursos" dentro del hub de Configuración (antes era un overlay modal). */

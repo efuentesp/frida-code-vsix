@@ -11,12 +11,14 @@ import { ProviderConfig } from "./ProviderConfig";
 export function ProveedoresTab({
 	providers,
 	deviceCode,
+	activeModel,
 	onSetKey,
 	onLogin,
 	onLogout,
 }: {
 	providers: ProviderOption[];
 	deviceCode?: { userCode: string; verificationUri: string };
+	activeModel?: { provider: string; modelId: string };
 	onSetKey: (id: string, key: string) => void;
 	onLogin: (id: string) => void;
 	onLogout: (id: string) => void;
@@ -30,6 +32,9 @@ export function ProveedoresTab({
 			provider={p}
 			meta={providerMeta(p.id, p.oauth)}
 			deviceCode={p.oauth ? deviceCode : undefined}
+			activeModelId={
+				activeModel?.provider === p.id ? activeModel.modelId : undefined
+			}
 			onSetKey={onSetKey}
 			onLogin={onLogin}
 			onLogout={onLogout}

@@ -186,6 +186,7 @@ export function SettingsHub({
 										<ProveedoresTab
 											providers={matchedProviders}
 											deviceCode={state.oauthDeviceCode}
+											activeModel={state.models?.active}
 											onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
 											onLogin={(id) => post({ type: "login_provider", provider: id })}
 											onLogout={(id) => post({ type: "logout_provider", provider: id })}
@@ -268,6 +269,7 @@ export function SettingsHub({
 							<ProveedoresTab
 								providers={providers}
 								deviceCode={state.oauthDeviceCode}
+								activeModel={state.models?.active}
 								onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
 								onLogin={(id) => post({ type: "login_provider", provider: id })}
 								onLogout={(id) => post({ type: "logout_provider", provider: id })}
