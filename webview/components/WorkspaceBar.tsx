@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { GoalState, WorkspaceInfo } from "../types";
 import { Tooltip } from "./Tooltip";
-import { CircleDot, Folder, GitBranch, GitFork, Target } from "lucide-react";
+import { Codicon } from "./Codicon";
 
 // Pinta la carpeta de trabajo y el branch git (con sync ↑↓ y conteo de cambios
 // +N ~N -N). Siempre visible en el footer, para saber exactamente dónde opera el
@@ -44,7 +44,6 @@ export function WorkspaceBar({
 	onRename,
 }: {
 	ws?: WorkspaceInfo;
-	/** #20 — goal activo de frida-goal (chip 🎯 junto a los datos de git). */
 	goal?: GoalState;
 	onRename?: (name: string) => void;
 }) {
@@ -66,7 +65,7 @@ export function WorkspaceBar({
 		<div className="ws-bar">
 			<Tooltip label={ws?.cwd ?? "Carpeta de trabajo"} side="top">
 				<span className="ws-cwd">
-					<Folder size={13} />
+					<Codicon name="folder" size={13} />
 					<code>{ws ? shortCwd(ws.cwd) : "…"}</code>
 				</span>
 			</Tooltip>
@@ -103,7 +102,7 @@ export function WorkspaceBar({
 			{ws?.branch && (
 				<Tooltip label={branchTooltip(ws)} side="top">
 					<span className={"ws-branch" + (ws.dirty ? " dirty" : "")}>
-						<GitBranch size={13} />
+						<Codicon name="git-branch" size={13} />
 						{ws.branch}
 						{/* Conteo de cambios +N ~N -N */}
 						{ws.diff &&
@@ -133,30 +132,25 @@ export function WorkspaceBar({
 								)}
 							</span>
 						)}
-					{ws.dirty && (
-						<span className="ws-dirty">
-							<CircleDot size={12} />
-						</span>
-					)}
-				</span>
+						{ws.dirty && (
+							<span className="ws-dirty">
+								<Codicon name="circle-filled" size={10} />
+							</span>
+						)}
+					</span>
 				</Tooltip>
 			)}
-			{/* Worktree vinculado: chip «wt: nombre» — única fuente del indicador
-			    (el badge del header se consolidó aquí, junto al resto de los datos de
-			    git). Solo existe cuando el cwd ES un worktree; en el checkout
-			    principal no aparece (cero ruido). Issue #13. */}
+			{/* Worktree vinculado: chip «wt: nombre» — única fuente del indicador */}
 			{ws?.worktreeName && (
 				<Tooltip
 					label={`Worktree · ${ws.cwd} · checkout vinculado del repo principal`}
 					side="top"
 				>
-				<span className="ws-worktree">
-					<GitFork size={13} /> wt: {ws.worktreeName}
-				</span>
+					<span className="ws-worktree">
+						<Codicon name="repo-forked" size={13} /> wt: {ws.worktreeName}
+					</span>
 				</Tooltip>
 			)}
-			{/* #20 — goal activo: chip 🎯 con estado y avance. Tooltip = objetivo
-			    completo + guards. Los estados parados indican cómo retomarlo. */}
 			{goal && goalChip(goal)}
 		</div>
 	);
@@ -165,39 +159,42 @@ export function WorkspaceBar({
 /** Chip del goal: texto corto + tooltip completo. */
 function goalChip(goal: GoalState) {
 	const tooltipLines: string[] = [goal.text];
-	tooltipLines.push(`estado: ${goal.status} · continuaciones: ${goal.iteration} · auto ${goal.automaticTurns}/25`);
+	tooltipLines.push(
+		`estado: ${goal.status} · continuaciones: ${goal.iteration} · auto ${goal.automaticTurns}/25`,
+	);
 	if (goal.tokenBudget !== undefined)
 		tooltipLines.push(`tokens: ${goal.tokensUsed}/${goal.tokenBudget}`);
 	if (goal.pausedReason) tooltipLines.push(`pausado: ${goal.pausedReason}`);
 	if (goal.blockedReason) tooltipLines.push(`bloqueado: ${goal.blockedReason}`);
-	if (goal.completionSummary) tooltipLines.push(`resumen: ${goal.completionSummary}`);
+	if (goal.completionSummary)
+		tooltipLines.push(`resumen: ${goal.completionSummary}`);
 	if (goal.status === "paused" || goal.status === "blocked")
 		tooltipLines.push("/goal resume para retomarlo");
 	const cls =
 		goal.status === "active"
-				? "ws-goal ws-goal-active"
-				: goal.status === "complete"
-					? "ws-goal ws-goal-complete"
-					: "ws-goal ws-goal-stopped";
+			? "ws-goal ws-goal-active"
+			: goal.status === "complete"
+				? "ws-goal ws-goal-complete"
+				: "ws-goal ws-goal-stopped";
 	return (
-			<Tooltip label={tooltipLines.join("\n")} side="top">
-				<span className={cls}>
-					<Target size={13} /> {goalLabel(goal)}
-				</span>
-			</Tooltip>
+		<Tooltip label={tooltipLines.join("\n")} side="top">
+			<span className={cls}>
+				<Codicon name="target" size={13} /> {goalLabel(goal)}
+			</span>
+		</Tooltip>
 	);
 }
 
 function goalLabel(goal: GoalState): string {
-	const short = goal.text.length > 24 ? `${goal.text.slice(0, 24)}…` : goal.text;
-	switch (goal.status) {
-		case "active":
-				return `${short} · ${goal.automaticTurns}/25`;
-		case "paused":
-				return "paused";
-		case "blocked":
-				return "blocked";
-		case "complete":
-			return "complete ✓";
-	}
+	const max = 32;
+	const txt = goal.text.replace(/\s+/g, " ").trim();
+	const trunc = txt.length > max ? `${txt.slice(0, max - 1)}…` : txt;
+	if (goal.status === "active") return trunc;
+	if (goal.status === "complete") return `✓ ${trunc}`;
+	if (goal.status === "paused") return `⏸ ${trunc}`;
+	if (goal.status === "blocked") return `⚠ ${trunc}`;
+	if (goal.status === "exhausted") return `⌛ ${trunc}`;
+	if (goal.status === "failed") return `✗ ${trunc}`;
+	if (goal.status === "aborted") return `⊘ ${trunc}`;
+	return trunc;
 }

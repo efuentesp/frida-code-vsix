@@ -50,6 +50,7 @@ import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
+import { Codicon } from "./components/Codicon";
 import { Followups } from "./components/Followups";
 import { getContextualFollowups } from "./followup-rules";
 
@@ -585,7 +586,7 @@ export function App() {
 						el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 					}}
 				>
-					<ArrowDown size={18} />
+					<Codicon name="arrow-down" size={16} />
 				</button>
 				<div ref={approvalsRef} className="approvals-area">
 					{/* Las tarjetas de aprobación se renderizan ahora en el footer, en lugar
