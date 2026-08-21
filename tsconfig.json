@@ -18,5 +18,5 @@
 		"pi-mcp-adapter": ["types/pi-mcp-adapter.d.ts"]
 	}
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "types/**/*.d.ts", "webview/**/*.d.ts"]
 }

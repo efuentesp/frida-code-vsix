@@ -2669,6 +2669,163 @@ button.sec:hover {
 	position: relative;
 }
 
+/* Barra de Estado Unificada (Propuesta 1: VS Code Native Statusline) */
+.statusline {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	height: 24px;
+	min-height: 24px;
+	padding: 0 10px;
+	background: var(
+		--vscode-statusBar-background,
+		var(--vscode-sideBar-background)
+	);
+	color: var(
+		--vscode-statusBar-foreground,
+		var(--vscode-descriptionForeground)
+	);
+	border-top: 1px solid
+		var(
+			--vscode-statusBar-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.2))
+		);
+	font-size: 11px;
+	line-height: 24px;
+	user-select: none;
+	overflow: hidden;
+}
+
+.statusline-left,
+.statusline-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
+.statusline-center {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.statusline-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(
+		--vscode-statusBar-foreground,
+		var(--vscode-descriptionForeground)
+	);
+	cursor: default;
+	transition: color 0.1s ease;
+}
+
+.statusline-item:hover {
+	color: var(--vscode-foreground);
+}
+
+.statusline-item.is-dirty {
+	color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+}
+
+.statusline-diff-badge {
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+	padding: 0 3px;
+	border-radius: 3px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	line-height: 14px;
+}
+
+.statusline-wt {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+
+.statusline-goal {
+	font-weight: 500;
+}
+.statusline-goal.active {
+	color: var(--vscode-testing-iconPassed, #89d185);
+}
+
+.statusline-session {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.statusline-session.is-editable {
+	cursor: pointer;
+}
+.statusline-session.is-editable:hover {
+	color: var(--vscode-foreground);
+	text-decoration: underline;
+}
+
+.statusline-rename-input {
+	height: 18px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	border: 1px solid var(--vscode-focusBorder);
+	border-radius: 3px;
+	padding: 0 4px;
+	font-size: 11px;
+	outline: none;
+}
+
+.statusline-ctx {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+
+.statusline-ctx-bar {
+	width: 36px;
+	height: 4px;
+	background: var(--vscode-progressBar-background, rgba(128, 128, 128, 0.25));
+	border-radius: 2px;
+	overflow: hidden;
+	display: inline-flex;
+}
+
+.statusline-ctx-fill {
+	height: 100%;
+	background: var(--vscode-textLink-foreground, #4daafc);
+	transition: width 0.2s ease;
+}
+.statusline-ctx-fill.mid {
+	background: var(--vscode-editorWarning-foreground, #cca700);
+}
+.statusline-ctx-fill.high {
+	background: var(--vscode-errorForeground, #f85149);
+}
+
+.statusline-ctx-pct {
+	font-size: 10.5px;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+}
+
+.statusline-cost {
+	font-size: 10.5px;
+	font-variant-numeric: tabular-nums;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+}
+
 /* Footer: barra de workspace + composer */
 .footer {
 	border-top: 1px solid var(--vscode-panel-border);

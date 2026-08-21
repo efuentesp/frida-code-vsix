@@ -20,22 +20,16 @@ import { SandboxesPanel } from "./components/SandboxesPanel";
 import { DetachedPanel } from "./components/DetachedPanel";
 import { RemoteRoot } from "./components/RemoteRoot";
 import { Composer, type CommandItem } from "./components/Composer";
-import { ContextBar } from "./components/ContextBar";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
-import { WorkspaceBar } from "./components/WorkspaceBar";
+import { Statusline } from "./components/Statusline";
 import {
-	ArrowDown,
 	Bot,
 	Brain,
 	CircleAlert,
 	CircleCheck,
 	CircleStop,
-	History,
 	Info,
-	ListChevronsDownUp,
-	Plus,
-	Settings,
 	TriangleAlert,
 	X,
 } from "lucide-react";
@@ -858,9 +852,10 @@ export function App() {
 						onCycleMode={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
 					/>
 				)}
-				<WorkspaceBar
+				<Statusline
 					ws={state.workspace}
 					goal={state.goal}
+					usage={state.usage}
 					onRename={(name) =>
 						state.workspace?.sessionPath &&
 						post({
@@ -870,7 +865,6 @@ export function App() {
 						})
 					}
 				/>
-				<ContextBar usage={state.usage} />
 			</div>
 			{sessionsOpen && state.sessions && (
 				<SessionsPanel

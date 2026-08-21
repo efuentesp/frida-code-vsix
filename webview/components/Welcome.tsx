@@ -15,7 +15,8 @@ const STARTER_CARDS: StarterCard[] = [
 	{
 		id: "aidd-plan",
 		title: "Planificar con AiDD",
-		desc: "Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
+		desc:
+			"Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
 		iconName: "rocket",
 		prompt: "/wf aidd-plan ",
 		actionType: "insert",
@@ -25,7 +26,8 @@ const STARTER_CARDS: StarterCard[] = [
 		title: "Diseñar Pruebas (TEA)",
 		desc: "Diseña la matriz de pruebas por escenarios y criterios de aceptación.",
 		iconName: "beaker",
-		prompt: "Ejecuta el workflow tea-test-design para diseñar las pruebas del proyecto.",
+		prompt:
+			"Ejecuta el workflow tea-test-design para diseñar las pruebas del proyecto.",
 		actionType: "submit",
 	},
 	{
@@ -39,7 +41,8 @@ const STARTER_CARDS: StarterCard[] = [
 	{
 		id: "explain-arch",
 		title: "Explicar Arquitectura",
-		desc: "Explica la estructura, módulos principales y flujo de datos del workspace.",
+		desc:
+			"Explica la estructura, módulos principales y flujo de datos del workspace.",
 		iconName: "symbol-structure",
 		prompt: "Explica la arquitectura y componentes clave de este proyecto.",
 		actionType: "submit",
@@ -67,8 +70,7 @@ const FEATURES: Feature[] = [
 				escribe <code>@</code> para adjuntar archivos (búsqueda difusa, navega
 				carpetas con <code>/</code>, comillas para espacios:{" "}
 				<code>@&quot;ruta con espacios&quot;</code>). Pega una{" "}
-				<strong>imagen</strong> del portapapeles para enviarla al modelo
-				(visión).
+				<strong>imagen</strong> del portapapeles para enviarla al modelo (visión).
 			</>
 		),
 	},
@@ -77,8 +79,8 @@ const FEATURES: Feature[] = [
 		title: "Bash rápido",
 		body: (
 			<>
-				<code>!comando</code> envía el resultado al modelo;{" "}
-				<code>!!comando</code> lo ejecuta sin enviarlo (solo lo ves tú).
+				<code>!comando</code> envía el resultado al modelo; <code>!!comando</code>{" "}
+				lo ejecuta sin enviarlo (solo lo ves tú).
 			</>
 		),
 	},
@@ -98,9 +100,9 @@ const FEATURES: Feature[] = [
 		title: "Envío y atajos",
 		body: (
 			<>
-				<kbd>Enter</kbd> envía · <kbd>Shift</kbd>+<kbd>Enter</kbd> salto de
-				línea · <kbd>Alt</kbd>+<kbd>Enter</kbd> encola un <em>follow-up</em>.{" "}
-				<kbd>↑</kbd>/<kbd>↓</kbd> recupera mensajes anteriores.
+				<kbd>Enter</kbd> envía · <kbd>Shift</kbd>+<kbd>Enter</kbd> salto de línea ·{" "}
+				<kbd>Alt</kbd>+<kbd>Enter</kbd> encola un <em>follow-up</em>. <kbd>↑</kbd>/
+				<kbd>↓</kbd> recupera mensajes anteriores.
 			</>
 		),
 	},
@@ -131,8 +133,8 @@ const FEATURES: Feature[] = [
 		title: "Detener respuesta",
 		body: (
 			<>
-				haz clic en el botón circular <strong>■</strong> o presiona{" "}
-				<kbd>Esc</kbd> dos veces para detener inmediatamente.
+				haz clic en el botón circular <strong>■</strong> o presiona <kbd>Esc</kbd>{" "}
+				dos veces para detener inmediatamente.
 			</>
 		),
 	},
@@ -175,7 +177,8 @@ export function Welcome({
 			</div>
 			<h1>Frida Code</h1>
 			<p className="welcome-sub">
-				Asistente inteligente de código de Softtek AppDev. ¿En qué podemos trabajar hoy?
+				Asistente inteligente de código de Softtek AppDev. ¿En qué podemos trabajar
+				hoy?
 			</p>
 
 			<div className="welcome-shortcuts">

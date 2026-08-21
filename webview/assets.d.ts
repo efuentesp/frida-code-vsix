@@ -1,16 +1,16 @@
 declare module "*.png" {
-	const content: string;
-	export default content;
+	const src: string;
+	export default src;
 }
 declare module "*.jpg" {
-	const content: string;
-	export default content;
+	const src: string;
+	export default src;
 }
 declare module "*.jpeg" {
-	const content: string;
-	export default content;
+	const src: string;
+	export default src;
 }
 declare module "*.svg" {
-	const content: string;
-	export default content;
+	const src: string;
+	export default src;
 }

@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["webview/**/*.ts", "webview/**/*.tsx"]
+  "include": ["webview/**/*.ts", "webview/**/*.tsx", "types/**/*.d.ts"]
 }
