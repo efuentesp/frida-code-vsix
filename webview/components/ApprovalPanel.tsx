@@ -108,9 +108,7 @@ export function ApprovalPanel({
 			<div className="perm-card">
 				<div className="perm-card-head">
 					<Codicon name="shield" size={14} className="perm-head-icon" />
-					<span className="perm-card-title">
-						Modo de automatización global
-					</span>
+					<span className="perm-card-title">Modo de automatización global</span>
 				</div>
 				<div className="perm-mode-cards">
 					{MODES.map((m) => {
@@ -125,9 +123,7 @@ export function ApprovalPanel({
 								<div className="perm-mode-card-head">
 									<Codicon name={m.icon} size={14} />
 									<span className="perm-mode-title">{m.title}</span>
-									{m.badge && (
-										<span className="perm-mode-badge">{m.badge}</span>
-									)}
+									{m.badge && <span className="perm-mode-badge">{m.badge}</span>}
 								</div>
 								<div className="perm-mode-desc">{m.desc}</div>
 							</button>
@@ -135,8 +131,8 @@ export function ApprovalPanel({
 					})}
 				</div>
 				<div className="perm-note">
-					Nota: la regla <code>Negar</code> siempre prevalece, incluso en modo
-					Auto. El modo también se sincroniza en el footer del chat.
+					Nota: la regla <code>Negar</code> siempre prevalece, incluso en modo Auto.
+					El modo también se sincroniza en el footer del chat.
 				</div>
 			</div>
 
@@ -157,9 +153,7 @@ export function ApprovalPanel({
 							</div>
 							<TriState
 								value={cfg.tool[t.id] ?? "ask"}
-								onChange={(s) =>
-									post({ type: "perm_set_tool", tool: t.id, state: s })
-								}
+								onChange={(s) => post({ type: "perm_set_tool", tool: t.id, state: s })}
 							/>
 						</div>
 					))}
@@ -170,14 +164,11 @@ export function ApprovalPanel({
 			<div className="perm-card">
 				<div className="perm-card-head">
 					<Codicon name="folder" size={14} className="perm-head-icon" />
-					<span className="perm-card-title">
-						Archivos y rutas protegidas
-					</span>
+					<span className="perm-card-title">Archivos y rutas protegidas</span>
 				</div>
 				<div className="perm-note">
-					Aplica transversalmente a cualquier tool que acceda al archivo.
-					Prevalece la regla más restrictiva (ej. <code>*.env</code>,{" "}
-					<code>~/.ssh/*</code>).
+					Aplica transversalmente a cualquier tool que acceda al archivo. Prevalece
+					la regla más restrictiva (ej. <code>*.env</code>, <code>~/.ssh/*</code>).
 				</div>
 				<PatternChips
 					map={cfg.path}
@@ -230,11 +221,7 @@ export function ApprovalPanel({
 			{/* ── 5. Fuera del workspace ── */}
 			<div className="perm-card">
 				<div className="perm-card-head">
-					<Codicon
-						name="link-external"
-						size={14}
-						className="perm-head-icon"
-					/>
+					<Codicon name="link-external" size={14} className="perm-head-icon" />
 					<span className="perm-card-title">Fuera del workspace</span>
 				</div>
 				<div className="perm-row">
@@ -259,9 +246,7 @@ export function ApprovalPanel({
 					automáticamente al cerrarla.
 				</div>
 				{(state.sessionPatterns ?? []).length === 0 ? (
-					<div className="perm-note muted">
-						— Nada aprobado por sesión todavía —
-					</div>
+					<div className="perm-note muted">— Nada aprobado por sesión todavía —</div>
 				) : (
 					<div className="perm-chips">
 						{(state.sessionPatterns ?? []).map((sp) => (

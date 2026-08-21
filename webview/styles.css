@@ -5265,7 +5265,7 @@ button.danger:hover {
 	font-family: var(--vscode-editor-font-family, monospace);
 }
 .res-section {
-	border-top: 1px solid var(--vscode-panel-border);
+	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .res-section:first-of-type {
 	border-top: none;
@@ -5273,34 +5273,63 @@ button.danger:hover {
 .res-section-head {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 8px 0;
+	gap: 8px;
+	padding: 8px 4px;
 	cursor: pointer;
 	user-select: none;
-	font-size: 12px;
-	font-weight: 600;
+	font-size: 12.5px;
+	font-weight: 700;
+	color: var(--vscode-foreground);
+	border-radius: 4px;
+	transition: background 0.1s ease;
 }
-.res-section-head .chev {
-	transition: transform 0.1s;
-	transform: rotate(90deg);
-	opacity: 0.6;
-	font-size: 10px;
+.res-section-head:hover {
+	background: var(--vscode-list-hoverBackground);
 }
-.res-section.collapsed .res-section-head .chev {
-	transform: rotate(0deg);
+.res-section-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	flex-shrink: 0;
+}
+.res-chev {
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
 }
 .res-section-title {
 	flex: 1;
 }
 .res-section-count {
-	font-weight: 400;
-	opacity: 0.6;
+	font-weight: 600;
+	font-size: 11px;
+	padding: 1px 6px;
+	border-radius: 9px;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.18));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
 }
 .res-section-body {
-	padding-bottom: 6px;
+	padding: 4px 0 10px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 .res-item {
-	padding: 4px 0 6px 16px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	transition: background 0.1s ease, border-color 0.1s ease;
+}
+.res-item:hover {
+	background: var(--vscode-list-hoverBackground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.3));
+}
+.res-item-head-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
 }
 .res-item-name {
 	display: flex;
@@ -5308,93 +5337,129 @@ button.danger:hover {
 	gap: 6px;
 	font-size: 12px;
 	word-break: break-all;
+	flex-wrap: wrap;
 }
-.res-item-name code {
+.res-code-name {
 	font-family: var(--vscode-editor-font-family, monospace);
-	font-size: 0.92em;
+	font-size: 12px;
+	font-weight: 600;
 	color: var(--vscode-foreground);
+}
+.res-use-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	background: var(--vscode-button-secondaryBackground, transparent);
+	color: var(--vscode-button-secondaryForeground, var(--vscode-textLink-foreground));
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: all 0.1s ease;
+}
+.res-use-btn:hover {
+	background: var(--vscode-button-background, #007acc);
+	color: var(--vscode-button-foreground, #ffffff);
+	border-color: transparent;
 }
 /* argumentHint de un comando (ej. "<provider/model>") en Recursos > Comandos. */
 .res-item-name .cmd-arg {
-	font-size: 10px;
-	opacity: 0.7;
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
 	font-family: var(--vscode-editor-font-family, monospace);
 }
 
-/* --- Procedencia: punto de color + barra de filtros (Recursos > Skills/Comandos) ---
- * Un color por origen para distinguir a simple vista de dónde viene cada
- * recurso (extensión / global ~/.frida / proyecto / built-in host / path). */
-.src-dot {
-	flex: none;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	display: inline-block;
+/* Badges visuales de procedencia */
+.res-tag-origin {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 9.5px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+	padding: 1px 6px;
+	border-radius: 3px;
 }
-/* extensión (frida-pipeline) → morado (marca frida AI) */
-.src-dot.src-extension {
-	background: #6a5acd;
+.res-tag-origin.src-project {
+	background: rgba(210, 153, 34, 0.16);
+	color: var(--vscode-editorWarning-foreground, #cca700);
+	border: 1px solid rgba(210, 153, 34, 0.3);
 }
-/* global (~/.frida) → azul */
-.src-dot.src-global {
-	background: #79c0ff;
+.res-tag-origin.src-global {
+	background: rgba(77, 170, 252, 0.14);
+	color: var(--vscode-textLink-foreground, #4daafc);
+	border: 1px solid rgba(77, 170, 252, 0.3);
 }
-/* proyecto (.frida/.pi en el cwd) → ámbar */
-.src-dot.src-project {
-	background: #d29922;
+.res-tag-origin.src-extension {
+	background: rgba(106, 90, 205, 0.18);
+	color: #9d8df1;
+	border: 1px solid rgba(106, 90, 205, 0.35);
 }
-/* built-in (host) → verde */
-.src-dot.src-built-in {
-	background: #3fb950;
+.res-tag-origin.src-built-in {
+	background: rgba(63, 185, 80, 0.14);
+	color: var(--vscode-testing-iconPassed, #3fb950);
+	border: 1px solid rgba(63, 185, 80, 0.3);
 }
-/* path (additionalSkillPaths) → gris */
-.src-dot.src-path {
-	background: #8b8b8b;
+.res-tag-origin.src-path {
+	background: rgba(128, 128, 128, 0.14);
+	color: var(--vscode-descriptionForeground);
+	border: 1px solid rgba(128, 128, 128, 0.3);
 }
 
-/* Barra de filtros por origen: chips con punto + conteo. */
+/* Barra de filtros por origen */
 .src-filter {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
-	margin-bottom: 8px;
+	gap: 5px;
+	margin-bottom: 6px;
 }
 .src-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
 	padding: 2px 8px;
-	border-radius: 10px;
+	border-radius: 4px;
 	font-size: 11px;
-	border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.35));
-	background: transparent;
+	font-weight: 500;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-editor-background);
 	color: var(--vscode-foreground);
 	cursor: pointer;
-	opacity: 0.7;
+	opacity: 0.8;
+	transition: all 0.1s ease;
 }
 .src-chip:hover {
 	opacity: 1;
-	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
+	background: var(--vscode-list-hoverBackground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
 }
 .src-chip.active {
 	opacity: 1;
-	border-color: var(--vscode-focusBorder, rgba(127, 127, 127, 0.6));
-	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.14));
+	border-color: var(--vscode-focusBorder, #007acc);
+	background: var(--vscode-list-activeSelectionBackground, rgba(0, 122, 204, 0.14));
+	font-weight: 600;
 }
-/* Ruta del archivo del skill en metadata atenuada (detalle bajo la desc.). */
-.res-item-meta.muted {
-	opacity: 0.55;
-	font-family: var(--vscode-editor-font-family, monospace);
+.src-chip-count {
 	font-size: 10px;
+	opacity: 0.75;
+}
+
+/* Ruta del archivo del skill en metadata atenuada */
+.res-item-meta.muted {
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10.5px;
 	word-break: break-all;
 }
 .res-item-meta {
-	font-size: 11px;
+	font-size: 11.5px;
 	color: var(--vscode-descriptionForeground);
-	margin-top: 2px;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
+	margin-top: 1px;
+	line-height: 1.35;
 	word-break: break-word;
 }
 .res-item.err .res-item-name code {
@@ -5444,26 +5509,55 @@ button.danger:hover {
 	border-right: 1px solid currentColor;
 }
 
-/* Sección "Dónde se cargan" dentro del panel de recursos */
+/* Sección "Dónde se cargan" */
 .res-loc-intro {
-	font-size: 11px;
-	opacity: 0.75;
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
 	margin: 4px 0 8px;
+	line-height: 1.4;
 }
 .res-loc-intro code {
 	font-family: var(--vscode-editor-font-family, monospace);
 }
 .res-loc-row {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	flex-wrap: wrap;
-	gap: 4px 6px;
-	padding: 3px 0 3px 16px;
+	gap: 6px 8px;
+	padding: 4px 0;
 	font-size: 12px;
 }
 .res-loc-kind {
-	min-width: 110px;
+	min-width: 120px;
 	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+.res-loc-paths {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.res-loc-path-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 7px;
+	border-radius: 4px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.08));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-foreground);
+	cursor: pointer;
+	font-size: 11px;
+	transition: all 0.1s ease;
+}
+.res-loc-path-btn:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-textLink-foreground, #4daafc);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+.res-loc-path-btn.muted {
+	color: var(--vscode-descriptionForeground);
 }
 .res-loc-path {
 	font-family: var(--vscode-editor-font-family, monospace);
@@ -5477,9 +5571,10 @@ button.danger:hover {
 	opacity: 0.4;
 }
 .res-loc-note {
-	font-size: 11px;
-	opacity: 0.7;
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
 	margin: 8px 0 4px;
+	line-height: 1.4;
 }
 .res-loc-note code {
 	font-family: var(--vscode-editor-font-family, monospace);
@@ -7402,7 +7497,10 @@ kbd {
 	cursor: pointer;
 }
 .perm-reset-btn:hover {
-	background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		var(--vscode-list-hoverBackground)
+	);
 }
 
 /* Control Tri-state interactivo con Codicons */
@@ -7430,7 +7528,8 @@ kbd {
 	transition: all 0.1s ease;
 }
 .perm-seg-btn + .perm-seg-btn {
-	border-left: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	border-left: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
 }
 .perm-seg-btn:hover {
 	background: var(--vscode-list-hoverBackground);
