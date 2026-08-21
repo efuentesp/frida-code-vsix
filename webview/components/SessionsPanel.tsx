@@ -194,15 +194,12 @@ export function SessionsPanel({
 										s.name && s.firstMessage && s.name !== s.firstMessage
 											? s.firstMessage
 											: null;
-									const totalTokens =
-										(s.inputTotal ?? 0) + (s.outputTotal ?? 0);
+									const totalTokens = (s.inputTotal ?? 0) + (s.outputTotal ?? 0);
 
 									return (
 										<div
 											key={s.path}
-											className={
-												"session-card" + (isCurrent ? " is-current" : "")
-											}
+											className={"session-card" + (isCurrent ? " is-current" : "")}
 										>
 											{editing === s.path ? (
 												<div className="session-rename-box">
@@ -243,8 +240,8 @@ export function SessionsPanel({
 											) : confirming === s.path ? (
 												<div className="session-confirm-box">
 													<span className="session-confirm-msg">
-														<Codicon name="warning" size={13} /> ¿Eliminar esta
-														sesión permanentemente?
+														<Codicon name="warning" size={13} /> ¿Eliminar esta sesión
+														permanentemente?
 													</span>
 													<div className="session-confirm-actions">
 														<button
@@ -276,41 +273,33 @@ export function SessionsPanel({
 														<div className="session-title-line">
 															<span
 																className={
-																	"session-status-icon " +
-																	(isCurrent ? "current" : "")
+																	"session-status-icon " + (isCurrent ? "current" : "")
 																}
 															>
 																<Codicon
-																	name={
-																		isCurrent ? "circle-filled" : "history"
-																	}
+																	name={isCurrent ? "circle-filled" : "history"}
 																	size={12}
 																/>
 															</span>
 															<span className="session-title">{title}</span>
 															{isCurrent && (
-																<span className="session-current-badge">
-																	ACTUAL
-																</span>
+																<span className="session-current-badge">ACTUAL</span>
 															)}
 														</div>
 
-														{snippet && (
-															<div className="session-snippet">«{snippet}»</div>
-														)}
+														{snippet && <div className="session-snippet">«{snippet}»</div>}
 
 														<div className="session-meta-row">
 															<span className="session-meta-chip">
 																<Codicon name="comment" size={11} />
 																<span>{s.messageCount} msgs</span>
 															</span>
-															{s.durationMs !== undefined &&
-																s.durationMs > 0 && (
-																	<span className="session-meta-chip">
-																		<Codicon name="clock" size={11} />
-																		<span>{formatDuration(s.durationMs)}</span>
-																	</span>
-																)}
+															{s.durationMs !== undefined && s.durationMs > 0 && (
+																<span className="session-meta-chip">
+																	<Codicon name="clock" size={11} />
+																	<span>{formatDuration(s.durationMs)}</span>
+																</span>
+															)}
 															{totalTokens > 0 && (
 																<span className="session-meta-chip">
 																	<Codicon name="database" size={11} />
@@ -323,9 +312,7 @@ export function SessionsPanel({
 																	<span>{projLabel(s.cwd)}</span>
 																</span>
 															)}
-															<span className="session-meta-date">
-																{fmtDate(s.modified)}
-															</span>
+															<span className="session-meta-date">{fmtDate(s.modified)}</span>
 														</div>
 													</div>
 

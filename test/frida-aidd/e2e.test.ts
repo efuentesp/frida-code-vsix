@@ -600,11 +600,11 @@ describe("frida-aidd · status.yaml de avance del plan (#78)", () => {
 		expect(yaml).toMatch(
 			/prd:\s*\n\s+status: done\s*\n\s+artifact: prd\.md\s*\n\s+attempts: 2/,
 		);
-		expect(yaml).toMatch(
-			/epics-and-stories:\s*\n\s+status: done/,
-		);
+		expect(yaml).toMatch(/epics-and-stories:\s*\n\s+status: done/);
 		// Spec del fan-out.
-		expect(yaml).toMatch(/E1-S1:\s*\n\s+status: done\s*\n\s+artifact: spec-E1-S1\.md/);
+		expect(yaml).toMatch(
+			/E1-S1:\s*\n\s+status: done\s*\n\s+artifact: spec-E1-S1\.md/,
+		);
 	}, 30000);
 
 	it("resume idempotente: stages preserved, specs preserved, sin agentes de stage", async () => {
@@ -639,9 +639,7 @@ describe("frida-aidd · status.yaml de avance del plan (#78)", () => {
 		});
 		const yaml = readStatusYaml();
 		expect(yaml).toContain("status: completed");
-		expect(yaml).toMatch(
-			/product-brief:\s*\n\s+status: preserved/,
-		);
+		expect(yaml).toMatch(/product-brief:\s*\n\s+status: preserved/);
 		expect(yaml).toMatch(/prd:\s*\n\s+status: preserved/);
 		expect(yaml).toMatch(/E1-S1:\s*\n\s+status: preserved/);
 		// Los agentes de stage NO corrieron (solo el extractor de historias).

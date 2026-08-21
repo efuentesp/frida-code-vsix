@@ -8,7 +8,14 @@ import {
 	type ReactNode,
 } from "react";
 import { reduce, initialState } from "./store";
-import type { ApprovalMode, InMessage, OutMessage, ToastLevel } from "./types";
+import type {
+	ApprovalMode,
+	InMessage,
+	OutMessage,
+	RetryState,
+	ToastLevel,
+	ToolEntry,
+} from "./types";
 import { fmtTokens, formatDuration } from "./format";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { TurnView } from "./components/Turn";
@@ -34,7 +41,6 @@ import {
 	X,
 } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
-import { AnimatedLabel } from "./components/AnimatedLabel";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
 import { ModelPanel } from "./components/ModelPanel";
@@ -46,6 +52,8 @@ import { Icon } from "./components/Icon";
 import { Codicon } from "./components/Codicon";
 import { Followups } from "./components/Followups";
 import { getContextualFollowups } from "./followup-rules";
+import { extractLastThought } from "./turn-grouping";
+import { getToolPhrase } from "./tool-phrases";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -269,57 +277,138 @@ export function App() {
 		return () => clearInterval(id);
 	}, [state.retry]);
 
-	const procPill = (() => {
+	// Temporizador en vivo para la línea de actividad (Propuesta A)
+	const [activityStart, setActivityStart] = useState<number | null>(null);
+	const [elapsedSeconds, setElapsedSeconds] = useState<string>("");
+
+	useEffect(() => {
+		if (state.busy || state.isCompacting) {
+			if (!activityStart) setActivityStart(Date.now());
+			const interval = setInterval(() => {
+				if (activityStart) {
+					const sec = ((Date.now() - activityStart) / 1000).toFixed(1);
+					setElapsedSeconds(`${sec}s`);
+				}
+			}, 200);
+			return () => clearInterval(interval);
+		}
+		setActivityStart(null);
+		setElapsedSeconds("");
+	}, [state.busy, state.isCompacting, activityStart]);
+
+	// Información dinámica en tiempo real sobre la actividad en curso (Propuesta A)
+	const activityInfo = (() => {
 		if (state.retry) {
 			const secs = retrySecs ?? Math.ceil(state.retry.delayMs / 1000);
 			return {
 				icon: "sync" as const,
 				spin: true,
-				text: `Reintentando (${state.retry.attempt}/${state.retry.maxAttempts}) en ${secs}s… (doble Esc para cancelar)`,
+				verb: "Reintentando:",
+				detail: `intento ${state.retry.attempt}/${state.retry.maxAttempts} en ${secs}s… (doble Esc para cancelar)`,
 				kind: "retry" as const,
+				canCancel: false,
+			};
+		}
+		if (state.isCompacting) {
+			const retryState = state.retry as RetryState | null | undefined;
+			const retryMsg = retryState
+				? `reintentando compactación (${retryState.attempt}/${retryState.maxAttempts}) en ${retrySecs ?? Math.ceil(retryState.delayMs / 1000)}s…`
+				: `compactando historial de la sesión${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`;
+			return {
+				icon: "database" as const,
+				spin: true,
+				verb: "Contexto:",
+				detail: retryMsg,
+				kind: "compacting" as const,
+				canCancel: true,
 			};
 		}
 		if (!state.busy) {
-			// El agente principal terminó, pero puede haber subagentes en background
-			// corriendo: el indicador persiste para que el usuario sepa que Frida sigue
-			// trabajando (el widget del footer da el detalle por agente).
 			const bg = state.backgroundRunning ?? 0;
 			if (bg > 0)
 				return {
 					icon: "hubot" as const,
 					spin: false,
-					text: `${bg} subagente${bg === 1 ? "" : "s"} en curso…`,
-					kind: "tool" as const,
+					verb: "Subagentes:",
+					detail: `${bg} agente${bg === 1 ? "" : "s"} en segundo plano…`,
+					kind: "subagent" as const,
+					canCancel: false,
 				};
 			return null;
 		}
+
 		const last = state.turns[state.turns.length - 1];
-		if (last?.bash?.status === "running")
+		if (last?.bash?.status === "running") {
 			return {
 				icon: "terminal" as const,
 				spin: false,
-				text: "Ejecutando terminal…",
+				verb: "Terminal:",
+				detail: last.bash.command || "ejecutando comando…",
 				kind: "bash" as const,
+				canCancel: false,
 			};
-		if (last?.status === "executing" && last.executingTool)
+		}
+
+		if (last?.status === "executing" || last?.executingTool) {
+			const runningToolSeg = last.segments.find(
+				(s): s is { kind: "tool" } & ToolEntry =>
+					s.kind === "tool" && s.state === "running",
+			);
+			const activeTool: ToolEntry | undefined =
+				runningToolSeg ??
+				(last.executingTool
+					? {
+							tool: last.executingTool,
+							state: "running" as const,
+							startedAt: Date.now(),
+							args: {},
+						}
+					: undefined);
+			if (activeTool) {
+				const phrase = getToolPhrase(activeTool);
+				return {
+					icon: phrase.iconName || "tools",
+					spin: false,
+					verb: `${phrase.verb}:`,
+					detail: phrase.arg || phrase.detail || "ejecutando herramienta…",
+					kind: "tool" as const,
+					canCancel: false,
+				};
+			}
 			return {
 				icon: "tools" as const,
 				spin: false,
-				text: `Ejecutando ${last.executingTool}…`,
+				verb: "Ejecutando:",
+				detail: last.executingTool ?? "herramienta…",
 				kind: "tool" as const,
+				canCancel: false,
 			};
-		if (last?.status === "thinking")
+		}
+
+		const thinkingSeg = last?.segments.find(
+			(s): s is { kind: "thinking"; text: string; startedAt: number } =>
+				s.kind === "thinking",
+		);
+
+		if (last?.status === "thinking" || thinkingSeg) {
+			const thought = extractLastThought(thinkingSeg?.text);
 			return {
 				icon: "sparkle" as const,
 				spin: false,
-				text: "Razonando…",
+				verb: "Razonando:",
+				detail: thought ? `«${thought}»` : "analizando contexto…",
 				kind: "thinking" as const,
+				canCancel: false,
 			};
+		}
+
 		return {
 			icon: "loading" as const,
 			spin: true,
-			text: "Procesando…",
+			verb: "Procesando:",
+			detail: "generando respuesta…",
 			kind: "default" as const,
+			canCancel: false,
 		};
 	})();
 
@@ -709,45 +798,39 @@ export function App() {
 						</button>
 					</div>
 				)}
-				{state.isCompacting ? (
-					<div className="proc-pill-anchor">
-						<div className="proc-pill is-compacting">
-							<Codicon name="database" size={12} />
-							<AnimatedLabel
-								text={
-									state.retry
-										? `Reintentando compactación (${state.retry.attempt}/${state.retry.maxAttempts}) en ${retrySecs ?? Math.ceil(state.retry.delayMs / 1000)}s…`
-										: `Compactando contexto${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`
-								}
-							/>
+				{activityInfo && (
+					<div className="activity-line-wrap">
+						<Codicon
+							name={activityInfo.icon}
+							size={13}
+							className={
+								`activity-icon is-${activityInfo.kind}` +
+								(activityInfo.spin
+									? " codicon-modifier-spin"
+									: activityInfo.kind === "thinking"
+										? " tc-sparkle-spin"
+										: "")
+							}
+						/>
+						<span className="activity-verb tc-shimmer">
+							{activityInfo.verb}
+						</span>
+						{activityInfo.detail && (
+							<span className="activity-detail">{activityInfo.detail}</span>
+						)}
+						{elapsedSeconds && (
+							<span className="activity-timer">· {elapsedSeconds}</span>
+						)}
+						{activityInfo.canCancel && (
 							<button
 								type="button"
-								className="proc-pill-cancel"
+								className="activity-cancel-link"
 								onClick={() => post({ type: "cancel_compaction" })}
 							>
 								Cancelar
 							</button>
-						</div>
+						)}
 					</div>
-				) : (
-					procPill && (
-						<div className="proc-pill-anchor">
-							<div className={`proc-pill is-${procPill.kind}`}>
-								<Codicon
-									name={procPill.icon}
-									size={12}
-									className={
-										procPill.spin
-											? "codicon-modifier-spin"
-											: procPill.kind === "thinking"
-												? "tc-sparkle-spin"
-												: ""
-									}
-								/>
-								<AnimatedLabel text={procPill.text} />
-							</div>
-						</div>
-					)
 				)}
 				<div className="web-footer">
 					{Object.entries(state.webRoots ?? {})

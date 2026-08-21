@@ -107,9 +107,10 @@ export function CollapsibleCard({
 	const now = Date.now();
 	const elapsedRunning = now - startRef.current;
 	const exceedsThreshold = running && elapsedRunning > threshold;
-	// Apertura automática: abierta mientras corre si hay parcial o se supera el
-	// umbral. Al finalizar (running=false) → false → se colapsa sola.
-	const autoOpen = running && (hasPartial || exceedsThreshold);
+	const isFlat = variant === "flat";
+	// Las herramientas en formato flat no se auto-abren durante la ejecución para
+	// evitar saltos molestos en el scroll del transcript de conversación.
+	const autoOpen = !isFlat && running && (hasPartial || exceedsThreshold);
 	const open = userToggle ?? (autoOpen || defaultOpen);
 
 	// AUTO-SCROLL: cuando la apertura es automática (durante la ejecución, sin
@@ -174,7 +175,6 @@ export function CollapsibleCard({
 		}
 	}
 
-	const isFlat = variant === "flat";
 	const containerClass =
 		`card card--${variant}` +
 		(open ? " open" : " collapsed") +
