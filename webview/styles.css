@@ -5958,6 +5958,108 @@ kbd {
 	transform: rotate(90deg);
 }
 
+/* Tool Grouping Copilot (.tool-group) */
+.tool-group {
+	margin: 2px 0;
+}
+
+.tool-group-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 3px 6px 3px 4px;
+	border-radius: 4px;
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+	line-height: 18px;
+	cursor: pointer;
+	text-align: left;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.tool-group-header:hover {
+	background-color: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+
+.tool-group-header .tc-icon-tools {
+	color: var(--vscode-foreground);
+	opacity: 0.85;
+	flex-shrink: 0;
+}
+
+.tool-group-header .tool-group-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+}
+
+.tool-group-header .tool-group-meta {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+	margin-left: auto;
+	padding-right: 4px;
+	font-variant-numeric: tabular-nums;
+}
+
+.tool-group-header:hover .tool-flat-chevron {
+	opacity: 0.8;
+}
+
+.tool-group-header.is-expanded .tool-flat-chevron {
+	opacity: 0.8;
+	transform: rotate(90deg);
+}
+
+.tool-group-body {
+	border-inline-start: 1px solid
+		var(
+			--vscode-tree-indentGuidesStroke,
+			var(--vscode-editorGroup-border, rgba(128, 128, 128, 0.2))
+		);
+	margin-left: 7px;
+	padding-left: 8px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+/* Thinking Segment Copilot (.thinking-flat-btn) */
+.thinking-flat-btn {
+	color: var(--vscode-descriptionForeground);
+}
+
+.thinking-body {
+	margin-top: 4px;
+	margin-left: 18px;
+	padding: 6px 10px;
+	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+	border-radius: 4px;
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.15))
+		);
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-descriptionForeground);
+}
+
 /* Card variante flat (Copilot) */
 .card.card--flat {
 	border: none;
