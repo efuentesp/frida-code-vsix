@@ -2207,11 +2207,15 @@ body {
 /* Aprobaciones */
 .approval {
 	border: 1px solid
-		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.25))
+		);
 	border-radius: 8px;
-	padding: 10px;
-	margin: 8px 0;
-	background: var(--vscode-list-hoverBackground);
+	padding: 10px 12px;
+	margin: 6px 0;
+	background: var(--vscode-editorWidget-background, var(--vscode-input-background));
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 .approval .ttl {
 	display: flex;
@@ -4449,9 +4453,13 @@ kbd {
    visual clara cuando coexisten varios paneles (workflow + todo + subagentes). */
 .web-footer > .fbox {
 	border: 1px solid
-		var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder));
+		var(
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.2))
+		);
 	border-radius: 8px;
-	background: var(--vscode-list-hoverBackground);
+	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+	overflow: hidden;
 }
 /* Divisor entre filas (fbox) del panel del todo dentro del footer: cualquier fbox
    con un hermano fbox previo (filas tras el header). */
