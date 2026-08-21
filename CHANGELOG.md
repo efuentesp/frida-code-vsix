@@ -17,6 +17,39 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.26.0] - 2026-08-21
+### Añadido
+
+- **ui** — barra de actividad de alto valor con formateador dedicado y tree view de tareas
+- **ui** — implementar Motor de Sugerencias Contextuales Semánticas en el footer
+- **ui** — implementar Línea de Actividad Fluida en el footer y eliminar auto-apertura saltarina de tools
+- **ui** — implementar panel de sesiones estilo Copilot Chat History con buscador y agrupación temporal
+- **ui** — rediseñar panel de permisos (ApprovalCard) con menú QuickPick estilo VS Code / Copilot
+- **ui** — mejorar contraste de barra de contexto con usado/total y tooltip de ruta absoluta en carpeta
+- **ui** — implementar Status Pill flotante sobre el composer y restaurar tooltip detallado de tokens
+- **webview** — pensamiento en streaming estilo Copilot Thought Stream y corrección de contraste en Statusline
+- **webview** — barra de estado unificada estilo nativo VS Code (Propuesta 1)
+- **webview** — pantalla de bienvenida moderna con Starter Cards interactivas (Copilot Canvas)
+- **webview** — fase 6 copilot — modernizar header, modales de sesiones y hub de configuración con Codicons
+- **webview** — fase 5 copilot — estilizado unificado para paneles dockeados y footer
+- **webview** — fase 6 copilot — modernización de WorkspaceBar y botón flotante de scroll con Codicons
+- **webview** — fase 5 copilot — followups contextuales y paneles dockeados en footer
+- **webview** — fase 4 copilot — footer input stack, border beam (.working) y botón circular ↑/■
+- **webview** — fase 3 copilot — estructura de turnos, thinking plano y agrupación de tools
+
+### Corregido
+
+- **enterprise** — corregir 400 en sesiones largas filtrando bloques de texto vacíos y ajustando maxTokens seguro
+
+### Interno
+
+- formatear styles.css con biome
+- **webview** — agregar tests unitarios para Composer en Fase 4
+- actualizar package-lock.json
+- remove node_modules symlink from git tracking
+- **roadmap** — marcar Fases 4, 5 y 6 como completadas en la hoja de ruta UI/UX Copilot
+- **roadmap** — marcar Fase 3 como completada en la hoja de ruta UI/UX Copilot
+
 ## [0.25.0] - 2026-08-21
 ### Añadido
 
