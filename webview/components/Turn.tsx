@@ -8,7 +8,11 @@ import { fmtDuration } from "../tool-phrases";
 import { BashCard } from "./BashCard";
 import { parseSkillBlock } from "../skill-block";
 import { SkillBlockCard } from "./SkillBlock";
-import { groupSegments, summarizeToolGroup } from "../turn-grouping";
+import {
+	groupSegments,
+	summarizeToolGroup,
+	extractLastThought,
+} from "../turn-grouping";
 
 export function TurnView({
 	turn,
@@ -93,7 +97,7 @@ export function TurnView({
 								</button>
 							)}
 						</div>
-						{blocks.map((block, idx) => {
+						{blocks.map((block) => {
 							if (block.kind === "thinking") {
 								const s = block.segment;
 								if (hideThinking || !s.text) return null;
@@ -263,6 +267,8 @@ function ThinkingSegment({
 
 	const open = userToggle ?? false;
 
+	const lastThought = isLive ? extractLastThought(text) : "";
+
 	return (
 		<div className="card card--flat">
 			<button
@@ -280,16 +286,19 @@ function ThinkingSegment({
 				<span className="tool-flat-title">
 					{isLive ? (
 						<>
-							<span className="tc-shimmer tc-verb">Razonando…</span>
+							<span className="tc-shimmer tc-verb">Pensando:</span>
+							<span className="thought-stream-quote">«{lastThought}»</span>
 							{hasTimer && durationStr && (
 								<span className="tc-arg">{durationStr}</span>
 							)}
 						</>
 					) : (
 						<>
-							<span className="tc-verb">Razonó</span>
+							<span className="tc-verb">Pensó</span>
 							<span className="tc-arg">
-								{hasTimer && durationStr ? `${durationStr}${tokenStr}` : "completado"}
+								{hasTimer && durationStr
+									? `${durationStr}${tokenStr}`
+									: "completado"}
 							</span>
 						</>
 					)}

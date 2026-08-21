@@ -29,9 +29,7 @@ function branchTooltip(ws: WorkspaceInfo): string {
 	const diffBits: string[] = [];
 	if (ws.diff) {
 		if (ws.diff.added > 0)
-			diffBits.push(
-				`${ws.diff.added} agregado${ws.diff.added === 1 ? "" : "s"}`,
-			);
+			diffBits.push(`${ws.diff.added} agregado${ws.diff.added === 1 ? "" : "s"}`);
 		if (ws.diff.modified > 0)
 			diffBits.push(
 				`${ws.diff.modified} modificado${ws.diff.modified === 1 ? "" : "s"}`,
@@ -52,7 +50,9 @@ function ctxTooltip(usage: Usage, pct: number, unknown: boolean): string {
 		`Contexto: ${usage.contextWindow > 0 ? `${fmt(usage.contextTokens)} / ${fmt(usage.contextWindow)}` : "…"} (${unknown ? "?" : `${pct}%`})`,
 	);
 	if (usage.inputTotal > 0 || usage.outputTotal > 0) {
-		lines.push(`Tokens: ↑${fmt(usage.inputTotal)} in · ↓${fmt(usage.outputTotal)} out`);
+		lines.push(
+			`Tokens: ↑${fmt(usage.inputTotal)} in · ↓${fmt(usage.outputTotal)} out`,
+		);
 	}
 	if (usage.cacheRead > 0 || usage.cacheWrite > 0) {
 		lines.push(
@@ -90,12 +90,7 @@ export interface StatuslineProps {
 	onRename?: (name: string) => void;
 }
 
-export function Statusline({
-	ws,
-	goal,
-	usage,
-	onRename,
-}: StatuslineProps) {
+export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState("");
 
@@ -141,27 +136,18 @@ export function Statusline({
 
 				{ws?.branch && (
 					<Tooltip label={branchTooltip(ws)} side="top">
-						<span
-							className={
-								"statusline-item" + (ws.dirty ? " is-dirty" : "")
-							}
-						>
+						<span className={"statusline-item" + (ws.dirty ? " is-dirty" : "")}>
 							<Codicon name="git-branch" size={12} />
 							<span className="statusline-txt">{ws.branch}</span>
 							{diffSummary ? (
-								<span className="statusline-diff-badge">
-									{diffSummary}
-								</span>
+								<span className="statusline-diff-badge">{diffSummary}</span>
 							) : null}
 						</span>
 					</Tooltip>
 				)}
 
 				{ws?.worktreeName && (
-					<Tooltip
-						label={`Worktree: ${ws.worktreeName} (${ws.cwd})`}
-						side="top"
-					>
+					<Tooltip label={`Worktree: ${ws.worktreeName} (${ws.cwd})`} side="top">
 						<span className="statusline-item statusline-wt">
 							<Codicon name="repo-forked" size={12} />
 							<span>wt:{ws.worktreeName}</span>
@@ -170,10 +156,7 @@ export function Statusline({
 				)}
 
 				{goal && (
-					<Tooltip
-						label={`Meta: ${goal.text} (${goal.status})`}
-						side="top"
-					>
+					<Tooltip label={`Meta: ${goal.text} (${goal.status})`} side="top">
 						<span
 							className={
 								"statusline-item statusline-goal " +
@@ -209,16 +192,9 @@ export function Statusline({
 						/>
 					) : (
 						<span
-							className={
-								"statusline-session" +
-								(onRename ? " is-editable" : "")
-							}
+							className={"statusline-session" + (onRename ? " is-editable" : "")}
 							onClick={onRename ? startEdit : undefined}
-							title={
-								onRename
-									? "Click para renombrar la sesión"
-									: ws.sessionName
-							}
+							title={onRename ? "Click para renombrar la sesión" : ws.sessionName}
 						>
 							• {ws.sessionName ?? "(sin nombre)"}
 						</span>
@@ -237,13 +213,9 @@ export function Statusline({
 									}}
 								/>
 							</span>
-							<span className="statusline-ctx-pct">
-								{unknown ? "?" : `${pct}%`}
-							</span>
+							<span className="statusline-ctx-pct">{unknown ? "?" : `${pct}%`}</span>
 							{usage.cost > 0 && (
-								<span className="statusline-cost">
-									${usage.cost.toFixed(3)}
-								</span>
+								<span className="statusline-cost">${usage.cost.toFixed(3)}</span>
 							)}
 						</div>
 					</Tooltip>

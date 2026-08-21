@@ -113,3 +113,23 @@ export function summarizeToolGroup(
 		label,
 	};
 }
+
+/**
+ * Extrae la última idea o reflexión significativa del texto de razonamiento en streaming.
+ */
+export function extractLastThought(text: string | undefined | null): string {
+	if (!text) return "Razonando…";
+	const lines = text
+		.split("\n")
+		.map((l) =>
+			l
+				.trim()
+				.replace(/^[-*•#>\d.]+\s*/, "")
+				.replace(/^["'«]+|["'»]+$/g, ""),
+		)
+		.filter((l) => l.length > 3 && !l.startsWith("```"));
+	if (lines.length === 0) return "Razonando…";
+	const last = lines[lines.length - 1];
+	const max = 55;
+	return last.length > max ? `${last.slice(0, max - 1)}…` : last;
+}

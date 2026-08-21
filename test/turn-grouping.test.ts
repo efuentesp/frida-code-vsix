@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { groupSegments, summarizeToolGroup } from "../webview/turn-grouping";
+import {
+	groupSegments,
+	summarizeToolGroup,
+	extractLastThought,
+} from "../webview/turn-grouping";
 import type { Segment, ToolEntry } from "../webview/types";
 
 function makeTool(over: Partial<ToolEntry> = {}): Extract<Segment, { kind: "tool" }> {
@@ -145,6 +149,25 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 			const summary = summarizeToolGroup([tool]);
 			expect(summary.count).toBe(1);
 			expect(summary.label).toBe("1 herramienta usada");
+		});
+	});
+
+	describe("extractLastThought", () => {
+		it("extrae la última línea relevante omitiendo viñetas y comillas", () => {
+			const text = "1. Primero examinamos el workspace\n2. Verificando dependencias en package.json";
+			expect(extractLastThought(text)).toBe("Verificando dependencias en package.json");
+		});
+
+		it("trunca pensamientos largos a ~55 caracteres", () => {
+			const long = "Esta es una reflexión sumamente larga que sobrepasa el límite visual del encabezado del pensamiento en vivo";
+			const result = extractLastThought(long);
+			expect(result.length).toBeLessThanOrEqual(55);
+			expect(result.endsWith("…")).toBe(true);
+		});
+
+		it("devuelve fallback si el texto está vacío o no tiene líneas útiles", () => {
+			expect(extractLastThought("")).toBe("Razonando…");
+			expect(extractLastThought(null)).toBe("Razonando…");
 		});
 	});
 });

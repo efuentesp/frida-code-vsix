@@ -2679,16 +2679,13 @@ button.sec:hover {
 	min-height: 24px;
 	padding: 0 10px;
 	background: var(
-		--vscode-statusBar-background,
-		var(--vscode-sideBar-background)
+		--vscode-sideBar-background,
+		var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08))
 	);
-	color: var(
-		--vscode-statusBar-foreground,
-		var(--vscode-descriptionForeground)
-	);
+	color: var(--vscode-foreground);
 	border-top: 1px solid
 		var(
-			--vscode-statusBar-border,
+			--vscode-widget-border,
 			var(--vscode-panel-border, rgba(128, 128, 128, 0.2))
 		);
 	font-size: 11px;
@@ -2720,10 +2717,7 @@ button.sec:hover {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	color: var(
-		--vscode-statusBar-foreground,
-		var(--vscode-descriptionForeground)
-	);
+	color: var(--vscode-descriptionForeground, inherit);
 	cursor: default;
 	transition: color 0.1s ease;
 }
@@ -2739,7 +2733,7 @@ button.sec:hover {
 .statusline-diff-badge {
 	font-size: 10px;
 	font-variant-numeric: tabular-nums;
-	opacity: 0.85;
+	opacity: 0.9;
 	padding: 0 3px;
 	border-radius: 3px;
 	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
@@ -2760,7 +2754,7 @@ button.sec:hover {
 
 .statusline-session {
 	font-size: 11px;
-	color: var(--vscode-descriptionForeground);
+	color: var(--vscode-descriptionForeground, inherit);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -2790,6 +2784,11 @@ button.sec:hover {
 	align-items: center;
 	gap: 5px;
 	cursor: pointer;
+	color: var(--vscode-descriptionForeground, inherit);
+}
+
+.statusline-ctx:hover {
+	color: var(--vscode-foreground);
 }
 
 .statusline-ctx-bar {
@@ -2816,14 +2815,14 @@ button.sec:hover {
 .statusline-ctx-pct {
 	font-size: 10.5px;
 	font-variant-numeric: tabular-nums;
-	color: var(--vscode-descriptionForeground);
+	color: inherit;
 }
 
 .statusline-cost {
 	font-size: 10.5px;
 	font-variant-numeric: tabular-nums;
-	color: var(--vscode-descriptionForeground);
-	opacity: 0.85;
+	color: inherit;
+	opacity: 0.9;
 }
 
 /* Footer: barra de workspace + composer */
@@ -6472,6 +6471,16 @@ kbd {
 /* Thinking Segment Copilot (.thinking-flat-btn) */
 .thinking-flat-btn {
 	color: var(--vscode-descriptionForeground);
+}
+
+.thought-stream-quote {
+	font-style: italic;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.9;
+	max-width: 280px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .thinking-body {
