@@ -7294,7 +7294,8 @@ kbd {
 	flex-direction: column;
 	gap: 6px;
 	padding: 8px 10px 4px 38px;
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 .tool-res-off {
 	display: flex;

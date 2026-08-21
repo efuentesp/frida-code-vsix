@@ -376,11 +376,7 @@ function getModuleIcon(module: string): string {
 	if (m.includes("git") || m.includes("sync")) return "git-branch";
 	if (m.includes("browser") || m.includes("web")) return "globe";
 	if (m.includes("subagent") || m.includes("parallel")) return "organization";
-	if (
-		m.includes("permission") ||
-		m.includes("gate") ||
-		m.includes("approval")
-	)
+	if (m.includes("permission") || m.includes("gate") || m.includes("approval"))
 		return "shield";
 	if (m.includes("aidd") || m.includes("workflow")) return "sparkle";
 	if (m.includes("lens") || m.includes("lsp") || m.includes("diagnostics"))
@@ -529,10 +525,7 @@ function ToolAccordionRow({
 						title={open ? "Contraer detalles" : "Ver herramientas y comandos"}
 						onClick={() => setOpen(!open)}
 					>
-						<Codicon
-							name={open ? "chevron-down" : "chevron-right"}
-							size={12}
-						/>
+						<Codicon name={open ? "chevron-down" : "chevron-right"} size={12} />
 					</button>
 				</div>
 			</div>
@@ -542,8 +535,8 @@ function ToolAccordionRow({
 						<div className="tool-res-off">
 							<Codicon name="info" size={12} />
 							<span>
-								Desactivado: las herramientas y comandos de este módulo no
-								consumen contexto ni están disponibles en el chat.
+								Desactivado: las herramientas y comandos de este módulo no consumen
+								contexto ni están disponibles en el chat.
 							</span>
 						</div>
 					)}
@@ -555,12 +548,7 @@ function ToolAccordionRow({
 						iconName="terminal"
 					/>
 					<ResLine label="Skills" items={res.skills} iconName="sparkle" />
-					<ResLine
-						label="Prompts"
-						items={res.prompts}
-						prefix="/"
-						iconName="book"
-					/>
+					<ResLine label="Prompts" items={res.prompts} prefix="/" iconName="book" />
 					{res.errors.length > 0 && (
 						<div className="tool-res-errors">
 							{res.errors.map((e, i) => (
