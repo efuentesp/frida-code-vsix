@@ -32,9 +32,7 @@ export function TurnView({
 	// Errata-14: excluye del texto copiable los bloques de puro eco (solo "✓"/
 	// espacios) que el modelo emitía imitando el placeholder del adapter.
 	const assistantText = turn.segments
-		.map((s) =>
-			s.kind === "text" && !isEchoNoiseText(s.text) ? s.text : null,
-		)
+		.map((s) => (s.kind === "text" && !isEchoNoiseText(s.text) ? s.text : null))
 		.filter((x): x is string => !!x)
 		.join("\n\n")
 		.trim();

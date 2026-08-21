@@ -157,8 +157,8 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 
 	// ─── Errata-14: bloques de texto de puro eco se omiten ────────────────────
 
-	describe("groupSegments · eco \"✓\" (Errata-14)", () => {
-		it("omite el bloque de texto que es solo \"✓\" (eco few-shot del placeholder)", () => {
+	describe('groupSegments · eco "✓" (Errata-14)', () => {
+		it('omite el bloque de texto que es solo "✓" (eco few-shot del placeholder)', () => {
 			const segments: Segment[] = [
 				{ kind: "text", text: "Voy a verificar" },
 				{ kind: "text", text: "✓" },
@@ -181,7 +181,9 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 		});
 
 		it("NO omite texto real que simplemente empieza con ✓", () => {
-			const segments: Segment[] = [{ kind: "text", text: "✓ Listo, todo aplicado" }];
+			const segments: Segment[] = [
+				{ kind: "text", text: "✓ Listo, todo aplicado" },
+			];
 			const blocks = groupSegments(segments);
 			expect(blocks).toHaveLength(1);
 			expect(blocks[0].kind).toBe("text");
