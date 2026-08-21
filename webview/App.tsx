@@ -812,9 +812,7 @@ export function App() {
 										: "")
 							}
 						/>
-						<span className="activity-verb tc-shimmer">
-							{activityInfo.verb}
-						</span>
+						<span className="activity-verb tc-shimmer">{activityInfo.verb}</span>
 						{activityInfo.detail && (
 							<span className="activity-detail">{activityInfo.detail}</span>
 						)}

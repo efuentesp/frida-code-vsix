@@ -1,4 +1,4 @@
-// webview/followup-rules.ts — Reglas de sugerencias contextuales (Followups Copilot)
+// webview/followup-rules.ts — Motor de sugerencias contextuales semánticas (Followups Copilot)
 // (Fase 5: Footer — Paneles Dockeados y Followups).
 
 import type { Turn, Segment } from "./types";
@@ -10,8 +10,195 @@ export interface FollowupSuggestion {
 	iconName?: string;
 }
 
+/** Extrae el texto final de conclusión generado por el asistente en el turno. */
+export function extractConclusionText(turn: Turn): string {
+	const textSegments = turn.segments.filter(
+		(s): s is Extract<Segment, { kind: "text" }> =>
+			s.kind === "text" && typeof s.text === "string",
+	);
+	if (textSegments.length === 0) return "";
+	return textSegments[textSegments.length - 1].text.trim();
+}
+
 /**
- * Deriva sugerencias contextuales basadas en el último turno de la conversación.
+ * 1. Extrae propuestas / alternativas si el asistente las presentó explícitamente.
+ *    Ejemplos: "### Propuesta 1: ...", "Propuesta A: ...", "**Opción 1**", "PROPUESTA 1".
+ */
+export function extractProposals(text: string): FollowupSuggestion[] {
+	if (!text) return [];
+	const suggestions: FollowupSuggestion[] = [];
+	const seenIds = new Set<string>();
+
+	// Patrón 1: Encabezados markdown "### Propuesta 1: Título" o "**Propuesta A: Título**"
+	const headingRegex =
+		/(?:###|\*\*)\s*(?:Propuesta|Opción|Alternativa)\s+([1-4]|[A-D])(?:\s*[:\-—.)]\s*([^\n*]+)|\*\*)/gi;
+	let m: RegExpExecArray | null;
+	while ((m = headingRegex.exec(text)) !== null) {
+		const key = m[1].toUpperCase();
+		const rawTitle = (m[2] ?? "").trim();
+		const cleanTitle = rawTitle
+			.replace(/\([^)]+\)/g, "")
+			.replace(/\*\*/g, "")
+			.trim();
+		const id = `prop-${key.toLowerCase()}`;
+		if (!seenIds.has(id)) {
+			seenIds.add(id);
+			const label = cleanTitle
+				? `Propuesta ${key}: ${cleanTitle.length > 20 ? cleanTitle.slice(0, 19) + "…" : cleanTitle}`
+				: `Propuesta ${key}`;
+			suggestions.push({
+				id,
+				label,
+				prompt: `Procedamos con la Propuesta ${key}.`,
+				iconName: "sparkle",
+			});
+		}
+	}
+
+	// Patrón 2: Bloques en cajas ASCII o texto "PROPUESTA 1 (Título)" / "PROPUESTA A:"
+	if (suggestions.length === 0) {
+		const boxRegex =
+			/PROPUESTA\s+([1-4]|[A-D])(?:\s*\(([^)]+)\)|[:\s]+([^\n│]+))/gi;
+		while ((m = boxRegex.exec(text)) !== null) {
+			const key = m[1].toUpperCase();
+			const rawTitle = (m[2] || m[3] || "")
+				.trim()
+				.replace(/[│┌┐└┘├┤─]/g, "")
+				.trim();
+			const cleanTitle = rawTitle.replace(/\*\*/g, "").trim();
+			const id = `prop-${key.toLowerCase()}`;
+			if (!seenIds.has(id)) {
+				seenIds.add(id);
+				const label = cleanTitle
+					? `Propuesta ${key}: ${cleanTitle.length > 20 ? cleanTitle.slice(0, 19) + "…" : cleanTitle}`
+					: `Propuesta ${key}`;
+				suggestions.push({
+					id,
+					label,
+					prompt: `Procedamos con la Propuesta ${key}.`,
+					iconName: "sparkle",
+				});
+			}
+		}
+	}
+
+	return suggestions.slice(0, 3);
+}
+
+/**
+ * 2. Extrae sugerencias dirigidas a la pregunta de cierre formulada por el asistente.
+ */
+export function extractQuestionFollowups(text: string): FollowupSuggestion[] {
+	if (!text || !text.includes("?")) return [];
+
+	// Obtener la última pregunta (desde ¿ o el último tramo hasta ?)
+	const lastQIndex = text.lastIndexOf("?");
+	const prevQ = text.lastIndexOf("¿", lastQIndex);
+	const question = (
+		prevQ === -1
+			? text.slice(Math.max(0, lastQIndex - 140), lastQIndex + 1)
+			: text.slice(prevQ, lastQIndex + 1)
+	).toLowerCase();
+
+	// Release / Publicación / Versión
+	if (/(release|publicar|versión|v\d+\.\d+|tag)/i.test(question || text)) {
+		const versionMatch = text.match(/\b(v\d+\.\d+\.\d+)\b/i);
+		const ver = versionMatch ? versionMatch[1] : "el release";
+		return [
+			{
+				id: "release-publish",
+				label: `Publicar ${ver}`,
+				prompt: `Sí, preparemos y publiquemos ${ver} en GitHub.`,
+				iconName: "rocket",
+			},
+			{
+				id: "release-changelog",
+				label: "Revisar changelog",
+				prompt: "Revisemos el changelog antes de publicar.",
+				iconName: "book",
+			},
+		];
+	}
+
+	// Aplicar ajustes / Cambios inmediatos
+	if (/(aplicar|ajuste|proceder|implementar|aplico)/i.test(question || text)) {
+		return [
+			{
+				id: "apply-yes",
+				label: "Sí, aplicar ajustes",
+				prompt: "Sí, aplica estos ajustes.",
+				iconName: "check",
+			},
+			{
+				id: "apply-adjust",
+				label: "Ajustar detalles",
+				prompt: "Me gustaría ajustar algunos detalles primero.",
+				iconName: "edit",
+			},
+		];
+	}
+
+	// Commit / Guardar en git
+	if (/(commit|guardar|comitear)/i.test(question || text)) {
+		return [
+			{
+				id: "commit-yes",
+				label: "Hacer commit",
+				prompt: "Sí, crea un commit con estos cambios.",
+				iconName: "git-commit",
+			},
+			{
+				id: "commit-diff",
+				label: "Ver git diff",
+				prompt: "Muestra el git diff antes de hacer commit.",
+				iconName: "git-compare",
+			},
+		];
+	}
+
+	// Siguiente paso / Continuar
+	if (/(siguiente|continuar|paso|avanzar|proseguir)/i.test(question || text)) {
+		return [
+			{
+				id: "next-step-yes",
+				label: "Sí, siguiente paso",
+				prompt: "Continuemos con el siguiente paso.",
+				iconName: "arrow-right",
+			},
+			{
+				id: "review-status",
+				label: "Revisar estado",
+				prompt: "Revisemos el estado actual antes de continuar.",
+				iconName: "checklist",
+			},
+		];
+	}
+
+	// Pregunta binaria de confirmación
+	if (
+		/(deseas|quieres|te parece|confirmas|procedemos|hacemos)/i.test(question)
+	) {
+		return [
+			{
+				id: "confirm-yes",
+				label: "Sí, adelante",
+				prompt: "Sí, adelante.",
+				iconName: "check",
+			},
+			{
+				id: "confirm-no",
+				label: "No, espera",
+				prompt: "No, espera un momento.",
+				iconName: "close",
+			},
+		];
+	}
+
+	return [];
+}
+
+/**
+ * Deriva sugerencias contextuales inteligentes basadas en la conclusión del último turno.
  */
 export function getContextualFollowups(
 	turns: readonly Turn[],
@@ -24,22 +211,38 @@ export function getContextualFollowups(
 
 	// 1. Si hubo error explícito en el turno
 	if (lastTurn.error) {
-		suggestions.push({
-			id: "retry-error",
-			label: "Reintentar acción",
-			prompt: "Reintenta la última acción corrigiendo el error.",
-			iconName: "refresh",
-		});
-		suggestions.push({
-			id: "explain-error",
-			label: "Explicar error",
-			prompt: "¿Por qué ocurrió este error y cómo lo resolvemos?",
-			iconName: "question",
-		});
-		return suggestions;
+		return [
+			{
+				id: "retry-error",
+				label: "Reintentar acción",
+				prompt: "Reintenta la última acción corrigiendo el error.",
+				iconName: "refresh",
+			},
+			{
+				id: "explain-error",
+				label: "Explicar error",
+				prompt: "¿Por qué ocurrió este error y cómo lo resolvemos?",
+				iconName: "question",
+			},
+		];
 	}
 
-	// 2. Extraer herramientas ejecutadas en el último turno
+	// 2. Analizar semánticamente el texto de conclusión del asistente
+	const conclusion = extractConclusionText(lastTurn);
+
+	// Nivel A: ¿El asistente presentó propuestas / alternativas?
+	const proposals = extractProposals(conclusion);
+	if (proposals.length > 0) {
+		return proposals;
+	}
+
+	// Nivel B: ¿El asistente formuló una pregunta de cierre / call to action?
+	const questionFollowups = extractQuestionFollowups(conclusion);
+	if (questionFollowups.length > 0) {
+		return questionFollowups;
+	}
+
+	// Nivel C: Heurística basada en herramientas ejecutadas
 	const toolSegments = lastTurn.segments.filter(
 		(s): s is Extract<Segment, { kind: "tool" }> => s.kind === "tool",
 	);
@@ -65,9 +268,15 @@ export function getContextualFollowups(
 		(t) => t.tool === "workflow" || t.tool === "workflow_status",
 	);
 
-	// Sugerencias según acciones:
 	if (hasEditOrWrite) {
-		if (!hasTestOrBuild) {
+		if (hasTestOrBuild) {
+			suggestions.push({
+				id: "commit-changes",
+				label: "Crear commit",
+				prompt: "Crea un commit con estos cambios.",
+				iconName: "git-commit",
+			});
+		} else {
 			suggestions.push({
 				id: "run-tests",
 				label: "Ejecutar tests",
@@ -83,7 +292,7 @@ export function getContextualFollowups(
 		});
 	}
 
-	if (hasTestOrBuild && !hasDiagnostics) {
+	if (hasTestOrBuild && !hasDiagnostics && suggestions.length < 3) {
 		suggestions.push({
 			id: "check-diagnostics",
 			label: "Comprobar diagnósticos",
@@ -92,7 +301,7 @@ export function getContextualFollowups(
 		});
 	}
 
-	if (hasWorkflow) {
+	if (hasWorkflow && suggestions.length < 3) {
 		suggestions.push({
 			id: "workflow-status",
 			label: "Ver estado del workflow",
@@ -101,7 +310,6 @@ export function getContextualFollowups(
 		});
 	}
 
-	// Fallback inteligente si no hay sugerencias específicas:
 	if (suggestions.length === 0 && lastTurn.segments.length > 0) {
 		suggestions.push({
 			id: "next-step",
