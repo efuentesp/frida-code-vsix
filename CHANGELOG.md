@@ -17,6 +17,23 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.25.0] - 2026-08-21
+### Añadido
+
+- **workflow** — unificar comando /wf con patrones agénticos de frida-extensible-workflows
+- **webview** — fase 2 copilot — fila de tools plana (.tool-flat) y catálogo tool por tool
+- **webview** — fase 1 copilot — fundaciones @vscode/codicons y primitivas CSS
+
+### Corregido
+
+- **aidd** — anclar rutas reales en specs de aidd-plan y exigir cumplimiento 1:1 de artefactos en aidd-ship
+- **aidd** — tolerar baselineCommit en sprint-status y robustecer extracción de JSON con prosa conversacional
+- **enterprise** — instalar patch de canales laterales en modelRuntime para evitar 422 en compact
+
+### Interno
+
+- formatear archivos con biome
+
 ## [0.24.0] - 2026-08-19
 ### Añadido
 
