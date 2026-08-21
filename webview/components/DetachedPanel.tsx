@@ -11,9 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Codicon } from "./Codicon";
 import type { DetachedPanelWs, DetachedRunWs } from "../types";
 
-export type DtAction =
-	| { kind: "refresh" }
-	| { kind: "stop"; runId: string };
+export type DtAction = { kind: "refresh" } | { kind: "stop"; runId: string };
 
 interface Props {
 	panel: DetachedPanelWs;
@@ -139,8 +137,8 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 				<div className="ccp-empty">
 					<div className="ccp-empty-title">Sin subagentes detached</div>
 					<div className="ccp-empty-hint">
-						Pide en el chat: «lanza un subagente detached que…» — corre en
-						su propio proceso y sobrevive a esta sesión. También:
+						Pide en el chat: «lanza un subagente detached que…» — corre en su propio
+						proceso y sobrevive a esta sesión. También:
 						<code>Agent(&#123; detached: true &#125;)</code>.
 					</div>
 					<div className="dt-empty-actions">
@@ -158,12 +156,7 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 	}
 
 	return (
-		<div
-			className="dt-panel ccp-panel"
-			ref={rootRef}
-			tabIndex={-1}
-			role="dialog"
-		>
+		<div className="dt-panel ccp-panel" ref={rootRef} tabIndex={-1} role="dialog">
 			<header className="ccp-head">
 				<div className="ccp-tabs">
 					<button

@@ -76,22 +76,21 @@ function readStats(entry: ToolEntry): string | null {
 
 // Status echo del tool `todo` (paridad renderTodoResult de rpiv-todo): glyph + label
 // coloreado según el status resultante de la acción.
-const TODO_STATUS_GLYPH: Record<string, { glyph: ReactNode; label: string }> =
-	{
-		pending: {
-			glyph: <Codicon name="circle-outline" size={11} />,
-			label: "pendiente",
-		},
-		in_progress: {
-			glyph: <Codicon name="record" size={11} />,
-			label: "en progreso",
-		},
-		completed: {
-			glyph: <Codicon name="pass-filled" size={11} />,
-			label: "completado",
-		},
-		deleted: { glyph: <Codicon name="error" size={11} />, label: "eliminado" },
-	};
+const TODO_STATUS_GLYPH: Record<string, { glyph: ReactNode; label: string }> = {
+	pending: {
+		glyph: <Codicon name="circle-outline" size={11} />,
+		label: "pendiente",
+	},
+	in_progress: {
+		glyph: <Codicon name="record" size={11} />,
+		label: "en progreso",
+	},
+	completed: {
+		glyph: <Codicon name="pass-filled" size={11} />,
+		label: "completado",
+	},
+	deleted: { glyph: <Codicon name="error" size={11} />, label: "eliminado" },
+};
 
 /** Infiere el status resultante de una acción `todo` parseando el content del
  *  resultado. create → "(status)"; update → "from → to"; delete → "eliminado".

@@ -229,10 +229,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 
 	const row = filteredRows[focusIdx];
 	const resRow = useMemo(
-		() =>
-			resView
-				? panel.resources.find((r) => r.name === resView)
-				: undefined,
+		() => (resView ? panel.resources.find((r) => r.name === resView) : undefined),
 		[resView, panel.resources],
 	);
 	const resItem = visibleResources[focusIdx];
@@ -599,21 +596,21 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 			? "↑↓ estado · ⏎ fijar · Tab acciones · Esc volver"
 			: inResView
 				? "↑↓ estado del plugin · ⏎ fijar · Tab acciones · Esc volver"
-			: inMktMenu
-			? confirmRemove
-				? "⏎ confirmar quitar · Esc cancelar"
-				: "↑↓ opción · ⏎ seleccionar · Esc volver"
-			: zone === "tabs"
-				? "←/→ o 1-4 cambia tab"
-				: zone === "buttons"
-					? "←/→ mover · ⏎ ejecutar"
-					: tab === "marketplaces"
-						? "↑↓ marketplace · ⏎ menú · “＋ Agregar” abre diálogo"
-						: tab === "errors"
-							? "↑↓ error · ⏎ reintentar"
-							: tab === "installed"
-								? "↑↓ recurso · Espacio alterna plugin · ⏎ detalle · ←/→ pliega sección"
-								: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
+				: inMktMenu
+					? confirmRemove
+						? "⏎ confirmar quitar · Esc cancelar"
+						: "↑↓ opción · ⏎ seleccionar · Esc volver"
+					: zone === "tabs"
+						? "←/→ o 1-4 cambia tab"
+						: zone === "buttons"
+							? "←/→ mover · ⏎ ejecutar"
+							: tab === "marketplaces"
+								? "↑↓ marketplace · ⏎ menú · “＋ Agregar” abre diálogo"
+								: tab === "errors"
+									? "↑↓ error · ⏎ reintentar"
+									: tab === "installed"
+										? "↑↓ recurso · Espacio alterna plugin · ⏎ detalle · ←/→ pliega sección"
+										: `escribe filtra (@mkt por origen) · ↑↓ mueve · ⏎ ${buttons[0]?.label ?? "acción"} · Tab zonas`;
 
 	const menuLabels = useMemo(() => {
 		if (!menuMkt) return [] as string[];
@@ -838,16 +835,12 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										<span className="ccp-instview-k">Origen</span>
 										<span>
 											{resRow.plugin} ·{" "}
-											{resRow.pluginRef.slice(
-												resRow.pluginRef.lastIndexOf("@") + 1,
-											)}
+											{resRow.pluginRef.slice(resRow.pluginRef.lastIndexOf("@") + 1)}
 										</span>
 									</div>
 									<div>
 										<span className="ccp-instview-k">Costo</span>
-										<span>
-											{resRow.tokens ? `~${resRow.tokens} tokens/turno` : "—"}
-										</span>
+										<span>{resRow.tokens ? `~${resRow.tokens} tokens/turno` : "—"}</span>
 									</div>
 									<div>
 										<span className="ccp-instview-k">Path</span>
@@ -898,8 +891,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										>
 											{b.primary && pending.has(resRow.pluginRef) ? (
 												<>
-													<span className="ccp-spin">⟳</span>{" "}
-													{pending.get(resRow.pluginRef)}
+													<span className="ccp-spin">⟳</span> {pending.get(resRow.pluginRef)}
 												</>
 											) : (
 												b.label
@@ -910,121 +902,119 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 							</div>
 						</div>
 					) : inInstView && viewRow ? (
-					<div className="ccp-mkt-full">
-						<div className="ccp-instview">
-							<div className="ccp-instview-head">
-								<button
-									type="button"
-									tabIndex={-1}
-									className="ccp-back"
-									onClick={() => setInstView(null)}
-								>
-									← Volver
-								</button>
-								<span className="ccp-instview-name">
-									{viewRow.label}
-									{viewRow.version ? ` v${viewRow.version}` : ""}
-								</span>
-								<span className={`ccp-badge ${STATUS_CLS[viewRow.status]}`}>
-									{STATUS_LABEL[viewRow.status]}
-								</span>
-							</div>
-							{viewRow.description ? (
-								<div className="ccp-instview-desc">{viewRow.description}</div>
-							) : null}
-							<div className="ccp-instview-fields">
-								<div>
-									<span className="ccp-instview-k">Origen</span>
-									<span>{viewRow.ref.slice(viewRow.ref.lastIndexOf("@") + 1)}</span>
-								</div>
-								<div>
-									<span className="ccp-instview-k">Costo</span>
-									<span>
-										{viewRow.tokens
-											? `~${viewRow.tokens} tokens/turno`
-											: "—"}
+						<div className="ccp-mkt-full">
+							<div className="ccp-instview">
+								<div className="ccp-instview-head">
+									<button
+										type="button"
+										tabIndex={-1}
+										className="ccp-back"
+										onClick={() => setInstView(null)}
+									>
+										← Volver
+									</button>
+									<span className="ccp-instview-name">
+										{viewRow.label}
+										{viewRow.version ? ` v${viewRow.version}` : ""}
+									</span>
+									<span className={`ccp-badge ${STATUS_CLS[viewRow.status]}`}>
+										{STATUS_LABEL[viewRow.status]}
 									</span>
 								</div>
-								<div>
-									<span className="ccp-instview-k">Componentes</span>
-									<span>{viewRow.components?.join(" · ") ?? "—"}</span>
-								</div>
-								<div>
-									<span className="ccp-instview-k">Path</span>
-									<span className="ccp-instview-path">{viewRow.path ?? "—"}</span>
-								</div>
-							</div>
-							<div className="ccp-instview-state">
-								<div className="ccp-instview-state-label">Estado:</div>
-								{(["habilitado", "deshabilitado"] as const).map((label, i) => (
-									<button
-										key={label}
-										type="button"
-										tabIndex={-1}
-										className="ccp-instview-opt"
-										data-focused={
-											zone === "list" && i === stateIdx ? "true" : "false"
-										}
-										onClick={() => {
-											setStateIdx(i);
-											const cur = viewRow.status === "disabled" ? 1 : 0;
-											if (i !== cur)
-												onAction(panel.id, {
-													kind: i === 0 ? "enable" : "disable",
-													ref: viewRow.ref,
-												});
-										}}
-									>
-										<span className="ccp-mkt-opt-cursor">
-											{zone === "list" && i === stateIdx ? "❯" : " "}
+								{viewRow.description ? (
+									<div className="ccp-instview-desc">{viewRow.description}</div>
+								) : null}
+								<div className="ccp-instview-fields">
+									<div>
+										<span className="ccp-instview-k">Origen</span>
+										<span>{viewRow.ref.slice(viewRow.ref.lastIndexOf("@") + 1)}</span>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Costo</span>
+										<span>
+											{viewRow.tokens ? `~${viewRow.tokens} tokens/turno` : "—"}
 										</span>
-										{i === 0 ? "◉" : "◯"} {label}
-									</button>
-								))}
-							</div>
-							{viewRow.description ? null : (
-								<div className="ccp-detail-md">
-									<Markdown>{viewRow.markdown}</Markdown>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Componentes</span>
+										<span>{viewRow.components?.join(" · ") ?? "—"}</span>
+									</div>
+									<div>
+										<span className="ccp-instview-k">Path</span>
+										<span className="ccp-instview-path">{viewRow.path ?? "—"}</span>
+									</div>
 								</div>
-							)}
-							<div
-								className={`ccp-actions${zone === "buttons" ? " ccp-actions-focus" : ""}`}
-							>
-								{(
-									viewRow.status === "installed"
-										? [{ key: "disable", label: "Deshabilitar", primary: true }, { key: "uninstall", label: "Desinstalar", primary: false }]
-										: [{ key: "enable", label: "Habilitar", primary: true }, { key: "uninstall", label: "Desinstalar", primary: false }]
-								).map((b, i) => (
-									<button
-										key={b.key}
-										type="button"
-										tabIndex={-1}
-										disabled={pending.has(viewRow.ref)}
-										className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
-											zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
-										}`}
-										onClick={() => submitBtn(b.key, viewRow)}
-									>
-										{b.primary && pending.has(viewRow.ref) ? (
-											<>
-												<span className="ccp-spin">⟳</span>{" "}
-												{pending.get(viewRow.ref)}
-											</>
-										) : (
-											b.label
-										)}
-									</button>
-								))}
+								<div className="ccp-instview-state">
+									<div className="ccp-instview-state-label">Estado:</div>
+									{(["habilitado", "deshabilitado"] as const).map((label, i) => (
+										<button
+											key={label}
+											type="button"
+											tabIndex={-1}
+											className="ccp-instview-opt"
+											data-focused={zone === "list" && i === stateIdx ? "true" : "false"}
+											onClick={() => {
+												setStateIdx(i);
+												const cur = viewRow.status === "disabled" ? 1 : 0;
+												if (i !== cur)
+													onAction(panel.id, {
+														kind: i === 0 ? "enable" : "disable",
+														ref: viewRow.ref,
+													});
+											}}
+										>
+											<span className="ccp-mkt-opt-cursor">
+												{zone === "list" && i === stateIdx ? "❯" : " "}
+											</span>
+											{i === 0 ? "◉" : "◯"} {label}
+										</button>
+									))}
+								</div>
+								{viewRow.description ? null : (
+									<div className="ccp-detail-md">
+										<Markdown>{viewRow.markdown}</Markdown>
+									</div>
+								)}
+								<div
+									className={`ccp-actions${zone === "buttons" ? " ccp-actions-focus" : ""}`}
+								>
+									{(viewRow.status === "installed"
+										? [
+												{ key: "disable", label: "Deshabilitar", primary: true },
+												{ key: "uninstall", label: "Desinstalar", primary: false },
+											]
+										: [
+												{ key: "enable", label: "Habilitar", primary: true },
+												{ key: "uninstall", label: "Desinstalar", primary: false },
+											]
+									).map((b, i) => (
+										<button
+											key={b.key}
+											type="button"
+											tabIndex={-1}
+											disabled={pending.has(viewRow.ref)}
+											className={`ccp-btn${b.primary ? " ccp-btn-primary" : ""}${
+												zone === "buttons" && i === focusBtn ? " ccp-btn-focus" : ""
+											}`}
+											onClick={() => submitBtn(b.key, viewRow)}
+										>
+											{b.primary && pending.has(viewRow.ref) ? (
+												<>
+													<span className="ccp-spin">⟳</span> {pending.get(viewRow.ref)}
+												</>
+											) : (
+												b.label
+											)}
+										</button>
+									))}
+								</div>
 							</div>
 						</div>
-					</div>
 					) : (
 						<div className="ccp-list ccp-list-full" ref={listRef}>
 							{(["skill", "cmd", "mcp"] as const).map((kind) => {
 								const items = visibleResources.filter((r) => r.kind === kind);
-								const total = filteredResources.filter(
-									(r) => r.kind === kind,
-								).length;
+								const total = filteredResources.filter((r) => r.kind === kind).length;
 								if (!total) return null;
 								const isCol = collapsed.has(kind);
 								return (
@@ -1045,10 +1035,10 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										>
 											<span className="ccp-res-caret">
 												{isCol ? (
-										<Codicon name="add" size={14} />
-									) : (
-										<Codicon name="remove" size={14} />
-									)}
+													<Codicon name="add" size={14} />
+												) : (
+													<Codicon name="remove" size={14} />
+												)}
 											</span>
 											{kind === "skill"
 												? "Skills"
@@ -1062,54 +1052,51 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 											: items.map((r) => {
 													const i = visibleResources.indexOf(r);
 													return (
-												<button
-													key={r.name}
-													type="button"
-													tabIndex={-1}
-													className={`ccp-res-row${i === focusIdx ? " ccp-row-focus" : ""}`}
-													data-focused={i === focusIdx ? "true" : "false"}
-													onClick={() => {
-														setFocusIdx(i);
-														setResView(r.name);
-														setStateIdx(r.status === "disabled" ? 1 : 0);
-													}}
-												>
-													<span className="ccp-mkt-opt-cursor">
-														{i === focusIdx ? "❯" : " "}
-													</span>
-													<span className="ccp-row-label">{r.name}</span>
-													<span className="ccp-comp">{r.kind}</span>
-													<span className="ccp-res-plugin">de {r.plugin}</span>
-													{r.tokens ? (
-														<span className="ccp-row-tok">~{r.tokens} tok</span>
-													) : null}
-													{pending.has(r.pluginRef) ? (
-														<span className="ccp-pend">
-															⏳ {pending.get(r.pluginRef)}
-														</span>
-													) : null}
-													<button
-														type="button"
-														tabIndex={-1}
-														className={`ccp-switch${r.status === "installed" ? " ccp-switch-on" : ""}`}
-														title={
-															r.status === "installed"
-																? "Habilitado — click para deshabilitar (afecta a todo el plugin)"
-																: "Deshabilitado — click para habilitar (afecta a todo el plugin)"
-														}
-														onClick={(ev) => {
-															ev.stopPropagation();
-															onAction(panel.id, {
-																kind:
-																	r.status === "disabled" ? "enable" : "disable",
-																ref: r.pluginRef,
-															});
-														}}
-													>
-														<span className="ccp-switch-knob" />
-													</button>
-													</button>
-												);
+														<button
+															key={r.name}
+															type="button"
+															tabIndex={-1}
+															className={`ccp-res-row${i === focusIdx ? " ccp-row-focus" : ""}`}
+															data-focused={i === focusIdx ? "true" : "false"}
+															onClick={() => {
+																setFocusIdx(i);
+																setResView(r.name);
+																setStateIdx(r.status === "disabled" ? 1 : 0);
+															}}
+														>
+															<span className="ccp-mkt-opt-cursor">
+																{i === focusIdx ? "❯" : " "}
+															</span>
+															<span className="ccp-row-label">{r.name}</span>
+															<span className="ccp-comp">{r.kind}</span>
+															<span className="ccp-res-plugin">de {r.plugin}</span>
+															{r.tokens ? (
+																<span className="ccp-row-tok">~{r.tokens} tok</span>
+															) : null}
+															{pending.has(r.pluginRef) ? (
+																<span className="ccp-pend">⏳ {pending.get(r.pluginRef)}</span>
+															) : null}
+															<button
+																type="button"
+																tabIndex={-1}
+																className={`ccp-switch${r.status === "installed" ? " ccp-switch-on" : ""}`}
+																title={
+																	r.status === "installed"
+																		? "Habilitado — click para deshabilitar (afecta a todo el plugin)"
+																		: "Deshabilitado — click para habilitar (afecta a todo el plugin)"
+																}
+																onClick={(ev) => {
+																	ev.stopPropagation();
+																	onAction(panel.id, {
+																		kind: r.status === "disabled" ? "enable" : "disable",
+																		ref: r.pluginRef,
+																	});
+																}}
+															>
+																<span className="ccp-switch-knob" />
+															</button>
+														</button>
+													);
 												})}
 									</div>
 								);
@@ -1139,9 +1126,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 									</span>
 								))}
 								{r.version ? <span className="ccp-row-ver">v{r.version}</span> : null}
-								{r.tokens ? (
-									<span className="ccp-row-tok">~{r.tokens} tok</span>
-								) : null}
+								{r.tokens ? <span className="ccp-row-tok">~{r.tokens} tok</span> : null}
 								{pending.has(r.ref) ? (
 									<span className="ccp-pend">⏳ {pending.get(r.ref)}</span>
 								) : null}
@@ -1202,8 +1187,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 									>
 										{b.primary && row && pending.has(row.ref) ? (
 											<>
-												<span className="ccp-spin">⟳</span>{" "}
-												{pending.get(row.ref)}
+												<span className="ccp-spin">⟳</span> {pending.get(row.ref)}
 											</>
 										) : (
 											b.label

@@ -106,10 +106,7 @@ export function OnboardingWizard({
 							})}
 						</div>
 						<div className="onb-actions">
-							<button
-								className="onb-link-btn"
-								onClick={() => setStep("welcome")}
-							>
+							<button className="onb-link-btn" onClick={() => setStep("welcome")}>
 								<Codicon name="arrow-left" size={13} /> Atrás
 							</button>
 						</div>
@@ -119,10 +116,7 @@ export function OnboardingWizard({
 				{step === "configure" && chosen && (
 					<div className="onb-step">
 						<div className="onb-stephead">
-							<button
-								className="onb-link-btn"
-								onClick={() => setStep("choose")}
-							>
+							<button className="onb-link-btn" onClick={() => setStep("choose")}>
 								<Codicon name="arrow-left" size={13} /> Atrás
 							</button>
 							<h2>Configura {providerMeta(chosen.id, chosen.oauth).name}</h2>
@@ -146,8 +140,9 @@ export function OnboardingWizard({
 						<Codicon name="sparkle" size={28} className="onb-done-icon" />
 						<h2>¡Conectado!</h2>
 						<p className="onb-intro">
-							<Codicon name="check" size={13} /> {providerMeta(chosen.id, chosen.oauth).name}{" "}
-							está listo. Ya puedes chatear con Frida.
+							<Codicon name="check" size={13} />{" "}
+							{providerMeta(chosen.id, chosen.oauth).name} está listo. Ya puedes
+							chatear con Frida.
 						</p>
 						<div className="onb-actions">
 							<button className="primary-btn" onClick={onDone}>

@@ -220,88 +220,160 @@ body {
 	background: rgba(210, 153, 34, 0.14);
 	opacity: 1;
 }
-/* Toast efímero para state.info (reemplaza al info-bar persistente). Flotante
-   bottom-center; el auto-hide (4.5s) lo controla el componente InfoToast. */
-/* Toast de notificación (header, top-right). Icono + color de contorno por
-   nivel (error/warning/info/success). Los errores NO se auto-cierran → el botón
-   de cierre (✕) siempre está visible; el texto es seleccionable para copiarlo. */
+/* ── InfoToast (Opción 1: VS Code Native Notification Card) ── */
+/* Notificación flotante top-right, superficie 100% sólida opaca, acento
+   semántico en borde izquierdo + codicons nativos y barra de progreso. */
 .info-toast {
 	position: fixed;
 	top: 44px;
-	right: 12px;
-	z-index: 50;
-	max-width: min(440px, 80%);
+	right: 14px;
+	z-index: 95;
+	max-width: min(440px, 85%);
 	display: flex;
 	align-items: flex-start;
-	gap: 8px;
-	padding: 8px 10px;
+	gap: 10px;
+	padding: 10px 12px;
 	font-size: 12px;
-	line-height: 1.35;
+	line-height: 1.4;
 	color: var(--vscode-foreground);
-	background: var(--vscode-list-hoverBackground);
-	border: 1px solid var(--vscode-panel-border);
-	border-left-width: 3px;
+	background: var(
+		--vscode-notifications-background,
+		var(--vscode-editorWidget-background, var(--vscode-editor-background))
+	);
+	border: 1px solid
+		var(
+			--vscode-notifications-border,
+			var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25))
+		);
+	border-left-width: 3.5px;
 	border-radius: 6px;
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-	animation: info-toast-in 0.18s ease-out;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+	animation: info-toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	overflow: hidden;
 }
-.info-toast > svg {
+
+.info-toast-icon {
 	flex: none;
+	display: flex;
+	align-items: center;
 	margin-top: 1px;
 }
-.info-toast-text {
+
+.info-toast-body {
 	flex: 1;
+	min-width: 0;
+}
+
+.info-toast-text {
 	user-select: text;
 	overflow-wrap: anywhere;
+	font-weight: 500;
+	color: var(--vscode-foreground);
 }
-.info-toast-close {
-	flex: none;
+
+.info-toast-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+	margin-top: -2px;
+	margin-right: -4px;
+}
+
+.info-toast-btn {
 	display: inline-flex;
 	align-items: center;
-	opacity: 0.55;
-	cursor: pointer;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
 	background: transparent;
 	border: none;
-	padding: 0;
-	color: inherit;
+	border-radius: 3px;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	opacity: 0.75;
+	transition: background 0.1s ease, color 0.1s ease, opacity 0.1s ease;
 }
-.info-toast-close:hover {
+
+.info-toast-btn:hover {
 	opacity: 1;
-	background: transparent;
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.18));
+	color: var(--vscode-foreground);
 }
-/* Niveles: acento del contorno (borde izq.) + color del icono. */
+
+/* Barra de progreso efímera (info / success) */
+.info-toast-progress {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	width: 100%;
+	height: 2px;
+	background: rgba(128, 128, 128, 0.15);
+	overflow: hidden;
+}
+
+.info-toast-progress-bar {
+	display: block;
+	height: 100%;
+	width: 100%;
+	background: currentColor;
+	transform-origin: left center;
+	animation: info-toast-timer 4.5s linear forwards;
+}
+
+@keyframes info-toast-timer {
+	from {
+		transform: scaleX(1);
+	}
+	to {
+		transform: scaleX(0);
+	}
+}
+
+/* Niveles semánticos: acento del contorno + color del icono */
 .info-toast.error {
 	border-left-color: var(--vscode-testing-iconFailed, #f85149);
 }
-.info-toast.error > svg {
+.info-toast.error .info-toast-icon {
 	color: var(--vscode-testing-iconFailed, #f85149);
 }
+
 .info-toast.warning {
 	border-left-color: var(--vscode-editorWarning-foreground, #cca700);
 }
-.info-toast.warning > svg {
+.info-toast.warning .info-toast-icon {
 	color: var(--vscode-editorWarning-foreground, #cca700);
 }
+
 .info-toast.info {
 	border-left-color: var(--vscode-textLink-foreground, #4daafc);
 }
-.info-toast.info > svg {
+.info-toast.info .info-toast-icon {
 	color: var(--vscode-textLink-foreground, #4daafc);
 }
+.info-toast.info .info-toast-progress-bar {
+	background: var(--vscode-textLink-foreground, #4daafc);
+}
+
 .info-toast.success {
 	border-left-color: var(--vscode-testing-iconPassed, #3fb950);
 }
-.info-toast.success > svg {
+.info-toast.success .info-toast-icon {
 	color: var(--vscode-testing-iconPassed, #3fb950);
 }
+.info-toast.success .info-toast-progress-bar {
+	background: var(--vscode-testing-iconPassed, #3fb950);
+}
+
 @keyframes info-toast-in {
 	from {
 		opacity: 0;
-		transform: translateY(-6px);
+		transform: translateY(-8px) scale(0.98);
 	}
 	to {
 		opacity: 1;
-		transform: translateY(0);
+		transform: translateY(0) scale(1);
 	}
 }
 .status-bar {

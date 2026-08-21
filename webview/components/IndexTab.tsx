@@ -46,22 +46,21 @@ export function IndexTab({
 	return (
 		<div className="cfg-resources">
 			<div className="cfg-section">
-				<Codicon name="database" size={13} /> Índice de código (semántico + call graph)
+				<Codicon name="database" size={13} /> Índice de código (semántico + call
+				graph)
 			</div>
 			<div className="cfg-row-desc" style={{ marginBottom: 8 }}>
-				Búsqueda por significado, grafo de llamadas y lookup de implementaciones
-				(6 tools del agente). Requiere un paquete on-demand (~256 MB, se poda a
-				~1/5 del disco) y un proveedor de embeddings (Ollama local, tu key de
-				OpenAI, o endpoint custom en settings frida.codebaseIndex.*).
+				Búsqueda por significado, grafo de llamadas y lookup de implementaciones (6
+				tools del agente). Requiere un paquete on-demand (~256 MB, se poda a ~1/5
+				del disco) y un proveedor de embeddings (Ollama local, tu key de OpenAI, o
+				endpoint custom en settings frida.codebaseIndex.*).
 			</div>
 			<div className="cfg-res-actions">
 				{!ci?.installed && (
 					<button
 						className="pc-save"
 						disabled={!!ci?.busy}
-						onClick={() =>
-							post({ type: "codebase_index_action", action: "install" })
-						}
+						onClick={() => post({ type: "codebase_index_action", action: "install" })}
 					>
 						{ci?.busy === "install" ? (
 							<>
@@ -79,9 +78,7 @@ export function IndexTab({
 						<button
 							className="pc-save"
 							disabled={!!ci?.busy}
-							onClick={() =>
-								post({ type: "codebase_index_action", action: "index" })
-							}
+							onClick={() => post({ type: "codebase_index_action", action: "index" })}
 						>
 							{ci?.busy === "index" ? (
 								<>
@@ -92,7 +89,7 @@ export function IndexTab({
 									<Codicon name="refresh" size={13} /> Indexar (incremental)
 								</>
 							)}
-					</button>
+						</button>
 						<button
 							className="pc-save"
 							disabled={!!ci?.busy}
@@ -105,9 +102,7 @@ export function IndexTab({
 						<button
 							className="pc-save"
 							disabled={!!ci?.busy}
-							onClick={() =>
-								post({ type: "codebase_index_action", action: "status" })
-							}
+							onClick={() => post({ type: "codebase_index_action", action: "status" })}
 						>
 							<Codicon name="database" size={13} /> Estado del índice
 						</button>
@@ -122,41 +117,41 @@ export function IndexTab({
 					<div className="cfg-row-desc">
 						{busy === "install" ? (
 							<>
-								Descargando e instalando el paquete (~256 MB). npm no imprime
-								progreso intermedio: es normal que solo veas esta barra avanzar
-								durante un par de minutos — el reloj confirma que sigue
-								trabajando. <strong>Tiempo: {fmtElapsed(elapsed)}</strong>
+								Descargando e instalando el paquete (~256 MB). npm no imprime progreso
+								intermedio: es normal que solo veas esta barra avanzar durante un par de
+								minutos — el reloj confirma que sigue trabajando.{" "}
+								<strong>Tiempo: {fmtElapsed(elapsed)}</strong>
 							</>
 						) : (
 							<>
-								Indexando el workspace — puede tardar según el tamaño del
-								repo. <strong>Tiempo: {fmtElapsed(elapsed)}</strong>
+								Indexando el workspace — puede tardar según el tamaño del repo.{" "}
+								<strong>Tiempo: {fmtElapsed(elapsed)}</strong>
 							</>
 						)}
 					</div>
 				</div>
 			)}
 			{ci?.lastLine && <div className="cfg-row-desc">{ci.lastLine}</div>}
-      <div className="cfg-row">
-        <div className="cfg-row-info">
-          <div className="cfg-row-title">Paquete upstream</div>
-          <div className="cfg-row-desc">
-            {ci?.installed
-              ? `Instalado${ci.version ? ` (v${ci.version})` : ""} (${ci.capturedTools?.length ?? 0} tools capturadas)`
-              : "No instalado — las tools del agente responden con la guía de instalación"}
-          </div>
-        </div>
-      </div>
-      <div className="cfg-row">
-        <div className="cfg-row-info">
-          <div className="cfg-row-title">Embeddings</div>
-          <div className="cfg-row-desc">
-            Ollama local (`ollama pull nomic-embed-text`), tu key de OpenAI ya
-            guardada en Frida, o endpoint custom. Sin índice, las tools muestran
-            la guía del proveedor.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+			<div className="cfg-row">
+				<div className="cfg-row-info">
+					<div className="cfg-row-title">Paquete upstream</div>
+					<div className="cfg-row-desc">
+						{ci?.installed
+							? `Instalado${ci.version ? ` (v${ci.version})` : ""} (${ci.capturedTools?.length ?? 0} tools capturadas)`
+							: "No instalado — las tools del agente responden con la guía de instalación"}
+					</div>
+				</div>
+			</div>
+			<div className="cfg-row">
+				<div className="cfg-row-info">
+					<div className="cfg-row-title">Embeddings</div>
+					<div className="cfg-row-desc">
+						Ollama local (`ollama pull nomic-embed-text`), tu key de OpenAI ya
+						guardada en Frida, o endpoint custom. Sin índice, las tools muestran la
+						guía del proveedor.
+					</div>
+				</div>
+			</div>
+		</div>
+	);
 }

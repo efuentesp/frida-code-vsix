@@ -578,8 +578,7 @@ export function Composer({
 			const atStart =
 				el.selectionStart === 0 && el.selectionStart === el.selectionEnd;
 			const atEnd =
-				el.selectionStart === text.length &&
-				el.selectionStart === el.selectionEnd;
+				el.selectionStart === text.length && el.selectionStart === el.selectionEnd;
 			// Historial del input (↑/↓ en los bordes, como bash).
 			if (e.key === "ArrowUp" && atStart) {
 				const h = historyRef.current;
@@ -667,9 +666,7 @@ export function Composer({
 								${"$"}
 								{s.name}
 							</code>
-							{s.description && (
-								<span className="cmd-desc">{s.description}</span>
-							)}
+							{s.description && <span className="cmd-desc">{s.description}</span>}
 						</div>
 					))}
 				</div>
@@ -690,12 +687,8 @@ export function Composer({
 								{c.kind === "builtin" ? "cmd" : c.kind}
 							</span>
 							<code className="cmd-label">{c.label}</code>
-							{c.argumentHint && (
-								<span className="cmd-arg">{c.argumentHint}</span>
-							)}
-							{c.description && (
-								<span className="cmd-desc">{c.description}</span>
-							)}
+							{c.argumentHint && <span className="cmd-arg">{c.argumentHint}</span>}
+							{c.description && <span className="cmd-desc">{c.description}</span>}
 						</div>
 					))}
 				</div>
@@ -841,8 +834,7 @@ export function Composer({
 								disabled={busy}
 								value={active?.modelId ?? ""}
 								onChange={(e) =>
-									active?.provider &&
-									onSelectModel?.(active.provider, e.target.value)
+									active?.provider && onSelectModel?.(active.provider, e.target.value)
 								}
 								aria-label="Modelo"
 							>
@@ -880,8 +872,7 @@ export function Composer({
 									className="chat-submit-btn stop"
 									onClick={() => {
 										console.log(
-											"[frida-abort] clic botón Detener (Composer) — busy=" +
-												busy,
+											"[frida-abort] clic botón Detener (Composer) — busy=" + busy,
 										);
 										onAbort?.();
 									}}

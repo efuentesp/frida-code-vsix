@@ -45,9 +45,8 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 	const filtered = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return sandboxes;
-		return sandboxes.filter(
-			(s) =>
-				`${s.name} ${s.image} ${s.projectDir}`.toLowerCase().includes(q),
+		return sandboxes.filter((s) =>
+			`${s.name} ${s.image} ${s.projectDir}`.toLowerCase().includes(q),
 		);
 	}, [sandboxes, query]);
 
@@ -149,7 +148,12 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 	}
 
 	return (
-		<div className="sbx-panel ccp-panel" ref={rootRef} tabIndex={-1} role="dialog">
+		<div
+			className="sbx-panel ccp-panel"
+			ref={rootRef}
+			tabIndex={-1}
+			role="dialog"
+		>
 			<header className="ccp-head">
 				<button
 					type="button"
@@ -202,9 +206,7 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 								onAction(panel.id, { kind: "changes", name: s.name });
 							}}
 						>
-							<span className="ccp-mkt-opt-cursor">
-								{i === focusIdx ? "❯" : " "}
-							</span>
+							<span className="ccp-mkt-opt-cursor">{i === focusIdx ? "❯" : " "}</span>
 							<span className="ccp-row-label">{s.name}</span>
 							<span className="ccp-comp">{s.image}</span>
 							<span
@@ -216,8 +218,8 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 					))}
 					{filtered.length ? null : (
 						<div className="ccp-empty">
-							Sin sandboxes{query ? ` para “${query}”` : ""}. El agente crea
-							uno con sandbox_create.
+							Sin sandboxes{query ? ` para “${query}”` : ""}. El agente crea uno con
+							sandbox_create.
 						</div>
 					)}
 				</div>
@@ -229,13 +231,11 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 							<div className="ccp-detail-md">
 								<div className="sbx-detail-name">{focused.name}</div>
 								<div className="sbx-detail-meta">
-									Imagen {focused.image} ·{" "}
-									{STATE_LABEL[focused.state] ?? focused.state}
+									Imagen {focused.image} · {STATE_LABEL[focused.state] ?? focused.state}
 									{focused.lastSeen ? ` · docker: ${focused.lastSeen}` : ""}
 								</div>
 								<div className="sbx-detail-meta">
-									Proyecto {focused.projectDir} · creado por{" "}
-									{focused.createdBy}
+									Proyecto {focused.projectDir} · creado por {focused.createdBy}
 								</div>
 							</div>
 							<div className="ccp-detail-btns">
@@ -298,8 +298,8 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 			</div>
 
 			<div className="ccp-foot">
-				↑↓ navegar · ⏎ ver cambios · Esc cerrar · el agente usa sandbox_create
-				para crear
+				↑↓ navegar · ⏎ ver cambios · Esc cerrar · el agente usa sandbox_create para
+				crear
 			</div>
 		</div>
 	);

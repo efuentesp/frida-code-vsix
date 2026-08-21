@@ -5,10 +5,9 @@ import {
 	useReducer,
 	useRef,
 	useState,
-	type ReactNode,
 } from "react";
 import { reduce, initialState } from "./store";
-import type { ApprovalMode, InMessage, OutMessage, ToastLevel } from "./types";
+import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { fmtTokens, formatDuration } from "./format";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { TurnView } from "./components/Turn";
@@ -33,6 +32,7 @@ import { LensDiagnostics } from "./components/LensDiagnostics";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
 import { Codicon } from "./components/Codicon";
+import { InfoToast } from "./components/InfoToast";
 import { Followups } from "./components/Followups";
 import { getContextualFollowups } from "./followup-rules";
 import { formatCurrentActivity } from "./activity-formatter";
@@ -503,8 +503,8 @@ export function App() {
 			{state.mode === "auto" && (
 				<div className="info-bar warn">
 					<Codicon name="warning" size={12} /> YOLO ON: TODO corre sin pedirte
-					confirmación (edit/write/bash, incl. comandos compuestos y rutas
-					externas). Detén con el botón Detener o doble Esc.
+					confirmación (edit/write/bash, incl. comandos compuestos y rutas externas).
+					Detén con el botón Detener o doble Esc.
 				</div>
 			)}
 			{escHint && (
@@ -941,58 +941,6 @@ export function App() {
 					initialTab={(settingsTab ?? "providers") as SettingsTab}
 				/>
 			)}
-		</div>
-	);
-}
-
-/** Toast efímero para `state.info`: muestra el mensaje flotante y se auto-oculta
- *  tras ~4.5s. Si llega un mensaje nuevo mientras está visible, reinicia el timer.
- *  Reemplaza al info-bar persistente (MVP → toast, como marcaba store.ts). Los
- *  avisos de modo (auto-edit/auto) y el hint de Esc siguen como info-bar
- *  (persistentes, arriba) porque son contexto operativo, no notificaciones. */
-const TOAST_META: Record<ToastLevel, { icon: ReactNode; cls: string }> = {
-	error: { icon: <Codicon name="error" size={14} />, cls: "error" },
-	warning: { icon: <Codicon name="warning" size={14} />, cls: "warning" },
-	info: { icon: <Codicon name="info" size={14} />, cls: "info" },
-	success: { icon: <Codicon name="pass-filled" size={14} />, cls: "success" },
-};
-function InfoToast({
-	toast,
-}: {
-	toast: { text: string; level: ToastLevel } | undefined;
-}) {
-	const [visible, setVisible] = useState(false);
-	const [cur, setCur] = useState<
-		{ text: string; level: ToastLevel } | undefined
-	>();
-	useEffect(() => {
-		if (!toast) return;
-		setCur(toast);
-		setVisible(true);
-		// Errores y warnings NO se auto-cierran: el usuario debe cerrarlos manualmente
-		// para alcanzar a leerlos/copiarlos (p. ej. el ABI de better-sqlite3 llegaba como
-		// warning y desaparecía a los 4.5s). info/success sí desaparecen.
-		if (toast.level === "error" || toast.level === "warning") return;
-		const t = setTimeout(() => setVisible(false), 4500);
-		return () => clearTimeout(t);
-	}, [toast]);
-	if (!visible || !cur) return null;
-	const meta = TOAST_META[cur.level] ?? TOAST_META.info;
-	return (
-		<div
-			className={"info-toast " + meta.cls}
-			role={cur.level === "error" ? "alert" : "status"}
-		>
-			{meta.icon}
-			<span className="info-toast-text">{cur.text}</span>
-			<button
-				className="info-toast-close"
-				aria-label="Cerrar aviso"
-				type="button"
-				onClick={() => setVisible(false)}
-			>
-				<Codicon name="close" size={13} />
-			</button>
 		</div>
 	);
 }

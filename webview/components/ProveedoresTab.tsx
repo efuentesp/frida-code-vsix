@@ -41,7 +41,8 @@ export function ProveedoresTab({
 			{configured.length > 0 && (
 				<section className="pv-section">
 					<h4 className="pv-heading">
-						<Codicon name="pass-filled" size={13} /> Configurados ({configured.length})
+						<Codicon name="pass-filled" size={13} /> Configurados ({configured.length}
+						)
 					</h4>
 					<div className="pv-list">{configured.map(card)}</div>
 				</section>
@@ -61,8 +62,8 @@ export function ProveedoresTab({
 			</section>
 
 			<p className="pv-hint">
-				<Codicon name="plug" size={12} /> Cada proveedor se configura distinto: DevEngine y
-				Z.ai usan API key; GitHub Copilot usa inicio de sesión (OAuth).
+				<Codicon name="plug" size={12} /> Cada proveedor se configura distinto:
+				DevEngine y Z.ai usan API key; GitHub Copilot usa inicio de sesión (OAuth).
 			</p>
 		</div>
 	);

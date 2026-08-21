@@ -60,11 +60,7 @@ export function UiDialog({
 							onChange={(e) => setText(e.target.value)}
 						/>
 						<div className="ui-dialog-row">
-							<button
-								type="submit"
-								className="ui-dialog-send"
-								disabled={!text.trim()}
-							>
+							<button type="submit" className="ui-dialog-send" disabled={!text.trim()}>
 								<Codicon name="send" size={14} /> Enviar
 							</button>
 						</div>

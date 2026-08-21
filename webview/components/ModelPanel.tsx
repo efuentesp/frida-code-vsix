@@ -50,9 +50,7 @@ export function ModelPanel({
 				{deviceCode && (
 					<div className="oauth-banner">
 						<div className="oauth-title">Iniciando sesión…</div>
-						<div className="oauth-hint">
-							Abre el navegador y entra este código:
-						</div>
+						<div className="oauth-hint">Abre el navegador y entra este código:</div>
 						<div className="oauth-code">{deviceCode.userCode}</div>
 						<a
 							className="oauth-link"
@@ -84,13 +82,9 @@ export function ModelPanel({
 								<div className="provider-head">
 									<span className="provider-name">
 										{p.name}
-										{p.oauth && (
-											<span className="provider-tag">suscripción</span>
-										)}
+										{p.oauth && <span className="provider-tag">suscripción</span>}
 									</span>
-									<span
-										className={"provider-badge " + (p.authed ? "ok" : "off")}
-									>
+									<span className={"provider-badge " + (p.authed ? "ok" : "off")}>
 										{p.authed ? (
 											<>
 												<Codicon name="check" size={12} /> conectado
@@ -102,19 +96,13 @@ export function ModelPanel({
 									{p.oauth &&
 										(p.authed ? (
 											<Tooltip label="Cerrar sesión" side="top">
-												<button
-													className="icon-btn"
-													onClick={() => onLogout(p.id)}
-												>
+												<button className="icon-btn" onClick={() => onLogout(p.id)}>
 													<Codicon name="sign-out" size={14} />
 												</button>
 											</Tooltip>
 										) : (
 											<Tooltip label="Iniciar sesión" side="top">
-												<button
-													className="icon-btn primary"
-													onClick={() => onLogin(p.id)}
-												>
+												<button className="icon-btn primary" onClick={() => onLogin(p.id)}>
 													<Codicon name="sign-in" size={14} /> Iniciar sesión
 												</button>
 											</Tooltip>
@@ -122,23 +110,15 @@ export function ModelPanel({
 									{p.apiKey && (
 										<>
 											<Tooltip
-												label={
-													p.authed ? "Actualizar API key" : "Introducir API key"
-												}
+												label={p.authed ? "Actualizar API key" : "Introducir API key"}
 												side="top"
 											>
-												<button
-													className="icon-btn"
-													onClick={() => onSetKey(p.id)}
-												>
+												<button className="icon-btn" onClick={() => onSetKey(p.id)}>
 													<Codicon name="key" size={14} />
 												</button>
 											</Tooltip>
 											{p.id === "zai" && (
-												<Tooltip
-													label="Explorar modelos disponibles"
-													side="top"
-												>
+												<Tooltip label="Explorar modelos disponibles" side="top">
 													<button
 														className="icon-btn"
 														onClick={() => onDiscoverModels(p.id)}
@@ -152,8 +132,7 @@ export function ModelPanel({
 								</div>
 								<div className="model-list">
 									{p.models.map((mm) => {
-										const selected =
-											isActiveProvider && active?.modelId === mm.id;
+										const selected = isActiveProvider && active?.modelId === mm.id;
 										const disabled = !p.authed;
 										return (
 											<button
@@ -174,12 +153,8 @@ export function ModelPanel({
 													mm.reasoning ||
 													mm.input?.includes("image")) && (
 													<span className="model-meta">
-														{mm.contextWindow
-															? fmtTokens(mm.contextWindow)
-															: null}
-														{mm.maxTokens
-															? ` · ${fmtTokens(mm.maxTokens)} out`
-															: null}
+														{mm.contextWindow ? fmtTokens(mm.contextWindow) : null}
+														{mm.maxTokens ? ` · ${fmtTokens(mm.maxTokens)} out` : null}
 														{mm.reasoning ? (
 															<>
 																{" · "}

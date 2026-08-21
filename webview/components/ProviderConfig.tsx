@@ -50,10 +50,7 @@ export function ProviderConfig({
 		<div className="pc-card">
 			<div className="pc-head">
 				<span className="pc-icon">
-					<Codicon
-						name={meta.authType === "oauth" ? "sparkle" : "key"}
-						size={15}
-					/>
+					<Codicon name={meta.authType === "oauth" ? "sparkle" : "key"} size={15} />
 				</span>
 				<div className="pc-titles">
 					<div className="pc-name">
@@ -75,10 +72,7 @@ export function ProviderConfig({
 							¿Olvidar la credencial de {meta.name}?
 						</span>
 						<div className="pc-actions">
-							<button
-								className="pc-sec"
-								onClick={() => setConfirmForget(false)}
-							>
+							<button className="pc-sec" onClick={() => setConfirmForget(false)}>
 								Cancelar
 							</button>
 							<button className="pc-danger" onClick={forget}>
@@ -96,10 +90,7 @@ export function ProviderConfig({
 							>
 								<Codicon name="edit" size={13} />
 							</button>
-							<button
-								className="pc-link-btn"
-								onClick={() => setConfirmForget(true)}
-							>
+							<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
 								<Codicon name="trash" size={12} /> Olvidar API key
 							</button>
 						</div>
@@ -123,11 +114,7 @@ export function ProviderConfig({
 										Cancelar
 									</button>
 								)}
-								<button
-									className="pc-save"
-									onClick={save}
-									disabled={!key.trim()}
-								>
+								<button className="pc-save" onClick={save} disabled={!key.trim()}>
 									Guardar key
 								</button>
 								{meta.getKeyUrl && (
@@ -145,10 +132,7 @@ export function ProviderConfig({
 					)
 				) : provider.authed ? (
 					<div className="pc-authed">
-						<button
-							className="pc-link-btn"
-							onClick={() => setConfirmForget(true)}
-						>
+						<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
 							<Codicon name="trash" size={12} /> Olvidar acceso
 						</button>
 					</div>
