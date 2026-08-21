@@ -11,7 +11,10 @@
 import { createFridaEnterpriseRuntime } from "./runtime";
 import { VERIFIED_MODEL_IDS } from "./catalog";
 import { patchFridaSideChannels } from "./side-channels";
-export { patchFridaSideChannels, type FridaSideChannelDeps } from "./side-channels";
+export {
+	patchFridaSideChannels,
+	type FridaSideChannelDeps,
+} from "./side-channels";
 import type { FridaEnterpriseRuntime } from "./runtime";
 import { buildFridaEnterpriseProviderConfig as buildProviderConfigInner } from "./provider";
 import { createFridaEnterpriseHooks as createHooksInner } from "./hooks";
@@ -75,7 +78,10 @@ export {
 	type FridaGatewayError,
 } from "./adapter";
 
-export { createFridaEnterpriseRuntime, type FridaEnterpriseRuntime } from "./runtime";
+export {
+	createFridaEnterpriseRuntime,
+	type FridaEnterpriseRuntime,
+} from "./runtime";
 export {
 	summarizeMessageEnd,
 	type FridaEnterpriseProviderDeps,
@@ -90,9 +96,10 @@ export function buildFridaEnterpriseProviderConfig() {
  * `runtime` opcional permite a las E2E/embedders conectar explícitamente la
  * misma instancia que usa OAuth; el host normal omite el argumento y usa el
  * singleton del barrel. Nunca se crea una segunda instancia accidentalmente. */
-export function createFridaEnterpriseHooks(
-	deps: { onUnauthorized: () => void; runtime?: FridaEnterpriseRuntime },
-) {
+export function createFridaEnterpriseHooks(deps: {
+	onUnauthorized: () => void;
+	runtime?: FridaEnterpriseRuntime;
+}) {
 	return createHooksInner({ ...deps, runtime: deps.runtime ?? runtime });
 }
 

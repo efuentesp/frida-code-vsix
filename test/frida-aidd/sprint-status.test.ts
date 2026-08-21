@@ -80,6 +80,24 @@ describe("frida-aidd · sprint-status lib (#38 pieza 5)", () => {
 		expect(lib.sprintSerializeStatus(second)).toBe(text);
 	});
 
+	it("parse: tolera baselineCommit y propiedades de metadatos opcionales (#93)", () => {
+		const lib = loadLib();
+		const yaml = `sprint: 1
+baselineCommit: a1b2c3d
+stories:
+  E1-S1:
+    title: Onboarding
+    spec: docs/aidd/planning/spec-E1-S1.md
+    status: done
+    attempts: 1
+    baselineCommit: 120d564
+`;
+		const parsed = lib.sprintParseStatus(yaml) as any;
+		expect(parsed.sprint).toBe("1");
+		expect(parsed.stories["E1-S1"].title).toBe("Onboarding");
+		expect(parsed.stories["E1-S1"].baselineCommit).toBe("120d564");
+	});
+
 	it("parse: rechaza status ilegal, historia sin title/spec, indentación rara", () => {
 		const lib = loadLib();
 		expect(() =>

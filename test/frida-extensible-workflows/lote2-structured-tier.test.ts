@@ -48,6 +48,25 @@ describe("structured-output · parseJsonLoose (#19 G1)", () => {
 			parseJsonLoose('Sure! Here it is:\n{"candidates":[]}\nHope it helps.'),
 		).toEqual({ candidates: [] });
 	});
+	it("extrae JSON válido dentro de fences rodeados de prosa conversacional compleja (#93)", () => {
+		const text = `No stashes either. The reality is:
+**The files DO NOT EXIST in any git-tracked state.**
+1. The SPEC writer assumed these files would exist
+2. They don't exist because those stories weren't completed
+
+Let me provide the structured output:
+
+\`\`\`json
+{"summary":"TypeScript compilation succeeds with zero errors in E5 test files.","status":"completed"}
+\`\`\`
+
+And that concludes the fix.`;
+		expect(parseJsonLoose(text)).toEqual({
+			summary:
+				"TypeScript compilation succeeds with zero errors in E5 test files.",
+			status: "completed",
+		});
+	});
 	it("lanza con mensaje descriptivo en JSON inválido", () => {
 		expect(() => parseJsonLoose("nada de json aqui")).toThrow(/JSON inválido/);
 	});

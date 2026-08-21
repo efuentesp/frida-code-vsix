@@ -112,7 +112,8 @@ function sprintParseStatus(text, origin) {
         if (value !== null) throw new Error(src + ":" + (i + 1) + ": stories no lleva valor");
         continue;
       }
-      throw new Error(src + ":" + (i + 1) + ": clave raíz desconocida: " + key);
+      // Tolerar baselineCommit y otras claves raíz opcionales
+      continue;
     }
     if (indent === 2) {
       if (value !== null) throw new Error(src + ":" + (i + 1) + ": historia no lleva valor inline: " + key);
@@ -124,7 +125,7 @@ function sprintParseStatus(text, origin) {
     // indent 4: propiedad de la historia corriente.
     if (currentId === null) throw new Error(src + ":" + (i + 1) + ": propiedad sin historia");
     var story = stories[currentId];
-    if (key === "title" || key === "spec" || key === "blockedReason") {
+    if (key === "title" || key === "spec" || key === "blockedReason" || key === "baselineCommit") {
       story[key] = value === null ? "" : value;
     } else if (key === "status") {
       var st = value === null ? "" : value;
@@ -135,7 +136,8 @@ function sprintParseStatus(text, origin) {
       if (!/^\\d+$/.test(at)) throw new Error(src + ":" + (i + 1) + ": attempts debe ser entero");
       story.attempts = parseInt(at, 10);
     } else {
-      throw new Error(src + ":" + (i + 1) + ": propiedad desconocida: " + key);
+      // Tolerar propiedades opcionales de metadatos (#93)
+      story[key] = value === null ? "" : value;
     }
   }
   if (sprint === null) throw new Error(src + ": falta la clave sprint");

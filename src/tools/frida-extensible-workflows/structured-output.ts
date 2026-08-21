@@ -34,31 +34,99 @@ function truncateForThrow(s: string): string {
 		: s;
 }
 
-/** Quita fences ```json, backticks sueltos y espacios; JSON.parse estricto. */
+/**
+ * Escanea el texto buscando un objeto o array JSON balanceado, respetando strings y escapes.
+ */
+function parseBalancedJson(text: string): unknown {
+	const firstObj = text.indexOf("{");
+	const firstArr = text.indexOf("[");
+	if (firstObj === -1 && firstArr === -1) {
+		throw new Error(
+			`No se encontró ningún delimitador '{' o '[' en el texto: ${text.slice(0, 100)}`,
+		);
+	}
+
+	const starts: number[] = [];
+	if (firstObj !== -1) starts.push(firstObj);
+	if (firstArr !== -1) starts.push(firstArr);
+	const start = Math.min(...starts);
+	const openChar = text[start];
+	const closeChar = openChar === "{" ? "}" : "]";
+
+	let depth = 0;
+	let inString = false;
+	let escape = false;
+
+	for (let i = start; i < text.length; i++) {
+		const char = text[i];
+		if (escape) {
+			escape = false;
+			continue;
+		}
+		if (char === "\\") {
+			escape = true;
+			continue;
+		}
+		if (char === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) continue;
+
+		if (char === openChar) {
+			depth++;
+		} else if (char === closeChar) {
+			depth--;
+			if (depth === 0) {
+				const candidate = text.slice(start, i + 1);
+				try {
+					return JSON.parse(candidate);
+				} catch (err) {
+					throw new Error(
+						`JSON inválido en candidato balanceado (${err instanceof Error ? err.message : String(err)}): ${candidate.slice(0, 100)}`,
+					);
+				}
+			}
+		}
+	}
+
+	throw new Error(
+		`Estructura JSON incompleta o no balanceada en: ${text.slice(start, start + 200)}`,
+	);
+}
+
+/** Quita fences ```json, backticks sueltos y espacios; JSON.parse estricto con tolerancia a prosa (#93). */
 export function parseJsonLoose(text: string): unknown {
-	let t = text.trim();
-	const fence = t.match(/^```[a-zA-Z]*\s*([\s\S]*?)\s*```$/);
-	if (fence) t = fence[1]!.trim();
-	// Objeto/array embebido en prosa: recorta al primer { o [ y el último } o ].
-	const firstObj = t.indexOf("{");
-	const firstArr = t.indexOf("[");
-	const start =
-		firstObj === -1
-			? firstArr
-			: firstArr === -1
-				? firstObj
-				: Math.min(firstObj, firstArr);
-	if (start > 0) t = t.slice(start);
-	const lastObj = t.lastIndexOf("}");
-	const lastArr = t.lastIndexOf("]");
-	const end = Math.max(lastObj, lastArr);
-	if (end !== -1 && end < t.length - 1) t = t.slice(0, end + 1);
+	const t = text.trim();
+
+	// 1. Si hay un bloque ```json ... ``` en cualquier parte del texto, intentar parsearlo primero
+	const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/g;
+	let match: RegExpExecArray | null;
+	while ((match = fenceRegex.exec(t)) !== null) {
+		const candidate = match[1]!.trim();
+		try {
+			return JSON.parse(candidate);
+		} catch {
+			try {
+				return parseBalancedJson(candidate);
+			} catch {
+				// probar siguiente bloque si lo hay
+			}
+		}
+	}
+
+	// 2. Intentar parsear el texto completo
 	try {
 		return JSON.parse(t);
-	} catch (e) {
-		throw new Error(
-			`JSON inválido en la respuesta del agente (${e instanceof Error ? e.message : String(e)}): ${t.slice(0, 200)}`,
-		);
+	} catch {
+		// 3. Scanner balanceado sobre el texto
+		try {
+			return parseBalancedJson(t);
+		} catch (e) {
+			throw new Error(
+				`JSON inválido en la respuesta del agente (${e instanceof Error ? e.message : String(e)}): ${t.slice(0, 200)}`,
+			);
+		}
 	}
 }
 
