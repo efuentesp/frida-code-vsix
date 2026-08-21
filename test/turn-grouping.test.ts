@@ -6,7 +6,9 @@ import {
 } from "../webview/turn-grouping";
 import type { Segment, ToolEntry } from "../webview/types";
 
-function makeTool(over: Partial<ToolEntry> = {}): Extract<Segment, { kind: "tool" }> {
+function makeTool(
+	over: Partial<ToolEntry> = {},
+): Extract<Segment, { kind: "tool" }> {
 	return {
 		kind: "tool",
 		tool: "read",
@@ -154,12 +156,16 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 
 	describe("extractLastThought", () => {
 		it("extrae la última línea relevante omitiendo viñetas y comillas", () => {
-			const text = "1. Primero examinamos el workspace\n2. Verificando dependencias en package.json";
-			expect(extractLastThought(text)).toBe("Verificando dependencias en package.json");
+			const text =
+				"1. Primero examinamos el workspace\n2. Verificando dependencias en package.json";
+			expect(extractLastThought(text)).toBe(
+				"Verificando dependencias en package.json",
+			);
 		});
 
 		it("trunca pensamientos largos a ~55 caracteres", () => {
-			const long = "Esta es una reflexión sumamente larga que sobrepasa el límite visual del encabezado del pensamiento en vivo";
+			const long =
+				"Esta es una reflexión sumamente larga que sobrepasa el límite visual del encabezado del pensamiento en vivo";
 			const result = extractLastThought(long);
 			expect(result.length).toBeLessThanOrEqual(55);
 			expect(result.endsWith("…")).toBe(true);

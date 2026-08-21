@@ -318,13 +318,13 @@ describe("toProviderModel", () => {
 		expect(toProviderModel({ capabilities: ["chat"] }, root)).toBeUndefined();
 	});
 
-	it("defaults 200k/128k cuando el gateway no los expone", () => {
+	it("defaults 200k/16k cuando el gateway no los expone", () => {
 		const m = toProviderModel(
 			{ id: "m", capabilities: ["chat"] },
 			"https://gw.example",
 		);
 		expect(m?.contextWindow).toBe(200000);
-		expect(m?.maxTokens).toBe(128000);
+		expect(m?.maxTokens).toBe(16384);
 	});
 });
 

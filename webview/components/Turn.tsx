@@ -127,10 +127,7 @@ export function TurnView({
 							if (block.kind === "tools") {
 								if (block.tools.length === 1) {
 									return (
-										<ToolCard
-											key={`tool-${block.startIndex}`}
-											entry={block.tools[0]}
-										/>
+										<ToolCard key={`tool-${block.startIndex}`} entry={block.tools[0]} />
 									);
 								}
 								return (
@@ -296,9 +293,7 @@ function ThinkingSegment({
 						<>
 							<span className="tc-verb">Pensó</span>
 							<span className="tc-arg">
-								{hasTimer && durationStr
-									? `${durationStr}${tokenStr}`
-									: "completado"}
+								{hasTimer && durationStr ? `${durationStr}${tokenStr}` : "completado"}
 							</span>
 						</>
 					)}

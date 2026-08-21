@@ -207,7 +207,7 @@ describe("fetchFridaEnterpriseModels", () => {
 				id: "MIDAS-GOLD",
 				name: "\u2b50 MIDAS-GOLD (responses, compacto 128k)",
 				contextWindow: 128000,
-				maxTokens: 128000, // default
+				maxTokens: 16384, // default
 			});
 		} finally {
 			globalThis.fetch = orig;

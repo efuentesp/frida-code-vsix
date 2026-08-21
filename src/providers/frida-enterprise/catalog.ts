@@ -164,7 +164,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000, // clamp: gateway anuncia 1M, upstream acepta 200k
-		maxTokens: 128_000,
+		maxTokens: 16_384,
 	},
 	{
 		id: "TITAN-CROWN",
@@ -174,7 +174,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000, // clamp: gateway anuncia 400k, upstream acepta 200k
-		maxTokens: 128_000,
+		maxTokens: 16_384,
 	},
 	{
 		id: "MIDAS-GOLD",
@@ -184,7 +184,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 128_000, // sin clamp: ya está por debajo del ceiling
-		maxTokens: 128_000,
+		maxTokens: 16_384,
 	},
 	{
 		id: "model-router",
@@ -194,7 +194,7 @@ const FALLBACK_SELECTED: FridaEnterpriseModelConfig[] = [
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000, // clamp: gateway anuncia 1M, upstream acepta 200k
-		maxTokens: 128_000,
+		maxTokens: 16_384,
 	},
 ];
 

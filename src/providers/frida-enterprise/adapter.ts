@@ -110,6 +110,7 @@ export function buildFridaPayload(
 					continue;
 				}
 				// Errata-13: assistant previo con output_text → input_text
+				// y descartar bloques de texto vacíos que el upstream Anthropic rechaza con 400
 				if (
 					m.role === "assistant" &&
 					Array.isArray(m.content) &&
@@ -118,13 +119,24 @@ export function buildFridaPayload(
 					)
 				) {
 					changed = true;
-					input.push({
-						...m,
-						content: m.content.map((c: any) =>
+					const filteredContent = m.content
+						.map((c: any) =>
 							c && typeof c === "object" && c.type === "output_text"
 								? { ...c, type: "input_text" }
 								: c,
-						),
+						)
+						.filter((c: any) => {
+							if (c && typeof c === "object" && c.type === "input_text") {
+								return typeof c.text === "string" && c.text.trim().length > 0;
+							}
+							return true;
+						});
+					input.push({
+						...m,
+						content:
+							filteredContent.length > 0
+								? filteredContent
+								: [{ type: "input_text", text: "✓" }],
 					});
 					continue;
 				}
@@ -296,7 +308,7 @@ export interface FridaEnterpriseModelConfig {
 /** Defaults del gateway cuando /v1/models no los expone (mismos que la
  *  extensión original). */
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
-export const DEFAULT_MAX_TOKENS = 128_000;
+export const DEFAULT_MAX_TOKENS = 16_384;
 
 /** Tope EFECTIVO de contexto del gateway: los upstream (Anthropic…)
  *  rechazan prompts >200k tokens aunque el gateway anuncie 1M/400k.

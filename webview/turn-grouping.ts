@@ -6,9 +6,17 @@ import { fmtDuration } from "./tool-phrases";
 import { fmtTok } from "./components/ToolCard";
 
 export type TurnBlock =
-	| { kind: "thinking"; segment: Extract<Segment, { kind: "thinking" }>; index: number }
+	| {
+			kind: "thinking";
+			segment: Extract<Segment, { kind: "thinking" }>;
+			index: number;
+	  }
 	| { kind: "text"; segment: Extract<Segment, { kind: "text" }>; index: number }
-	| { kind: "tools"; tools: Array<Extract<Segment, { kind: "tool" }>>; startIndex: number };
+	| {
+			kind: "tools";
+			tools: Array<Extract<Segment, { kind: "tool" }>>;
+			startIndex: number;
+	  };
 
 /**
  * Agrupa segmentos contiguos de tipo "tool" en un único bloque "tools".
@@ -81,7 +89,9 @@ export function summarizeToolGroup(
 		const startTimes = tools.map((t) => t.startedAt).filter((t) => t > 0);
 		if (startTimes.length > 0) {
 			const minStart = Math.min(...startTimes);
-			const endTimes = tools.map((t) => (t.endedAt && t.endedAt > 0 ? t.endedAt : now));
+			const endTimes = tools.map((t) =>
+				t.endedAt && t.endedAt > 0 ? t.endedAt : now,
+			);
 			const maxEnd = Math.max(...endTimes);
 			durationMs = Math.max(0, maxEnd - minStart);
 		}
@@ -90,7 +100,8 @@ export function summarizeToolGroup(
 	const durationStr = fmtDuration(durationMs);
 
 	const totalTokens = tools.reduce(
-		(sum, t) => sum + (typeof t.tokensLLM === "number" && t.tokensLLM > 0 ? t.tokensLLM : 0),
+		(sum, t) =>
+			sum + (typeof t.tokensLLM === "number" && t.tokensLLM > 0 ? t.tokensLLM : 0),
 		0,
 	);
 	const tokensStr = totalTokens > 0 ? fmtTok(totalTokens) : "";
