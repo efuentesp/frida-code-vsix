@@ -7,29 +7,6 @@ import { Spinner } from "./Spinner";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { Tooltip } from "./Tooltip";
 import { getToolPhrase, type ToolPhrase } from "../tool-phrases";
-import {
-	Compass,
-	FilePen,
-	FileText,
-	Folder,
-	Gauge,
-	ListChecks,
-	MessageCircleQuestion,
-	PencilLine,
-	ScanSearch,
-	Search,
-	Terminal,
-	UserCheck,
-	Circle,
-	CircleCheck,
-	CircleDot,
-	CircleX,
-	Users,
-	Wrench,
-	Globe,
-	Library,
-	BookOpen,
-} from "lucide-react";
 
 // Formatea una duración en ms a algo legible (318 ms · 4.2s).
 export function fmtDuration(ms: number): string {
@@ -99,17 +76,27 @@ function readStats(entry: ToolEntry): string | null {
 
 // Status echo del tool `todo` (paridad renderTodoResult de rpiv-todo): glyph + label
 // coloreado según el status resultante de la acción.
-const TODO_STATUS_GLYPH: Record<string, { glyph: ReactNode; label: string }> = {
-	pending: { glyph: <Circle size={11} />, label: "pendiente" },
-	in_progress: { glyph: <CircleDot size={11} />, label: "en progreso" },
-	completed: { glyph: <CircleCheck size={11} />, label: "completado" },
-	deleted: { glyph: <CircleX size={11} />, label: "eliminado" },
-};
+const TODO_STATUS_GLYPH: Record<string, { glyph: ReactNode; label: string }> =
+	{
+		pending: {
+			glyph: <Codicon name="circle-outline" size={11} />,
+			label: "pendiente",
+		},
+		in_progress: {
+			glyph: <Codicon name="record" size={11} />,
+			label: "en progreso",
+		},
+		completed: {
+			glyph: <Codicon name="pass-filled" size={11} />,
+			label: "completado",
+		},
+		deleted: { glyph: <Codicon name="error" size={11} />, label: "eliminado" },
+	};
 
 /** Infiere el status resultante de una acción `todo` parseando el content del
  *  resultado. create → "(status)"; update → "from → to"; delete → "eliminado".
  *  null si no aplica (list/get/clear no tienen status echo, como rpiv). */
-function todoStatusEcho(
+function _todoStatusEcho(
 	entry: ToolEntry,
 ): { glyph: ReactNode; label: string; status: string } | null {
 	if (entry.tool !== "todo" || !entry.result) return null;
@@ -142,7 +129,7 @@ const basename = (p: string): string =>
 /** Header del tool `todo`: glyph de acción + subject (paridad renderTodoCall de
  *  rpiv-todo). El subject de update/get/delete llega en args._subject (resuelto
  *  por enrichTodoArgs en el host, pues el webview no ve el store). */
-const TODO_ICON = <ListChecks size={13} />;
+const TODO_ICON = <Codicon name="checklist" size={13} />;
 const TODO_ACTION_LABEL: Record<string, (a: ToolArgs) => string> = {
 	create: (a) => `+ ${str(a._subject ?? a.subject)}`,
 	update: (a) => `→ #${str(a.id)} ${str(a._subject ?? a.subject)}`,
@@ -169,7 +156,7 @@ function askCallInfo(a: ToolArgs): ToolInfo {
 	const first = qs[0] as Record<string, unknown> | undefined;
 	const label = first ? String(first.header ?? first.question ?? "") : "";
 	return {
-		icon: <MessageCircleQuestion size={13} />,
+		icon: <Codicon name="question" size={13} />,
 		name: "ask_user_question",
 		label,
 	};
@@ -186,7 +173,11 @@ function browserCallInfo(a: ToolArgs): ToolInfo {
 						(a.args as unknown[]).find((x) => /^https?:\/\//.test(String(x))) ?? "",
 					)
 				: "";
-	return { icon: <Compass size={13} />, name: "agent_browser", label: url };
+	return {
+		icon: <Codicon name="compass" size={13} />,
+		name: "agent_browser",
+		label: url,
+	};
 }
 
 /** Resumen legible de la llamada (icono + texto) según el tool, en vez de JSON.
@@ -196,14 +187,14 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	read: (a) => {
 		const p = str(a.path);
 		return {
-			icon: <FileText size={13} />,
+			icon: <Codicon name="file-text" size={13} />,
 			name: "read",
 			label: basename(p),
 			path: p,
 		};
 	},
 	bash: (a) => ({
-		icon: <Terminal size={13} />,
+		icon: <Codicon name="terminal" size={13} />,
 		name: "bash",
 		label: str(a.command),
 	}),
@@ -213,7 +204,7 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	edit: (a) => {
 		const p = str(a.path);
 		return {
-			icon: <PencilLine size={13} />,
+			icon: <Codicon name="edit" size={13} />,
 			name: "edit",
 			label: basename(p),
 			path: p,
@@ -222,26 +213,26 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	write: (a) => {
 		const p = str(a.path);
 		return {
-			icon: <FilePen size={13} />,
-			name: "write",
+			icon: <Codicon name="edit" size={13} />,
+			name: "edit",
 			label: basename(p),
 			path: p,
 		};
 	},
 	grep: (a) => ({
-		icon: <Search size={13} />,
+		icon: <Codicon name="search" size={13} />,
 		name: "grep",
 		label: `"${str(a.pattern)}"${a.path ? ` en ${str(a.path)}` : ""}`,
 	}),
 	find: (a) => ({
-		icon: <Search size={13} />,
+		icon: <Codicon name="search" size={13} />,
 		name: "find",
 		label: `${str(a.pattern)}${a.path ? ` en ${str(a.path)}` : ""}`,
 	}),
 	ls: (a) => {
 		const p = str(a.path);
 		return {
-			icon: <Folder size={13} />,
+			icon: <Codicon name="folder" size={13} />,
 			name: "ls",
 			label: basename(p),
 			path: p,
@@ -253,24 +244,24 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	// frida-supi-web (porte de @mrclrchtr/supi-web): las 3 tools web. El cuerpo se
 	// renderiza como Markdown (ver renderResult), no como terminal plano.
 	web_fetch_md: (a) => ({
-		icon: <Globe size={13} />,
+		icon: <Codicon name="globe" size={13} />,
 		name: "Web Fetch",
 		label: str(a.url),
 	}),
 	web_docs_search: (a) => ({
-		icon: <Library size={13} />,
+		icon: <Codicon name="library" size={13} />,
 		name: "Docs Search",
 		label: str(a.library_name),
 	}),
 	web_docs_fetch: (a) => ({
-		icon: <BookOpen size={13} />,
+		icon: <Codicon name="book" size={13} />,
 		name: "Docs Fetch",
 		label: str(a.library_id),
 	}),
 	// Sub-agente autónomo: label = descripción corta (3-5 palabras) que pide el
 	// tool, o el tipo de agente si no trae descripción.
 	agent: (a) => ({
-		icon: <Users size={13} />,
+		icon: <Codicon name="organization" size={13} />,
 		name: "agent",
 		label: str(a.description) || str(a.subagent_type),
 	}),
@@ -278,27 +269,35 @@ const TOOL_INFO: Record<string, (a: ToolArgs) => ToolInfo> = {
 	// palomita = "resultado recibido") distingue la recuperación del lanzamiento
 	// (agent → Users). Label = agent_id que identifica al sub-agente.
 	get_subagent_result: (a) => ({
-		icon: <UserCheck size={13} />,
+		icon: <Codicon name="account" size={13} />,
 		name: "get_subagent_result",
 		label: str(a.agent_id),
 	}),
 	// Reporte de uso del contexto (presión del context window, categorías,
-	// system prompt). El icono (Gauge) ya lo identifica; sin label.
-	context: () => ({ icon: <Gauge size={13} />, name: "context", label: "" }),
+	// system prompt). El icono (dashboard) ya lo identifica; sin label.
+	context: () => ({
+		icon: <Codicon name="dashboard" size={13} />,
+		name: "context",
+		label: "",
+	}),
 };
 
-function toolCallInfo(tool: string, args: unknown): ToolInfo {
+function _toolCallInfo(tool: string, args: unknown): ToolInfo {
 	const a = (args ?? {}) as ToolArgs;
 	const lens = LENS_INFO[tool];
 	if (lens)
 		return {
-			icon: <ScanSearch size={13} />,
+			icon: <Codicon name="search" size={13} />,
 			name: lens.label,
 			label: lens.arg(a),
 		};
 	const fn = TOOL_INFO[tool];
 	if (fn) return fn(a);
-	return { icon: <Wrench size={13} />, name: tool, label: "" };
+	return {
+		icon: <Codicon name="tools" size={13} />,
+		name: tool,
+		label: "",
+	};
 }
 
 /** Token count legible: 1234 → "1.2k tokens", 500 → "500 tokens". */
@@ -607,7 +606,7 @@ function renderBody(entry: ToolEntry, running: boolean): ReactNode {
 
 /** Contenido del header entre el icono y el estado (título, etiqueta, badges).
  *  Extraído a función para mantener baja la complejidad de ToolCard. */
-function buildLeading(p: {
+function _buildLeading(p: {
 	name: string;
 	label: string;
 	path?: string;
@@ -651,7 +650,7 @@ function buildLeading(p: {
 
 /** Bloque de estado a la derecha (spinner/check/x + duración). Extraído a
  *  función para mantener baja la complejidad de ToolCard. */
-function buildStatus(
+function _buildStatus(
 	state: ToolState,
 	elapsed: number,
 	ctxTokens = 0,

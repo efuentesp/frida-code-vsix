@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { Bot, Brain } from "lucide-react";
 
 export interface CodiconProps {
 	name: string;
@@ -10,15 +9,14 @@ export interface CodiconProps {
 	spin?: boolean;
 }
 
-// Iconos de marca propios de Frida que se conservan en vector mientras el resto migra a codicons
-const BRAND_ICONS: Record<string, typeof Bot> = {
-	bot: Bot,
-	brain: Brain,
+// Aliases para nombres comunes de iconos
+const ICON_ALIASES: Record<string, string> = {
+	bot: "copilot",
+	brain: "sparkle",
 };
 
 /**
  * Componente unificado para renderizar glifos vectoriales de @vscode/codicons.
- * Si se pide un icono de marca (bot, brain), hace fallback a los SVGs de Frida.
  */
 export function Codicon({
 	name,
@@ -28,20 +26,10 @@ export function Codicon({
 	style,
 	spin = false,
 }: CodiconProps) {
-	const Brand = BRAND_ICONS[name];
-	if (Brand) {
-		return (
-			<Brand
-				size={size}
-				className={`codicon-brand ${className}`.trim()}
-				aria-label={ariaLabel}
-				aria-hidden={!ariaLabel}
-				style={style}
-			/>
-		);
+	let normalized = name.startsWith("codicon-") ? name.slice(8) : name;
+	if (ICON_ALIASES[normalized]) {
+		normalized = ICON_ALIASES[normalized];
 	}
-
-	const normalized = name.startsWith("codicon-") ? name.slice(8) : name;
 	const spinClass =
 		spin || normalized === "loading" ? " codicon-modifier-spin" : "";
 	const fullClass =

@@ -8,7 +8,7 @@
 // (la descarga de ~256 MB es silenciosa minutos enteros), así que la señal de
 // vida la damos nosotros — el usuario nunca debe dudar de si algo pasa.
 import { useEffect, useRef, useState } from "react";
-import { Database, Download, Hammer, Loader2, RefreshCw } from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { OutMessage, State } from "../types";
 
 /** Formatea segundos como m:ss (el reloj de la barra de progreso). */
@@ -46,7 +46,7 @@ export function IndexTab({
 	return (
 		<div className="cfg-resources">
 			<div className="cfg-section">
-				<Database size={13} /> Índice de código (semántico + call graph)
+				<Codicon name="database" size={13} /> Índice de código (semántico + call graph)
 			</div>
 			<div className="cfg-row-desc" style={{ marginBottom: 8 }}>
 				Búsqueda por significado, grafo de llamadas y lookup de implementaciones
@@ -65,11 +65,11 @@ export function IndexTab({
 					>
 						{ci?.busy === "install" ? (
 							<>
-								<Loader2 size={13} className="spin" /> Instalando…
+								<Codicon name="loading" size={13} spin /> Instalando…
 							</>
 						) : (
 							<>
-								<Download size={13} /> Instalar paquete
+								<Codicon name="cloud-download" size={13} /> Instalar paquete
 							</>
 						)}
 					</button>
@@ -85,11 +85,11 @@ export function IndexTab({
 						>
 							{ci?.busy === "index" ? (
 								<>
-									<Loader2 size={13} className="spin" /> Indexando…
+									<Codicon name="loading" size={13} spin /> Indexando…
 								</>
 							) : (
 								<>
-									<RefreshCw size={13} /> Indexar (incremental)
+									<Codicon name="refresh" size={13} /> Indexar (incremental)
 								</>
 							)}
 					</button>
@@ -100,7 +100,7 @@ export function IndexTab({
 								post({ type: "codebase_index_action", action: "rebuild" })
 							}
 						>
-							<Hammer size={13} /> Rebuild completo
+							<Codicon name="tools" size={13} /> Rebuild completo
 						</button>
 						<button
 							className="pc-save"
@@ -109,7 +109,7 @@ export function IndexTab({
 								post({ type: "codebase_index_action", action: "status" })
 							}
 						>
-							<Database size={13} /> Estado del índice
+							<Codicon name="database" size={13} /> Estado del índice
 						</button>
 					</>
 				)}

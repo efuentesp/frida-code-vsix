@@ -1,7 +1,6 @@
-import { Orbit } from "lucide-react";
+import { Codicon } from "./Codicon";
 
-// Spinner basado en el icono Orbit de lucide, animado con la keyframe `sp`
-// existente. Reemplaza al .spin (anillo con border) para un look más moderno.
+// Spinner basado en codicon loading animado con la clase codicon-modifier-spin.
 export function Spinner({ size = 14 }: { size?: number }) {
-  return <Orbit size={size} className="spinner" />;
+	return <Codicon name="loading" size={size} spin className="spinner" />;
 }

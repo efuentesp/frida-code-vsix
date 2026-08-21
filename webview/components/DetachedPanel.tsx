@@ -8,7 +8,7 @@
  * también (reabierto tras /reload o reinicio de VS Code).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, Search, Square, X } from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { DetachedPanelWs, DetachedRunWs } from "../types";
 
 export type DtAction =
@@ -133,7 +133,7 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 						className="ccp-close"
 						onClick={() => onClose(panel.id)}
 					>
-						<X size={14} />
+						<Codicon name="close" size={14} />
 					</button>
 				</header>
 				<div className="ccp-empty">
@@ -149,7 +149,7 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 							className="ccp-btn"
 							onClick={() => onAction(panel.id, { kind: "refresh" })}
 						>
-							<RefreshCw size={13} /> Refrescar
+							<Codicon name="refresh" size={13} /> Refrescar
 						</button>
 					</div>
 				</div>
@@ -188,20 +188,20 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 						title="Refrescar"
 						onClick={() => onAction(panel.id, { kind: "refresh" })}
 					>
-						<RefreshCw size={13} />
+						<Codicon name="refresh" size={13} />
 					</button>
 					<button
 						type="button"
 						className="ccp-close"
 						onClick={() => onClose(panel.id)}
 					>
-						<X size={14} />
+						<Codicon name="close" size={14} />
 					</button>
 				</div>
 			</header>
 
 			<div className="ccp-search">
-				<Search size={12} />
+				<Codicon name="search" size={12} />
 				<input
 					type="text"
 					value={query}
@@ -289,7 +289,7 @@ export function DetachedPanel({ panel, onAction, onClose }: Props) {
 									className="ccp-btn"
 									onClick={() => setConfirmStop(sel.id)}
 								>
-									<Square size={13} /> Detener
+									<Codicon name="stop-circle" size={13} /> Detener
 								</button>
 							)}
 							{confirmStop === sel.id && (

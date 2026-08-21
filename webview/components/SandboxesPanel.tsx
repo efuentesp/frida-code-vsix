@@ -7,7 +7,7 @@
  * honesto con guía + reintentar (diseño UX del comentario en #35).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Package, RefreshCw, Search, Terminal, X } from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { SandboxInfoWs, SandboxPanelWs } from "../types";
 
 /** Acción del panel → host (todas excepto refresh/reprobe llevan name). */
@@ -118,7 +118,7 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 						title="Cerrar (Esc)"
 						onClick={() => onClose(panel.id)}
 					>
-						<X size={13} />
+						<Codicon name="close" size={13} />
 					</button>
 				</header>
 				<div className="sbx-empty">
@@ -156,7 +156,7 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 					className={`cfg-tab${tab === "active" ? " active" : ""}`}
 					onClick={() => setTab("active")}
 				>
-					<Package size={12} /> Activos ({sandboxes.length})
+					<Codicon name="package" size={12} /> Activos ({sandboxes.length})
 				</button>
 				<span className="ccp-spacer" />
 				<button
@@ -165,7 +165,7 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 					title="Refrescar"
 					onClick={() => act({ kind: "refresh" })}
 				>
-					<RefreshCw size={13} />
+					<Codicon name="refresh" size={13} />
 				</button>
 				<button
 					type="button"
@@ -173,13 +173,13 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 					title="Cerrar (Esc)"
 					onClick={() => onClose(panel.id)}
 				>
-					<X size={13} />
+					<Codicon name="close" size={13} />
 				</button>
 			</header>
 
 			{/* Búsqueda (patrón ccp; teclado llega por el root) */}
 			<div className="ccp-search">
-				<Search size={12} />
+				<Codicon name="search" size={12} />
 				<input
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
@@ -245,7 +245,7 @@ export function SandboxesPanel({ panel, onAction, onClose }: Props) {
 									disabled={pending !== null}
 									onClick={() => act({ kind: "terminal", name: focused.name })}
 								>
-									<Terminal size={12} /> Terminal
+									<Codicon name="terminal" size={12} /> Terminal
 								</button>
 								{focused.state === "active" ? (
 									<button

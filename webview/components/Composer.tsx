@@ -1,9 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import {
-	Maximize,
-	Minimize2,
-	ShieldCheck,
-} from "lucide-react";
 import { Codicon } from "./Codicon";
 import { Tooltip } from "./Tooltip";
 import type { ApprovalMode, ImageAttachment, ProviderOption } from "../types";
@@ -188,16 +183,16 @@ export function Composer({
 	// Patrón idéntico al de /: sin round-trip al host.
 	const skillItems = commands?.filter((c) => c.kind === "skill") ?? [];
 	const skillMatches =
-		skillQuery !== null
-			? skillItems
+		skillQuery === null
+			? []
+			: skillItems
 					.map((s) => ({
 						s,
 						score: subseqScore(s.name.toLowerCase(), skillQuery.toLowerCase()),
 					}))
 					.filter((x) => x.score >= 0)
 					.sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name))
-					.map((x) => x.s)
-			: [];
+					.map((x) => x.s);
 	const skillOpen = skillMatches.length > 0;
 
 	// Opciones del argumento según el comando (derivadas de models).
@@ -775,7 +770,11 @@ export function Composer({
 								else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
 							}}
 						>
-							{expanded ? <Minimize2 size={15} /> : <Maximize size={15} />}
+							{expanded ? (
+								<Codicon name="screen-normal" size={14} />
+							) : (
+								<Codicon name="screen-full" size={14} />
+							)}
 						</button>
 					</Tooltip>
 				</div>
@@ -872,7 +871,7 @@ export function Composer({
 								className={"bar-ico mode-" + (mode ?? "manual")}
 								onClick={() => onCycleMode?.()}
 							>
-								<ShieldCheck size={15} />
+								<Codicon name="shield" size={15} />
 							</button>
 						</Tooltip>
 						{busy ? (

@@ -1,4 +1,4 @@
-import { CheckCircle2, Plug, PlugZap } from "lucide-react";
+import { Codicon } from "./Codicon";
 import type { ProviderOption } from "../types";
 import { providerMeta } from "../providers-registry";
 import { ProviderConfig } from "./ProviderConfig";
@@ -41,7 +41,7 @@ export function ProveedoresTab({
 			{configured.length > 0 && (
 				<section className="pv-section">
 					<h4 className="pv-heading">
-						<CheckCircle2 size={13} /> Configurados ({configured.length})
+						<Codicon name="pass-filled" size={13} /> Configurados ({configured.length})
 					</h4>
 					<div className="pv-list">{configured.map(card)}</div>
 				</section>
@@ -49,7 +49,7 @@ export function ProveedoresTab({
 
 			<section className="pv-section">
 				<h4 className="pv-heading">
-					<PlugZap size={13} /> Disponibles ({available.length})
+					<Codicon name="plug" size={13} /> Disponibles ({available.length})
 				</h4>
 				{available.length === 0 ? (
 					<div className="pv-empty">
@@ -61,7 +61,7 @@ export function ProveedoresTab({
 			</section>
 
 			<p className="pv-hint">
-				<Plug size={12} /> Cada proveedor se configura distinto: DevEngine y
+				<Codicon name="plug" size={12} /> Cada proveedor se configura distinto: DevEngine y
 				Z.ai usan API key; GitHub Copilot usa inicio de sesión (OAuth).
 			</p>
 		</div>

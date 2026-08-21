@@ -48,17 +48,16 @@ describe("Codicon component (Fase 1 Fundaciones)", () => {
 		expect(html).not.toContain('aria-hidden="true"');
 	});
 
-	it("utiliza fallback a SVG de marca para 'bot' y 'brain'", () => {
+	it("utiliza aliases semánticos de codicon para 'bot' y 'brain'", () => {
 		const botHtml = renderToStaticMarkup(
 			React.createElement(Codicon, { name: "bot", size: 18 }),
 		);
-		expect(botHtml).toContain("svg");
-		expect(botHtml).toContain("codicon-brand");
+		expect(botHtml).toContain("codicon-copilot");
+		expect(botHtml).toContain("font-size:18px");
 
 		const brainHtml = renderToStaticMarkup(
 			React.createElement(Codicon, { name: "brain" }),
 		);
-		expect(brainHtml).toContain("svg");
-		expect(brainHtml).toContain("codicon-brand");
+		expect(brainHtml).toContain("codicon-sparkle");
 	});
 });

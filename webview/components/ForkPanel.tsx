@@ -1,5 +1,5 @@
 import { Tooltip } from "./Tooltip";
-import { GitBranch, X } from "lucide-react";
+import { Codicon } from "./Codicon";
 
 export function ForkPanel({
   points,
@@ -15,10 +15,10 @@ export function ForkPanel({
       <div className="sessions-panel" onClick={(e) => e.stopPropagation()}>
         <div className="sessions-head">
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <GitBranch size={14} /> Bifurcar desde un mensaje
+            <Codicon name="git-branch" size={14} /> Bifurcar desde un mensaje
           </span>
           <Tooltip label="Cerrar" side="top">
-            <button className="icon-btn" onClick={onClose}><X size={15} /></button>
+            <button className="icon-btn" onClick={onClose}><Codicon name="close" size={15} /></button>
           </Tooltip>
         </div>
         <div className="sessions-list">

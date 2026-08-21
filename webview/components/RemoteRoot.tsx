@@ -1,60 +1,43 @@
 import type { ReactNode, CSSProperties } from "react";
 import type { WebNode } from "../types";
 import { Markdown } from "./Markdown";
-import {
-	Check,
-	ChevronDown,
-	ChevronRight,
-	Circle,
-	CircleCheck,
-	CircleDot,
-	CirclePause,
-	CircleStop,
-	CircleX,
-	Clock,
-	Coins,
-	FileText,
-	Hourglass,
-	ListChecks,
-	ListTodo,
-	LoaderCircle,
-	Pin,
-	PinOff,
-	RotateCw,
-	Square,
-	Trash2,
-	TriangleAlert,
-	X,
-} from "lucide-react";
+import { Codicon } from "./Codicon";
 
-import type { LucideIcon } from "lucide-react";
-
-/** Registro nombre-lucide (kebab) → componente. `ficon` lo consulta por `name`. */
-const F_ICONS: Record<string, LucideIcon> = {
-	circle: Circle,
-	"loader-circle": LoaderCircle,
-	check: Check,
-	x: X,
-	"circle-stop": CircleStop,
-	square: Square,
-	"chevron-down": ChevronDown,
-	"chevron-right": ChevronRight,
-	"rotate-cw": RotateCw,
-	/* #71 WorkflowPanel v2 (cards con pills — iconos en vez de glifos). */
-	"circle-check": CircleCheck,
-	"circle-dot": CircleDot,
-	"circle-pause": CirclePause,
-	"circle-x": CircleX,
-	clock: Clock,
-	coins: Coins,
-	"file-text": FileText,
-	hourglass: Hourglass,
-	"list-checks": ListChecks,
-	"list-todo": ListTodo,
-	pin: Pin,
-	"pin-off": PinOff,
-	"trash-2": Trash2,
-	"triangle-alert": TriangleAlert,
+/** Mapeo de nombres históricos de iconos a nombres de @vscode/codicons. */
+const F_ICONS_TO_CODICON: Record<string, string> = {
+	circle: "circle-outline",
+	"loader-circle": "loading",
+	check: "check",
+	x: "close",
+	"circle-stop": "stop-circle",
+	square: "square",
+	"chevron-down": "chevron-down",
+	"chevron-right": "chevron-right",
+	"rotate-cw": "refresh",
+	/* #71 WorkflowPanel v2 (cards con pills). */
+	"circle-check": "pass-filled",
+	"circle-dot": "record",
+	"circle-pause": "debug-pause",
+	"circle-x": "error",
+	clock: "clock",
+	coins: "symbol-numeric",
+	"file-text": "file-text",
+	hourglass: "history",
+	"list-checks": "checklist",
+	"list-todo": "checklist",
+	pin: "pin",
+	"pin-off": "pinned-dirty",
+	"trash-2": "trash",
+	"triangle-alert": "warning",
+	"shield-alert": "shield",
+	shield: "shield",
+	"arrow-right": "arrow-right",
+	bot: "copilot",
+	brain: "sparkle",
+	sparkle: "sparkle",
+	sparkles: "sparkle",
+	send: "send",
+	terminal: "terminal",
 };
 
 // Renderer espejo de Remote React (opción A). Recibe el árbol WebNode serializado
@@ -271,26 +254,25 @@ function renderNode(
 			return <Markdown>{flattenText(node.children)}</Markdown>;
 		}
 		case "ficon": {
-			// Icono lucide por nombre. El host sólo pasa `name` (+size/color/cls);
-			// el webview es quien tiene lucide-react y materializa el SVG. `cls` se
-			// aplica como className (ej. "spinner" para rotar el loader-circle).
+			// Icono codicon por nombre. El host sólo pasa `name` (+size/color/cls).
+			// `cls` se aplica como className (ej. "spinner" para rotar).
 			const name = typeof node.props.name === "string" ? node.props.name : "";
-			const Icon = F_ICONS[name];
-			if (!Icon) return null;
-			const ip: {
-				size?: number;
-				color?: string;
-				strokeWidth?: number;
-				className?: string;
-			} = {};
-			if (typeof node.props.size === "number") ip.size = node.props.size;
-			if (typeof node.props.color === "string") ip.color = node.props.color;
-			if (typeof node.props.strokeWidth === "number")
-				ip.strokeWidth = node.props.strokeWidth;
+			const codiconName = F_ICONS_TO_CODICON[name] || name;
+			const size = typeof node.props.size === "number" ? node.props.size : 14;
+			const color =
+				typeof node.props.color === "string" ? node.props.color : undefined;
 			const cls =
 				typeof node.props.cls === "string" && node.props.cls ? node.props.cls : "";
-			if (cls) ip.className = cls;
-			return <Icon {...ip} />;
+			const spin = cls.includes("spinner") || name === "loader-circle";
+			return (
+				<Codicon
+					name={codiconName}
+					size={size}
+					style={color ? { color } : undefined}
+					className={cls}
+					spin={spin}
+				/>
+			);
 		}
 		default:
 			return (

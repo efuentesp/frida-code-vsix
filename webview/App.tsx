@@ -23,16 +23,6 @@ import { Composer, type CommandItem } from "./components/Composer";
 import { SessionsPanel } from "./components/SessionsPanel";
 import { Welcome } from "./components/Welcome";
 import { Statusline } from "./components/Statusline";
-import {
-	Bot,
-	Brain,
-	CircleAlert,
-	CircleCheck,
-	CircleStop,
-	Info,
-	TriangleAlert,
-	X,
-} from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
@@ -352,7 +342,7 @@ export function App() {
 			<header className="toolbar">
 				<span className="brand">
 					<span className="avatar ai sm">
-						<Bot size={13} />
+						<Codicon name="copilot" size={13} />
 					</span>{" "}
 					Frida Code
 				</span>
@@ -419,7 +409,7 @@ export function App() {
 									post({ type: "abort" });
 								}}
 							>
-								<CircleStop size={13} /> Detener
+								<Codicon name="stop-circle" size={13} /> Detener
 							</button>
 						</Tooltip>
 					)}
@@ -472,7 +462,7 @@ export function App() {
 							className={"ico" + (hideThinking ? " off" : " active")}
 							onClick={() => setHideThinking((v) => !v)}
 						>
-							<Brain size={15} />
+							<Codicon name="sparkle" size={15} />
 						</button>
 					</Tooltip>
 				</span>
@@ -506,20 +496,21 @@ export function App() {
 
 			{state.mode === "auto-edit" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> Edición automática: crear/editar archivos sin
-					confirmación (bash sí pide).
+					<Codicon name="warning" size={12} /> Edición automática: crear/editar
+					archivos sin confirmación (bash sí pide).
 				</div>
 			)}
 			{state.mode === "auto" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte confirmación
-					(edit/write/bash, incl. comandos compuestos y rutas externas). Detén con el
-					botón Detener o doble Esc.
+					<Codicon name="warning" size={12} /> YOLO ON: TODO corre sin pedirte
+					confirmación (edit/write/bash, incl. comandos compuestos y rutas
+					externas). Detén con el botón Detener o doble Esc.
 				</div>
 			)}
 			{escHint && (
 				<div className="info-bar">
-					<CircleStop size={12} /> Presiona Esc de nuevo para detener…
+					<Codicon name="stop-circle" size={12} /> Presiona Esc de nuevo para
+					detener…
 				</div>
 			)}
 			<div
@@ -675,14 +666,14 @@ export function App() {
 			<div className="footer">
 				{state.providerError && (
 					<div className="provider-error-bar">
-						<TriangleAlert size={12} /> {state.providerError}
+						<Codicon name="warning" size={12} /> {state.providerError}
 						<button
 							aria-label="Cerrar error del proveedor"
 							className="info-toast-close"
 							type="button"
 							onClick={() => post({ type: "clear_provider_error" })}
 						>
-							<X size={13} />
+							<Codicon name="close" size={13} />
 						</button>
 					</div>
 				)}
@@ -960,10 +951,10 @@ export function App() {
  *  avisos de modo (auto-edit/auto) y el hint de Esc siguen como info-bar
  *  (persistentes, arriba) porque son contexto operativo, no notificaciones. */
 const TOAST_META: Record<ToastLevel, { icon: ReactNode; cls: string }> = {
-	error: { icon: <CircleAlert size={14} />, cls: "error" },
-	warning: { icon: <TriangleAlert size={14} />, cls: "warning" },
-	info: { icon: <Info size={14} />, cls: "info" },
-	success: { icon: <CircleCheck size={14} />, cls: "success" },
+	error: { icon: <Codicon name="error" size={14} />, cls: "error" },
+	warning: { icon: <Codicon name="warning" size={14} />, cls: "warning" },
+	info: { icon: <Codicon name="info" size={14} />, cls: "info" },
+	success: { icon: <Codicon name="pass-filled" size={14} />, cls: "success" },
 };
 function InfoToast({
 	toast,
@@ -1000,7 +991,7 @@ function InfoToast({
 				type="button"
 				onClick={() => setVisible(false)}
 			>
-				<X size={13} />
+				<Codicon name="close" size={13} />
 			</button>
 		</div>
 	);

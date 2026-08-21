@@ -1,14 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-	AlertTriangle,
-	Package,
-	RefreshCw,
-	Search,
-	SquareMinus,
-	SquarePlus,
-	Store,
-	X,
-} from "lucide-react";
+import { Codicon } from "./Codicon";
 import { Markdown } from "./Markdown";
 import type { CcPanelErrorWs, CcPanelRowWs, CcPanelWs } from "../types";
 
@@ -109,25 +100,25 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 	const tabs: {
 		key: Tab;
 		label: string;
-		icon: typeof Search;
+		iconName: string;
 		count?: number;
 	}[] = [
 		{
 			key: "discover",
 			label: "Discover",
-			icon: Search,
+			iconName: "search",
 			count: panel.rows.length,
 		},
 		{
 			key: "installed",
 			label: "Instalados",
-			icon: Package,
+			iconName: "package",
 			count: panel.resources.length,
 		},
 		{
 			key: "marketplaces",
 			label: "Marketplaces",
-			icon: Store,
+			iconName: "extensions",
 			count: panel.marketplaces.length,
 		},
 		...(panel.errors.length
@@ -135,7 +126,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 					{
 						key: "errors" as Tab,
 						label: "Errores",
-						icon: AlertTriangle,
+						iconName: "warning",
 						count: panel.errors.length,
 					},
 				]
@@ -646,7 +637,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 						className={`ccp-tab${tab === t.key ? " ccp-tab-active" : ""}`}
 						onClick={() => switchTab(t.key)}
 					>
-						<t.icon size={12} />
+						<Codicon name={t.iconName} size={12} />
 						{t.label}
 						{typeof t.count === "number" ? (
 							<span className="ccp-tab-count">{t.count}</span>
@@ -660,12 +651,12 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 					title="Cerrar (Esc)"
 					onClick={() => onClose(panel.id)}
 				>
-					<X size={14} />
+					<Codicon name="close" size={14} />
 				</button>
 			</div>
 			{showSearch ? (
 				<div className="ccp-head">
-					<Search size={14} />
+					<Codicon name="search" size={14} />
 					<span className="ccp-title">{panel.title}</span>
 					<input
 						ref={inputRef}
@@ -710,7 +701,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										{menuMkt.autoUpdate ? (
 											<>
 												{" · "}
-												<RefreshCw size={11} className="ccp-mkt-auto" />
+												<Codicon name="refresh" size={11} className="ccp-mkt-auto" />
 												auto-update
 											</>
 										) : null}
@@ -759,7 +750,7 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 										<span className="ccp-mkt-name">
 											✻ {m.name}
 											{m.autoUpdate ? (
-												<RefreshCw size={11} className="ccp-mkt-auto" />
+												<Codicon name="refresh" size={11} className="ccp-mkt-auto" />
 											) : null}
 										</span>
 										<span className="ccp-mkt-url">{m.url}</span>
@@ -1053,7 +1044,11 @@ export function CcPluginsPanel({ panel, onAction, onRowMeta, onClose }: Props) {
 											}
 										>
 											<span className="ccp-res-caret">
-												{isCol ? <SquarePlus size={14} /> : <SquareMinus size={14} />}
+												{isCol ? (
+										<Codicon name="add" size={14} />
+									) : (
+										<Codicon name="remove" size={14} />
+									)}
 											</span>
 											{kind === "skill"
 												? "Skills"
