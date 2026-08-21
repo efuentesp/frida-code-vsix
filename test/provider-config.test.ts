@@ -5,6 +5,7 @@ import { ProviderConfig } from "../webview/components/ProviderConfig";
 import { ProveedoresTab } from "../webview/components/ProveedoresTab";
 import type { ProviderOption } from "../webview/types";
 
+// Pruebas para ProviderConfig y ProveedoresTab (Propuesta 1)
 describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model Hub)", () => {
 	const mockEnterprise: ProviderOption = {
 		id: "frida-enterprise",
@@ -24,9 +25,7 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 		oauth: false,
 		apiKey: true,
 		authed: true,
-		models: [
-			{ id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet" },
-		],
+		models: [{ id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet" }],
 	};
 
 	const mockOpenAI: ProviderOption = {

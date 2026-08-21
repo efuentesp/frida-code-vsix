@@ -6525,13 +6525,20 @@ kbd {
 	font-size: 11.5px;
 	font-weight: 500;
 	border-radius: 4px;
-	border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25)));
+	border: 1px solid
+		var(
+			--vscode-button-border,
+			var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25))
+		);
 	background: var(--vscode-button-secondaryBackground, transparent);
 	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
 	cursor: pointer;
 }
 .pc-iconbtn:hover {
-	background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		var(--vscode-list-hoverBackground)
+	);
 	color: var(--vscode-foreground);
 }
 .pc-link-btn {
@@ -7204,120 +7211,254 @@ kbd {
 	opacity: 0.8;
 }
 
-/* ── Panel de Auto-Aprobación (#55): tri-states por superficie ── */
+/* ── Auto-Aprobación / Permisos (Propuesta 1: VS Code Security Matrix & Policy Cards) ── */
 .perm-body {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 12px;
 	padding: 4px 0 16px;
 }
+.perm-card {
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 8px;
+	padding: 12px 14px;
+	background: var(--vscode-editor-background);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.perm-card-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.perm-head-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.perm-card-title {
+	font-weight: 700;
+	font-size: 12.5px;
+	color: var(--vscode-foreground);
+}
 .perm-note {
-	font-size: 11px;
-	opacity: 0.75;
-	line-height: 1.5;
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.4;
+}
+.perm-note code {
+	font-family: var(--vscode-editor-font-family, monospace);
 }
 .perm-note.muted {
 	text-align: left;
 	font-style: italic;
+	opacity: 0.7;
 }
-.perm-mode-row {
+
+/* Selector de modo global con tarjetas interactivas */
+.perm-mode-cards {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.perm-mode-card {
+	flex: 1 1 120px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.06));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	cursor: pointer;
+	text-align: left;
+	transition: all 0.15s ease;
+}
+.perm-mode-card:hover {
+	background: var(--vscode-list-hoverBackground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+.perm-mode-card.active {
+	border-color: var(--vscode-focusBorder, #007acc);
+	background: rgba(0, 122, 204, 0.12);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+.perm-mode-card-head {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 6px;
+}
+.perm-mode-title {
+	font-weight: 700;
+	font-size: 12px;
+	color: var(--vscode-foreground);
+}
+.perm-mode-badge {
+	font-size: 9.5px;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-weight: 600;
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.18));
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	margin-left: auto;
+}
+.perm-mode-desc {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.35;
+}
+
+/* Herramientas del sistema */
+.perm-tools-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
 }
 .perm-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 10px;
-	padding: 4px 0;
+	padding: 4px 6px;
+	border-radius: 4px;
+	transition: background 0.1s ease;
+}
+.perm-row:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+.perm-tool-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+.perm-tool-icon {
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
 }
 .perm-row-name {
 	font-size: 12px;
 	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
-/* Select/inputs: estilo de formulario del hub (variables VS Code). */
+
+/* Select/inputs de permisos */
 .perm-select,
 .perm-input {
-	background: var(--vscode-dropdown-background);
-	color: var(--vscode-dropdown-foreground);
-	border: 1px solid var(--vscode-dropdown-border);
-	border-radius: 3px;
+	background: var(--vscode-input-background, var(--vscode-dropdown-background));
+	color: var(--vscode-input-foreground, var(--vscode-dropdown-foreground));
+	border: 1px solid var(--vscode-input-border, var(--vscode-dropdown-border));
+	border-radius: 4px;
 	font-size: 12px;
-	padding: 3px 6px;
+	padding: 4px 8px;
 }
 .perm-input {
 	flex: 1;
 	min-width: 120px;
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+.perm-input:focus,
+.perm-select:focus {
+	border-color: var(--vscode-focusBorder);
+	outline: none;
 }
 .perm-add {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	margin: 2px 0 8px;
+	margin-top: 4px;
 }
-/* El botón es <button>: button:hover global inyecta el violeta PRIMARIO (lección
-   del acordeón #54 y tabs). Especificidad 0,2,0 > 0,1,1 con hover sutil. */
-.perm-add-btn:hover,
-.perm-chip .rm:hover,
-.perm-chip.session:hover {
-	background: var(--vscode-list-hoverBackground);
-	color: var(--vscode-list-hoverForeground);
+.perm-add-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	font-size: 11.5px;
+	font-weight: 600;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-button-border, transparent);
+	background: var(--vscode-button-background, #007acc);
+	color: var(--vscode-button-foreground, #ffffff);
+	cursor: pointer;
 }
-/* Segmented tri-state: 3 botones compactos ✓/●/✕. */
+.perm-add-btn:hover {
+	background: var(--vscode-button-hoverBackground, #0062a3);
+}
+.perm-reset-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 10px;
+	font-size: 11.5px;
+	font-weight: 500;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	background: var(--vscode-button-secondaryBackground, transparent);
+	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+	cursor: pointer;
+}
+.perm-reset-btn:hover {
+	background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+/* Control Tri-state interactivo con Codicons */
 .perm-seg {
 	display: inline-flex;
-	border: 1px solid var(--vscode-dropdown-border);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
 	border-radius: 4px;
 	overflow: hidden;
 	flex-shrink: 0;
+	background: var(--vscode-editor-background);
 }
 .perm-seg-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	background: transparent;
 	color: var(--vscode-descriptionForeground);
 	border: none;
 	border-radius: 0;
-	padding: 2px 9px;
-	font-size: 12px;
+	padding: 3px 8px;
+	font-size: 11px;
+	font-weight: 500;
 	cursor: pointer;
-	opacity: 0.55;
+	opacity: 0.6;
+	transition: all 0.1s ease;
 }
 .perm-seg-btn + .perm-seg-btn {
-	border-left: 1px solid var(--vscode-dropdown-border);
+	border-left: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
 }
-/* Mismo fix anti-violeta que .perm-add-btn para los segmentos. */
 .perm-seg-btn:hover {
 	background: var(--vscode-list-hoverBackground);
-	opacity: 0.9;
+	opacity: 1;
 }
 .perm-seg-btn.is-allow.active {
-	color: var(--vscode-gitDecoration-addedResourceForeground);
-	background: color-mix(
-		in srgb,
-		var(--vscode-gitDecoration-addedResourceForeground) 14%,
-		transparent
-	);
+	color: var(--vscode-testing-iconPassed, #3fb950);
+	background: rgba(63, 185, 80, 0.16);
 	opacity: 1;
+	font-weight: 700;
 }
 .perm-seg-btn.is-ask.active {
-	color: var(--vscode-editorWarning-foreground);
-	background: color-mix(
-		in srgb,
-		var(--vscode-editorWarning-foreground) 14%,
-		transparent
-	);
+	color: var(--vscode-editorWarning-foreground, #cca700);
+	background: rgba(204, 167, 0, 0.16);
 	opacity: 1;
+	font-weight: 700;
 }
 .perm-seg-btn.is-deny.active {
-	color: var(--vscode-editorError-foreground);
-	background: color-mix(
-		in srgb,
-		var(--vscode-editorError-foreground) 14%,
-		transparent
-	);
+	color: var(--vscode-testing-iconFailed, #f85149);
+	background: rgba(248, 81, 73, 0.16);
 	opacity: 1;
+	font-weight: 700;
 }
-/* Chips de patrones declarativos + patrones de sesión. */
+.perm-seg-label {
+	font-size: 10.5px;
+}
+
+/* Chips de patrones protegidos */
 .perm-chips {
 	display: flex;
 	flex-wrap: wrap;
@@ -7328,40 +7469,62 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	border: 1px solid var(--vscode-dropdown-border);
-	border-radius: 10px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 5px;
 	padding: 2px 6px 2px 8px;
-	font-size: 11px;
+	font-size: 11.5px;
 	background: var(--vscode-editor-background);
 }
+.perm-chip code {
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-foreground);
+}
 .perm-chip .rm {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	background: transparent;
 	border: none;
 	color: var(--vscode-descriptionForeground);
-	padding: 0 2px;
+	padding: 1px 3px;
 	cursor: pointer;
-	font-size: 13px;
-	line-height: 1;
 	border-radius: 3px;
+}
+.perm-chip .rm:hover {
+	color: var(--vscode-errorForeground, #f85149);
+	background: var(--vscode-list-hoverBackground);
 }
 .perm-chip.session {
 	cursor: pointer;
-	border-color: var(--vscode-gitDecoration-addedResourceForeground);
+	border-color: var(--vscode-focusBorder, #007acc);
+	background: rgba(0, 122, 204, 0.08);
+}
+.perm-chip-revoke {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font-size: 10.5px;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	margin-left: 2px;
+}
+.perm-chip.session:hover .perm-chip-revoke {
+	color: var(--vscode-errorForeground, #f85149);
 }
 .perm-chip-kind {
-	font-size: 9px;
+	font-size: 9.5px;
+	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.4px;
-	opacity: 0.7;
+	color: var(--vscode-descriptionForeground);
 }
 .perm-glyph.is-allow {
-	color: var(--vscode-gitDecoration-addedResourceForeground);
+	color: var(--vscode-testing-iconPassed, #3fb950);
 }
 .perm-glyph.is-ask {
-	color: var(--vscode-editorWarning-foreground);
+	color: var(--vscode-editorWarning-foreground, #cca700);
 }
 .perm-glyph.is-deny {
-	color: var(--vscode-editorError-foreground);
+	color: var(--vscode-testing-iconFailed, #f85149);
 }
 .perm-check {
 	display: inline-flex;
@@ -7369,6 +7532,7 @@ kbd {
 	gap: 8px;
 	font-size: 12px;
 	cursor: pointer;
+	color: var(--vscode-foreground);
 }
 .perm-check input {
 	accent-color: var(--vscode-button-background);

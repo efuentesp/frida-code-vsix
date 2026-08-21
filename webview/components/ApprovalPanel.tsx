@@ -1,40 +1,62 @@
 import { useState } from "react";
 import type { ApprovalMode, OutMessage, PermState, State } from "../types";
+import { Codicon } from "./Codicon";
 
-// Panel de Auto-Aprobación (#55): editor visual de la política declarativa de
-// frida-permission-system (permission.json) dentro del webview. Reemplaza al
-// overlay /gates-config (Remote React, retirado). Cada cambio persiste en el
-// host vía el puente perm_* y el gate lee la política fresca en el próximo
-// tool_call — sin recargar la sesión. El snapshot llega en state.permissions
-// (host lo publica al abrir el tab, tras cada cambio y al limpiar sesión).
+// Panel de Auto-Aprobación (Propuesta 1: VS Code Security Matrix & Policy Cards):
+// Editor visual de la política declarativa de permisos con selector visual de modo,
+// tri-states con Codicons nativos de VS Code, y tarjetas de reglas de protección.
 
-/** Tri-states con glifos (paridad con el overlay retirado). */
-const PERM_META: Record<PermState, { glyph: string; label: string }> = {
-	allow: { glyph: "✓", label: "Permitir" },
-	ask: { glyph: "●", label: "Preguntar" },
-	deny: { glyph: "✕", label: "Negar" },
+/** Tri-states con Codicons nativos. */
+const PERM_META: Record<
+	PermState,
+	{ icon: string; label: string; cls: string }
+> = {
+	allow: { icon: "pass", label: "Permitir", cls: "allow" },
+	ask: { icon: "question", label: "Preguntar", cls: "ask" },
+	deny: { icon: "error", label: "Negar", cls: "deny" },
 };
 
-/** Tools conocidos de la superficie `tool` (paridad DEFAULT_POLICY). */
-const KNOWN_TOOLS: { id: string; label?: string }[] = [
-	{ id: "read" },
-	{ id: "edit" },
-	{ id: "write" },
-	{ id: "bash" },
-	{ id: "grep" },
-	{ id: "find" },
-	{ id: "ls" },
-	{ id: "todo" },
-	{ id: "ask_user_question" },
-	{ id: "*", label: "desconocidos (MCP / extensiones)" },
+/** Tools conocidos con su icono contextual. */
+const KNOWN_TOOLS: { id: string; label?: string; icon: string }[] = [
+	{ id: "read", icon: "file-text" },
+	{ id: "edit", icon: "edit" },
+	{ id: "write", icon: "edit" },
+	{ id: "bash", icon: "terminal" },
+	{ id: "grep", icon: "search" },
+	{ id: "find", icon: "search" },
+	{ id: "ls", icon: "folder" },
+	{ id: "todo", icon: "checklist" },
+	{ id: "ask_user_question", icon: "question" },
+	{ id: "*", label: "* desconocidos (MCP / extensiones)", icon: "extensions" },
 ];
 
-const MODE_DESC: Record<string, string> = {
-	manual: "Respeta la política tal cual: todo `preguntar` abre el diálogo.",
-	"auto-edit":
-		"Ediciones (edit/write) con `preguntar` pasan sin diálogo; bash y force-ask siguen pidiendo.",
-	auto: "Todo `preguntar` pasa sin diálogo (salvo deny, que siempre gana).",
-};
+const MODES: {
+	id: ApprovalMode;
+	title: string;
+	desc: string;
+	icon: string;
+	badge?: string;
+}[] = [
+	{
+		id: "manual",
+		title: "Manual",
+		desc: "Estricto: pregunta antes de cada acción relevante.",
+		icon: "shield",
+	},
+	{
+		id: "auto-edit",
+		title: "Auto-edit",
+		desc: "Balanceado: edita archivos sin preguntar; bash pide confirmación.",
+		icon: "edit",
+		badge: "Recomendado",
+	},
+	{
+		id: "auto",
+		title: "Auto",
+		desc: "Autónomo: todo corre sin diálogo salvo reglas de bloqueo.",
+		icon: "zap",
+	},
+];
 
 const KIND_LABEL: Record<string, string> = {
 	tool: "Tool",
@@ -59,12 +81,13 @@ export function ApprovalPanel({
 		return <div className="cfg-stub">Cargando política de permisos…</div>;
 	}
 
-	// Tools extra definidos directamente en permission.json (fuera de la lista
-	// conocida): se muestran igual, el usuario no debería perderlos de vista.
 	const extraTools = Object.keys(cfg.tool).filter(
 		(t) => !KNOWN_TOOLS.some((k) => k.id === t),
 	);
-	const tools = [...KNOWN_TOOLS, ...extraTools.map((t) => ({ id: t }))];
+	const tools: { id: string; label?: string; icon: string }[] = [
+		...KNOWN_TOOLS,
+		...extraTools.map((t) => ({ id: t, label: t, icon: "tools" })),
+	];
 
 	const addPath = (): void => {
 		const p = newPath.trim();
@@ -81,163 +104,224 @@ export function ApprovalPanel({
 
 	return (
 		<div className="perm-body">
-			{/* ── Modo global ── */}
-			<div className="cfg-section">Modo global</div>
-			<div className="perm-mode-row">
-				<select
-					className="perm-select"
-					value={cfg.mode}
-					onChange={(e) =>
-						post({ type: "set_mode", mode: e.target.value as ApprovalMode })
-					}
-				>
-					<option value="manual">Manual</option>
-					<option value="auto-edit">Auto-edit</option>
-					<option value="auto">Auto</option>
-				</select>
-				<span className="perm-note">{MODE_DESC[cfg.mode]}</span>
-			</div>
-			<div className="perm-note">
-				`negar` siempre gana, incluso en Auto. El modo también vive en el footer
-				de la conversación (los dos mandan al mismo lugar).
-			</div>
-
-			{/* ── Tools ── */}
-			<div className="cfg-section">Tools</div>
-			{tools.map((t) => (
-				<div key={t.id} className="perm-row">
-					<span className="perm-row-name" title={t.id}>
-						{t.id === "*" ? "* desconocidos (MCP / extensiones)" : t.id}
+			{/* ── 1. Selector de modo global ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="shield" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">
+						Modo de automatización global
 					</span>
-					<TriState
-						value={cfg.tool[t.id] ?? "ask"}
-						onChange={(s) => post({ type: "perm_set_tool", tool: t.id, state: s })}
-					/>
 				</div>
-			))}
-
-			{/* ── Paths ── */}
-			<div className="cfg-section">Paths (wildcards)</div>
-			<div className="perm-note">
-				Cross-cutting: aplica a cualquier tool que toque el archivo. Si varios
-				patrones matchean, gana el MÁS RESTRICTIVO (`*.env: allow` + `*.env.example:
-				deny` → deny). Ej. `*.env`, `~/.ssh/*`.
-			</div>
-			<PatternChips
-				map={cfg.path}
-				onRemove={(p) => post({ type: "perm_remove_path", pattern: p })}
-			/>
-			<div className="perm-add">
-				<input
-					className="perm-input"
-					placeholder="*.env"
-					value={newPath}
-					onChange={(e) => setNewPath(e.target.value)}
-					onKeyDown={(e) => e.key === "Enter" && addPath()}
-				/>
-				<StateSelect value={newPathState} onChange={setNewPathState} />
-				<button className="perm-add-btn" onClick={addPath}>
-					Añadir
-				</button>
-			</div>
-
-			{/* ── Bash ── */}
-			<div className="cfg-section">Comandos bash</div>
-			<div className="perm-note">
-				Wildcards sobre el comando completo. Ej. `git push *`, `rm -rf *`,
-				`npm *`. Los deny hardcodeados (dangerous-commands) siguen aplicando
-				como capa extra.
-			</div>
-			<PatternChips
-				map={cfg.bash}
-				onRemove={(p) => post({ type: "perm_remove_bash", pattern: p })}
-			/>
-			<div className="perm-add">
-				<input
-					className="perm-input"
-					placeholder="git push *"
-					value={newBash}
-					onChange={(e) => setNewBash(e.target.value)}
-					onKeyDown={(e) => e.key === "Enter" && addBash()}
-				/>
-				<StateSelect value={newBashState} onChange={setNewBashState} />
-				<button className="perm-add-btn" onClick={addBash}>
-					Añadir
-				</button>
+				<div className="perm-mode-cards">
+					{MODES.map((m) => {
+						const isSelected = cfg.mode === m.id;
+						return (
+							<button
+								key={m.id}
+								type="button"
+								className={`perm-mode-card${isSelected ? " active" : ""}`}
+								onClick={() => post({ type: "set_mode", mode: m.id })}
+							>
+								<div className="perm-mode-card-head">
+									<Codicon name={m.icon} size={14} />
+									<span className="perm-mode-title">{m.title}</span>
+									{m.badge && (
+										<span className="perm-mode-badge">{m.badge}</span>
+									)}
+								</div>
+								<div className="perm-mode-desc">{m.desc}</div>
+							</button>
+						);
+					})}
+				</div>
+				<div className="perm-note">
+					Nota: la regla <code>Negar</code> siempre prevalece, incluso en modo
+					Auto. El modo también se sincroniza en el footer del chat.
+				</div>
 			</div>
 
-			{/* ── Fuera del workspace ── */}
-			<div className="cfg-section">Fuera del workspace</div>
-			<div className="perm-row">
-				<span className="perm-row-name">
-					Acceso a paths fuera de la carpeta de trabajo
-				</span>
-				<TriState
-					value={cfg.externalDirectory}
-					onChange={(s) => post({ type: "perm_set_external", state: s })}
-				/>
-			</div>
-
-			{/* ── Sesión ── */}
-			<div className="cfg-section">Aprobado en esta sesión</div>
-			<div className="perm-note">
-				Patrones aprobados con «sí, siempre» en el diálogo de permisos. Viven en
-				memoria: al revocarlos aquí vuelven a pedir de inmediato; al cerrar la
-				sesión se olvidan solos.
-			</div>
-			{(state.sessionPatterns ?? []).length === 0 ? (
-				<div className="perm-note muted">— Nada aprobado por sesión todavía —</div>
-			) : (
-				<div className="perm-chips">
-					{(state.sessionPatterns ?? []).map((sp) => (
-						<button
-							key={`${sp.kind}:${sp.pattern}`}
-							className="perm-chip session"
-							title="Revocar (vuelve a preguntar)"
-							onClick={() =>
-								post({
-									type: "perm_revoke_session_pattern",
-									kind: sp.kind,
-									pattern: sp.pattern,
-								})
-							}
-						>
-							<span className="perm-chip-kind">{KIND_LABEL[sp.kind]}</span>
-							<code>{sp.pattern}</code>
-							<span className="rm">×</span>
-						</button>
+			{/* ── 2. Herramientas del sistema (Tools) ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="tools" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">Herramientas del sistema</span>
+				</div>
+				<div className="perm-tools-grid">
+					{tools.map((t) => (
+						<div key={t.id} className="perm-row">
+							<div className="perm-tool-label">
+								<Codicon name={t.icon} size={13} className="perm-tool-icon" />
+								<span className="perm-row-name" title={t.id}>
+									{t.label || t.id}
+								</span>
+							</div>
+							<TriState
+								value={cfg.tool[t.id] ?? "ask"}
+								onChange={(s) =>
+									post({ type: "perm_set_tool", tool: t.id, state: s })
+								}
+							/>
+						</div>
 					))}
 				</div>
-			)}
-
-			{/* ── Auditoría ── */}
-			<div className="cfg-section">Auditoría</div>
-			<div className="perm-row">
-				<label className="perm-check">
-					<input
-						type="checkbox"
-						checked={cfg.auditLog}
-						onChange={(e) =>
-							post({ type: "perm_set_audit", enabled: e.target.checked })
-						}
-					/>
-					<span>
-						Registrar decisiones en <code>approvals.jsonl</code>
-					</span>
-				</label>
-				<button className="perm-add-btn" onClick={() => post({ type: "perm_reset" })}>
-					Restablecer defaults
-				</button>
 			</div>
-			<div className="perm-note">
-				El log lo consulta <code>/gates</code>. Restablecer vuelve a la política
-				por defecto (y a modo Manual) — no borra el historial.
+
+			{/* ── 3. Archivos y rutas protegidas (Paths) ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="folder" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">
+						Archivos y rutas protegidas
+					</span>
+				</div>
+				<div className="perm-note">
+					Aplica transversalmente a cualquier tool que acceda al archivo.
+					Prevalece la regla más restrictiva (ej. <code>*.env</code>,{" "}
+					<code>~/.ssh/*</code>).
+				</div>
+				<PatternChips
+					map={cfg.path}
+					onRemove={(p) => post({ type: "perm_remove_path", pattern: p })}
+				/>
+				<div className="perm-add">
+					<input
+						className="perm-input"
+						placeholder="Patrón (ej. *.env, .git/*)"
+						value={newPath}
+						onChange={(e) => setNewPath(e.target.value)}
+						onKeyDown={(e) => e.key === "Enter" && addPath()}
+					/>
+					<StateSelect value={newPathState} onChange={setNewPathState} />
+					<button type="button" className="perm-add-btn" onClick={addPath}>
+						<Codicon name="add" size={12} /> Añadir
+					</button>
+				</div>
+			</div>
+
+			{/* ── 4. Comandos bash ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="terminal" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">Comandos bash</span>
+				</div>
+				<div className="perm-note">
+					Wildcards sobre el comando completo (ej. <code>git push *</code>,{" "}
+					<code>rm -rf *</code>).
+				</div>
+				<PatternChips
+					map={cfg.bash}
+					onRemove={(p) => post({ type: "perm_remove_bash", pattern: p })}
+				/>
+				<div className="perm-add">
+					<input
+						className="perm-input"
+						placeholder="Patrón (ej. git push *, npm *)"
+						value={newBash}
+						onChange={(e) => setNewBash(e.target.value)}
+						onKeyDown={(e) => e.key === "Enter" && addBash()}
+					/>
+					<StateSelect value={newBashState} onChange={setNewBashState} />
+					<button type="button" className="perm-add-btn" onClick={addBash}>
+						<Codicon name="add" size={12} /> Añadir
+					</button>
+				</div>
+			</div>
+
+			{/* ── 5. Fuera del workspace ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon
+						name="link-external"
+						size={14}
+						className="perm-head-icon"
+					/>
+					<span className="perm-card-title">Fuera del workspace</span>
+				</div>
+				<div className="perm-row">
+					<span className="perm-row-name">
+						Acceso a archivos fuera de la carpeta de trabajo
+					</span>
+					<TriState
+						value={cfg.externalDirectory}
+						onChange={(s) => post({ type: "perm_set_external", state: s })}
+					/>
+				</div>
+			</div>
+
+			{/* ── 6. Aprobado en esta sesión ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="history" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">Aprobado en esta sesión</span>
+				</div>
+				<div className="perm-note">
+					Patrones aceptados con «sí, siempre» durante esta sesión. Se descartan
+					automáticamente al cerrarla.
+				</div>
+				{(state.sessionPatterns ?? []).length === 0 ? (
+					<div className="perm-note muted">
+						— Nada aprobado por sesión todavía —
+					</div>
+				) : (
+					<div className="perm-chips">
+						{(state.sessionPatterns ?? []).map((sp) => (
+							<button
+								key={`${sp.kind}:${sp.pattern}`}
+								type="button"
+								className="perm-chip session"
+								title="Revocar (vuelve a preguntar)"
+								onClick={() =>
+									post({
+										type: "perm_revoke_session_pattern",
+										kind: sp.kind,
+										pattern: sp.pattern,
+									})
+								}
+							>
+								<span className="perm-chip-kind">{KIND_LABEL[sp.kind]}</span>
+								<code>{sp.pattern}</code>
+								<span className="perm-chip-revoke">
+									<Codicon name="close" size={11} /> Revocar
+								</span>
+							</button>
+						))}
+					</div>
+				)}
+			</div>
+
+			{/* ── 7. Auditoría y Registro ── */}
+			<div className="perm-card">
+				<div className="perm-card-head">
+					<Codicon name="output" size={14} className="perm-head-icon" />
+					<span className="perm-card-title">Auditoría y registro</span>
+				</div>
+				<div className="perm-row">
+					<label className="perm-check">
+						<input
+							type="checkbox"
+							checked={cfg.auditLog}
+							onChange={(e) =>
+								post({ type: "perm_set_audit", enabled: e.target.checked })
+							}
+						/>
+						<span>
+							Registrar decisiones en <code>approvals.jsonl</code>
+						</span>
+					</label>
+					<button
+						type="button"
+						className="perm-reset-btn"
+						onClick={() => post({ type: "perm_reset" })}
+					>
+						<Codicon name="refresh" size={12} /> Restablecer defaults
+					</button>
+				</div>
 			</div>
 		</div>
 	);
 }
 
-/** Control segmentado ✓ / ● / ✕ (un tri-state). */
+/** Control segmentado interactivo con Codicons de VS Code (allow / ask / deny). */
 function TriState({
 	value,
 	onChange,
@@ -247,16 +331,22 @@ function TriState({
 }) {
 	return (
 		<div className="perm-seg">
-			{(["allow", "ask", "deny"] as const).map((s) => (
-				<button
-					key={s}
-					className={`perm-seg-btn is-${s}${value === s ? " active" : ""}`}
-					title={PERM_META[s].label}
-					onClick={() => onChange(s)}
-				>
-					{PERM_META[s].glyph}
-				</button>
-			))}
+			{(["allow", "ask", "deny"] as const).map((s) => {
+				const meta = PERM_META[s];
+				const isSelected = value === s;
+				return (
+					<button
+						key={s}
+						type="button"
+						className={`perm-seg-btn is-${s}${isSelected ? " active" : ""}`}
+						title={meta.label}
+						onClick={() => onChange(s)}
+					>
+						<Codicon name={meta.icon} size={11} />
+						<span className="perm-seg-label">{meta.label}</span>
+					</button>
+				);
+			})}
 		</div>
 	);
 }
@@ -275,14 +365,14 @@ function StateSelect({
 			value={value}
 			onChange={(e) => onChange(e.target.value as PermState)}
 		>
-			<option value="allow">✓ Permitir</option>
-			<option value="ask">● Preguntar</option>
-			<option value="deny">✕ Negar</option>
+			<option value="allow">Permitir</option>
+			<option value="ask">Preguntar</option>
+			<option value="deny">Negar</option>
 		</select>
 	);
 }
 
-/** Chips de patrones declarativos (con estado y remove). */
+/** Chips de patrones declarativos (con codicon de estado y botón de eliminar). */
 function PatternChips({
 	map,
 	onRemove,
@@ -296,19 +386,27 @@ function PatternChips({
 	}
 	return (
 		<div className="perm-chips">
-			{entries.map(([pattern, state]) => (
-				<span key={pattern} className={`perm-chip is-${state}`}>
-					<span className={`perm-glyph is-${state}`}>{PERM_META[state].glyph}</span>
-					<code>{pattern}</code>
-					<button
-						className="rm"
-						title="Quitar patrón"
-						onClick={() => onRemove(pattern)}
-					>
-						×
-					</button>
-				</span>
-			))}
+			{entries.map(([pattern, state]) => {
+				const meta = PERM_META[state];
+				return (
+					<span key={pattern} className={`perm-chip is-${state}`}>
+						<Codicon
+							name={meta.icon}
+							size={12}
+							className={`perm-glyph is-${state}`}
+						/>
+						<code>{pattern}</code>
+						<button
+							type="button"
+							className="rm"
+							title="Quitar patrón"
+							onClick={() => onRemove(pattern)}
+						>
+							<Codicon name="close" size={11} />
+						</button>
+					</span>
+				);
+			})}
 		</div>
 	);
 }

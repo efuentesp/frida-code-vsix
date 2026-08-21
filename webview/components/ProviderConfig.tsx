@@ -64,11 +64,7 @@ export function ProviderConfig({
 				<span className="pc-icon">
 					<Codicon
 						name={
-							meta.authType === "oauth"
-								? "sparkle"
-								: provider.authed
-									? "key"
-									: "plug"
+							meta.authType === "oauth" ? "sparkle" : provider.authed ? "key" : "plug"
 						}
 						size={16}
 					/>
@@ -110,9 +106,7 @@ export function ProviderConfig({
 								<span
 									key={m.id}
 									className={`pc-model-chip${isCurrentActive ? " active" : ""}`}
-									title={
-										isCurrentActive ? "Modelo activo en el chat" : m.name
-									}
+									title={isCurrentActive ? "Modelo activo en el chat" : m.name}
 								>
 									<span className="pc-model-chip-name">{m.name}</span>
 									{isCurrentActive && (
@@ -151,10 +145,7 @@ export function ProviderConfig({
 								<Codicon name="edit" size={13} />
 								<span>Cambiar</span>
 							</button>
-							<button
-								className="pc-link-btn"
-								onClick={() => setConfirmForget(true)}
-							>
+							<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
 								<Codicon name="trash" size={12} /> Olvidar API key
 							</button>
 						</div>
@@ -188,11 +179,7 @@ export function ProviderConfig({
 										Cancelar
 									</button>
 								)}
-								<button
-									className="pc-save"
-									onClick={save}
-									disabled={!key.trim()}
-								>
+								<button className="pc-save" onClick={save} disabled={!key.trim()}>
 									Guardar key
 								</button>
 								{meta.getKeyUrl && (
@@ -210,10 +197,7 @@ export function ProviderConfig({
 					)
 				) : provider.authed ? (
 					<div className="pc-authed">
-						<button
-							className="pc-link-btn"
-							onClick={() => setConfirmForget(true)}
-						>
+						<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
 							<Codicon name="sign-out" size={12} /> Olvidar acceso
 						</button>
 					</div>
@@ -241,8 +225,7 @@ export function ProviderConfig({
 							target="_blank"
 							rel="noreferrer"
 						>
-							{deviceCode.verificationUri}{" "}
-							<Codicon name="link-external" size={11} />
+							{deviceCode.verificationUri} <Codicon name="link-external" size={11} />
 						</a>
 					</div>
 				) : (
