@@ -535,7 +535,9 @@ describe("frida-extensible-workflows · stats del run: ⏱ + ∑tokens (#81)", (
 				structuralPath: [],
 			},
 		});
-		expect(getWorkflowRuns()[0].lastActivityAt ?? 0).toBeGreaterThanOrEqual(t1 ?? 0);
+		expect(getWorkflowRuns()[0].lastActivityAt ?? 0).toBeGreaterThanOrEqual(
+			t1 ?? 0,
+		);
 	});
 
 	it("formatTokens legible; runStats elapsed con lastActivity", () => {
@@ -605,7 +607,9 @@ describe("frida-extensible-workflows · visibilidad forzada del panel (#84)", ()
 
 	it("pin reactivo: toggle + notifica listeners", () => {
 		let fires = 0;
-		const off = subscribePanelVisibility(() => { fires += 1; });
+		const off = subscribePanelVisibility(() => {
+			fires += 1;
+		});
 		expect(isPanelPinned()).toBe(false);
 		setPanelPinned(true);
 		expect(isPanelPinned()).toBe(true);
@@ -614,7 +618,11 @@ describe("frida-extensible-workflows · visibilidad forzada del panel (#84)", ()
 	});
 
 	it("rehydrateRuns: revive awaiting de disco sin pisar los ya presentes", () => {
-		upsertWorkflowRun({ runId: "vivo", workflowName: "wf-vivo", state: "running" });
+		upsertWorkflowRun({
+			runId: "vivo",
+			workflowName: "wf-vivo",
+			state: "running",
+		});
 		rehydrateRuns([
 			{
 				runId: "vivo",

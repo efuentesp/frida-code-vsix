@@ -189,8 +189,7 @@ export function pipelineGraph(
 				? "pending"
 				: "done";
 		const agentCount = run.agents.filter((a) => a.phase === name).length;
-		const durationMs =
-			startedAt === undefined ? 0 : (endedAt ?? now) - startedAt;
+		const durationMs = startedAt === undefined ? 0 : (endedAt ?? now) - startedAt;
 		return {
 			name,
 			state,
@@ -319,12 +318,12 @@ export function runStats(
  * cap 3 — para que un fallo rápido siga visible en el panel y se pueda
  * debuggear desde la UI (antes el return null los borraba de la pantalla). */
 export function recentFailed(
-		runs: readonly WorkflowRunView[],
+	runs: readonly WorkflowRunView[],
 ): readonly WorkflowRunView[] {
-		return runs
-				.filter((r) => r.state === "failed")
-				.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
-				.slice(0, 3);
+	return runs
+		.filter((r) => r.state === "failed")
+		.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0))
+		.slice(0, 3);
 }
 
 /** ¿Hay algo que pintar en el panel? (#84) — contenido real (runs/huérfanos)

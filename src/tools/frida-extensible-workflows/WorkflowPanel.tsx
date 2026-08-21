@@ -14,7 +14,12 @@ import { useSyncExternalStore, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 import { resolveCheckpointFromUi } from "./frida-delivery";
-import { purgeOrphans, readOrphanJournal, readLiveRuns, scanOrphans } from "./gc";
+import {
+	purgeOrphans,
+	readOrphanJournal,
+	readLiveRuns,
+	scanOrphans,
+} from "./gc";
 import { wfLog } from "./telemetry";
 import {
 	getOrphanRuns,
@@ -118,10 +123,7 @@ function WorkflowPanel(): ReactElement | null {
 			gap={4}
 			header={<HeaderSummary runs={runs} collapsed={collapsed} />}
 			actions={
-				<fbutton
-					variant="secondary"
-				onClick={() => setPanelPinned(!pinned)}
-				>
+				<fbutton variant="secondary" onClick={() => setPanelPinned(!pinned)}>
 					<ficon
 						name={pinned ? "pin" : "pin-off"}
 						size={10}
@@ -132,7 +134,9 @@ function WorkflowPanel(): ReactElement | null {
 		>
 			{empty ? (
 				<ftext size={11} color="#8b949e">
-					{"Sin runs — usa /wf o workflow(…) para lanzar uno. El pin lo mantiene visible; quítalo para auto-ocultar."}
+					{
+						"Sin runs — usa /wf o workflow(…) para lanzar uno. El pin lo mantiene visible; quítalo para auto-ocultar."
+					}
 				</ftext>
 			) : null}
 			{active.map((r) => (
@@ -152,19 +156,11 @@ function WorkflowPanel(): ReactElement | null {
 						</ftext>
 					</fbox>
 					{failedRecent.map((r) => (
-						<fbox
-							key={r.runId}
-							flexDirection="row"
-							gap={4}
-							alignItems="flex-start"
-						>
+						<fbox key={r.runId} flexDirection="row" gap={4} alignItems="flex-start">
 							<fbox flex={1} flexDirection="column">
 								<RunView run={r} />
 							</fbox>
-							<fbutton
-								variant="secondary"
-								onClick={() => removeWorkflowRun(r.runId)}
-							>
+							<fbutton variant="secondary" onClick={() => removeWorkflowRun(r.runId)}>
 								<ficon name="x" size={10} color="#8b949e" />
 							</fbutton>
 						</fbox>
@@ -513,18 +509,9 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 							: isDone
 								? STATE_COLOR.completed
 								: "#8b949e";
-						const bg = isCurrent
-							? "#58a6ff22"
-							: isDone
-								? "#3fb9501a"
-								: "transparent";
+						const bg = isCurrent ? "#58a6ff22" : isDone ? "#3fb9501a" : "transparent";
 						return (
-							<fbox
-								key={node.name}
-								flexDirection="row"
-								gap={4}
-								alignItems="center"
-							>
+							<fbox key={node.name} flexDirection="row" gap={4} alignItems="center">
 								<fbox
 									cls={`wf-node ${node.state}`}
 									flexDirection="row"
@@ -535,13 +522,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 									bordered
 								>
 									<ficon
-										name={
-											isDone
-												? "check"
-												: isCurrent
-													? "loader-circle"
-													: "circle"
-										}
+										name={isDone ? "check" : isCurrent ? "loader-circle" : "circle"}
 										size={10}
 										color={color}
 										cls={isCurrent ? "spinner" : undefined}
@@ -679,11 +660,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 						<fbutton
 							variant="primary"
 							onClick={() =>
-								resolveCheckpointFromUi(
-									run.runId,
-									run.checkpointName ?? "",
-									true,
-								)
+								resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", true)
 							}
 						>
 							<fbox flexDirection="row" gap={4} alignItems="center">
@@ -696,11 +673,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 						<fbutton
 							variant="danger"
 							onClick={() =>
-								resolveCheckpointFromUi(
-									run.runId,
-									run.checkpointName ?? "",
-									false,
-								)
+								resolveCheckpointFromUi(run.runId, run.checkpointName ?? "", false)
 							}
 						>
 							<fbox flexDirection="row" gap={4} alignItems="center">
