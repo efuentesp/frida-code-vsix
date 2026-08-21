@@ -95,8 +95,7 @@ export function QuestionsPanel({ questions, onResult, initialTab }: Props) {
 								key: "complete",
 								label: "Completar pendientes →",
 								cls: "q-btn",
-								action: () =>
-									goToTab(firstMissingIndex >= 0 ? firstMissingIndex : 0),
+								action: () => goToTab(firstMissingIndex >= 0 ? firstMissingIndex : 0),
 							},
 							{
 								key: "skipSubmit",
@@ -478,20 +477,16 @@ export function QuestionsPanel({ questions, onResult, initialTab }: Props) {
 					{!allAnswered && (
 						<div className="q-review-warn-box">
 							<div className="q-review-warn-head">
-								<Codicon
-									name="warning"
-									size={13}
-									className="q-review-warn-icon"
-								/>
+								<Codicon name="warning" size={13} className="q-review-warn-icon" />
 								<span className="q-review-warn-title">
 									Faltan por responder ({questions.length - answeredCount} de{" "}
 									{questions.length})
 								</span>
 							</div>
 							<div className="q-review-warn-desc">
-								Preguntas pendientes: <strong>{missing.join(", ")}</strong>.
-								Puedes completar las preguntas pendientes para mayor precisión o
-								confirmar la omisión con el botón secundario.
+								Preguntas pendientes: <strong>{missing.join(", ")}</strong>. Puedes
+								completar las preguntas pendientes para mayor precisión o confirmar la
+								omisión con el botón secundario.
 							</div>
 						</div>
 					)}

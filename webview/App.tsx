@@ -678,7 +678,13 @@ export function App() {
 					</div>
 				)}
 				{activity && (
-					<div className="activity-line-wrap">
+					<div className={`activity-line-wrap is-${activity.kind}`}>
+						<div className="activity-spectrum-track" aria-hidden="true">
+							<div className="activity-bipolar-line" />
+							<div className="activity-bipolar-wave is-left" />
+							<div className="activity-bipolar-wave is-right" />
+							<div className="activity-bipolar-center" />
+						</div>
 						<div className={`activity-icon-beacon is-${activity.kind}`}>
 							<Codicon
 								name={activity.icon}
