@@ -5471,19 +5471,36 @@ kbd {
 .fbox.tone-active {
 	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.08));
 }
-/* Columna de filas del panel Todos: guía vertical única (border-left) que
-   reemplaza los caracteres de dibujo ├─└─│. Es CSS puro → no se desajusta al
-   cambiar fuente, zoom o ancho de ventana. El padding-left separa las filas
-   de la rama, como un árbol indentado. */
-.fbox.todo-rows {
-	border-left: 1px solid
-		var(--vscode-editorWhitespace-foreground, var(--vscode-descriptionForeground));
-	padding-left: 10px;
+/* Tree View Compacto de Tareas estilo VS Code Test Explorer (Propuesta 2) */
+.fbox.todo-tree-container {
+	padding: 2px 0 4px 6px;
+	font-size: 11.5px;
+	line-height: 1.4;
 }
-/* Sub-línea de activeForm: indentada bajo el glyph para leerse como anidada.
-   Padding fijo (robusto) en vez de alinear con un carácter │. */
-.fbox.todo-activeform {
-	padding-left: 16px;
+.fbox.todo-tree-row {
+	border-radius: 4px;
+	padding: 2px 4px;
+	transition: background 0.1s ease;
+}
+.fbox.todo-tree-row:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+.fbox.todo-tree-row.is-active {
+	background: var(
+		--vscode-list-inactiveSelectionBackground,
+		rgba(204, 167, 0, 0.08)
+	);
+}
+.todo-tree-branch {
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+	opacity: 0.45;
+	user-select: none;
+	font-size: 11px;
+}
+.todo-deps {
+	opacity: 0.7;
+	font-size: 10px;
+	font-variant-numeric: tabular-nums;
 }
 /* fmarkdown: contenedor con borde + scroll para previews side-by-side */
 .fbox .md {

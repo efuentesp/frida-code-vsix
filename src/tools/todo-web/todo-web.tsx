@@ -4,26 +4,20 @@
 // y se re-renderiza solo ante cada mutation del store reactivo vía
 // useSyncExternalStore(subscribeTodoState, getTodoState).
 //
-// Paridad visual con el TodoPanel nativo: header con count + indicador de
-// actividad, glifos ○/◐/✓, activeForm entre paréntesis en su propia línea (debajo del subject), dependencias (⛓ #id).
+// Propuesta 2: Tree View Compacto estilo VS Code Test Explorer / Explorer.
+// Header con count e icono de checklist, ramas tipo árbol (├─ / └─), iconos
+// nativos (circle-check verde, loader-circle ámbar con spin, circle gris),
+// visualización de activeForm y dependencias (⛓ #id).
 // Auto-hide: si no hay tareas visibles devuelve null → el reconciler envía
-// tree:null → el webview no renderiza nada (equivalente al setWidget(undefined)
-// de rpiv-todo cuando la lista está vacía).
+// tree:null → el webview no renderiza nada.
 //
-// Tags intrinsic de frida-webview (fbox/ftext), tipados en src/frida-webview/index.ts.
+// Tags intrinsic de frida-webview (fbox/ftext/ficon/fbutton), tipados en src/frida-webview/index.ts.
 
 import { useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import type { Task, TaskStatus } from "../todo/types";
 import { getHiddenIds, getTodoState, subscribeTodoState } from "./store";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
-
-const GLYPH: Record<TaskStatus, string> = {
-	pending: "○",
-	in_progress: "◐",
-	completed: "✓",
-	deleted: "✗",
-};
 
 // Color por estado (paleta temática VS Code):
 //   - pending: undefined → color por defecto (texto normal, legible).
@@ -56,24 +50,17 @@ function TodoWebPanel({
 	// muestra aunque esté en hiddenIds (status !== completed).
 	const tasks = state.tasks.filter(
 		(t) =>
-			t.status !== "deleted" &&
-			!(t.status === "completed" && hiddenIds.has(t.id)),
+			t.status !== "deleted" && !(t.status === "completed" && hiddenIds.has(t.id)),
 	);
 	// Auto-hide: sin tareas → null → tree:null → el webview no pinta el panel.
 	if (tasks.length === 0) return null;
 
 	const completed = tasks.filter((t) => t.status === "completed").length;
-	const hasActive = tasks.some(
-		(t) => t.status === "in_progress" || t.status === "pending",
-	);
-	// Tarea en progreso (el protocolo todo mantiene una sola in_progress a la
-	// vez). Cuando el panel está COLAPSADO mostramos su subject en el header
-	// (◐ ámbar) para dar contexto de qué se está haciendo sin expandir.
-	// Expandido / sin tarea en progreso → header sin cambios.
 	const activeTask = tasks.find((t) => t.status === "in_progress");
-	// Mostrar #id en cada fila sólo si alguna tarea tiene dependencias (blockedBy),
-	// para anclar las referencias ⛓ #N (paridad con rpiv-todo selectShowTaskIds).
-	const showIds = tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
+	const allDone = completed === tasks.length;
+	// Mostrar #id en cada fila si hay más de 1 tarea o si alguna tiene dependencias (blockedBy)
+	const showIds =
+		tasks.length > 1 || tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
 	return (
 		<CollapsiblePanel
@@ -82,29 +69,41 @@ function TodoWebPanel({
 			padding={6}
 			header={
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext>{hasActive ? "●" : "○"}</ftext>
-					<ftext bold>Todos</ftext>
-					<ftext>
+					<ficon
+						name="list-checks"
+						size={13}
+						color="var(--vscode-textLink-foreground, #4daafc)"
+					/>
+					<ftext bold>Tareas</ftext>
+					<ftext color="var(--vscode-descriptionForeground)">
 						({completed}/{tasks.length})
 					</ftext>
 					{collapsed && activeTask ? (
 						<ftext color="var(--vscode-list-warningForeground, #cca700)">
-							◐ {activeTask.subject}
+							◐ {activeTask.activeForm || activeTask.subject}
+						</ftext>
+					) : collapsed && allDone ? (
+						<ftext color="var(--vscode-testing-iconPassed, #73c991)">
+							✓ Todas completadas
 						</ftext>
 					) : null}
-					{/* #66: re-sincronizar — replay + conciliación manual (el panel puede
-					    acumular stale si el modelo no cierra tareas; ver issue). */}
+					{/* #66: re-sincronizar — replay + conciliación manual */}
 					{onRefresh ? (
 						<fbutton variant="secondary" onClick={onRefresh}>
-							↻
+							<ficon name="rotate-cw" size={11} />
 						</fbutton>
 					) : null}
 				</fbox>
 			}
 		>
-			<fbox flexDirection="column" gap={4} cls="todo-rows">
-				{tasks.map((t) => (
-					<TaskRow key={t.id} task={t} showIds={showIds} />
+			<fbox flexDirection="column" gap={2} cls="todo-tree-container">
+				{tasks.map((t, i) => (
+					<TaskRow
+						key={t.id}
+						task={t}
+						showIds={showIds}
+						isLast={i === tasks.length - 1}
+					/>
 				))}
 			</fbox>
 		</CollapsiblePanel>
@@ -114,48 +113,84 @@ function TodoWebPanel({
 function TaskRow({
 	task,
 	showIds,
+	isLast,
 }: {
 	task: Task;
 	showIds: boolean;
+	isLast: boolean;
 }): ReactElement {
 	const active = task.status === "in_progress";
 	const done = task.status === "completed";
 	const statusColor = STATUS_COLOR[task.status];
-	// El activeForm (present-continuous, p.ej. "Formulando preguntas…") va en su
-	// propia línea debajo del subject, indentada (padding-left) para leerse como
-	// sub-línea. Antes compartía fila con el subject y se desalineaba en ventanas
-	// angostas; el indent CSS es robusto sin importar fuente/zoom/ancho.
-	const showActiveForm = active && !!task.activeForm;
+	const branchGuide = isLast ? "└─" : "├─";
+
 	return (
-		<fbox flexDirection="column" gap={2} tone={active ? "active" : "default"}>
-			{/* Línea 1: glyph + (#id) + subject + (deps). Sin caracteres de rama: la
-			    guía vertical la dibuja el contenedor .todo-rows (border-left CSS). */}
+		<fbox
+			flexDirection="column"
+			gap={1}
+			cls={`todo-tree-row${active ? " is-active" : ""}`}
+			tone={active ? "active" : "default"}
+		>
 			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext color={statusColor}>{GLYPH[task.status]}</ftext>
+				<ftext
+					color="var(--vscode-tree-indentGuidesStroke, var(--vscode-descriptionForeground))"
+					cls="todo-tree-branch"
+				>
+					{branchGuide}
+				</ftext>
+				{done ? (
+					<ficon
+						name="circle-check"
+						size={12}
+						color="var(--vscode-testing-iconPassed, #73c991)"
+					/>
+				) : active ? (
+					<ficon
+						name="loader-circle"
+						size={12}
+						color="var(--vscode-list-warningForeground, #cca700)"
+						cls="spin"
+					/>
+				) : task.status === "deleted" ? (
+					<ficon
+						name="circle-x"
+						size={12}
+						color="var(--vscode-errorForeground, #f85149)"
+					/>
+				) : (
+					<ficon
+						name="circle"
+						size={12}
+						color="var(--vscode-descriptionForeground)"
+					/>
+				)}
+
 				{showIds ? (
-					<ftext color="var(--vscode-descriptionForeground)">#{task.id}</ftext>
+					<ftext color="var(--vscode-descriptionForeground)" size={11}>
+						#{task.id}
+					</ftext>
 				) : null}
+
 				<ftext bold={active} color={statusColor} strike={done}>
 					{task.subject}
 				</ftext>
-				{task.blockedBy && task.blockedBy.length > 0 ? (
-					<ftext>⛓ {task.blockedBy.map((id) => `#${id}`).join(",")}</ftext>
-				) : null}
-			</fbox>
-			{/* Línea 2 (sólo en progreso con activeForm): sub-línea muteada, indentada
-			    bajo el glyph vía .todo-activeform (padding-left). */}
-			{showActiveForm ? (
-				<fbox
-					cls="todo-activeform"
-					flexDirection="row"
-					gap={6}
-					alignItems="center"
-				>
-					<ftext color="var(--vscode-descriptionForeground)" size={12} wrap>
+
+				{active && task.activeForm ? (
+					<ftext color="var(--vscode-descriptionForeground)" size={11}>
 						({task.activeForm})
 					</ftext>
-				</fbox>
-			) : null}
+				) : null}
+
+				{task.blockedBy && task.blockedBy.length > 0 ? (
+					<ftext
+						color="var(--vscode-descriptionForeground)"
+						size={10}
+						cls="todo-deps"
+					>
+						(⛓ {task.blockedBy.map((id) => `#${id}`).join(",")})
+					</ftext>
+				) : null}
+			</fbox>
 		</fbox>
 	);
 }

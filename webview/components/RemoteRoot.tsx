@@ -15,6 +15,8 @@ import {
 	Coins,
 	FileText,
 	Hourglass,
+	ListChecks,
+	ListTodo,
 	LoaderCircle,
 	Pin,
 	PinOff,
@@ -47,6 +49,8 @@ const F_ICONS: Record<string, LucideIcon> = {
 	coins: Coins,
 	"file-text": FileText,
 	hourglass: Hourglass,
+	"list-checks": ListChecks,
+	"list-todo": ListTodo,
 	pin: Pin,
 	"pin-off": PinOff,
 	"trash-2": Trash2,
@@ -144,8 +148,7 @@ function flexStyle(props: Record<string, unknown>): CSSProperties {
 	if (typeof props.flex === "number") s.flex = props.flex;
 	if (typeof props.gap === "number") s.gap = props.gap;
 	if (typeof props.padding === "number") s.padding = props.padding;
-	if (typeof props.paddingLeft === "number")
-		s.paddingLeft = props.paddingLeft;
+	if (typeof props.paddingLeft === "number") s.paddingLeft = props.paddingLeft;
 	if (typeof props.margin === "number") s.margin = props.margin;
 	if (typeof props.alignItems === "string")
 		s.alignItems = props.alignItems as any;
@@ -285,9 +288,7 @@ function renderNode(
 			if (typeof node.props.strokeWidth === "number")
 				ip.strokeWidth = node.props.strokeWidth;
 			const cls =
-				typeof node.props.cls === "string" && node.props.cls
-					? node.props.cls
-					: "";
+				typeof node.props.cls === "string" && node.props.cls ? node.props.cls : "";
 			if (cls) ip.className = cls;
 			return <Icon {...ip} />;
 		}

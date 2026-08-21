@@ -112,7 +112,8 @@ Ticker al lado del composer.
 					},
 					{
 						kind: "text",
-						text: "### Propuesta 1: Usar Redux\n### Propuesta 2: Usar Zustand\n¿Cuál elegimos?",
+						text:
+							"### Propuesta 1: Usar Redux\n### Propuesta 2: Usar Zustand\n¿Cuál elegimos?",
 					},
 				],
 			}),

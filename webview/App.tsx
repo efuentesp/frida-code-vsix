@@ -8,14 +8,7 @@ import {
 	type ReactNode,
 } from "react";
 import { reduce, initialState } from "./store";
-import type {
-	ApprovalMode,
-	InMessage,
-	OutMessage,
-	RetryState,
-	ToastLevel,
-	ToolEntry,
-} from "./types";
+import type { ApprovalMode, InMessage, OutMessage, ToastLevel } from "./types";
 import { fmtTokens, formatDuration } from "./format";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { TurnView } from "./components/Turn";
@@ -52,8 +45,7 @@ import { Icon } from "./components/Icon";
 import { Codicon } from "./components/Codicon";
 import { Followups } from "./components/Followups";
 import { getContextualFollowups } from "./followup-rules";
-import { extractLastThought } from "./turn-grouping";
-import { getToolPhrase } from "./tool-phrases";
+import { formatCurrentActivity } from "./activity-formatter";
 
 type VsCodeApi = { postMessage(msg: OutMessage): void };
 
@@ -296,121 +288,17 @@ export function App() {
 		setElapsedSeconds("");
 	}, [state.busy, state.isCompacting, activityStart]);
 
-	// Información dinámica en tiempo real sobre la actividad en curso (Propuesta A)
-	const activityInfo = (() => {
-		if (state.retry) {
-			const secs = retrySecs ?? Math.ceil(state.retry.delayMs / 1000);
-			return {
-				icon: "sync" as const,
-				spin: true,
-				verb: "Reintentando:",
-				detail: `intento ${state.retry.attempt}/${state.retry.maxAttempts} en ${secs}s… (doble Esc para cancelar)`,
-				kind: "retry" as const,
-				canCancel: false,
-			};
-		}
-		if (state.isCompacting) {
-			const retryState = state.retry as RetryState | null | undefined;
-			const retryMsg = retryState
-				? `reintentando compactación (${retryState.attempt}/${retryState.maxAttempts}) en ${retrySecs ?? Math.ceil(retryState.delayMs / 1000)}s…`
-				: `compactando historial de la sesión${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`;
-			return {
-				icon: "database" as const,
-				spin: true,
-				verb: "Contexto:",
-				detail: retryMsg,
-				kind: "compacting" as const,
-				canCancel: true,
-			};
-		}
-		if (!state.busy) {
-			const bg = state.backgroundRunning ?? 0;
-			if (bg > 0)
-				return {
-					icon: "hubot" as const,
-					spin: false,
-					verb: "Subagentes:",
-					detail: `${bg} agente${bg === 1 ? "" : "s"} en segundo plano…`,
-					kind: "subagent" as const,
-					canCancel: false,
-				};
-			return null;
-		}
-
-		const last = state.turns[state.turns.length - 1];
-		if (last?.bash?.status === "running") {
-			return {
-				icon: "terminal" as const,
-				spin: false,
-				verb: "Terminal:",
-				detail: last.bash.command || "ejecutando comando…",
-				kind: "bash" as const,
-				canCancel: false,
-			};
-		}
-
-		if (last?.status === "executing" || last?.executingTool) {
-			const runningToolSeg = last.segments.find(
-				(s): s is { kind: "tool" } & ToolEntry =>
-					s.kind === "tool" && s.state === "running",
-			);
-			const activeTool: ToolEntry | undefined =
-				runningToolSeg ??
-				(last.executingTool
-					? {
-							tool: last.executingTool,
-							state: "running" as const,
-							startedAt: Date.now(),
-							args: {},
-						}
-					: undefined);
-			if (activeTool) {
-				const phrase = getToolPhrase(activeTool);
-				return {
-					icon: phrase.iconName || "tools",
-					spin: false,
-					verb: `${phrase.verb}:`,
-					detail: phrase.arg || phrase.detail || "ejecutando herramienta…",
-					kind: "tool" as const,
-					canCancel: false,
-				};
-			}
-			return {
-				icon: "tools" as const,
-				spin: false,
-				verb: "Ejecutando:",
-				detail: last.executingTool ?? "herramienta…",
-				kind: "tool" as const,
-				canCancel: false,
-			};
-		}
-
-		const thinkingSeg = last?.segments.find(
-			(s): s is { kind: "thinking"; text: string; startedAt: number } =>
-				s.kind === "thinking",
-		);
-
-		if (last?.status === "thinking" || thinkingSeg) {
-			const thought = extractLastThought(thinkingSeg?.text);
-			return {
-				icon: "sparkle" as const,
-				spin: false,
-				verb: "Razonando:",
-				detail: thought ? `«${thought}»` : "analizando contexto…",
-				kind: "thinking" as const,
-				canCancel: false,
-			};
-		}
-
-		return {
-			icon: "loading" as const,
-			spin: true,
-			verb: "Procesando:",
-			detail: "generando respuesta…",
-			kind: "default" as const,
-			canCancel: false,
-		};
-	})();
+	// Información dinámica y legible en tiempo real sobre la actividad en curso
+	const lastTurn = state.turns[state.turns.length - 1];
+	const activity = formatCurrentActivity(
+		lastTurn,
+		state.busy,
+		state.isCompacting,
+		state.compactReason,
+		state.retry,
+		state.backgroundRunning,
+		retrySecs,
+	);
 
 	// Roots de diálogo en el slot del composer (ask_user_question): reemplazan
 	// el input como las aprobaciones. placement "composer" (distinto de "footer"
@@ -798,28 +686,31 @@ export function App() {
 						</button>
 					</div>
 				)}
-				{activityInfo && (
+				{activity && (
 					<div className="activity-line-wrap">
 						<Codicon
-							name={activityInfo.icon}
+							name={activity.icon}
 							size={13}
 							className={
-								`activity-icon is-${activityInfo.kind}` +
-								(activityInfo.spin
+								`activity-icon is-${activity.kind}` +
+								(activity.spin
 									? " codicon-modifier-spin"
-									: activityInfo.kind === "thinking"
+									: activity.kind === "thinking"
 										? " tc-sparkle-spin"
 										: "")
 							}
 						/>
-						<span className="activity-verb tc-shimmer">{activityInfo.verb}</span>
-						{activityInfo.detail && (
-							<span className="activity-detail">{activityInfo.detail}</span>
+						<span className="activity-verb tc-shimmer">{activity.verb}</span>
+						{activity.target && (
+							<span className="activity-target">{activity.target}</span>
+						)}
+						{activity.parentDir && (
+							<span className="activity-parent">{activity.parentDir}</span>
 						)}
 						{elapsedSeconds && (
 							<span className="activity-timer">· {elapsedSeconds}</span>
 						)}
-						{activityInfo.canCancel && (
+						{activity.canCancel && (
 							<button
 								type="button"
 								className="activity-cancel-link"
