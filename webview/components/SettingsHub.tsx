@@ -143,8 +143,9 @@ export function SettingsHub({
 										})
 									}
 								/>
-						))}
-						{(state.resources?.modules ?? []).filter((m) => !m.toggleable).length > 0 && (
+							))}
+						{(state.resources?.modules ?? []).filter((m) => !m.toggleable).length >
+							0 && (
 							<>
 								<div className="cfg-section">Módulos base (siempre activos)</div>
 								{(state.resources?.modules ?? [])
@@ -283,8 +284,8 @@ function ToolAccordionRow({
 				<div className="tool-acc-body">
 					{on ? null : (
 						<div className="tool-res-off">
-							Desactivado: la sesión se recarga al mover el toggle; los
-							recursos listados reaparecen al reactivarlo.
+							Desactivado: la sesión se recarga al mover el toggle; los recursos
+							listados reaparecen al reactivarlo.
 						</div>
 					)}
 					<ResLine label="Tools" items={res.tools} />

@@ -1,9 +1,57 @@
 import { useState } from "react";
-import { Brain, Key, Lightbulb, RotateCw } from "lucide-react";
+import { Codicon } from "./Codicon";
 import logo from "../assets/frida-logo.png";
 
-// Cada característica se renderiza como JSX (no markdown) para resaltar atajos con <code>/<kbd>.
-// El mismo contenido se reutiliza para el "tip del día" y para la lista completa de instrucciones.
+interface StarterCard {
+	id: string;
+	title: string;
+	desc: string;
+	iconName: string;
+	prompt: string;
+	actionType?: "submit" | "insert";
+}
+
+const STARTER_CARDS: StarterCard[] = [
+	{
+		id: "aidd-plan",
+		title: "Planificar con AiDD",
+		desc: "Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
+		iconName: "rocket",
+		prompt: "/wf aidd-plan ",
+		actionType: "insert",
+	},
+	{
+		id: "tea-test",
+		title: "Diseñar Pruebas (TEA)",
+		desc: "Diseña la matriz de pruebas por escenarios y criterios de aceptación.",
+		iconName: "beaker",
+		prompt: "Ejecuta el workflow tea-test-design para diseñar las pruebas del proyecto.",
+		actionType: "submit",
+	},
+	{
+		id: "codebase-audit",
+		title: "Auditar Codebase",
+		desc: "Inspecciona calidad, modularidad, patrones de reuso y consistencia.",
+		iconName: "search-sparkle",
+		prompt: "Realiza una auditoría integral del código en src/",
+		actionType: "submit",
+	},
+	{
+		id: "explain-arch",
+		title: "Explicar Arquitectura",
+		desc: "Explica la estructura, módulos principales y flujo de datos del workspace.",
+		iconName: "symbol-structure",
+		prompt: "Explica la arquitectura y componentes clave de este proyecto.",
+		actionType: "submit",
+	},
+];
+
+const SHORTCUTS = [
+	{ label: "@archivos", text: "@", iconName: "file" },
+	{ label: "/workflows", text: "/wf ", iconName: "gear" },
+	{ label: "$skills", text: "$", iconName: "sparkle" },
+];
+
 interface Feature {
 	key: string;
 	title: string;
@@ -36,27 +84,23 @@ const FEATURES: Feature[] = [
 	},
 	{
 		key: "slash",
-		title: "Comandos /",
+		title: "Comandos / y Workflows",
 		body: (
 			<>
-				<em>skills</em> y <em>prompts</em>, además de acciones{" "}
-				<code>/compact</code> <code>/reload</code> <code>/new</code>{" "}
-				<code>/model</code> <code>/login</code> <code>/name</code>{" "}
-				<code>/copy</code> <code>/clone</code> <code>/fork</code>{" "}
-				<code>/help</code>. Filtra escribiendo, <kbd>↑</kbd>/<kbd>↓</kbd>{" "}
-				navega, <kbd>Enter</kbd> selecciona.
+				usa <code>/wf aidd-plan</code>, <code>/wf aidd-ship</code> o escribe{" "}
+				<code>/</code> para ver comandos rápidos como <code>/compact</code>,{" "}
+				<code>/reload</code>, <code>/model</code> o <code>/login</code>.
 			</>
 		),
 	},
 	{
 		key: "send",
-		title: "Envío",
+		title: "Envío y atajos",
 		body: (
 			<>
 				<kbd>Enter</kbd> envía · <kbd>Shift</kbd>+<kbd>Enter</kbd> salto de
 				línea · <kbd>Alt</kbd>+<kbd>Enter</kbd> encola un <em>follow-up</em>.{" "}
-				<kbd>↑</kbd>/<kbd>↓</kbd> recupera mensajes anteriores. Botón{" "}
-				<strong>expandir</strong> para prompts largos.
+				<kbd>↑</kbd>/<kbd>↓</kbd> recupera mensajes anteriores.
 			</>
 		),
 	},
@@ -65,34 +109,9 @@ const FEATURES: Feature[] = [
 		title: "Contexto y razonamiento",
 		body: (
 			<>
-				la barra inferior muestra uso del contexto y tokens (
-				<code>↑↓ RW CH</code>). Botón de razonamiento (<Brain size={12} />) para
-				ocultar/mostrar el <em>thinking</em>; <code>/compact</code> resume el
-				contexto y se puede cancelar.
-			</>
-		),
-	},
-	{
-		key: "model",
-		title: "Modelos y sesión",
-		body: (
-			<>
-				elige proveedor/modelo en el selector (Softtek o GitHub Copilot, con{" "}
-				<code>/login</code> para suscripciones); botón API key (
-				<Key size={12} />) para rotarla. Copia cualquier turno con su icono.{" "}
-				<code>/fork</code> y <code>/clone</code> bifurcan la conversación.
-			</>
-		),
-	},
-	{
-		key: "resources",
-		title: "Recursos",
-		body: (
-			<>
-				<em>skills</em>, <em>prompts</em> y extensiones se cargan de{" "}
-				<code>~/.frida</code> (global) y <code>.pi</code> (proyecto). Botón{" "}
-				<strong>Recursos</strong> para verlos; <strong>Recargar</strong> tras
-				añadirlos.
+				la barra inferior muestra uso del contexto y tokens. El botón de
+				razonamiento permite alternar el <em>thinking</em>; <code>/compact</code>{" "}
+				resume el contexto.
 			</>
 		),
 	},
@@ -101,15 +120,9 @@ const FEATURES: Feature[] = [
 		title: "Aprobaciones y seguridad",
 		body: (
 			<>
-				Frida pide confirmar <strong>ediciones</strong>, <strong>bash</strong> y
-				tools desconocidos. Cambia de modo con el botón de modo:{" "}
-				<strong>manual</strong> (pregunta todo), <strong>auto-edit</strong>{" "}
-				(deja pasar ediciones) y <strong>auto</strong> (no pregunta… salvo lo
-				crítico: bloquea <code>.env</code>/claves y <code>rm -rf /</code>, y
-				sigue pidiendo para bash con <code>sudo</code>/<code>&&</code> o rutas
-				fuera del workspace). Cada decisión se <strong>audita</strong> en{" "}
-				<code>approval-logs/approvals.jsonl</code>. Patrones propios: settings{" "}
-				<code>frida.gates.*</code>.
+				Frida pide confirmar <strong>ediciones</strong> y <strong>bash</strong>.
+				Cambia de modo con el botón de escudo: <strong>manual</strong>,{" "}
+				<strong>auto-edit</strong> o <strong>YOLO (auto)</strong>.
 			</>
 		),
 	},
@@ -118,14 +131,20 @@ const FEATURES: Feature[] = [
 		title: "Detener respuesta",
 		body: (
 			<>
-				pulsa <kbd>Esc</kbd> dos veces para detener una respuesta en curso.
+				haz clic en el botón circular <strong>■</strong> o presiona{" "}
+				<kbd>Esc</kbd> dos veces para detener inmediatamente.
 			</>
 		),
 	},
 ];
 
-export function Welcome() {
-	// Un tip aleatorio al cargar; no cambia salvo que el usuario lo pida.
+export function Welcome({
+	onPrompt,
+	onInsert,
+}: {
+	onPrompt?: (text: string) => void;
+	onInsert?: (text: string) => void;
+}) {
 	const [tipIndex, setTipIndex] = useState(() =>
 		Math.floor(Math.random() * FEATURES.length),
 	);
@@ -141,20 +160,66 @@ export function Welcome() {
 
 	const tip = FEATURES[tipIndex];
 
+	const handleCardClick = (card: StarterCard) => {
+		if (card.actionType === "insert" && onInsert) {
+			onInsert(card.prompt);
+		} else if (onPrompt) {
+			onPrompt(card.prompt);
+		}
+	};
+
 	return (
 		<div className="welcome">
 			<div className="welcome-logo">
 				<img src={logo} className="welcome-logo-img" alt="Frida Code" />
 			</div>
-			<h1>Frida Code (Softtek)</h1>
+			<h1>Frida Code</h1>
 			<p className="welcome-sub">
-				Frida Code es un asistente de codificación con IA creado por la VEU de AppDev. Pídele que construya funciones, corrija errores o explique tu base de código.
+				Asistente inteligente de código de Softtek AppDev. ¿En qué podemos trabajar hoy?
 			</p>
+
+			<div className="welcome-shortcuts">
+				{SHORTCUTS.map((s) => (
+					<button
+						key={s.label}
+						type="button"
+						className="welcome-shortcut-btn"
+						onClick={() => onInsert?.(s.text)}
+					>
+						<Codicon name={s.iconName} size={12} />
+						<span>{s.label}</span>
+					</button>
+				))}
+			</div>
+
+			<div className="welcome-cards">
+				{STARTER_CARDS.map((c) => (
+					<div
+						key={c.id}
+						className="starter-card"
+						onClick={() => handleCardClick(c)}
+						role="button"
+						tabIndex={0}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								handleCardClick(c);
+							}
+						}}
+					>
+						<div className="starter-card-head">
+							<Codicon name={c.iconName} size={15} className="starter-card-icon" />
+							<span>{c.title}</span>
+						</div>
+						<p className="starter-card-desc">{c.desc}</p>
+					</div>
+				))}
+			</div>
 
 			<div className="tip-day">
 				<div className="tip-day-label">
 					<span>
-						<Lightbulb size={12} /> Tip del día
+						<Codicon name="lightbulb" size={12} /> Tip del día
 					</span>
 					<button
 						className="tip-day-refresh"
@@ -162,7 +227,7 @@ export function Welcome() {
 						title="Ver otro tip"
 						aria-label="Ver otro tip"
 					>
-						<RotateCw size={13} />
+						<Codicon name="refresh" size={13} />
 					</button>
 				</div>
 				<p className="tip-day-body">
@@ -171,7 +236,7 @@ export function Welcome() {
 			</div>
 
 			<details className="welcome-help">
-				<summary>Ver todas las instrucciones</summary>
+				<summary>Instrucciones y atajos</summary>
 				<ul className="tips">
 					{FEATURES.map((f) => (
 						<li key={f.key}>

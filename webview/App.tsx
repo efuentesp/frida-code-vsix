@@ -98,9 +98,7 @@ export function App() {
 	// Scope del listado de sesiones: 'project' filtra por el cwd del workspace;
 	// 'all' muestra todas. Recuerda la elección durante la sesión (estado en App,
 	// no por-panel) y se reenvía al backend al alternar el toggle.
-	const [sessionScope, setSessionScope] = useState<"project" | "all">(
-		"project",
-	);
+	const [sessionScope, setSessionScope] = useState<"project" | "all">("project");
 	const [modelsOpen, setModelsOpen] = useState(false);
 	const [forkOpen, setForkOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
@@ -192,9 +190,7 @@ export function App() {
 	// se ocultaba durante un approval y el doble-Esc estaba pausado).
 	useEffect(() => {
 		if (!state.busy) {
-			diagLog(
-				`listener Esc DESACTIVADO (busy=false) — el doble-Esc no disparará`,
-			);
+			diagLog(`listener Esc DESACTIVADO (busy=false) — el doble-Esc no disparará`);
 			setEscHint(false);
 			return;
 		}
@@ -275,9 +271,7 @@ export function App() {
 		setRetrySecs(Math.ceil(total / 1000));
 		const start = Date.now();
 		const id = setInterval(() => {
-			setRetrySecs(
-				Math.max(0, Math.ceil((total - (Date.now() - start)) / 1000)),
-			);
+			setRetrySecs(Math.max(0, Math.ceil((total - (Date.now() - start)) / 1000)));
 		}, 250);
 		return () => clearInterval(id);
 	}, [state.retry]);
@@ -369,14 +363,9 @@ export function App() {
 						side="bottom"
 					>
 						<span
-							className={
-								"lens-badge" + (state.lensStatus.active ? " active" : "")
-							}
+							className={"lens-badge" + (state.lensStatus.active ? " active" : "")}
 						>
-							<Icon
-								name={state.lensStatus.active ? "check" : "circle"}
-								size={12}
-							/>
+							<Icon name={state.lensStatus.active ? "check" : "circle"} size={12} />
 						</span>
 					</Tooltip>
 				)}
@@ -387,9 +376,7 @@ export function App() {
 					>
 						<button
 							className="sub-version"
-							onClick={() =>
-								post({ type: "submit", text: "/update", mode: "steer" })
-							}
+							onClick={() => post({ type: "submit", text: "/update", mode: "steer" })}
 						>
 							v{state.version}
 						</button>
@@ -469,17 +456,13 @@ export function App() {
 						<button
 							className={"ico" + (ctxWarn ? " warn" : "")}
 							onClick={() => post({ type: "compact" })}
-							disabled={
-								state.busy || state.isCompacting || state.turns.length === 0
-							}
+							disabled={state.busy || state.isCompacting || state.turns.length === 0}
 						>
 							<Codicon name="collapse-all" size={15} />
 						</button>
 					</Tooltip>
 					<Tooltip
-						label={
-							hideThinking ? "Mostrar razonamiento" : "Ocultar razonamiento"
-						}
+						label={hideThinking ? "Mostrar razonamiento" : "Ocultar razonamiento"}
 						side="bottom"
 					>
 						<button
@@ -520,15 +503,15 @@ export function App() {
 
 			{state.mode === "auto-edit" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> Edición automática: crear/editar archivos
-					sin confirmación (bash sí pide).
+					<TriangleAlert size={12} /> Edición automática: crear/editar archivos sin
+					confirmación (bash sí pide).
 				</div>
 			)}
 			{state.mode === "auto" && (
 				<div className="info-bar warn">
-					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte
-					confirmación (edit/write/bash, incl. comandos compuestos y rutas
-					externas). Detén con el botón Detener o doble Esc.
+					<TriangleAlert size={12} /> YOLO ON: TODO corre sin pedirte confirmación
+					(edit/write/bash, incl. comandos compuestos y rutas externas). Detén con el
+					botón Detener o doble Esc.
 				</div>
 			)}
 			{escHint && (
@@ -542,13 +525,22 @@ export function App() {
 				onScroll={() => {
 					const el = logRef.current;
 					if (!el) return;
-					const atBottom =
-						el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+					const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 					stickRef.current = atBottom;
 					setStick(atBottom);
 				}}
 			>
-				{state.turns.length === 0 && <Welcome />}
+				{state.turns.length === 0 && (
+					<Welcome
+						onPrompt={(text) => post({ type: "submit", text, mode: "steer" })}
+						onInsert={(text) =>
+							dispatch({
+								type: "composer_insert",
+								text,
+							})
+						}
+					/>
+				)}
 				{state.compactions
 					.filter((c) => c.afterTurnId === null)
 					.map((c) => (
@@ -561,9 +553,7 @@ export function App() {
 					<Fragment key={t.id}>
 						<TurnView
 							turn={t}
-							live={
-								state.busy && t.id === state.turns[state.turns.length - 1]?.id
-							}
+							live={state.busy && t.id === state.turns[state.turns.length - 1]?.id}
 							hideThinking={hideThinking}
 							onCopy={(text) => post({ type: "copy_text", text })}
 						/>
@@ -611,16 +601,13 @@ export function App() {
 									ref: "ref" in a ? a.ref : undefined,
 									value: a.kind === "mkt_add" ? a.value : undefined,
 									name:
-										(a.kind === "mkt_remove" || a.kind === "mkt_update") &&
-										"name" in a
+										(a.kind === "mkt_remove" || a.kind === "mkt_update") && "name" in a
 											? a.name
 											: undefined,
 									source: a.kind === "retry" ? a.source : undefined,
 								})
 							}
-							onRowMeta={(id, ref) =>
-								post({ type: "ccplugins_row_meta", id, ref })
-							}
+							onRowMeta={(id, ref) => post({ type: "ccplugins_row_meta", id, ref })}
 							onClose={(id) => post({ type: "ccplugins_panel_close", id })}
 						/>
 					) : null}
@@ -653,22 +640,22 @@ export function App() {
 							}
 							onClose={(id) => post({ type: "sandbox_panel_close", id })}
 						/>
-				) : null}
-				{state.dtPanel ? (
-					<DetachedPanel
-						panel={state.dtPanel}
-						onAction={(id, a) =>
-							post({
-								type: "detached_panel_action",
-								id,
-								action: a.kind,
-								runId: "runId" in a ? a.runId : undefined,
-							})
-						}
-						onClose={(id) => post({ type: "detached_panel_close", id })}
-					/>
-				) : null}
-				{Object.entries(state.webRoots ?? {})
+					) : null}
+					{state.dtPanel ? (
+						<DetachedPanel
+							panel={state.dtPanel}
+							onAction={(id, a) =>
+								post({
+									type: "detached_panel_action",
+									id,
+									action: a.kind,
+									runId: "runId" in a ? a.runId : undefined,
+								})
+							}
+							onClose={(id) => post({ type: "detached_panel_close", id })}
+						/>
+					) : null}
+					{Object.entries(state.webRoots ?? {})
 						.filter(([, r]) => r.placement === "overlay" && r.tree)
 						.map(([id, r]) => (
 							<RemoteRoot
@@ -792,9 +779,7 @@ export function App() {
 											})
 										}
 									>
-										{mc.source === "auto-detected"
-											? "Volver al anterior"
-											: "Cancelar"}
+										{mc.source === "auto-detected" ? "Volver al anterior" : "Cancelar"}
 									</button>
 								</div>
 							</div>
@@ -810,9 +795,7 @@ export function App() {
 								key={a.id}
 								approval={a}
 								active={i === 0}
-								onRespond={(r) =>
-									post({ type: "approval_response", id: a.id, ...r })
-								}
+								onRespond={(r) => post({ type: "approval_response", id: a.id, ...r })}
 							/>
 						))}
 					</div>
@@ -872,9 +855,7 @@ export function App() {
 							post({ type: "select_model", provider, model: modelId })
 						}
 						onSetThinking={(level) => post({ type: "set_thinking", level })}
-						onCycleMode={() =>
-							post({ type: "set_mode", mode: nextMode(state.mode) })
-						}
+						onCycleMode={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
 					/>
 				)}
 				<WorkspaceBar
@@ -904,9 +885,7 @@ export function App() {
 						post({ type: "switch_session", path: p });
 						setSessionsOpen(false);
 					}}
-					onRename={(p, n) =>
-						post({ type: "rename_session", path: p, name: n })
-					}
+					onRename={(p, n) => post({ type: "rename_session", path: p, name: n })}
 					onDelete={(p) => post({ type: "delete_session", path: p })}
 				/>
 			)}

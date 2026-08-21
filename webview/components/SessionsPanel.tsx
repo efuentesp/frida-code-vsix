@@ -127,9 +127,7 @@ export function SessionsPanel({
 									</div>
 								) : confirming === s.path ? (
 									<div className="session-confirm">
-										<span className="session-confirm-msg">
-											¿Eliminar esta sesión?
-										</span>
+										<span className="session-confirm-msg">¿Eliminar esta sesión?</span>
 										<button className="sec" onClick={() => setConfirming(null)}>
 											Cancelar
 										</button>
@@ -163,9 +161,7 @@ export function SessionsPanel({
 												{showProj && (
 													<>
 														{" · "}
-														<span className="session-proj">
-															📁 {projLabel(s.cwd)}
-														</span>
+														<span className="session-proj">📁 {projLabel(s.cwd)}</span>
 													</>
 												)}
 												{" · "}
@@ -178,8 +174,7 @@ export function SessionsPanel({
 												<div className="session-stats-line">
 													<span>⏱ {formatDuration(s.durationMs ?? 0)}</span>
 													<span className="ss-tokens">
-														↑{fmtTokens(s.inputTotal ?? 0)} ↓
-														{fmtTokens(s.outputTotal ?? 0)}
+														↑{fmtTokens(s.inputTotal ?? 0)} ↓{fmtTokens(s.outputTotal ?? 0)}
 													</span>
 												</div>
 											)}
@@ -197,9 +192,7 @@ export function SessionsPanel({
 										</Tooltip>
 										<Tooltip
 											label={
-												isCurrent
-													? "No puedes eliminar la sesión activa"
-													: "Eliminar"
+												isCurrent ? "No puedes eliminar la sesión activa" : "Eliminar"
 											}
 											side="top"
 										>
