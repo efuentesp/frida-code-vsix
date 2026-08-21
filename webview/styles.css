@@ -3085,12 +3085,12 @@ button.sec:hover {
 	color: var(--vscode-foreground);
 }
 
-/* Línea de Actividad Fluida Integrada (Propuesta A: Copilot Chat Fluid Activity) */
+/* Línea de Actividad Fluida Integrada (Propuesta 3: Shimmer Sweep + Beacon Pulse) */
 .activity-line-wrap {
 	display: flex;
 	align-items: center;
 	justify-content: flex-start;
-	gap: 6px;
+	gap: 6.5px;
 	padding: 4px 12px 6px 12px;
 	font-size: 11.5px;
 	line-height: 1.3;
@@ -3113,32 +3113,122 @@ button.sec:hover {
 	}
 }
 
-.activity-icon {
-	flex-shrink: 0;
-	color: var(--vscode-textLink-foreground, #4daafc);
-	display: flex;
+/* Faro de pulso en el ícono (Beacon) */
+.activity-icon-beacon {
+	position: relative;
+	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--vscode-textLink-foreground, #4daafc);
 }
-.activity-icon.is-tool {
+.activity-icon-beacon.is-tool {
 	color: var(--vscode-symbolIcon-functionForeground, #b180d7);
 }
-.activity-icon.is-bash {
+.activity-icon-beacon.is-bash {
 	color: var(--vscode-charts-green, #73c991);
 }
-.activity-icon.is-compacting {
+.activity-icon-beacon.is-compacting {
 	color: var(--vscode-editorWarning-foreground, #cca700);
 }
-.activity-icon.is-retry {
+.activity-icon-beacon.is-retry {
 	color: var(--vscode-errorForeground, #f85149);
 }
-.activity-icon.is-subagent {
+.activity-icon-beacon.is-subagent {
 	color: var(--vscode-charts-purple, #b180d7);
+}
+.activity-icon-beacon.is-thinking {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+
+.activity-beacon-ring {
+	position: absolute;
+	inset: -2px;
+	border-radius: 50%;
+	background: currentColor;
+	pointer-events: none;
+	opacity: 0;
+	animation: activity-beacon-pulse 2.2s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+@keyframes activity-beacon-pulse {
+	0% {
+		transform: scale(0.6);
+		opacity: 0.55;
+	}
+	45% {
+		transform: scale(1.8);
+		opacity: 0;
+	}
+	100% {
+		transform: scale(1.8);
+		opacity: 0;
+	}
+}
+
+.activity-icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	color: inherit;
+}
+
+/* Flujo de texto con barrido de luz continuo (Shimmer Sweep) */
+.activity-text-flow {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 5px;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	background: linear-gradient(
+		90deg,
+		var(--vscode-foreground) 0%,
+		var(--vscode-foreground) 25%,
+		var(--vscode-textLink-foreground, #4daafc) 45%,
+		var(--vscode-editor-foreground, #cfe3ff) 50%,
+		var(--vscode-textLink-foreground, #4daafc) 55%,
+		var(--vscode-foreground) 75%,
+		var(--vscode-foreground) 100%
+	);
+	background-size: 250% 100%;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	animation: activity-shimmer-sweep 2.4s linear infinite;
+}
+
+@keyframes activity-shimmer-sweep {
+	0% {
+		background-position: 150% 0;
+	}
+	100% {
+		background-position: -150% 0;
+	}
 }
 
 .activity-verb {
 	font-weight: 600;
-	color: var(--vscode-foreground);
 	flex-shrink: 0;
+}
+
+.activity-target {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 11px;
+	font-weight: 500;
+	flex-shrink: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.activity-parent {
+	font-size: 10.5px;
+	opacity: 0.7;
+	flex-shrink: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .activity-detail {
@@ -3170,6 +3260,30 @@ button.sec:hover {
 }
 .activity-cancel-link:hover {
 	color: var(--vscode-textLink-activeForeground, #70baff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.activity-beacon-ring {
+		display: none;
+		animation: none;
+	}
+	.activity-text-flow {
+		animation: none;
+		background: none;
+		-webkit-background-clip: initial;
+		-webkit-text-fill-color: initial;
+		color: var(--vscode-foreground);
+	}
+}
+
+.vscode-high-contrast .activity-beacon-ring {
+	display: none;
+}
+.vscode-high-contrast .activity-text-flow {
+	background: none;
+	-webkit-background-clip: initial;
+	-webkit-text-fill-color: initial;
+	color: var(--vscode-foreground);
 }
 @keyframes proc-pulse {
 	0%,

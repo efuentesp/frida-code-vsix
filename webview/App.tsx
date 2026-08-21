@@ -688,25 +688,30 @@ export function App() {
 				)}
 				{activity && (
 					<div className="activity-line-wrap">
-						<Codicon
-							name={activity.icon}
-							size={13}
-							className={
-								`activity-icon is-${activity.kind}` +
-								(activity.spin
-									? " codicon-modifier-spin"
-									: activity.kind === "thinking"
-										? " tc-sparkle-spin"
-										: "")
-							}
-						/>
-						<span className="activity-verb tc-shimmer">{activity.verb}</span>
-						{activity.target && (
-							<span className="activity-target">{activity.target}</span>
-						)}
-						{activity.parentDir && (
-							<span className="activity-parent">{activity.parentDir}</span>
-						)}
+						<div className={`activity-icon-beacon is-${activity.kind}`}>
+							<Codicon
+								name={activity.icon}
+								size={13}
+								className={
+									`activity-icon is-${activity.kind}` +
+									(activity.spin
+										? " codicon-modifier-spin"
+										: activity.kind === "thinking"
+											? " tc-sparkle-spin"
+											: "")
+								}
+							/>
+							<span className="activity-beacon-ring" aria-hidden="true" />
+						</div>
+						<div className="activity-text-flow">
+							<span className="activity-verb">{activity.verb}</span>
+							{activity.target && (
+								<span className="activity-target">{activity.target}</span>
+							)}
+							{activity.parentDir && (
+								<span className="activity-parent">{activity.parentDir}</span>
+							)}
+						</div>
 						{elapsedSeconds && (
 							<span className="activity-timer">· {elapsedSeconds}</span>
 						)}
