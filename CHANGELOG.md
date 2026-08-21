@@ -17,6 +17,34 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.27.0] - 2026-08-21
+### Añadido
+
+- **webview** — rediseñar tarjetas de módulos de herramientas con capacidades categorizadas (Propuesta 1)
+- **webview** — rediseñar panel de recursos como explorador interactivo con acciones rápidas (Propuesta 1)
+- **webview** — rediseñar panel de auto-aprobación con matriz de seguridad y selector visual de modo (Propuesta 1)
+- **webview** — rediseñar tarjetas de proveedor con catálogo de modelos y control de credenciales (Propuesta 1)
+- **webview** — implementar notificación nativa VS Code sólida con barra de progreso para Toast (Opción 1)
+- **workflows** — implementar visualización de pipeline graph y subagentes en paralelo (Propuesta 1)
+- **webview** — rediseñar panel de configuración estilo VS Code Settings con buscador global (Propuesta 1)
+- **webview** — rediseñar panel ask_user_question con flujo conversacional e historial de pasos (Propuesta 2)
+- **webview** — implementar animación de haz de luz continuo y faro de pulso en barra de actividad (Propuesta 3)
+
+### Cambiado
+
+- **webview** — migrar todos los iconos restantes a @vscode/codicons y desinstalar lucide-react
+
+### Corregido
+
+- **webview** — omitir bloques de texto de puro eco ("✓") en el transcript
+- **enterprise** — omitir mensajes assistant sin contenido en vez de placeholder sintético
+
+### Interno
+
+- **webview** — formateo de SettingsHub y styles.css
+- aplicar formato biome a WorkflowPanel y panel-view
+- aplicar formato biome a turn-grouping y Turn tras Errata-14
+
 ## [0.26.0] - 2026-08-21
 ### Añadido
 
