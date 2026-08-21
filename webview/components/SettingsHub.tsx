@@ -371,6 +371,26 @@ export function SettingsHub({
 	);
 }
 
+function getModuleIcon(module: string): string {
+	const m = module.toLowerCase();
+	if (m.includes("git") || m.includes("sync")) return "git-branch";
+	if (m.includes("browser") || m.includes("web")) return "globe";
+	if (m.includes("subagent") || m.includes("parallel")) return "organization";
+	if (
+		m.includes("permission") ||
+		m.includes("gate") ||
+		m.includes("approval")
+	)
+		return "shield";
+	if (m.includes("aidd") || m.includes("workflow")) return "sparkle";
+	if (m.includes("lens") || m.includes("lsp") || m.includes("diagnostics"))
+		return "search";
+	if (m.includes("index") || m.includes("codebase")) return "database";
+	if (m.includes("todo") || m.includes("task")) return "checklist";
+	if (m.includes("core") || m.includes("system")) return "tools";
+	return "extensions";
+}
+
 function ToggleRow({
 	title,
 	desc,
@@ -383,50 +403,67 @@ function ToggleRow({
 	onToggle: () => void;
 }) {
 	return (
-		<div className="cfg-row">
-			<div className="cfg-row-info">
-				<div className="cfg-row-title">{title}</div>
-				<div className="cfg-row-desc">{desc}</div>
+		<div className={`tool-card-mod${on ? "" : " is-off"}`}>
+			<div className="tool-card-head">
+				<div className="tool-card-icon-wrap">
+					<Codicon name="tools" size={15} className="tool-card-icon" />
+				</div>
+				<div className="tool-card-info">
+					<div className="tool-card-title-row">
+						<span className="tool-card-title">{title}</span>
+					</div>
+					<div className="tool-card-desc">{desc}</div>
+				</div>
+				<div className="tool-card-actions">
+					<button
+						type="button"
+						className={"switch" + (on ? " on" : "")}
+						aria-label={on ? `Desactivar ${title}` : `Activar ${title}`}
+						onClick={onToggle}
+					/>
+				</div>
 			</div>
-			<button className={"switch" + (on ? " on" : "")} onClick={onToggle} />
 		</div>
 	);
 }
 
-/** Fila de recurso en el acordeón (#54): etiqueta + pills separadas por ·. */
+/** Fila de recurso en el acordeón: categoría con codicon + chips interactivos. */
 function ResLine({
 	label,
 	items,
 	prefix,
+	iconName,
 }: {
 	label: string;
 	items: string[];
 	prefix?: string;
+	iconName: string;
 }) {
+	if (items.length === 0) return null;
 	const shown = items.slice(0, 12);
 	const rest = items.length - shown.length;
 	return (
 		<div className="tool-res-line">
-			<span className="tool-res-label">{label}</span>
-			{shown.length === 0 ? (
-				<span className="tool-res-empty">—</span>
-			) : (
-				<span className="tool-res-items">
-					{shown.map((v) => (
-						<code key={v}>
+			<div className="tool-res-label-wrap">
+				<Codicon name={iconName} size={11} className="tool-res-icon" />
+				<span className="tool-res-label">{label}:</span>
+			</div>
+			<div className="tool-res-chips">
+				{shown.map((v) => (
+					<span key={v} className="tool-res-chip">
+						<code>
 							{prefix}
 							{v}
 						</code>
-					))}
-					{rest > 0 && <span className="muted">+{rest} más</span>}
-				</span>
-			)}
+					</span>
+				))}
+				{rest > 0 && <span className="tool-res-more">+{rest} más</span>}
+			</div>
 		</div>
 	);
 }
 
-/** Toggle con acordeón de recursos del módulo (#54): tools, comandos,
- *  skills, prompts y errores — lo que se activa/desactiva con el toggle. */
+/** Toggle con tarjeta de módulo de recursos (Propuesta 1: Feature Manager). */
 function ToolAccordionRow({
 	title,
 	desc,
@@ -447,54 +484,88 @@ function ToolAccordionRow({
 		res.skills.length +
 		res.prompts.length +
 		res.errors.length;
+	const iconName = getModuleIcon(res.module);
+
 	return (
-		<div className={"tool-acc" + (open ? " open" : "")}>
-			<div className="tool-acc-head">
-				<button
-					className="tool-acc-exp"
-					aria-label={open ? "Colapsar" : "Expandir"}
-					onClick={() => setOpen(!open)}
-				>
-					<Codicon name={open ? "chevron-down" : "chevron-right"} size={12} />
-				</button>
-				<button
-					className="tool-acc-info"
-					title={desc}
-					onClick={() => setOpen(!open)}
-				>
-					<span className="tool-acc-title">{title}</span>
-					<span className={"tool-acc-count" + (total === 0 ? " zero" : "")}>
-						{total}
-					</span>
-				</button>
-				{onToggle ? (
+		<div className={`tool-card-mod${open ? " open" : ""}${on ? "" : " is-off"}`}>
+			<div className="tool-card-head">
+				<div className="tool-card-icon-wrap">
+					<Codicon name={iconName} size={15} className="tool-card-icon" />
+				</div>
+				<div className="tool-card-info" onClick={() => setOpen(!open)}>
+					<div className="tool-card-title-row">
+						<span className="tool-card-title">{title}</span>
+						<span className={`tool-card-count${total === 0 ? " zero" : ""}`}>
+							{total} {total === 1 ? "recurso" : "recursos"}
+						</span>
+					</div>
+					<div className="tool-card-desc">{desc}</div>
+				</div>
+				<div className="tool-card-actions">
+					{onToggle ? (
+						<button
+							type="button"
+							className={"switch" + (on ? " on" : "")}
+							aria-label={on ? `Desactivar ${title}` : `Activar ${title}`}
+							title={
+								on
+									? "Habilitado — click para desactivar"
+									: "Desactivado — click para habilitar"
+							}
+							onClick={onToggle}
+						/>
+					) : (
+						<span
+							className="tool-card-base-badge"
+							title="Módulo base — siempre activo"
+						>
+							BASE
+						</span>
+					)}
 					<button
-						className={"switch" + (on ? " on" : "")}
-						aria-label="Activar/desactivar"
-						onClick={onToggle}
-					/>
-				) : (
-					<span className="tag" title="Módulo base — siempre activo">
-						base
-					</span>
-				)}
+						type="button"
+						className="tool-card-exp-btn"
+						aria-label={open ? "Contraer detalles" : "Expandir detalles"}
+						title={open ? "Contraer detalles" : "Ver herramientas y comandos"}
+						onClick={() => setOpen(!open)}
+					>
+						<Codicon
+							name={open ? "chevron-down" : "chevron-right"}
+							size={12}
+						/>
+					</button>
+				</div>
 			</div>
 			{open && (
-				<div className="tool-acc-body">
-					{on ? null : (
+				<div className="tool-card-body">
+					{!on && (
 						<div className="tool-res-off">
-							Desactivado: la sesión se recarga al mover el toggle; los recursos
-							listados reaparecen al reactivarlo.
+							<Codicon name="info" size={12} />
+							<span>
+								Desactivado: las herramientas y comandos de este módulo no
+								consumen contexto ni están disponibles en el chat.
+							</span>
 						</div>
 					)}
-					<ResLine label="Tools" items={res.tools} />
-					<ResLine label="Comandos" items={res.commands} prefix="/" />
-					<ResLine label="Skills" items={res.skills} />
-					<ResLine label="Prompts" items={res.prompts} prefix="/" />
+					<ResLine label="Tools" items={res.tools} iconName="tools" />
+					<ResLine
+						label="Comandos"
+						items={res.commands}
+						prefix="/"
+						iconName="terminal"
+					/>
+					<ResLine label="Skills" items={res.skills} iconName="sparkle" />
+					<ResLine
+						label="Prompts"
+						items={res.prompts}
+						prefix="/"
+						iconName="book"
+					/>
 					{res.errors.length > 0 && (
 						<div className="tool-res-errors">
 							{res.errors.map((e, i) => (
 								<div key={i} className="tool-res-err">
+									<Codicon name="warning" size={12} />
 									<code>{e.path}</code> <span>{e.error}</span>
 								</div>
 							))}

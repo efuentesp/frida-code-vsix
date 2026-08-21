@@ -108,7 +108,7 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("Index");
 	});
 
-	it("renderiza la pestaña de herramientas con acordeón y toggles", () => {
+	it("renderiza la pestaña de herramientas con tarjetas de módulos, switches e iconos semánticos", () => {
 		const post = vi.fn();
 		const onClose = vi.fn();
 
@@ -121,10 +121,14 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 			}),
 		);
 
+		expect(html).toContain("tool-card-mod");
 		expect(html).toContain("Frida Git Sync");
 		expect(html).toContain("Sincronización de ramas y git");
+		expect(html).toContain("codicon-git-branch");
+		expect(html).toContain("switch on");
 		expect(html).toContain("Módulos base (siempre activos)");
 		expect(html).toContain("Frida Core");
+		expect(html).toContain("BASE");
 	});
 
 	it("renderiza la pestaña de recursos cuando se inicializa en resources", () => {

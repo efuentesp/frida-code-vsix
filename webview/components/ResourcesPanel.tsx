@@ -66,10 +66,7 @@ function LocationsSection() {
 					title="Copiar ruta global"
 				>
 					<code>{global}</code>
-					<Codicon
-						name={copiedKey === `${kind}-g` ? "check" : "copy"}
-						size={11}
-					/>
+					<Codicon name={copiedKey === `${kind}-g` ? "check" : "copy"} size={11} />
 				</button>
 				<span className="res-loc-sep">·</span>
 				<button
@@ -79,10 +76,7 @@ function LocationsSection() {
 					title="Copiar ruta de proyecto"
 				>
 					<code>{project}</code>
-					<Codicon
-						name={copiedKey === `${kind}-p` ? "check" : "copy"}
-						size={11}
-					/>
+					<Codicon name={copiedKey === `${kind}-p` ? "check" : "copy"} size={11} />
 				</button>
 			</div>
 		</div>
@@ -103,16 +97,12 @@ function LocationsSection() {
 			{open && (
 				<div className="res-section-body">
 					<p className="res-loc-intro">
-						Descubrimiento automático en <code>~/.frida</code> y{" "}
-						<code>.pi</code>. <code>global</code> = disponible en todos tus
-						proyectos; <code>proyecto</code> = exclusivo de este repositorio.
+						Descubrimiento automático en <code>~/.frida</code> y <code>.pi</code>.{" "}
+						<code>global</code> = disponible en todos tus proyectos;{" "}
+						<code>proyecto</code> = exclusivo de este repositorio.
 					</p>
 					<Row kind="Skills" global="~/.frida/skills/" project=".pi/skills/" />
-					<Row
-						kind="Prompts"
-						global="~/.frida/prompts/"
-						project=".pi/prompts/"
-					/>
+					<Row kind="Prompts" global="~/.frida/prompts/" project=".pi/prompts/" />
 					<Row
 						kind="Extensiones / MCP"
 						global="~/.frida/extensions/"
@@ -128,9 +118,8 @@ function LocationsSection() {
 						</div>
 					</div>
 					<p className="res-loc-note">
-						MCP no es nativo: se carga como <strong>extensión</strong> (un
-						paquete que lo aporta). Tras colocar recursos, pulsa{" "}
-						<code>Recargar</code>.
+						MCP no es nativo: se carga como <strong>extensión</strong> (un paquete que
+						lo aporta). Tras colocar recursos, pulsa <code>Recargar</code>.
 					</p>
 				</div>
 			)}
@@ -153,14 +142,16 @@ function extName(p: string): string {
 }
 
 // Metadatos por origen de recurso
-const ORIGIN_META: Record<string, { label: string; cls: string; icon: string }> =
-	{
-		extension: { label: "extensión", cls: "src-extension", icon: "extensions" },
-		global: { label: "global", cls: "src-global", icon: "globe" },
-		project: { label: "proyecto", cls: "src-project", icon: "folder" },
-		"built-in": { label: "built-in", cls: "src-built-in", icon: "lock" },
-		path: { label: "path", cls: "src-path", icon: "file" },
-	};
+const ORIGIN_META: Record<
+	string,
+	{ label: string; cls: string; icon: string }
+> = {
+	extension: { label: "extensión", cls: "src-extension", icon: "extensions" },
+	global: { label: "global", cls: "src-global", icon: "globe" },
+	project: { label: "proyecto", cls: "src-project", icon: "folder" },
+	"built-in": { label: "built-in", cls: "src-built-in", icon: "lock" },
+	path: { label: "path", cls: "src-path", icon: "file" },
+};
 const ORIGIN_ORDER = ["extension", "global", "project", "built-in", "path"];
 
 /** Badge visual de procedencia */
@@ -325,9 +316,7 @@ export function ResourcesContent({
 									<span>Usar</span>
 								</button>
 							</div>
-							{s.description && (
-								<div className="res-item-meta">{s.description}</div>
-							)}
+							{s.description && <div className="res-item-meta">{s.description}</div>}
 							{s.path && (
 								<div className="res-item-meta muted">
 									<code>{shortPath(s.path)}</code>
@@ -338,11 +327,7 @@ export function ResourcesContent({
 				</Section>
 
 				{/* 3. Comandos */}
-				<Section
-					title="Comandos"
-					count={res.commands.length}
-					iconName="terminal"
-				>
+				<Section title="Comandos" count={res.commands.length} iconName="terminal">
 					<SourceFilter
 						items={res.commands}
 						active={cmdFilter}
@@ -354,9 +339,7 @@ export function ResourcesContent({
 								<div className="res-item-name">
 									<SourceBadge source={c.source} />
 									<code className="res-code-name">/{c.name}</code>
-									{c.argumentHint && (
-										<span className="cmd-arg">{c.argumentHint}</span>
-									)}
+									{c.argumentHint && <span className="cmd-arg">{c.argumentHint}</span>}
 									{c.source === "extension" && c.extension && (
 										<span className="tag">{c.extension}</span>
 									)}
@@ -371,9 +354,7 @@ export function ResourcesContent({
 									<span>Insertar</span>
 								</button>
 							</div>
-							{c.description && (
-								<div className="res-item-meta">{c.description}</div>
-							)}
+							{c.description && <div className="res-item-meta">{c.description}</div>}
 						</div>
 					))}
 				</Section>
@@ -396,9 +377,7 @@ export function ResourcesContent({
 									<span>Insertar</span>
 								</button>
 							</div>
-							{p.description && (
-								<div className="res-item-meta">{p.description}</div>
-							)}
+							{p.description && <div className="res-item-meta">{p.description}</div>}
 						</div>
 					))}
 				</Section>
