@@ -34,7 +34,6 @@ import {
 	X,
 } from "lucide-react";
 import { Tooltip } from "./components/Tooltip";
-import { Spinner } from "./components/Spinner";
 import { AnimatedLabel } from "./components/AnimatedLabel";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
@@ -270,25 +269,58 @@ export function App() {
 		return () => clearInterval(id);
 	}, [state.retry]);
 
-	const procLabel = (() => {
+	const procPill = (() => {
 		if (state.retry) {
 			const secs = retrySecs ?? Math.ceil(state.retry.delayMs / 1000);
-			return `Reintentando (${state.retry.attempt}/${state.retry.maxAttempts}) en ${secs}s… (doble Esc para cancelar)`;
+			return {
+				icon: "sync" as const,
+				spin: true,
+				text: `Reintentando (${state.retry.attempt}/${state.retry.maxAttempts}) en ${secs}s… (doble Esc para cancelar)`,
+				kind: "retry" as const,
+			};
 		}
 		if (!state.busy) {
 			// El agente principal terminó, pero puede haber subagentes en background
 			// corriendo: el indicador persiste para que el usuario sepa que Frida sigue
 			// trabajando (el widget del footer da el detalle por agente).
 			const bg = state.backgroundRunning ?? 0;
-			if (bg > 0) return `${bg} subagente${bg === 1 ? "" : "s"} en curso…`;
+			if (bg > 0)
+				return {
+					icon: "hubot" as const,
+					spin: false,
+					text: `${bg} subagente${bg === 1 ? "" : "s"} en curso…`,
+					kind: "tool" as const,
+				};
 			return null;
 		}
 		const last = state.turns[state.turns.length - 1];
-		if (last?.bash?.status === "running") return "Ejecutando bash…";
+		if (last?.bash?.status === "running")
+			return {
+				icon: "terminal" as const,
+				spin: false,
+				text: "Ejecutando terminal…",
+				kind: "bash" as const,
+			};
 		if (last?.status === "executing" && last.executingTool)
-			return `Ejecutando ${last.executingTool}…`;
-		if (last?.status === "thinking") return "Pensando…";
-		return "Procesando…";
+			return {
+				icon: "tools" as const,
+				spin: false,
+				text: `Ejecutando ${last.executingTool}…`,
+				kind: "tool" as const,
+			};
+		if (last?.status === "thinking")
+			return {
+				icon: "sparkle" as const,
+				spin: false,
+				text: "Razonando…",
+				kind: "thinking" as const,
+			};
+		return {
+			icon: "loading" as const,
+			spin: true,
+			text: "Procesando…",
+			kind: "default" as const,
+		};
 	})();
 
 	// Roots de diálogo en el slot del composer (ask_user_question): reemplazan
@@ -678,26 +710,42 @@ export function App() {
 					</div>
 				)}
 				{state.isCompacting ? (
-					<div className="proc-bar">
-						<Spinner size={14} />
-						<AnimatedLabel
-							text={
-								state.retry
-									? `Reintentando compactación (${state.retry.attempt}/${state.retry.maxAttempts}) en ${retrySecs ?? Math.ceil(state.retry.delayMs / 1000)}s…`
-									: `Compactando contexto${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`
-							}
-						/>
-						<button
-							className="proc-cancel"
-							onClick={() => post({ type: "cancel_compaction" })}
-						>
-							Cancelar
-						</button>
+					<div className="proc-pill-anchor">
+						<div className="proc-pill is-compacting">
+							<Codicon name="database" size={12} />
+							<AnimatedLabel
+								text={
+									state.retry
+										? `Reintentando compactación (${state.retry.attempt}/${state.retry.maxAttempts}) en ${retrySecs ?? Math.ceil(state.retry.delayMs / 1000)}s…`
+										: `Compactando contexto${state.compactReason && state.compactReason !== "manual" ? " (automática)" : ""}…`
+								}
+							/>
+							<button
+								type="button"
+								className="proc-pill-cancel"
+								onClick={() => post({ type: "cancel_compaction" })}
+							>
+								Cancelar
+							</button>
+						</div>
 					</div>
 				) : (
-					procLabel && (
-						<div className="proc-bar">
-							<Spinner size={14} /> <AnimatedLabel text={procLabel} />
+					procPill && (
+						<div className="proc-pill-anchor">
+							<div className={`proc-pill is-${procPill.kind}`}>
+								<Codicon
+									name={procPill.icon}
+									size={12}
+									className={
+										procPill.spin
+											? "codicon-modifier-spin"
+											: procPill.kind === "thinking"
+												? "tc-sparkle-spin"
+												: ""
+									}
+								/>
+								<AnimatedLabel text={procPill.text} />
+							</div>
 						</div>
 					)
 				)}

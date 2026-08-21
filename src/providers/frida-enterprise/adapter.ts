@@ -21,9 +21,7 @@ export interface FridaIdentity {
 
 /** Claims del payload de un JWT SIN verificar firma (el gateway la valida).
  *  user_id es el claim propietario de Frida; sub es el estándar Firebase. */
-export function identityFromToken(
-	idToken: string,
-): FridaIdentity | undefined {
+export function identityFromToken(idToken: string): FridaIdentity | undefined {
 	try {
 		const part = String(idToken ?? "").split(".")[1];
 		if (!part) return undefined;
@@ -36,8 +34,7 @@ export function identityFromToken(
 				: typeof claims?.sub === "string"
 					? claims.sub
 					: undefined;
-		const email =
-			typeof claims?.email === "string" ? claims.email : undefined;
+		const email = typeof claims?.email === "string" ? claims.email : undefined;
 		if (user_id === undefined && email === undefined) return undefined;
 		return { user_id, email };
 	} catch {
@@ -210,15 +207,19 @@ export function payloadShapeTag(
 			for (const it of items) {
 				if (it && typeof it === "object") {
 					const o = it as Record<string, unknown>;
-				if (o.type === "function_call") out.push("fc");
+					if (o.type === "function_call") out.push("fc");
 					else if (o.type === "function_call_output") out.push("fc_out");
 					else if (o.type === "reasoning") out.push("reasoning");
 					else if (typeof o.role === "string") {
 						// content-types de un message (sólo el primero, basta para diagnosticar)
 						let suffix = "";
 						const c = o.content;
-						if (Array.isArray(c) && c[0] && typeof c[0] === "object" &&
-							typeof (c[0] as any).type === "string") {
+						if (
+							Array.isArray(c) &&
+							c[0] &&
+							typeof c[0] === "object" &&
+							typeof (c[0] as any).type === "string"
+						) {
 							suffix = `(${(c[0] as any).type})`;
 						}
 						if (o.role === "assistant" && Array.isArray(o.tool_calls)) {
@@ -349,11 +350,7 @@ export function modelClass(id: string, contextWindow: number): string {
  *  la traducción Anthropic→responses del gateway (0 tokens) y MERCURY no
  *  expone razonamiento. */
 export function isSuggested(id: string): boolean {
-	return (
-		id === "DEMETER-BLOOM" ||
-		id === "TITAN-CROWN" ||
-		id === "MIDAS-GOLD"
-	);
+	return id === "DEMETER-BLOOM" || id === "TITAN-CROWN" || id === "MIDAS-GOLD";
 }
 
 export function toProviderModel(
@@ -444,7 +441,8 @@ export interface FridaTranslatedResponse {
 }
 
 function parseToolArguments(value: unknown): Record<string, unknown> {
-	if (value && typeof value === "object") return value as Record<string, unknown>;
+	if (value && typeof value === "object")
+		return value as Record<string, unknown>;
 	if (typeof value === "string") {
 		try {
 			const parsed = JSON.parse(value);
@@ -456,9 +454,16 @@ function parseToolArguments(value: unknown): Record<string, unknown> {
 	return {};
 }
 
-function mapFinishReason(reason: unknown): FridaTranslatedResponse["finishReason"] {
+function mapFinishReason(
+	reason: unknown,
+): FridaTranslatedResponse["finishReason"] {
 	if (reason === "tool_calls" || reason === "function_call") return "toolUse";
-	if (reason === "length" || reason === "max_tokens" || reason === "max_output_tokens") return "length";
+	if (
+		reason === "length" ||
+		reason === "max_tokens" ||
+		reason === "max_output_tokens"
+	)
+		return "length";
 	if (reason === "stop" || reason === "end" || reason == null) return "stop";
 	return "error";
 }
@@ -468,7 +473,9 @@ function mapFinishReason(reason: unknown): FridaTranslatedResponse["finishReason
 export function translateFridaResponse(response: any): FridaTranslatedResponse {
 	const choice = response?.choices?.[0] ?? {};
 	const message = choice.message ?? {};
-	const rawToolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+	const rawToolCalls = Array.isArray(message.tool_calls)
+		? message.tool_calls
+		: [];
 	const toolCalls = rawToolCalls.map((call: any) => ({
 		id: call?.id,
 		name: call?.function?.name,
@@ -554,7 +561,8 @@ export function classifyGatewayError(
 	if (status === 422 && /user_id|email/i.test(text))
 		return {
 			kind: "identity",
-			hint: "El gateway no recibió user_id/email: reinicia sesión (/login frida-enterprise)",
+			hint:
+				"El gateway no recibió user_id/email: reinicia sesión (/login frida-enterprise)",
 		};
 	if (status === 502 || /not available for chat/i.test(text))
 		return {

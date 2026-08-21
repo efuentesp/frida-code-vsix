@@ -131,15 +131,15 @@ export async function fetchFridaEnterpriseModels(
 			if (ka !== kb) return ka - kb; // grande(0) < mediano(1) < compacto(2)
 			if (isSuggested(a.id) !== isSuggested(b.id))
 				return isSuggested(a.id) ? -1 : 1; // ⭐ abre el bloque
-			return (
-				b.contextWindow - a.contextWindow || a.id.localeCompare(b.id)
-			);
+			return b.contextWindow - a.contextWindow || a.id.localeCompare(b.id);
 		});
 	dbg(
-		`catálogo: ${list.length} brutos → ${out.length} verificados · ⭐ ${out
-			.filter((m) => isSuggested(m.id))
-			.map((m) => m.id)
-			.join(", ") || "—"} · primero: ${out[0]?.name ?? "—"}`,
+		`catálogo: ${list.length} brutos → ${out.length} verificados · ⭐ ${
+			out
+				.filter((m) => isSuggested(m.id))
+				.map((m) => m.id)
+				.join(", ") || "—"
+		} · primero: ${out[0]?.name ?? "—"}`,
 	);
 	return out;
 }

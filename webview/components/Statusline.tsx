@@ -44,27 +44,36 @@ function branchTooltip(ws: WorkspaceInfo): string {
 	return [ws.branch, ...syncBits, ...diffBits].join(" · ");
 }
 
+function fmtNum(n: number): string {
+	return n.toLocaleString();
+}
+
 function ctxTooltip(usage: Usage, pct: number, unknown: boolean): string {
 	const lines: string[] = [];
+	const curToks = usage.contextTokens > 0 ? fmtNum(usage.contextTokens) : "0";
+	const maxToks = usage.contextWindow > 0 ? fmtNum(usage.contextWindow) : "200,000";
 	lines.push(
-		`Contexto: ${usage.contextWindow > 0 ? `${fmt(usage.contextTokens)} / ${fmt(usage.contextWindow)}` : "…"} (${unknown ? "?" : `${pct}%`})`,
+		`Ventana de contexto: ${curToks} / ${maxToks} tokens (${unknown ? "?" : `${pct}%`})`,
 	);
 	if (usage.inputTotal > 0 || usage.outputTotal > 0) {
 		lines.push(
-			`Tokens: ↑${fmt(usage.inputTotal)} in · ↓${fmt(usage.outputTotal)} out`,
+			`Tokens de sesión: ↑ ${fmtNum(usage.inputTotal)} in · ↓ ${fmtNum(usage.outputTotal)} out`,
 		);
 	}
 	if (usage.cacheRead > 0 || usage.cacheWrite > 0) {
+		const hitRate =
+			usage.cacheHitRate === undefined
+				? ""
+				: ` · ${usage.cacheHitRate.toFixed(0)}% hit`;
 		lines.push(
-			`Caché: R${fmt(usage.cacheRead)} · W${fmt(usage.cacheWrite)}${
-				usage.cacheHitRate === undefined
-					? ""
-					: ` (Hit Rate: ${usage.cacheHitRate.toFixed(0)}%)`
-			}`,
+			`Caché: R ${fmtNum(usage.cacheRead)} · W ${fmtNum(usage.cacheWrite)}${hitRate}`,
 		);
 	}
+	if (usage.reserveTokens && usage.reserveTokens > 0) {
+		lines.push(`Reserva de compactación: ${fmtNum(usage.reserveTokens)} tokens`);
+	}
 	if (usage.cost > 0) {
-		lines.push(`Costo acumulado: $${usage.cost.toFixed(3)}`);
+		lines.push(`Costo estimado: $${usage.cost.toFixed(4)} USD`);
 	}
 	return lines.join("\n");
 }
@@ -203,8 +212,11 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 
 			<div className="statusline-right">
 				{usage && (
-					<Tooltip label={ctxTooltip(usage, pct, unknown)} side="top">
-						<div className="statusline-ctx">
+					<Tooltip label={ctxTooltip(usage, pct, unknown)} side="top-left" wide>
+						<div
+							className="statusline-ctx"
+							title={ctxTooltip(usage, pct, unknown)}
+						>
 							<span className="statusline-ctx-bar">
 								<span
 									className={"statusline-ctx-fill " + level}
@@ -213,7 +225,12 @@ export function Statusline({ ws, goal, usage, onRename }: StatuslineProps) {
 									}}
 								/>
 							</span>
-							<span className="statusline-ctx-pct">{unknown ? "?" : `${pct}%`}</span>
+							<span className="statusline-ctx-tokens">
+								{usage.contextTokens > 0 ? fmt(usage.contextTokens) : ""}
+							</span>
+							<span className="statusline-ctx-pct">
+								{unknown ? "?" : `${pct}%`}
+							</span>
 							{usage.cost > 0 && (
 								<span className="statusline-cost">${usage.cost.toFixed(3)}</span>
 							)}

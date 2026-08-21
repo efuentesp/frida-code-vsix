@@ -56,9 +56,9 @@ describe("parseCallbackInput", () => {
 	});
 
 	it("extrae el code de una URL https con query", () => {
-		expect(
-			parseCallbackInput("https://example.com/cb?state=x&code=QQQ999"),
-		).toBe("QQQ999");
+		expect(parseCallbackInput("https://example.com/cb?state=x&code=QQQ999")).toBe(
+			"QQQ999",
+		);
 	});
 
 	it("extrae el code de la página /redirect del portal (la que queda en la barra)", () => {
@@ -89,42 +89,42 @@ describe("parseCallbackInput", () => {
 // ─── Fallback catalog (F3-d: SELECTED, no MODEL1..4) ───────────────────────
 
 describe("buildFallbackCatalog (F3-d: offline muestra SÓLO los ⭐ medidos)", () => {
-		it("con envVars → los 4 SELECTED, aunque MODEL1..4 nombren a los viejos", () => {
-			const cat = buildFallbackCatalog({
-				COMPATIBLE_API_URL: "https://gw",
-				MODEL1: "AEOLUS-GALE",
-				MODEL2: "NIKE-VICTORY",
-				MODEL3: "TIRESIAS-PRISM",
-				MODEL4: "SELENE-CIPHER",
-			});
-			// El combo jamás muestra los viejos (ni online ni offline)
-			expect(cat.map((m) => m.id)).toEqual([
-				"DEMETER-BLOOM",
-				"TITAN-CROWN",
-				"MIDAS-GOLD",
-				"model-router",
-			]);
-			expect(cat.map((m) => m.name)).toEqual([
-				"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
-				"\u2b50 TITAN-CROWN (responses, mediano 200k)",
-				"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
-				"model-router (responses, meta)",
-			]);
+	it("con envVars → los 4 SELECTED, aunque MODEL1..4 nombren a los viejos", () => {
+		const cat = buildFallbackCatalog({
+			COMPATIBLE_API_URL: "https://gw",
+			MODEL1: "AEOLUS-GALE",
+			MODEL2: "NIKE-VICTORY",
+			MODEL3: "TIRESIAS-PRISM",
+			MODEL4: "SELENE-CIPHER",
 		});
+		// El combo jamás muestra los viejos (ni online ni offline)
+		expect(cat.map((m) => m.id)).toEqual([
+			"DEMETER-BLOOM",
+			"TITAN-CROWN",
+			"MIDAS-GOLD",
+			"model-router",
+		]);
+		expect(cat.map((m) => m.name)).toEqual([
+			"\u2b50 DEMETER-BLOOM (responses, grande 200k)",
+			"\u2b50 TITAN-CROWN (responses, mediano 200k)",
+			"\u2b50 MIDAS-GOLD (responses, compacto 128k)",
+			"model-router (responses, meta)",
+		]);
+	});
 
-		it("sin env vars → catálogo vacío (pre-login, nada conocido)", () => {
-			expect(buildFallbackCatalog({})).toEqual([]);
-		});
+	it("sin env vars → catálogo vacío (pre-login, nada conocido)", () => {
+		expect(buildFallbackCatalog({})).toEqual([]);
+	});
 
-		it("todos reasoning:true y por /v1/responses (medido 2026-08-16)", () => {
-			const cat = buildFallbackCatalog({ MODEL1: "x" });
-			expect(cat.length).toBe(4);
-			for (const m of cat) {
-				expect(m.reasoning).toBe(true);
-				expect(m.api).toBe("openai-responses");
-				expect(m.contextWindow).toBeGreaterThan(0);
-			}
-		});
+	it("todos reasoning:true y por /v1/responses (medido 2026-08-16)", () => {
+		const cat = buildFallbackCatalog({ MODEL1: "x" });
+		expect(cat.length).toBe(4);
+		for (const m of cat) {
+			expect(m.reasoning).toBe(true);
+			expect(m.api).toBe("openai-responses");
+			expect(m.contextWindow).toBeGreaterThan(0);
+		}
+	});
 });
 
 // ─── Provider config ──────────────────────────────────────────────────────────
@@ -167,7 +167,11 @@ describe("fetchFridaEnterpriseModels", () => {
 							max_output_tokens: 128000,
 						},
 						// ⭐ compacto (SELECTED) → pasa y se anota
-						{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 },
+						{
+							id: "MIDAS-GOLD",
+							capabilities: ["chat", "responses"],
+							context_window_tokens: 128000,
+						},
 						// chat PERO con 502 del backend (matriz live) → EXCLUIDO
 						{ id: "VULCAN-FORGE", capabilities: ["chat"] },
 						// flaky (round-trip sin contenido) → EXCLUIDO
@@ -224,15 +228,47 @@ describe("fetchFridaEnterpriseModels", () => {
 			jsonResponse({
 				data: [
 					// ⭐ medidos (deben quedar, con ⭐ y orden)
-					{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 },
-					{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 },
-					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
-					{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 },
+					{
+						id: "MIDAS-GOLD",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 128000,
+					},
+					{
+						id: "TITAN-CROWN",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 400000,
+					},
+					{
+						id: "DEMETER-BLOOM",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					},
+					{
+						id: "model-router",
+						capabilities: ["chat"],
+						context_window_tokens: 1000000,
+					},
 					// verificados PERO fuera de SELECTED → no aparecen en el combo
-					{ id: "NIKE-VICTORY", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
-					{ id: "SELENE-CIPHER", capabilities: ["chat"], context_window_tokens: 262144 },
-					{ id: "MERCURY-WING", capabilities: ["chat"], context_window_tokens: 128000 },
-					{ id: "GAIA-FLARE", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
+					{
+						id: "NIKE-VICTORY",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					},
+					{
+						id: "SELENE-CIPHER",
+						capabilities: ["chat"],
+						context_window_tokens: 262144,
+					},
+					{
+						id: "MERCURY-WING",
+						capabilities: ["chat"],
+						context_window_tokens: 128000,
+					},
+					{
+						id: "GAIA-FLARE",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					},
 					// no verificados → siguen fuera
 					{ id: "VULCAN-FORGE", capabilities: ["chat"] },
 				],
@@ -260,10 +296,26 @@ describe("fetchFridaEnterpriseModels", () => {
 			jsonResponse({
 				data: [
 					// los 4 SELECTED en DESORDEN: el sort los ordena por clase
-					{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 }, // compacto
-					{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 }, // meta
-					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 }, // grande
-					{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 }, // mediano
+					{
+						id: "MIDAS-GOLD",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 128000,
+					}, // compacto
+					{
+						id: "model-router",
+						capabilities: ["chat"],
+						context_window_tokens: 1000000,
+					}, // meta
+					{
+						id: "DEMETER-BLOOM",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					}, // grande
+					{
+						id: "TITAN-CROWN",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 400000,
+					}, // mediano
 				],
 			});
 		try {
@@ -296,14 +348,46 @@ describe("fetchFridaEnterpriseModels", () => {
 			jsonResponse({
 				data: [
 					// los 4 SELECTED…
-					{ id: "PUCK-SWIFT", capabilities: ["chat"], context_window_tokens: 128000 },
-					{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 },
-					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 }, // ⭐ grande
-					{ id: "GAIA-FLARE", capabilities: ["chat", "responses"], context_window_tokens: 1050000 },
-					{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 }, // ⭐ compacto
-					{ id: "SELENE-CIPHER", capabilities: ["chat"], context_window_tokens: 262144 },
-					{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 }, // ⭐ mediano
-					{ id: "NIKE-VICTORY", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
+					{
+						id: "PUCK-SWIFT",
+						capabilities: ["chat"],
+						context_window_tokens: 128000,
+					},
+					{
+						id: "model-router",
+						capabilities: ["chat"],
+						context_window_tokens: 1000000,
+					},
+					{
+						id: "DEMETER-BLOOM",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					}, // ⭐ grande
+					{
+						id: "GAIA-FLARE",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1050000,
+					},
+					{
+						id: "MIDAS-GOLD",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 128000,
+					}, // ⭐ compacto
+					{
+						id: "SELENE-CIPHER",
+						capabilities: ["chat"],
+						context_window_tokens: 262144,
+					},
+					{
+						id: "TITAN-CROWN",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 400000,
+					}, // ⭐ mediano
+					{
+						id: "NIKE-VICTORY",
+						capabilities: ["chat", "responses"],
+						context_window_tokens: 1000000,
+					},
 				],
 			});
 		try {
@@ -335,12 +419,28 @@ describe("fetchFridaEnterpriseModels", () => {
 		(globalThis as any).fetch = async () =>
 			new Response(
 				JSON.stringify({
-				data: [
-					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
-					{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 },
-					{ id: "MIDAS-GOLD", capabilities: ["chat", "responses"], context_window_tokens: 128000 },
-					{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 },
-				],
+					data: [
+						{
+							id: "DEMETER-BLOOM",
+							capabilities: ["chat", "responses"],
+							context_window_tokens: 1000000,
+						},
+						{
+							id: "TITAN-CROWN",
+							capabilities: ["chat", "responses"],
+							context_window_tokens: 400000,
+						},
+						{
+							id: "MIDAS-GOLD",
+							capabilities: ["chat", "responses"],
+							context_window_tokens: 128000,
+						},
+						{
+							id: "model-router",
+							capabilities: ["chat"],
+							context_window_tokens: 1000000,
+						},
+					],
 				}),
 				{ status: 200 },
 			);
@@ -373,9 +473,9 @@ describe("fetchFridaEnterpriseModels", () => {
 				status: 403,
 			});
 		try {
-			await expect(
-				fetchFridaEnterpriseModels("https://gw", "T"),
-			).rejects.toThrow(/403.*nope/);
+			await expect(fetchFridaEnterpriseModels("https://gw", "T")).rejects.toThrow(
+				/403.*nope/,
+			);
 		} finally {
 			globalThis.fetch = orig;
 		}
@@ -389,9 +489,7 @@ describe("refreshModels (Errata-4: baseUrl con /v1)", () => {
 		const orig = globalThis.fetch;
 		(globalThis as any).fetch = async () =>
 			jsonResponse({
-				data: [
-					{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"] },
-				],
+				data: [{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"] }],
 			}); // ⭐ seleccionado
 		try {
 			const cfg = buildFridaEnterpriseProviderConfig() as any;
@@ -410,7 +508,10 @@ describe("refreshModels (Errata-4: baseUrl con /v1)", () => {
 		const cfg = buildFridaEnterpriseProviderConfig() as any;
 		const models = await cfg.refreshModels({
 			allowNetwork: false,
-			credential: { compatibleApiUrl: "https://gw.example", envVars: { MODEL1: "m1" } },
+			credential: {
+				compatibleApiUrl: "https://gw.example",
+				envVars: { MODEL1: "m1" },
+			},
 		});
 		expect(models.length).toBeGreaterThan(0);
 		expect(models[0].baseUrl).toBe("https://gw.example/v1");
@@ -461,8 +562,8 @@ describe("buildFridaEnterpriseOAuth", () => {
 			if (String(url).includes("signInWithCustomToken"))
 				return jsonResponse({
 					idToken: "ID1",
-				refreshToken: "R1",
-				expiresIn: "3600",
+					refreshToken: "R1",
+					expiresIn: "3600",
 				});
 			if (String(url).includes("/auth/token"))
 				return jsonResponse({ access_token: "AT" });
@@ -479,9 +580,7 @@ describe("buildFridaEnterpriseOAuth", () => {
 					return "https://extension.enterprise.fridaplatform.online/redirect?code=PROMPTCODE&state=y";
 				},
 				onManualCodeInput: async () => {
-					throw new Error(
-						"onManualCodeInput no debe usarse cuando onPrompt existe",
-					);
+					throw new Error("onManualCodeInput no debe usarse cuando onPrompt existe");
 				},
 			});
 			const cred = await oauth.login(cbs);
@@ -523,17 +622,21 @@ describe("buildFridaEnterpriseOAuth", () => {
 			const cred = await oauth.login(cbs as any);
 			// URL de login con los 5 params del protocolo
 			const authUrl = seen.auth[0].url as string;
-			expect(authUrl.startsWith("https://extension.enterprise.fridaplatform.online/login?")).toBe(true);
+			expect(
+				authUrl.startsWith(
+					"https://extension.enterprise.fridaplatform.online/login?",
+				),
+			).toBe(true);
 			const params = new URLSearchParams(authUrl.split("?")[1]);
 			// redirect_uri va BASE64URL: el portal SPA lo decodifica con atob (fIe→dIe)
 			// y descarta los params si falla — con el URI crudo el login termina en
 			// /home sin code (verificado en vivo 2026-08-15).
 			expect(params.get("redirect_uri")).toBe(
 				Buffer.from("vscode://fridaplatform.frida-extension")
-				.toString("base64")
-				.replace(/\+/g, "-")
-				.replace(/\//g, "_")
-				.replace(/=+$/, ""),
+					.toString("base64")
+					.replace(/\+/g, "-")
+					.replace(/\//g, "_")
+					.replace(/=+$/, ""),
 			);
 			expect(params.get("code_challenge_method")).toBe("S256");
 			expect(params.get("response_type")).toBe("code");
@@ -679,7 +782,9 @@ describe("createFridaEnterpriseHooks", () => {
 		// Gate Errata-7: siembra el modelo del payload en la whitelist (en el
 		// host real lo siembra refreshModels con catálogo/store/fallback).
 		const runtime = createFridaEnterpriseRuntime(["m1"]);
-		createFridaEnterpriseHooks({ onUnauthorized: unauthorized, runtime })(pi as any);
+		createFridaEnterpriseHooks({ onUnauthorized: unauthorized, runtime })(
+			pi as any,
+		);
 		const headersHook = events.find((e) => e.name === "before_provider_headers");
 		const before = events.find((e) => e.name === "before_provider_request");
 		const after = events.find((e) => e.name === "after_provider_response");

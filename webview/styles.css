@@ -138,6 +138,21 @@ body {
 	bottom: 100%;
 	margin-bottom: 6px;
 }
+.tip-top-left {
+	bottom: 100%;
+	right: 0;
+	left: auto;
+	transform: none;
+	margin-bottom: 6px;
+	text-align: left;
+}
+.tip-top-right {
+	bottom: 100%;
+	left: 0;
+	transform: none;
+	margin-bottom: 6px;
+	text-align: left;
+}
 .tip-bottom {
 	top: 100%;
 	margin-top: 6px;
@@ -2691,7 +2706,8 @@ button.sec:hover {
 	font-size: 11px;
 	line-height: 24px;
 	user-select: none;
-	overflow: hidden;
+	position: relative;
+	z-index: 40;
 }
 
 .statusline-left,
@@ -2810,6 +2826,13 @@ button.sec:hover {
 }
 .statusline-ctx-fill.high {
 	background: var(--vscode-errorForeground, #f85149);
+}
+
+.statusline-ctx-tokens {
+	font-size: 10.5px;
+	font-variant-numeric: tabular-nums;
+	color: inherit;
+	opacity: 0.85;
 }
 
 .statusline-ctx-pct {
@@ -2943,27 +2966,88 @@ button.sec:hover {
 	color: var(--vscode-foreground);
 }
 
-/* Indicador de procesamiento fijo (sobre el Composer, no depende del scroll) */
-.proc-bar {
+/* Status Pill Flotante (Propuesta 2: Floating Pill sobre el Composer) */
+.proc-pill-anchor {
 	display: flex;
-	align-items: center;
-	gap: 8px;
+	justify-content: flex-start;
 	padding: 4px 12px;
-	font-size: 12px;
-	color: var(--vscode-descriptionForeground);
-	border-bottom: 1px solid var(--vscode-panel-border);
-	background: var(--vscode-sideBar-background);
-}
-.proc-bar .spin {
-	width: 11px;
-	height: 11px;
-	border-width: 2px;
+	pointer-events: none;
 }
 
-/* AnimatedLabel — pulso para el indicador "Procesando…" (proc-bar).
-   Toda la etiqueta late (opacidad + brillo del color de acento) en bucle, como
-   el Brain de "Razonamiento". display:inline-block para que filter/opacity
-   rendericen de forma fiable. Respeta prefers-reduced-motion. */
+.proc-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	background: var(
+		--vscode-editorWidget-background,
+		var(--vscode-sideBar-background, #252526)
+	);
+	border: 1px solid
+		var(
+			--vscode-editorWidget-border,
+			var(--vscode-widget-border, rgba(128, 128, 128, 0.25))
+		);
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+	pointer-events: auto;
+	backdrop-filter: blur(8px);
+	animation: proc-pill-in 0.18s ease-out;
+}
+
+.proc-pill.is-thinking {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	border-color: var(--vscode-focusBorder, rgba(77, 170, 252, 0.35));
+}
+
+.proc-pill.is-bash,
+.proc-pill.is-tool {
+	color: var(--vscode-symbolIcon-functionForeground, #b180d7);
+	border-color: rgba(177, 128, 215, 0.3);
+}
+
+.proc-pill.is-compacting {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+	border-color: rgba(204, 167, 0, 0.35);
+}
+
+.proc-pill.is-retry {
+	color: var(--vscode-errorForeground, #f85149);
+	border-color: rgba(248, 81, 73, 0.35);
+}
+
+.proc-pill-cancel {
+	background: none;
+	border: none;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+	padding: 0 2px 0 4px;
+	text-decoration: underline;
+}
+.proc-pill-cancel:hover {
+	color: var(--vscode-textLink-activeForeground, #70baff);
+}
+
+@keyframes proc-pill-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* AnimatedLabel — pulso para el indicador de estado.
+   Toda la etiqueta late (opacidad + brillo del color de acento) en bucle.
+   Respeta prefers-reduced-motion. */
+.proc-pill .proc-label.wave,
 .proc-bar .proc-label.wave {
 	display: inline-block;
 	animation: proc-pulse 1.2s ease-in-out infinite;
@@ -2980,6 +3064,7 @@ button.sec:hover {
 	}
 }
 @media (prefers-reduced-motion: reduce) {
+	.proc-pill .proc-label.wave,
 	.proc-bar .proc-label.wave {
 		animation: none;
 	}

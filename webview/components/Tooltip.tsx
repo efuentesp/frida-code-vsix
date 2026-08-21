@@ -9,7 +9,13 @@ export function Tooltip({
 	children,
 }: {
 	label: string;
-	side?: "top" | "bottom" | "bottom-right" | "bottom-left";
+	side?:
+		| "top"
+		| "top-left"
+		| "top-right"
+		| "bottom"
+		| "bottom-right"
+		| "bottom-left";
 	wide?: boolean;
 	children: ReactNode;
 }) {

@@ -166,13 +166,19 @@ describe("buildFridaPayload: role developer → system (Errata-8)", () => {
 		const out = buildFridaPayload({ model: "M", messages }, identity) as {
 			messages: typeof messages;
 		};
-		expect(out.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool"]);
+		expect(out.messages.map((m) => m.role)).toEqual([
+			"user",
+			"assistant",
+			"tool",
+		]);
 		expect(out.messages[2]).toBe(messages[2]); // misma referencia si no cambia
 	});
 
 	it("payload sin messages o messages no-array → intacto", () => {
 		expect(buildFridaPayload({ model: "M" }, identity).messages).toBeUndefined();
-		expect(buildFridaPayload({ model: "M", messages: "x" }, identity).messages).toBe("x");
+		expect(
+			buildFridaPayload({ model: "M", messages: "x" }, identity).messages,
+		).toBe("x");
 	});
 });
 
@@ -258,7 +264,11 @@ describe("toProviderModel", () => {
 		// router → meta
 		expect(
 			toProviderModel(
-				{ id: "model-router", capabilities: ["chat"], context_window_tokens: 1000000 },
+				{
+					id: "model-router",
+					capabilities: ["chat"],
+					context_window_tokens: 1000000,
+				},
 				root,
 			)?.name,
 		).toBe("model-router (meta)");
@@ -285,13 +295,21 @@ describe("toProviderModel", () => {
 		const root = "https://gw.example";
 		expect(
 			toProviderModel(
-				{ id: "DEMETER-BLOOM", capabilities: ["chat", "responses"], context_window_tokens: 1000000 },
+				{
+					id: "DEMETER-BLOOM",
+					capabilities: ["chat", "responses"],
+					context_window_tokens: 1000000,
+				},
 				root,
 			)?.name,
 		).toBe("⭐ DEMETER-BLOOM (responses, grande 200k)");
 		expect(
 			toProviderModel(
-				{ id: "TITAN-CROWN", capabilities: ["chat", "responses"], context_window_tokens: 400000 },
+				{
+					id: "TITAN-CROWN",
+					capabilities: ["chat", "responses"],
+					context_window_tokens: 400000,
+				},
 				root,
 			)?.name,
 		).toBe("⭐ TITAN-CROWN (responses, mediano 200k)");
@@ -345,7 +363,10 @@ describe("translateFridaResponse (Frida → Pi, respuesta final)", () => {
 							{
 								id: "call-1",
 								type: "function",
-								function: { name: "bash", arguments: JSON.stringify({ command: "echo hola" }) },
+								function: {
+									name: "bash",
+									arguments: JSON.stringify({ command: "echo hola" }),
+								},
 							},
 						],
 					},
@@ -368,26 +389,52 @@ describe("translateFridaResponse (Frida → Pi, respuesta final)", () => {
 	});
 
 	it("normaliza finish_reason length/stop/function_call", () => {
-		expect(translateFridaResponse({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }).finishReason).toBe("stop");
-		expect(translateFridaResponse({ choices: [{ message: { content: "x" }, finish_reason: "length" }] }).finishReason).toBe("length");
-		expect(translateFridaResponse({ choices: [{ message: { content: "x" }, finish_reason: "function_call" }] }).finishReason).toBe("toolUse");
+		expect(
+			translateFridaResponse({
+				choices: [{ message: { content: "x" }, finish_reason: "stop" }],
+			}).finishReason,
+		).toBe("stop");
+		expect(
+			translateFridaResponse({
+				choices: [{ message: { content: "x" }, finish_reason: "length" }],
+			}).finishReason,
+		).toBe("length");
+		expect(
+			translateFridaResponse({
+				choices: [{ message: { content: "x" }, finish_reason: "function_call" }],
+			}).finishReason,
+		).toBe("toolUse");
 	});
 });
 
 describe("translateFridaStreamChunk (Frida SSE → Pi events)", () => {
 	it("traduce delta de texto", () => {
-		expect(translateFridaStreamChunk({ choices: [{ delta: { content: "hola" }, finish_reason: null }] })).toEqual({
+		expect(
+			translateFridaStreamChunk({
+				choices: [{ delta: { content: "hola" }, finish_reason: null }],
+			}),
+		).toEqual({
 			type: "text_delta",
 			text: "hola",
 		});
 	});
 
 	it("traduce delta de reasoning y cierre", () => {
-		expect(translateFridaStreamChunk({ choices: [{ delta: { reasoning_content: "pensando" }, finish_reason: null }] })).toEqual({
+		expect(
+			translateFridaStreamChunk({
+				choices: [
+					{ delta: { reasoning_content: "pensando" }, finish_reason: null },
+				],
+			}),
+		).toEqual({
 			type: "reasoning_delta",
 			text: "pensando",
 		});
-		expect(translateFridaStreamChunk({ choices: [{ delta: {}, finish_reason: "tool_calls" }] })).toEqual({
+		expect(
+			translateFridaStreamChunk({
+				choices: [{ delta: {}, finish_reason: "tool_calls" }],
+			}),
+		).toEqual({
 			type: "done",
 			finishReason: "toolUse",
 		});
@@ -395,9 +442,31 @@ describe("translateFridaStreamChunk (Frida SSE → Pi events)", () => {
 
 	it("traduce delta de tool call con arguments string u objeto", () => {
 		const out = translateFridaStreamChunk({
-			choices: [{ delta: { tool_calls: [{ index: 0, id: "c", function: { name: "bash", arguments: JSON.stringify({ command: "ls" }) } }] }, finish_reason: null }],
+			choices: [
+				{
+					delta: {
+						tool_calls: [
+							{
+								index: 0,
+								id: "c",
+								function: {
+									name: "bash",
+									arguments: JSON.stringify({ command: "ls" }),
+								},
+							},
+						],
+					},
+					finish_reason: null,
+				},
+			],
 		});
-		expect(out).toMatchObject({ type: "tool_call_delta", index: 0, id: "c", name: "bash", arguments: { command: "ls" } });
+		expect(out).toMatchObject({
+			type: "tool_call_delta",
+			index: 0,
+			id: "c",
+			name: "bash",
+			arguments: { command: "ls" },
+		});
 	});
 });
 
@@ -418,8 +487,10 @@ describe("classifyGatewayError (errores reales capturados en vivo)", () => {
 
 	it("400 'not available for chat' → model-unavailable", () => {
 		expect(
-			classifyGatewayError(400, '{"detail":"Model \'X\' is not available for chat."}')
-				.kind,
+			classifyGatewayError(
+				400,
+				'{"detail":"Model \'X\' is not available for chat."}',
+			).kind,
 		).toBe("model-unavailable");
 	});
 
@@ -464,7 +535,12 @@ describe("toProviderModel: dual-endpoint (ADR-1003)", () => {
 
 	it("modelo con responses en capabilities → api openai-responses, baseUrl {root}/v1", () => {
 		const m = toProviderModel(
-			{ id: "NIKE-VICTORY", capabilities: ["chat", "responses"], context_window_tokens: 1_000_000, max_output_tokens: 128_000 },
+			{
+				id: "NIKE-VICTORY",
+				capabilities: ["chat", "responses"],
+				context_window_tokens: 1_000_000,
+				max_output_tokens: 128_000,
+			},
 			ROOT,
 		);
 		expect(m).toBeDefined();
@@ -482,15 +558,27 @@ describe("toProviderModel: dual-endpoint (ADR-1003)", () => {
 	});
 
 	it("reasoning:true aunque el gateway no declare la capability reasoning (ADR-1003 E5/E6: lo decide el endpoint/modelo)", () => {
-		const nike = toProviderModel({ id: "NIKE-VICTORY", capabilities: ["chat", "responses"] }, ROOT);
-		const selene = toProviderModel({ id: "SELENE-CIPHER", capabilities: ["chat"] }, ROOT);
+		const nike = toProviderModel(
+			{ id: "NIKE-VICTORY", capabilities: ["chat", "responses"] },
+			ROOT,
+		);
+		const selene = toProviderModel(
+			{ id: "SELENE-CIPHER", capabilities: ["chat"] },
+			ROOT,
+		);
 		expect(nike!.reasoning).toBe(true);
 		expect(selene!.reasoning).toBe(true);
 	});
 
 	it("compat.supportsReasoningEffort:true SÓLO para modelos chat (responses la lleva nativa)", () => {
-		const nike = toProviderModel({ id: "NIKE-VICTORY", capabilities: ["chat", "responses"] }, ROOT);
-		const selene = toProviderModel({ id: "SELENE-CIPHER", capabilities: ["chat"] }, ROOT);
+		const nike = toProviderModel(
+			{ id: "NIKE-VICTORY", capabilities: ["chat", "responses"] },
+			ROOT,
+		);
+		const selene = toProviderModel(
+			{ id: "SELENE-CIPHER", capabilities: ["chat"] },
+			ROOT,
+		);
 		expect((selene as any).compat).toEqual({ supportsReasoningEffort: true });
 		expect((nike as any).compat?.supportsReasoningEffort).toBeUndefined();
 	});
@@ -498,12 +586,20 @@ describe("toProviderModel: dual-endpoint (ADR-1003)", () => {
 	it("responses-only sin chat sigue excluido del catálogo (no hay adapter que lo pida)", () => {
 		// HEPHAESTUS-ANVIL etc: caps ["responses"] solas. La original los enruta por
 		// responses, pero NO están en el catálogo verificado chat; se mantienen fuera.
-		const m = toProviderModel({ id: "HEPHAESTUS-ANVIL", capabilities: ["responses"] }, ROOT);
+		const m = toProviderModel(
+			{ id: "HEPHAESTUS-ANVIL", capabilities: ["responses"] },
+			ROOT,
+		);
 		expect(m).toBeUndefined();
 	});
 
 	it("embeddings sigue excluido", () => {
-		expect(toProviderModel({ id: "MNEMOSYNE-THREAD", capabilities: ["embeddings"] }, ROOT)).toBeUndefined();
+		expect(
+			toProviderModel(
+				{ id: "MNEMOSYNE-THREAD", capabilities: ["embeddings"] },
+				ROOT,
+			),
+		).toBeUndefined();
 	});
 });
 
@@ -559,7 +655,12 @@ describe("buildFridaPayload: developer→system también en input (Errata-8 resp
 
 	it("no fabrica reasoning si ya existe (responses nativo con summary)", () => {
 		const out = buildFridaPayload(
-			{ model: "M", input: [], reasoning: { effort: "medium", summary: "auto" }, reasoning_effort: "high" },
+			{
+				model: "M",
+				input: [],
+				reasoning: { effort: "medium", summary: "auto" },
+				reasoning_effort: "high",
+			},
 			{ user_id: "u", email: "e" },
 		);
 		expect(out.reasoning).toEqual({ effort: "medium", summary: "auto" });
@@ -572,20 +673,23 @@ describe("buildFridaPayload: traducción Errata-13 (output_text→input_text, dr
 	const ID = { user_id: "u1", email: "u@x.com" };
 
 	it("assistant previo: content output_text → input_text (el gateway 500-kea con output_text)", () => {
-		const out = buildFridaPayload({
-			input: [
-				{ role: "system", content: [{ type: "input_text", text: "s" }] },
-				{ role: "user", content: [{ type: "input_text", text: "u" }] },
-				{
-					type: "message",
-					role: "assistant",
-					content: [{ type: "output_text", text: "Hace 22°C.", annotations: [] }],
-					status: "completed",
-					id: "msg_1",
-				},
-				{ role: "user", content: [{ type: "input_text", text: "gracias" }] },
-			],
-		}, ID);
+		const out = buildFridaPayload(
+			{
+				input: [
+					{ role: "system", content: [{ type: "input_text", text: "s" }] },
+					{ role: "user", content: [{ type: "input_text", text: "u" }] },
+					{
+						type: "message",
+						role: "assistant",
+						content: [{ type: "output_text", text: "Hace 22°C.", annotations: [] }],
+						status: "completed",
+						id: "msg_1",
+					},
+					{ role: "user", content: [{ type: "input_text", text: "gracias" }] },
+				],
+			},
+			ID,
+		);
 		const ast = (out.input as any[]).find((i) => i.role === "assistant");
 		expect(ast.content[0].type).toBe("input_text");
 		expect(ast.content[0].text).toBe("Hace 22°C.");
@@ -595,36 +699,59 @@ describe("buildFridaPayload: traducción Errata-13 (output_text→input_text, dr
 	});
 
 	it("items reasoning se DESCARTAN (el gateway 500-kea con ellos)", () => {
-		const out = buildFridaPayload({
-			input: [
-				{ role: "user", content: [{ type: "input_text", text: "hola" }] },
-				{ type: "reasoning", id: "rs_1", summary: [{ type: "summary_text", text: "x" }], encrypted_content: "ENC" },
-				{
-					type: "message",
-					role: "assistant",
-					content: [{ type: "output_text", text: "respuesta" }],
-				},
-			],
-		}, ID);
+		const out = buildFridaPayload(
+			{
+				input: [
+					{ role: "user", content: [{ type: "input_text", text: "hola" }] },
+					{
+						type: "reasoning",
+						id: "rs_1",
+						summary: [{ type: "summary_text", text: "x" }],
+						encrypted_content: "ENC",
+					},
+					{
+						type: "message",
+						role: "assistant",
+						content: [{ type: "output_text", text: "respuesta" }],
+					},
+				],
+			},
+			ID,
+		);
 		const types = (out.input as any[]).map((i) => i.type ?? i.role);
 		expect(types).toEqual(["user", "message"]); // reasoning descartado
 	});
 
 	it("function_call / function_call_output pasan INTACTOS (el gateway los acepta)", () => {
-		const fc = { type: "function_call", call_id: "c1", name: "get_weather", arguments: "{}" };
-		const fco = { type: "function_call_output", call_id: "c1", output: '{"temp":22}' };
-		const out = buildFridaPayload({ input: [{ role: "user", content: "u" }, fc, fco] }, ID);
+		const fc = {
+			type: "function_call",
+			call_id: "c1",
+			name: "get_weather",
+			arguments: "{}",
+		};
+		const fco = {
+			type: "function_call_output",
+			call_id: "c1",
+			output: '{"temp":22}',
+		};
+		const out = buildFridaPayload(
+			{ input: [{ role: "user", content: "u" }, fc, fco] },
+			ID,
+		);
 		expect((out.input as any[])[1]).toEqual(fc);
 		expect((out.input as any[])[2]).toEqual(fco);
 	});
 
 	it("developer→system (Errata-8) sigue aplicando JUNTO a la traducción", () => {
-		const out = buildFridaPayload({
-			input: [
-				{ role: "developer", content: [{ type: "input_text", text: "s" }] },
-				{ type: "reasoning", id: "rs_1", summary: [] },
-			],
-		}, ID);
+		const out = buildFridaPayload(
+			{
+				input: [
+					{ role: "developer", content: [{ type: "input_text", text: "s" }] },
+					{ type: "reasoning", id: "rs_1", summary: [] },
+				],
+			},
+			ID,
+		);
 		expect((out.input as any[])[0].role).toBe("system");
 		expect((out.input as any[]).length).toBe(1);
 	});
@@ -705,8 +832,12 @@ describe("payloadShapeTag (histograma role:type, para el dbg del hook)", () => {
 
 describe("reasoningEffortTag (observabilidad del effort en el dbg del hook)", () => {
 	it("payload chat traducido (reasoning:{effort}) → reasoning=<effort>", () => {
-		expect(reasoningEffortTag({ reasoning: { effort: "high" } })).toBe("reasoning=high");
-		expect(reasoningEffortTag({ reasoning: { effort: "none" } })).toBe("reasoning=none");
+		expect(reasoningEffortTag({ reasoning: { effort: "high" } })).toBe(
+			"reasoning=high",
+		);
+		expect(reasoningEffortTag({ reasoning: { effort: "none" } })).toBe(
+			"reasoning=none",
+		);
 	});
 
 	it("payload responses (effort+summary) → reasoning=<effort>(<summary>)", () => {
@@ -716,17 +847,23 @@ describe("reasoningEffortTag (observabilidad del effort en el dbg del hook)", ()
 	});
 
 	it("payload sin traducir (reasoning_effort crudo) también lo reporta", () => {
-		expect(reasoningEffortTag({ reasoning_effort: "medium" })).toBe("reasoning=medium");
+		expect(reasoningEffortTag({ reasoning_effort: "medium" })).toBe(
+			"reasoning=medium",
+		);
 	});
 
 	it("payload SIN effort → reasoning=ausente (el gateway aplicará su default)", () => {
 		expect(reasoningEffortTag({})).toBe("reasoning=ausente");
-		expect(reasoningEffortTag({ reasoning: { summary: "auto" } })).toBe("reasoning=ausente");
+		expect(reasoningEffortTag({ reasoning: { summary: "auto" } })).toBe(
+			"reasoning=ausente",
+		);
 	});
 
 	it("payload malformado → ausente, sin lanzar (defensivo Errata-6)", () => {
 		expect(() => reasoningEffortTag(undefined as any)).not.toThrow();
-		expect(reasoningEffortTag({ reasoning: "no-objeto" } as any)).toBe("reasoning=ausente");
+		expect(reasoningEffortTag({ reasoning: "no-objeto" } as any)).toBe(
+			"reasoning=ausente",
+		);
 	});
 });
 
