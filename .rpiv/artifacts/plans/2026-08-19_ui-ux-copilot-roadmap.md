@@ -255,6 +255,6 @@ Esta hoja de ruta establece la adopción gradual de la identidad visual y patron
 - [x] **Fase 1 (Fundaciones Visuales y Primitivas CSS)**: `@vscode/codicons`, `Codicon.tsx`, `.tc-shimmer`, `font-variant-numeric: tabular-nums`, accesibilidad `prefers-reduced-motion` (`431d5ec`).
 - [x] **Fase 2 (Fila de Tools Plana y Catálogo Tool por Tool)**: `tool-phrases.ts` para 20+ herramientas con soporte de verbos en gerundio/pasado, `.tool-flat` y lazy grid expansion (`01ae60c`).
 - [x] **Fase 3 (Estructura de Turnos, Thinking y Agrupación)**: `turn-grouping.ts` con partición cronológica, fila plana `ThinkingSegment` (`Razonando…` $\rightarrow$ `Razonó`), y disclosure `ToolGroup` con línea guía vertical (`5cc1232`).
-- [ ] **Fase 4 (Footer — Input Stack, Composer y Border Beam)**: Rediseño del cuadro de entrada con border beam `.working`, botón de submit circular (↑/■) y toolbars integradas.
-- [ ] **Fase 5 (Footer — Paneles Dockeados y Followups)**: Widgets dockeados en píldora única y followups contextuales.
-- [ ] **Fase 6 (Header, Overlays y Botón Scroll-to-Bottom)**: WorkspaceBar compacto, overlays consistentes y botón flotante con badge.
+- [x] **Fase 4 (Footer — Input Stack, Composer y Border Beam)**: `.chat-input-stack` con borde unificado, border beam `.working` animado con conic-gradient, botón circular Submit/Abort (↑/■) y toolbars integradas (`98a8b65`).
+- [x] **Fase 5 (Footer — Paneles Dockeados y Followups)**: `Followups.tsx` con reglas contextuales inteligentes en `followup-rules.ts` y chips clicables (`d693f07`).
+- [x] **Fase 6 (Header, Overlays y Botón Scroll-to-Bottom)**: `WorkspaceBar` modernizado con Codicons y botón flotante `.jump-bottom` (`c01d332`).
