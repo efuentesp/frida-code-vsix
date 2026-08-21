@@ -929,6 +929,10 @@ export function App() {
 					}}
 					onRename={(p, n) => post({ type: "rename_session", path: p, name: n })}
 					onDelete={(p) => post({ type: "delete_session", path: p })}
+					onNewSession={() => {
+						post({ type: "new_session" });
+						setSessionsOpen(false);
+					}}
 				/>
 			)}
 			{modelsOpen && state.models && (

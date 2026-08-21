@@ -271,10 +271,7 @@ export function ApprovalCard({
 				title={collapsed ? "Expandir" : "Colapsar"}
 			>
 				<span className="ap-chev">
-					<Codicon
-						name={collapsed ? "chevron-right" : "chevron-down"}
-						size={13}
-					/>
+					<Codicon name={collapsed ? "chevron-right" : "chevron-down"} size={13} />
 				</span>
 				<span className="ap-shield-badge">
 					<Codicon name="shield" size={13} />
@@ -368,9 +365,7 @@ export function ApprovalCard({
 									{active && (
 										<>
 											<span className="ap-key-chip">Y</span>{" "}
-											{approval.suggestedPattern && (
-												<span className="ap-key-chip">P</span>
-											)}{" "}
+											{approval.suggestedPattern && <span className="ap-key-chip">P</span>}{" "}
 											<span className="ap-key-chip">N</span>{" "}
 											<span className="ap-key-chip">M</span>
 										</>

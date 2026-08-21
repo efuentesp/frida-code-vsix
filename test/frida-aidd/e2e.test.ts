@@ -39,8 +39,8 @@ beforeEach(() => {
 
 afterEach(() => {
 	if (REAL_HOME) process.env.HOME = REAL_HOME;
-	rmSync(home, { recursive: true, force: true });
-	rmSync(cwd, { recursive: true, force: true });
+	rmSync(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+	rmSync(cwd, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
 
 /**
