@@ -17,6 +17,32 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.29.0] - 2026-08-22
+### Añadido
+
+- **settings** — nuevo panel de Productividad y Agentes (Refs #102)
+- **settings** — rediseño de la pestaña de Uso en Configuración (Refs #101)
+- **settings** — rediseño del tab Index en Configuración (Refs #100)
+- **settings** — pestaña Entorno & Dependencias en Configuración (Refs #99)
+- **providers** — frida-antigravity — Google Antigravity / Cloud Code Assist (Refs #97)
+- **todo-web** — botón de resincronización justificado a la derecha con icono sync nativo de VS Code
+- **webview** — ampliar la línea de pensamiento en vivo de 55 a 120 caracteres y hacerla fluida al ancho del panel
+
+### Corregido
+
+- **ui** — una sola ventana al cambiar de proveedor — elimina la re-confirmación del host (Refs #98)
+- **abort** — el botón Detener/doble Esc aborta la sesión real del SDK (Refs #96)
+
+### Interno
+
+- **design** — arquitectura de recolección y monitoreo de métricas DORA/SPACE/FLOW/Agentes
+- reformateo biome de la pestaña de Productividad (Refs #102)
+- reformateo biome de la pestaña de Uso (Refs #101)
+- reformateo biome de la pestaña Entorno y dependencias (Refs #99)
+- reindentación biome del comentario #98 en selectModel (Refs #98)
+- reformateo biome del port frida-antigravity y Composer (Refs #97)
+- artefactos de webview regenerados por el empaquetado de 0.28.0
+
 ## [0.28.0] - 2026-08-22
 ### Añadido
 
