@@ -1,6 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	computeTiming,
 	SessionTimingDetail,
@@ -164,6 +164,21 @@ describe("SessionTimingPopover — chip (#107)", () => {
 	});
 });
 
+/** Busca en el árbol de elementos el primero con className dada. */
+function findByClass(el: unknown, cls: string): any {
+	if (!el || typeof el !== "object") return null;
+	const e = el as { props?: any; type?: unknown };
+	const c = e.props?.className;
+	if (typeof c === "string" && c.split(/\s+/).includes(cls)) return e;
+	const kids = e.props?.children;
+	const list = Array.isArray(kids) ? kids : [kids];
+	for (const k of list) {
+		const hit = findByClass(k, cls);
+		if (hit) return hit;
+	}
+	return null;
+}
+
 describe("SessionTimingDetail — popover (#107)", () => {
 	it("desglose completo: sparkline, filas, %, pie y máximo con turno", () => {
 		const t = computeTiming(mkUsage(), false, undefined, 0);
@@ -201,6 +216,19 @@ describe("SessionTimingDetail — popover (#107)", () => {
 		expect(html).toContain("stp-running");
 		expect(html).toContain("turno en curso");
 		expect(html).toContain("13 turnos"); // cerrados + en curso
+	});
+
+	it("REGRESIÓN: el botón ✕ cierra el popover (onClick wired a onClose)", () => {
+		const t = computeTiming(mkUsage(), false, undefined, 0);
+		const onClose = vi.fn();
+		// Invocar el function component directamente (sin hooks) para obtener
+		// su árbol de elementos con los handlers intactos.
+		const el = SessionTimingDetail({ usage: mkUsage(), t, onClose });
+		const close = findByClass(el, "stp-close");
+		expect(close).toBeTruthy();
+		expect(typeof close.props.onClick).toBe("function");
+		close.props.onClick();
+		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
 	it("sparkline limitado a 20 barras, máximo marcado dentro del recorte", () => {

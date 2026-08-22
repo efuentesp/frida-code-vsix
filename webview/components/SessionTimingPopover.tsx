@@ -61,15 +61,28 @@ export function computeTiming(
 
 export type Timing = ReturnType<typeof computeTiming>;
 
-/** Cuerpo del popover (puro): desglose completo de la sesión. */
-export function SessionTimingDetail({ usage, t }: { usage: Usage; t: Timing }) {
+/** Cuerpo del popover: desglose completo de la sesión. onClose wired al ✕. */
+export function SessionTimingDetail({
+	usage,
+	t,
+	onClose,
+}: {
+	usage: Usage;
+	t: Timing;
+	onClose?: () => void;
+}) {
 	return (
 		<div className="stp" role="dialog" aria-label="Detalle de tiempo de sesión">
 			<div className="stp-head">
 				<span className="stp-title">
 					<Codicon name="watch" size={13} /> Tiempo de sesión
 				</span>
-				<button type="button" className="stp-close" aria-label="Cerrar">
+				<button
+					type="button"
+					className="stp-close"
+					aria-label="Cerrar"
+					onClick={onClose}
+				>
 					<Codicon name="close" size={13} />
 				</button>
 			</div>
@@ -227,7 +240,13 @@ export function SessionTimingPopover({
 				<span className="st-chip-turns">{t.turnsClosed}t</span>
 				{t.running && <span className="st-chip-live" aria-label="en curso" />}
 			</button>
-			{open && <SessionTimingDetail usage={usage} t={t} />}
+			{open && (
+				<SessionTimingDetail
+					usage={usage}
+					t={t}
+					onClose={() => setOpen(false)}
+				/>
+			)}
 		</span>
 	);
 }
