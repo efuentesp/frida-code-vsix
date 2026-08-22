@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="c2-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#161b22"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+
+    <!-- Main Bracket / Primary Gradient -->
+    <linearGradient id="c2-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="50%" stop-color="#a371f7"/>
+      <stop offset="100%" stop-color="#ff7b72"/>
+    </linearGradient>
+
+    <!-- Glowing Eye Gradient -->
+    <linearGradient id="c2-eye-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#79c0ff"/>
+      <stop offset="100%" stop-color="#a371f7"/>
+    </linearGradient>
+
+    <!-- AI Sparkle Gradient -->
+    <linearGradient id="c2-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2cc60"/>
+      <stop offset="100%" stop-color="#ff7b72"/>
+    </linearGradient>
+
+    <filter id="c2-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- App Icon Squircle Background -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#c2-bg)" stroke="#30363d" stroke-width="4"/>
+
+  <!-- Top AI Sparkle ✦ Crown / Antenna -->
+  <path d="M 256 70 Q 256 106 274 124 Q 256 106 256 142 Q 256 106 238 124 Q 256 106 256 70 Z" 
+        fill="url(#c2-sparkle-grad)" filter="url(#c2-glow)"/>
+  <circle cx="256" cy="106" r="3.5" fill="#ffffff"/>
+
+  <!-- Outer Robot Brackets { } -->
+  <g filter="url(#c2-glow)">
+    <!-- Left Bracket { (Thick & Stylized) -->
+    <path d="M 160 140 
+             Q 104 140 104 195 
+             L 104 225 
+             Q 104 256 74 256 
+             Q 104 256 104 287 
+             L 104 317 
+             Q 104 372 160 372" 
+          fill="none" stroke="url(#c2-primary)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Bracket } (Thick & Stylized) -->
+    <path d="M 352 140 
+             Q 408 140 408 195 
+             L 408 225 
+             Q 408 256 438 256 
+             Q 408 256 408 287 
+             L 408 317 
+             Q 408 372 352 372" 
+          fill="none" stroke="url(#c2-primary)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Robot Face Core: > - and Smile -->
+  <g filter="url(#c2-glow)">
+    <!-- Left Eye: Bold Chevron '>' -->
+    <path d="M 186 215 L 236 256 L 186 297" 
+          fill="none" stroke="url(#c2-eye-grad)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Eye: Bold Wink Dash '-' -->
+    <path d="M 282 256 L 332 256" 
+          fill="none" stroke="url(#c2-eye-grad)" stroke-width="18" stroke-linecap="round"/>
+
+    <!-- Terminal Prompt / Pulse Accent Dot -->
+    <circle cx="348" cy="232" r="5" fill="#58a6ff"/>
+
+    <!-- Minimalist Robot Smile / Code Underline -->
+    <path d="M 232 334 L 280 334" 
+          fill="none" stroke="#a371f7" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- Antenna Nodes Base -->
+  <circle cx="160" cy="140" r="10" fill="#58a6ff"/>
+  <circle cx="352" cy="140" r="10" fill="#ff7b72"/>
+  <circle cx="160" cy="372" r="10" fill="#58a6ff"/>
+  <circle cx="352" cy="372" r="10" fill="#ff7b72"/>
+</svg>

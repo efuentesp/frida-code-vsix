@@ -26,7 +26,7 @@ import type {
 // 1-9 selección directa · ←/→ cambia de pestaña (pregunta o Enviar) · Shift+⏎
 // envía · Esc cancela (por niveles en el input).
 
-interface Props {
+export interface QuestionsPanelProps {
 	questions: WebQuestionSpec[];
 	onResult: (r: { answers: WebQuestionAnswer[]; cancelled: boolean }) => void;
 	initialTab?: number;
@@ -34,7 +34,11 @@ interface Props {
 
 type Zone = "options" | "input" | "buttons";
 
-export function QuestionsPanel({ questions, onResult, initialTab }: Props) {
+export function QuestionsPanel({
+	questions,
+	onResult,
+	initialTab,
+}: QuestionsPanelProps) {
 	// tab: 0..questions.length-1 = pregunta · questions.length = pestaña "Enviar" (review)
 	const [tab, setTab] = useState(initialTab ?? 0);
 	const [drafts, setDrafts] = useState<Record<number, WebQuestionAnswer>>({});

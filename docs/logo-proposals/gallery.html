@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Propuestas de Nuevo Logo — Frida Code</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #c9d1d9;
+        --text-bright: #ffffff;
+        --text-muted: #8b949e;
+        --accent: #58a6ff;
+        --accent-purple: #bc8cff;
+        --tag-bg: rgba(56, 139, 253, 0.15);
+      }
+      .light-theme {
+        --bg: #f6f8fa;
+        --card-bg: #ffffff;
+        --border: #d0d7de;
+        --text: #24292f;
+        --text-bright: #0969da;
+        --text-muted: #57606a;
+        --accent: #0969da;
+        --accent-purple: #8250df;
+        --tag-bg: rgba(9, 105, 218, 0.1);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 40px 24px;
+        line-height: 1.5;
+        transition:
+          background 0.2s,
+          color 0.2s;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 28px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--text-bright);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+      .section-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-bright);
+        margin: 28px 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .theme-toggle {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .theme-toggle:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        transition:
+          transform 0.2s,
+          border-color 0.2s,
+          box-shadow 0.2s;
+        position: relative;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        border-color: var(--accent);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+      }
+      .badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 10px;
+        background: var(--tag-bg);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+      .img-wrap {
+        width: 140px;
+        height: 140px;
+        margin: 12px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .img-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .card h2 {
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--text-bright);
+        margin-bottom: 4px;
+      }
+      .concept-tag {
+        font-family: monospace;
+        font-size: 12px;
+        color: var(--accent-purple);
+        margin-bottom: 10px;
+        background: rgba(188, 140, 255, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
+      }
+      .desc {
+        font-size: 12.5px;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+        flex-grow: 1;
+        text-align: left;
+      }
+      .sizes-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+        width: 100%;
+      }
+      .size-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .size-item span {
+        font-size: 9.5px;
+        color: var(--text-muted);
+      }
+      .comparison-section {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px;
+        margin-top: 10px;
+      }
+      .comparison-section h3 {
+        font-size: 15px;
+        margin-bottom: 14px;
+        color: var(--text-bright);
+      }
+      .mockup-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .mockup-item {
+        flex: 1;
+        min-width: 200px;
+        background: #090d13;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .mockup-item .mock-icon {
+        width: 28px;
+        height: 28px;
+      }
+      .mockup-item .mock-info {
+        text-align: left;
+      }
+      .mockup-item .mock-title {
+        font-weight: 600;
+        font-size: 12px;
+        color: #ffffff;
+      }
+      .mockup-item .mock-sub {
+        font-size: 10.5px;
+        color: #8b949e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <h1>🤖 Propuestas de Nuevo Logo — Frida Code</h1>
+          <div class="subtitle">
+            Evolución del robot actual de Lucide con ojo izquierdo
+            <code>&gt;</code> y ojo derecho <code>_</code> (guiño).
+          </div>
+        </div>
+        <button
+          class="theme-toggle"
+          onclick="document.body.classList.toggle('light-theme')"
+        >
+          🌓 Alternar Tema Claro/Oscuro
+        </button>
+      </header>
+
+      <!-- PROPUESTAS SERIE V2 (Mismo robot actual con expresión > y _) -->
+      <div class="section-title">
+        ✨ Serie V2: Robot actual con ojo izquierdo &gt; y guiño _
+      </div>
+      <div class="grid">
+        <!-- V2-1: Classic Purple -->
+        <div class="card">
+          <div class="badge">Más fiel al actual</div>
+          <h2>V2-1: Classic Purple</h2>
+          <div class="concept-tag">{ &gt; _ } Púrpura Frida</div>
+          <div class="img-wrap">
+            <img
+              src="concept-v2-1-classic-purple.svg"
+              alt="V2-1: Classic Purple"
+            />
+          </div>
+          <p class="desc">
+            Mismo fondo circular morado (#6a5acd) y silueta exacta del robot
+            actual, pero con el ojo izquierdo en <code>&gt;</code> y el derecho
+            en <code>_</code> simulando el guiño.
+          </p>
+          <div class="sizes-row">
+            <div class="size-item">
+              <img
+                src="concept-v2-1-classic-purple.svg"
+                width="32"
+                height="32"
+                alt="32px"
+              /><span>32px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-1-classic-purple.svg"
+                width="24"
+                height="24"
+                alt="24px"
+              /><span>24px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-1-classic-purple.svg"
+                width="16"
+                height="16"
+                alt="16px"
+              /><span>16px</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- V2-2: Copilot Gradient -->
+        <div class="card">
+          <div class="badge">Recomendado AI</div>
+          <h2>V2-2: Copilot Neón</h2>
+          <div class="concept-tag">{ &gt; _ } Azul &amp; Púrpura</div>
+          <div class="img-wrap">
+            <img src="concept-v2-2-copilot-neon.svg" alt="V2-2: Copilot Neon" />
+          </div>
+          <p class="desc">
+            Fondo con degradado moderno Copilot (azul a violeta espacial),
+            silueta limpia y destello sutil de inteligencia <code>✦</code> junto
+            al guiño.
+          </p>
+          <div class="sizes-row">
+            <div class="size-item">
+              <img
+                src="concept-v2-2-copilot-neon.svg"
+                width="32"
+                height="32"
+                alt="32px"
+              /><span>32px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-2-copilot-neon.svg"
+                width="24"
+                height="24"
+                alt="24px"
+              /><span>24px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-2-copilot-neon.svg"
+                width="16"
+                height="16"
+                alt="16px"
+              /><span>16px</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- V2-3: Dark Glass -->
+        <div class="card">
+          <h2>V2-3: Dark Glass</h2>
+          <div class="concept-tag">{ &gt; _ } Cian &amp; Violeta</div>
+          <div class="img-wrap">
+            <img src="concept-v2-3-dark-glass.svg" alt="V2-3: Dark Glass" />
+          </div>
+          <p class="desc">
+            Fondo oscuro carbón con borde fino en degradado. Ojo
+            <code>&gt;</code> en cian neón eléctrico y ojo <code>_</code> en
+            violeta neón.
+          </p>
+          <div class="sizes-row">
+            <div class="size-item">
+              <img
+                src="concept-v2-3-dark-glass.svg"
+                width="32"
+                height="32"
+                alt="32px"
+              /><span>32px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-3-dark-glass.svg"
+                width="24"
+                height="24"
+                alt="24px"
+              /><span>24px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-3-dark-glass.svg"
+                width="16"
+                height="16"
+                alt="16px"
+              /><span>16px</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- V2-4: Amber Terminal -->
+        <div class="card">
+          <h2>V2-4: Amber Terminal</h2>
+          <div class="concept-tag">{ &gt; _ } Ámbar Hacker</div>
+          <div class="img-wrap">
+            <img
+              src="concept-v2-5-amber-terminal.svg"
+              alt="V2-4: Amber Terminal"
+            />
+          </div>
+          <p class="desc">
+            Fondo oscuro con acento y trazos en ámbar terminal / dorado. Muy
+            técnico, elegante y con personalidad de consola dev.
+          </p>
+          <div class="sizes-row">
+            <div class="size-item">
+              <img
+                src="concept-v2-5-amber-terminal.svg"
+                width="32"
+                height="32"
+                alt="32px"
+              /><span>32px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-5-amber-terminal.svg"
+                width="24"
+                height="24"
+                alt="24px"
+              /><span>24px</span>
+            </div>
+            <div class="size-item">
+              <img
+                src="concept-v2-5-amber-terminal.svg"
+                width="16"
+                height="16"
+                alt="16px"
+              /><span>16px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulación comparativa -->
+      <div class="comparison-section">
+        <h3>Simulación en Activity Bar &amp; Welcome Screen</h3>
+        <div class="mockup-row">
+          <div class="mockup-item">
+            <img
+              src="concept-v2-1-classic-purple.svg"
+              class="mock-icon"
+              alt="v2-1"
+            />
+            <div class="mock-info">
+              <div class="mock-title">V2-1: Classic Purple</div>
+              <div class="mock-sub">Frida Code · { &gt; _ }</div>
+            </div>
+          </div>
+          <div class="mockup-item">
+            <img
+              src="concept-v2-2-copilot-neon.svg"
+              class="mock-icon"
+              alt="v2-2"
+            />
+            <div class="mock-info">
+              <div class="mock-title">V2-2: Copilot Neón</div>
+              <div class="mock-sub">Frida Code · { &gt; _ }</div>
+            </div>
+          </div>
+          <div class="mockup-item">
+            <img
+              src="concept-v2-3-dark-glass.svg"
+              class="mock-icon"
+              alt="v2-3"
+            />
+            <div class="mock-info">
+              <div class="mock-title">V2-3: Dark Glass</div>
+              <div class="mock-sub">Frida Code · { &gt; _ }</div>
+            </div>
+          </div>
+          <div class="mockup-item">
+            <img
+              src="concept-v2-5-amber-terminal.svg"
+              class="mock-icon"
+              alt="v2-4"
+            />
+            <div class="mock-info">
+              <div class="mock-title">V2-4: Amber Terminal</div>
+              <div class="mock-sub">Frida Code · { &gt; _ }</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

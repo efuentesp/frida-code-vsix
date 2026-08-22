@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { QuestionsPanel } from "../webview/components/QuestionsPanel";
+import {
+	QuestionsPanel,
+	type QuestionsPanelProps,
+} from "../webview/components/QuestionsPanel";
 import type { WebQuestionSpec } from "../webview/types";
 
 describe("QuestionsPanel (Propuesta 2: Flujo Conversacional con Historial de Respuestas)", () => {
@@ -174,13 +177,12 @@ describe("QuestionsPanel (Propuesta 2: Flujo Conversacional con Historial de Res
 			},
 		];
 		const onResult = vi.fn();
-		const html = renderToStaticMarkup(
-			React.createElement(QuestionsPanel, {
-				questions,
-				onResult,
-				initialTab: 2, // Pestaña de revisión
-			}),
-		);
+		const props: QuestionsPanelProps = {
+			questions,
+			onResult,
+			initialTab: 2, // Pestaña de revisión
+		};
+		const html = renderToStaticMarkup(React.createElement(QuestionsPanel, props));
 
 		expect(html).toContain("q-review");
 		expect(html).toContain("Listo para enviar");

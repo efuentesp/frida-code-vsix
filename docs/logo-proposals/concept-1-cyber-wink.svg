@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background / Aura Gradients -->
+    <radialGradient id="c1-bg-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#388bfd" stop-opacity="0.3"/>
+      <stop offset="60%" stop-color="#8957e5" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#0d1117" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Metallic Head Chassis Gradient -->
+    <linearGradient id="c1-chassis" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d333b"/>
+      <stop offset="50%" stop-color="#1e2228"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+
+    <!-- Border Accent Gradient -->
+    <linearGradient id="c1-border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="50%" stop-color="#8957e5"/>
+      <stop offset="100%" stop-color="#3fb950"/>
+    </linearGradient>
+
+    <!-- Visor Glass Gradient -->
+    <linearGradient id="c1-visor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0a0e14"/>
+      <stop offset="100%" stop-color="#121820"/>
+    </linearGradient>
+
+    <!-- Neon Glow Cyan -->
+    <linearGradient id="c1-neon-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#79c0ff"/>
+      <stop offset="100%" stop-color="#388bfd"/>
+    </linearGradient>
+
+    <!-- Neon Glow Purple -->
+    <linearGradient id="c1-neon-purple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d2a8ff"/>
+      <stop offset="100%" stop-color="#a371f7"/>
+    </linearGradient>
+
+    <!-- Sparkle Gold -->
+    <linearGradient id="c1-sparkle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2cc60"/>
+      <stop offset="100%" stop-color="#e3b341"/>
+    </linearGradient>
+
+    <!-- Drop Shadows & Glow Filters -->
+    <filter id="c1-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="c1-soft-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background Soft Aura -->
+  <circle cx="256" cy="256" r="230" fill="url(#c1-bg-glow)"/>
+
+  <!-- Top AI Crystal Antenna -->
+  <g filter="url(#c1-soft-shadow)">
+    <!-- Antenna base -->
+    <path d="M 236 100 L 276 100 L 268 126 L 244 126 Z" fill="#2d333b" stroke="url(#c1-border-grad)" stroke-width="2"/>
+    <!-- Crystal diamond -->
+    <path d="M 256 50 L 274 82 L 256 102 L 238 82 Z" fill="url(#c1-neon-cyan)" filter="url(#c1-glow)"/>
+    <path d="M 256 50 L 274 82 L 256 102 Z" fill="#ffffff" opacity="0.3"/>
+    <!-- Antenna Pulse Sparkle -->
+    <circle cx="256" cy="46" r="3" fill="#ffffff" filter="url(#c1-glow)"/>
+  </g>
+
+  <!-- Left & Right Ears / Headphones -->
+  <g filter="url(#c1-soft-shadow)">
+    <!-- Left Ear -->
+    <rect x="52" y="210" width="32" height="100" rx="16" fill="url(#c1-chassis)" stroke="url(#c1-border-grad)" stroke-width="3"/>
+    <circle cx="68" cy="260" r="8" fill="url(#c1-neon-cyan)" filter="url(#c1-glow)"/>
+    
+    <!-- Right Ear -->
+    <rect x="428" y="210" width="32" height="100" rx="16" fill="url(#c1-chassis)" stroke="url(#c1-border-grad)" stroke-width="3"/>
+    <circle cx="444" cy="260" r="8" fill="url(#c1-neon-purple)" filter="url(#c1-glow)"/>
+  </g>
+
+  <!-- Main Robot Head Outer Chassis -->
+  <rect x="74" y="118" width="364" height="294" rx="64" fill="url(#c1-chassis)" stroke="url(#c1-border-grad)" stroke-width="4" filter="url(#c1-soft-shadow)"/>
+
+  <!-- Visor Bezel / Screen Background -->
+  <rect x="100" y="144" width="312" height="242" rx="44" fill="url(#c1-visor)" stroke="#21262d" stroke-width="3"/>
+
+  <!-- Subtle Visor Glass Reflection Gloss -->
+  <path d="M 104 180 Q 256 148 408 180 L 408 148 Q 256 148 104 148 Z" fill="#ffffff" opacity="0.05"/>
+
+  <!-- Code Bracket Face Frame { } and Face Features -->
+  <g filter="url(#c1-glow)">
+    <!-- Left Bracket { -->
+    <path d="M 152 186 Q 132 186 132 216 L 132 246 Q 132 265 116 265 Q 132 265 132 284 L 132 314 Q 132 344 152 344" 
+          fill="none" stroke="url(#c1-neon-cyan)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Bracket } -->
+    <path d="M 360 186 Q 380 186 380 216 L 380 246 Q 380 265 396 265 Q 380 265 380 284 L 380 314 Q 380 344 360 344" 
+          fill="none" stroke="url(#c1-neon-purple)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Left Eye: Terminal Prompt Chevron '>' (Active Glowing Eye) -->
+    <path d="M 188 230 L 226 256 L 188 282" 
+          fill="none" stroke="url(#c1-neon-cyan)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Eye Sparkle inside chevron -->
+    <circle cx="196" cy="256" r="3.5" fill="#ffffff"/>
+
+    <!-- Right Eye: Wink Line '-' (Playful Wink Eye) -->
+    <path d="M 286 256 L 324 256" 
+          fill="none" stroke="url(#c1-neon-purple)" stroke-width="11" stroke-linecap="round"/>
+    <!-- Cute Wink Accent Arch -->
+    <path d="M 286 244 Q 305 236 324 244" 
+          fill="none" stroke="url(#c1-neon-purple)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Cute Micro Smile ⌣ -->
+    <path d="M 238 310 Q 256 324 274 310" 
+          fill="none" stroke="#58a6ff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Cheek Blush Dots -->
+  <ellipse cx="166" cy="298" rx="8" ry="4" fill="#ff7b72" opacity="0.4" filter="url(#c1-glow)"/>
+  <ellipse cx="346" cy="298" rx="8" ry="4" fill="#ff7b72" opacity="0.4" filter="url(#c1-glow)"/>
+
+  <!-- Bottom Floating Collar / Chin Detail -->
+  <path d="M 200 412 L 312 412 L 292 432 L 220 432 Z" fill="#1e2228" stroke="url(#c1-border-grad)" stroke-width="2"/>
+</svg>
