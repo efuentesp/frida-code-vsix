@@ -32,6 +32,7 @@ import { LensDiagnostics } from "./components/LensDiagnostics";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
 import { Codicon } from "./components/Codicon";
+import { FridaRobotIcon } from "./components/FridaRobotIcon";
 import { InfoToast } from "./components/InfoToast";
 import { Followups } from "./components/Followups";
 import { getContextualFollowups } from "./followup-rules";
@@ -342,7 +343,7 @@ export function App() {
 			<header className="toolbar">
 				<span className="brand">
 					<span className="avatar ai sm">
-						<Codicon name="copilot" size={13} />
+						<FridaRobotIcon size={12} />
 					</span>{" "}
 					Frida Code
 				</span>
