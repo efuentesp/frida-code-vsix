@@ -433,59 +433,59 @@ export function IndexTab({
 							type="button"
 							className="ci-files-refresh"
 							title="Volver a consultar el índice"
-							onClick={() =>
-								post({ type: "codebase_index_action", action: "files" })
-							}
+							onClick={() => post({ type: "codebase_index_action", action: "files" })}
 						>
 							<Codicon name="refresh" size={13} />
 						</button>
 
 						{filesOpen && (
 							<div className="ci-files-body">
-								{idxFiles ? idxFiles.available ? (
-									<>
-										<div className="ci-files-list">
-											{filteredFiles.length === 0 && (
-												<div className="ci-files-empty">
-													Ningún archivo coincide con «{filesQuery}».
-												</div>
-											)}
-											{filteredFiles.map((f) => (
-												<div key={f.path} className="ci-file-row">
-													<span className="ci-file-path" title={f.path}>
-														{f.path}
-													</span>
-													<span className="ci-file-meta">{f.language}</span>
-													<span className="ci-file-chunks">{f.chunks}</span>
-												</div>
-											))}
-										</div>
-										{idxFiles.failed.length > 0 && (
-											<div className="ci-files-failed">
-												<div className="ci-files-failed-head">
-													<Codicon name="warning" size={13} /> Fallidos en embedding
-													({idxFiles.failed.length} archivos)
-												</div>
-												{idxFiles.failed.slice(0, 10).map((f) => (
-													<div key={f.path} className="ci-file-row is-failed">
+								{idxFiles ? (
+									idxFiles.available ? (
+										<>
+											<div className="ci-files-list">
+												{filteredFiles.length === 0 && (
+													<div className="ci-files-empty">
+														Ningún archivo coincide con «{filesQuery}».
+													</div>
+												)}
+												{filteredFiles.map((f) => (
+													<div key={f.path} className="ci-file-row">
 														<span className="ci-file-path" title={f.path}>
 															{f.path}
 														</span>
+														<span className="ci-file-meta">{f.language}</span>
 														<span className="ci-file-chunks">{f.chunks}</span>
 													</div>
 												))}
 											</div>
-										)}
-									</>
-								) : (
-									<div className="ci-files-empty">
-										Sin índice construido en este workspace — ejecuta «Indexar»
-										para crearlo.
-									</div>
+											{idxFiles.failed.length > 0 && (
+												<div className="ci-files-failed">
+													<div className="ci-files-failed-head">
+														<Codicon name="warning" size={13} /> Fallidos en embedding (
+														{idxFiles.failed.length} archivos)
+													</div>
+													{idxFiles.failed.slice(0, 10).map((f) => (
+														<div key={f.path} className="ci-file-row is-failed">
+															<span className="ci-file-path" title={f.path}>
+																{f.path}
+															</span>
+															<span className="ci-file-chunks">{f.chunks}</span>
+														</div>
+													))}
+												</div>
+											)}
+										</>
+									) : (
+										<div className="ci-files-empty">
+											Sin índice construido en este workspace — ejecuta «Indexar» para
+											crearlo.
+										</div>
+									)
 								) : (
 									<div className="ci-files-empty">Consultando el índice…</div>
 								)}
-						</div>
+							</div>
 						)}
 					</div>
 				</div>

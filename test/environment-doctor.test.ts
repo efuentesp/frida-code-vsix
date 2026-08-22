@@ -200,7 +200,11 @@ describe("environment/doctor · detección de dependencias", () => {
 				};
 			}
 			if (cmd === "ollama" && args[0] === "list") {
-				return { stdout: "NAME  ID  SIZE\nnomic-embed-text  abc123  274 MB", stderr: "", code: 0 };
+				return {
+					stdout: "NAME  ID  SIZE\nnomic-embed-text  abc123  274 MB",
+					stderr: "",
+					code: 0,
+				};
 			}
 			return { stdout: "", stderr: "", code: 127 };
 		};
@@ -246,9 +250,53 @@ describe("environment/doctor · detección de dependencias", () => {
 		expect(res.notes).toContain("Opcional");
 	});
 
+	it("#110 — checkOllama: daemon activo SIN modelo de embeddings → advertencia con comando", async () => {
+		const mockExec: ExecFn = async (cmd, args) => {
+			if (cmd === "ollama" && args[0] === "--version") {
+				return { stdout: "ollama is version 0.12.6", stderr: "", code: 0 };
+			}
+			if (cmd === "ollama" && args[0] === "list") {
+				// daemon activo pero solo modelos de chat, ninguno de embeddings
+				return {
+					stdout: "NAME  ID  SIZE\nllama3.1  abc123  4.7 GB\nqwen2.5  def456  4.4 GB",
+					stderr: "",
+					code: 0,
+				};
+			}
+			return { stdout: "", stderr: "", code: 127 };
+		};
+
+		const res = await checkOllama(mockExec);
+		expect(res.installed).toBe(true);
+		expect(res.notes).toContain("falta el modelo de embeddings");
+		expect(res.notes).toContain("ollama pull nomic-embed-text");
+	});
+
+	it("#110 — checkOllama: mxbai-embed-large (2º modelo del catálogo upstream) también vale", async () => {
+		const mockExec: ExecFn = async (cmd, args) => {
+			if (cmd === "ollama" && args[0] === "--version") {
+				return { stdout: "ollama is version 0.12.6", stderr: "", code: 0 };
+			}
+			if (cmd === "ollama" && args[0] === "list") {
+				return {
+					stdout: "NAME  ID  SIZE\nmxbai-embed-large:latest  xyz  667 MB",
+					stderr: "",
+					code: 0,
+				};
+			}
+			return { stdout: "", stderr: "", code: 127 };
+		};
+
+		const res = await checkOllama(mockExec);
+		expect(res.notes).toContain("Daemon activo y listo");
+		expect(res.notes).toContain("mxbai-embed-large");
+		expect(res.notes).not.toContain("falta");
+	});
+
 	it("#110 — checkEnvironment incluye ollama (7 deps)", async () => {
 		const mockExec: ExecFn = async (cmd) => {
-			if (cmd === "git") return { stdout: "git version 2.44.0", stderr: "", code: 0 };
+			if (cmd === "git")
+				return { stdout: "git version 2.44.0", stderr: "", code: 0 };
 			if (cmd === "bash") return { stdout: "version 5.2.0", stderr: "", code: 0 };
 			return { stdout: "", stderr: "not found", code: 127 };
 		};

@@ -433,8 +433,7 @@ export async function checkOllama(exec: ExecFn): Promise<DependencyStatus> {
 	const out = `${res.stdout}\n${res.stderr}`;
 	const installed = res.code === 0 && /ollama|version/i.test(out);
 	const vMatch =
-		out.match(/version is\s+([^\s]+)/i) ??
-		out.match(/is version\s+([^\s]+)/i);
+		out.match(/version is\s+([^\s]+)/i) ?? out.match(/is version\s+([^\s]+)/i);
 	const version = vMatch ? `v${vMatch[1]}` : undefined;
 
 	let notes: string | undefined;
@@ -446,8 +445,19 @@ export async function checkOllama(exec: ExecFn): Promise<DependencyStatus> {
 				.map((l) => l.trim())
 				.filter((l) => l && !/^name(\s|$)/i.test(l))
 				.map((l) => l.split(/\s{2,}|\t/)[0]);
-			const embed = models.find((m) => /embed/i.test(m));
-			notes = `Daemon activo y listo (${models.length} ${models.length === 1 ? "modelo" : "modelos"}${embed ? `, incluye ${embed}` : ""})`;
+			// Catálogo de modelos de embedding Ollama que acepta el upstream
+			// (EMBEDDING_MODELS.ollama de open-codebase-index): default
+			// nomic-embed-text. Coincidencia exacta o con tag (:latest).
+			const EMBED_MODELS = ["nomic-embed-text", "mxbai-embed-large"];
+			const stripTag = (m: string) => m.replace(/:latest$/, "");
+			const embed = models.find((m) => EMBED_MODELS.includes(stripTag(m)));
+			if (embed) {
+				notes = `Daemon activo y listo (${models.length} ${models.length === 1 ? "modelo" : "modelos"}, incluye ${embed})`;
+			} else {
+				// Daemon arriba pero sin modelo de embeddings: la indexación con
+				// motor Ollama fallará al vectorizar — advertencia accionable.
+				notes = `Daemon activo pero falta el modelo de embeddings: ejecuta 'ollama pull nomic-embed-text' (${models.length} ${models.length === 1 ? "modelo" : "modelos"} instalados, ninguno de embeddings)`;
+			}
 		} else {
 			notes = "Daemon detenido (inicia la app de Ollama o ejecuta 'ollama serve')";
 		}
@@ -469,18 +479,20 @@ export async function checkOllama(exec: ExecFn): Promise<DependencyStatus> {
 		installGuides: {
 			win32: {
 				command: "winget install Ollama.Ollama",
-				guide: "Tras instalar, ejecuta 'ollama pull nomic-embed-text' para el modelo de embeddings.",
+				guide:
+					"Tras instalar, ejecuta 'ollama pull nomic-embed-text' para el modelo de embeddings.",
 				url: "https://ollama.com/download",
 			},
 			darwin: {
 				command: "brew install --cask ollama",
 				guide:
-				"O descarga la app desde ollama.com; luego 'ollama pull nomic-embed-text'.",
+					"O descarga la app desde ollama.com; luego 'ollama pull nomic-embed-text'.",
 				url: "https://ollama.com/download",
 			},
 			linux: {
 				command: "curl -fsSL https://ollama.com/install.sh | sh",
-				guide: "Tras instalar, habilita el servicio y ejecuta 'ollama pull nomic-embed-text'.",
+				guide:
+					"Tras instalar, habilita el servicio y ejecuta 'ollama pull nomic-embed-text'.",
 				url: "https://ollama.com/download",
 			},
 		},

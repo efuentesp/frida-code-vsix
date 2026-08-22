@@ -120,10 +120,7 @@ async function queryViaNodeSqlite(
 	}
 }
 
-async function queryViaCli(
-	db: string,
-	sql: string,
-): Promise<unknown[] | null> {
+async function queryViaCli(db: string, sql: string): Promise<unknown[] | null> {
 	try {
 		const { stdout } = await execFile("sqlite3", ["-readonly", db, sql], {
 			maxBuffer: 8 * 1024 * 1024,

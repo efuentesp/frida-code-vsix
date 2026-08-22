@@ -3,7 +3,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { aggregateFailed, readIndexedFiles } from "../src/tools/frida-codebase-index/files";
+import {
+	aggregateFailed,
+	readIndexedFiles,
+} from "../src/tools/frida-codebase-index/files";
 
 function tmpdir(): string {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "frida-idx-files-"));
@@ -63,12 +66,15 @@ describe("codebase-index/files — lista de archivos indexados (#112)", () => {
 		const idx = path.join(d, ".codebase-index", "index");
 		fs.mkdirSync(idx, { recursive: true });
 		const db = path.join(idx, "codebase.db");
-		execFileSync("sqlite3", [db, `
+		execFileSync("sqlite3", [
+			db,
+			`
 			CREATE TABLE chunks (chunk_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, language TEXT NOT NULL);
 			INSERT INTO chunks VALUES ('c1', 'src/a.ts', 'typescript');
 			INSERT INTO chunks VALUES ('c2', 'src/a.ts', 'typescript');
 			INSERT INTO chunks VALUES ('c3', 'webview/b.tsx', 'tsx');
-		`]);
+		`,
+		]);
 		fs.writeFileSync(
 			path.join(idx, ".failed-batches.abc.json.tmp"),
 			JSON.stringify({
