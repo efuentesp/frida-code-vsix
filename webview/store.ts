@@ -593,6 +593,14 @@ export function reduce(state: State, msg: InMessage): State {
 		case "codebase_index_state":
 			return { ...state, codebaseIndex: msg.state };
 
+		// #112 — lista de archivos presentes en el índice (consulta read-only).
+		case "codebase_index_files":
+			return { ...state, codebaseIndexFiles: {
+				available: msg.available,
+				files: msg.files,
+				failed: msg.failed,
+			} };
+
 		// Reporte de diagnóstico del entorno y dependencias del sistema (#99).
 		case "environment_status":
 			return { ...state, environment: msg.status, environmentChecking: false };

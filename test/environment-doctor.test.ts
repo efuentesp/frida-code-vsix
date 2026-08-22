@@ -7,6 +7,7 @@ import {
 	checkGh,
 	checkGit,
 	checkNodeNpm,
+	checkOllama,
 	type ExecFn,
 } from "../src/environment/doctor";
 
@@ -183,8 +184,80 @@ describe("environment/doctor · detección de dependencias", () => {
 		expect(report.platform).toBe("win32");
 		expect(report.platformLabel).toBe("Windows");
 		expect(report.arch).toBe("x64");
-		expect(report.totalCount).toBe(6);
+		expect(report.totalCount).toBe(7);
 		expect(report.readyCount).toBe(4);
 		expect(report.coreReady).toBe(true);
+	});
+
+	it("#110 — checkOllama: instalado con daemon activo", async () => {
+		const mockExec: ExecFn = async (cmd, args) => {
+			if (cmd === "ollama" && args[0] === "--version") {
+				return {
+					stdout:
+						"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.30.10",
+					stderr: "",
+					code: 0,
+				};
+			}
+			if (cmd === "ollama" && args[0] === "list") {
+				return { stdout: "NAME  ID  SIZE\nnomic-embed-text  abc123  274 MB", stderr: "", code: 0 };
+			}
+			return { stdout: "", stderr: "", code: 127 };
+		};
+
+		const res = await checkOllama(mockExec);
+		expect(res.installed).toBe(true);
+		expect(res.version).toBe("v0.30.10");
+		expect(res.category).toBe("optional");
+		expect(res.notes).toContain("Daemon activo");
+		expect(res.notes).toContain("nomic-embed-text");
+	});
+
+	it("#110 — checkOllama: instalado sin daemon", async () => {
+		const mockExec: ExecFn = async (cmd, args) => {
+			if (cmd === "ollama" && args[0] === "--version") {
+				return { stdout: "ollama is version 0.12.6", stderr: "", code: 0 };
+			}
+			if (cmd === "ollama" && args[0] === "list") {
+				return {
+					stdout: "",
+					stderr: "could not connect to a running Ollama server",
+					code: 1,
+				};
+			}
+			return { stdout: "", stderr: "", code: 127 };
+		};
+
+		const res = await checkOllama(mockExec);
+		expect(res.installed).toBe(true);
+		expect(res.version).toBe("v0.12.6");
+		expect(res.notes).toContain("Daemon detenido");
+	});
+
+	it("#110 — checkOllama: no instalado", async () => {
+		const mockExec: ExecFn = async () => ({
+			stdout: "",
+			stderr: "not found",
+			code: 127,
+		});
+
+		const res = await checkOllama(mockExec);
+		expect(res.installed).toBe(false);
+		expect(res.notes).toContain("Opcional");
+	});
+
+	it("#110 — checkEnvironment incluye ollama (7 deps)", async () => {
+		const mockExec: ExecFn = async (cmd) => {
+			if (cmd === "git") return { stdout: "git version 2.44.0", stderr: "", code: 0 };
+			if (cmd === "bash") return { stdout: "version 5.2.0", stderr: "", code: 0 };
+			return { stdout: "", stderr: "not found", code: 127 };
+		};
+		const report = await checkEnvironment({
+			exec: mockExec,
+			platform: "darwin",
+			arch: "arm64",
+		});
+		expect(report.totalCount).toBe(7);
+		expect(report.dependencies.some((d) => d.id === "ollama")).toBe(true);
 	});
 });

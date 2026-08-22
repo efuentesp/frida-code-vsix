@@ -167,6 +167,7 @@ import {
 	parseAutoIndexProgress,
 	type IndexProgress,
 } from "./tools/frida-codebase-index/progress";
+import { readIndexedFiles } from "./tools/frida-codebase-index/files";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -571,6 +572,9 @@ export async function activate(
 	// #109 — progreso en vivo de la indexación (sondeo de index_status cada 2s
 	// mientras index/rebuild corren en este mismo proceso → mismo coordinador).
 	let ciProgress: IndexProgress | null = null;
+	// #111 — epoch ms del inicio de la acción: el reloj del tab deriva de aquí
+	// y sobrevive cambios de pestaña (remount del componente).
+	let ciBusySince: number | null = null;
 	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
 	// pierde en arranque frío (el listener del webview monta en webview_ready).
 	let pendingSettingsTab: string | undefined;
@@ -586,6 +590,7 @@ export async function activate(
 				...ciUi,
 				version: ciUi.installed ? installedVersion(defaultAgentDir()) : undefined,
 				busy: ciBusy,
+				busySince: ciBusySince,
 				lastLine: ciLastLine,
 				progress: ciProgress,
 				config: {
@@ -2940,10 +2945,37 @@ export async function activate(
 				postPermissionsConfig();
 				break;
 			case "codebase_index_action": {
-				const action = msg.action as "install" | "index" | "rebuild" | "status";
+				const action = msg.action as
+					| "install"
+					| "index"
+					| "rebuild"
+					| "status"
+					| "files";
+				// #112 — consulta read-only de archivos indexados: no es una acción
+				// «busy» (no deshabilita botones ni arranca reloj).
+				if (action === "files") {
+					try {
+						const res = await readIndexedFiles(workspaceCwd());
+						post({
+							type: "codebase_index_files",
+							available: !!res,
+							files: res?.files ?? [],
+							failed: res?.failed ?? [],
+						});
+					} catch {
+						post({
+							type: "codebase_index_files",
+							available: false,
+							files: [],
+							failed: [],
+						});
+					}
+					break;
+				}
 				ciBusy = action === "install" ? "install" : "index";
 				ciLastLine = undefined;
 				ciProgress = null;
+				ciBusySince = Date.now(); // #111 — el reloj vive en el store, no en el tab
 				postCodebaseIndexState();
 				try {
 					if (action === "install") {
@@ -3018,6 +3050,7 @@ export async function activate(
 					ciLastLine = e?.guide ?? e?.message ?? String(e);
 				}
 				ciBusy = null;
+				ciBusySince = null;
 				postCodebaseIndexState();
 				break;
 			}

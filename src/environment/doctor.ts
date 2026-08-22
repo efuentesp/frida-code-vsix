@@ -425,6 +425,68 @@ export async function checkDocker(exec: ExecFn): Promise<DependencyStatus> {
 	};
 }
 
+export async function checkOllama(exec: ExecFn): Promise<DependencyStatus> {
+	// `ollama --version` imprime warnings al stderr/stdout si el daemon está
+	// caído pero el CLI existe — la versión aparece como "version is X" o
+	// "ollama is version X" según la versión del CLI.
+	const res = await exec("ollama", ["--version"]);
+	const out = `${res.stdout}\n${res.stderr}`;
+	const installed = res.code === 0 && /ollama|version/i.test(out);
+	const vMatch =
+		out.match(/version is\s+([^\s]+)/i) ??
+		out.match(/is version\s+([^\s]+)/i);
+	const version = vMatch ? `v${vMatch[1]}` : undefined;
+
+	let notes: string | undefined;
+	if (installed) {
+		const list = await exec("ollama", ["list"]);
+		if (list.code === 0) {
+			const models = list.stdout
+				.split("\n")
+				.map((l) => l.trim())
+				.filter((l) => l && !/^name(\s|$)/i.test(l))
+				.map((l) => l.split(/\s{2,}|\t/)[0]);
+			const embed = models.find((m) => /embed/i.test(m));
+			notes = `Daemon activo y listo (${models.length} ${models.length === 1 ? "modelo" : "modelos"}${embed ? `, incluye ${embed}` : ""})`;
+		} else {
+			notes = "Daemon detenido (inicia la app de Ollama o ejecuta 'ollama serve')";
+		}
+	} else {
+		notes =
+			"Opcional: embeddings 100% locales para el índice de código; sin Ollama el motor Auto usa proveedores en la nube (Copilot/OpenAI).";
+	}
+
+	return {
+		id: "ollama",
+		name: "Ollama",
+		category: "optional",
+		installed,
+		version,
+		notes,
+		description:
+			"Servidor local de modelos: embeddings locales (privados) para el índice de código.",
+		usedBy: "Índice de código — motor de embeddings local (nomic-embed-text)",
+		installGuides: {
+			win32: {
+				command: "winget install Ollama.Ollama",
+				guide: "Tras instalar, ejecuta 'ollama pull nomic-embed-text' para el modelo de embeddings.",
+				url: "https://ollama.com/download",
+			},
+			darwin: {
+				command: "brew install --cask ollama",
+				guide:
+				"O descarga la app desde ollama.com; luego 'ollama pull nomic-embed-text'.",
+				url: "https://ollama.com/download",
+			},
+			linux: {
+				command: "curl -fsSL https://ollama.com/install.sh | sh",
+				guide: "Tras instalar, habilita el servicio y ejecuta 'ollama pull nomic-embed-text'.",
+				url: "https://ollama.com/download",
+			},
+		},
+	};
+}
+
 export async function checkEnvironment(deps?: {
 	exec?: ExecFn;
 	platform?: NodeJS.Platform;
@@ -434,16 +496,18 @@ export async function checkEnvironment(deps?: {
 	const platform = deps?.platform ?? process.platform;
 	const arch = deps?.arch ?? os.arch();
 
-	const [git, bash, nodeNpm, gh, agentBrowser, docker] = await Promise.all([
-		checkGit(exec),
-		checkBash(exec, platform),
-		checkNodeNpm(exec),
-		checkGh(exec),
-		checkAgentBrowser(exec),
-		checkDocker(exec),
-	]);
+	const [git, bash, nodeNpm, gh, agentBrowser, docker, ollama] =
+		await Promise.all([
+			checkGit(exec),
+			checkBash(exec, platform),
+			checkNodeNpm(exec),
+			checkGh(exec),
+			checkAgentBrowser(exec),
+			checkDocker(exec),
+			checkOllama(exec),
+		]);
 
-	const dependencies = [git, bash, nodeNpm, gh, agentBrowser, docker];
+	const dependencies = [git, bash, nodeNpm, gh, agentBrowser, docker, ollama];
 	const readyCount = dependencies.filter((d) => d.installed).length;
 	const coreReady = git.installed && bash.installed;
 

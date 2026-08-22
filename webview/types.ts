@@ -476,6 +476,9 @@ export interface CodebaseIndexUiState {
 	capturedTools?: string[];
 	/** Acción en curso (botones deshabilitados). */
 	busy?: "install" | "index" | null;
+	/** Epoch ms del inicio de la acción en curso (#111): el reloj de la
+	 *  tarjeta deriva de aquí y así SOBREVIVE cambios de pestaña (remount). */
+	busySince?: number | null;
 	/** Última línea de progreso/resultado/error (guía incluida). */
 	lastLine?: string;
 	/** Progreso en vivo de la indexación (#109) — null cuando el coordinador
@@ -758,6 +761,12 @@ export interface State {
 	sessionPatterns?: SessionPatternUi[];
 	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
 	codebaseIndex?: CodebaseIndexUiState;
+	/** Archivos presentes en el índice (#112) — respuesta a action:"files". */
+	codebaseIndexFiles?: {
+		available: boolean;
+		files: { path: string; chunks: number; language: string }[];
+		failed: { path: string; chunks: number }[];
+	};
 	/** Reporte de diagnóstico del entorno y dependencias del sistema (#99). */
 	environment?: EnvironmentReport;
 	environmentChecking?: boolean;
@@ -918,6 +927,12 @@ export type InMessage =
 	| { type: "composer_insert"; text: string }
 	| { type: "open_settings"; tab?: string }
 	| { type: "codebase_index_state"; state: CodebaseIndexUiState }
+	| {
+			type: "codebase_index_files";
+			available: boolean;
+			files: { path: string; chunks: number; language: string }[];
+			failed: { path: string; chunks: number }[];
+	  }
 	| { type: "environment_status"; status: EnvironmentReport }
 	| { type: "environment_checking"; checking: boolean }
 	| { type: "error"; text: string };
@@ -1051,6 +1066,6 @@ export type OutMessage =
 	  }
 	| {
 			type: "codebase_index_action";
-			action: "install" | "index" | "rebuild" | "status";
+			action: "install" | "index" | "rebuild" | "status" | "files";
 	  }
 	| { type: "check_environment" };

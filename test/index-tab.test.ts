@@ -176,6 +176,75 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		expect(html).toContain('aria-valuenow="45"');
 	});
 
+	it("#111 — el reloj deriva de busySince del store: elapsed inmediato sin reiniciarse en remount", () => {
+		const post = vi.fn();
+		const since = Date.now() - 125_000; // lleva 2m5s indexando
+		const state: State = {
+			...baseState,
+			codebaseIndex: {
+				installed: true,
+				busy: "index",
+				busySince: since,
+			},
+		};
+
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, { state, post }),
+		);
+
+		// El primer render ya refleja el tiempo acumulado (no 0:00) — así, al
+		// volver de otra pestaña, el reloj retoma donde iba en vez de reiniciarse.
+		const m = html.match(/Tiempo:\s*<strong>([\d:]+)<\/strong>/);
+		expect(m).toBeTruthy();
+		const [mm, ss] = (m?.[1] ?? "").split(":").map(Number);
+		const secs = mm * 60 + ss;
+		expect(secs).toBeGreaterThanOrEqual(124);
+		expect(secs).toBeLessThanOrEqual(127);
+	});
+
+	it("#112 — sección Archivos indexados: conteo, filas y fallidos", () => {
+		const post = vi.fn();
+		const state: State = {
+			...baseState,
+			codebaseIndex: { installed: true, version: "0.23.0" },
+			codebaseIndexFiles: {
+				available: true,
+				files: [
+					{ path: "src/extension.ts", chunks: 142, language: "typescript" },
+					{ path: "webview/App.tsx", chunks: 38, language: "typescriptreact" },
+				],
+				failed: [{ path: "docs/g.md", chunks: 48 }],
+			},
+		};
+
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, { state, post }),
+		);
+
+		expect(html).toContain("ARCHIVOS EN EL ÍNDICE");
+		expect(html).toContain("Archivos indexados <strong>(2)</strong>");
+		expect(html).toContain("src/extension.ts");
+		expect(html).toContain("142");
+		expect(html).toContain("typescript");
+		expect(html).toContain("Fallidos en embedding");
+		expect(html).toContain("docs/g.md");
+	});
+
+	it("#112 — sin índice construido: guía honesta", () => {
+		const post = vi.fn();
+		const state: State = {
+			...baseState,
+			codebaseIndex: { installed: true },
+			codebaseIndexFiles: { available: false, files: [], failed: [] },
+		};
+
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, { state, post }),
+		);
+
+		expect(html).toContain("Sin índice construido");
+	});
+
 	it("#109 — sin datos del coordinador: barra indeterminada y contadores en —", () => {
 		const post = vi.fn();
 		const state: State = {

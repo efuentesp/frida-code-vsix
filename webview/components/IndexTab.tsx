@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Codicon } from "./Codicon";
 import type { OutMessage, State } from "../types";
 
@@ -81,26 +81,47 @@ export function IndexTab({
 	const busy = ci?.busy ?? null;
 	const isInstalled = !!ci?.installed;
 
-	// Reloj de la acción en curso: arranca cuando busy pasa a truthy, se limpia
-	// al terminar. Es la prueba de vida cuando npm está en silencio.
-	const [elapsed, setElapsed] = useState(0);
-	const startedAt = useRef<number | null>(null);
+	// Reloj de la acción en curso (#111): deriva de ci.busySince (epoch ms del
+	// HOST, vive en el store) — así NO se reinicia al cambiar de pestaña:
+	// el componente se desmonta/remonta pero busySince sigue siendo el mismo
+	// y el elapsed se recomputa correcto desde el primer render.
+	const busySince = ci?.busySince ?? null;
+	const [elapsed, setElapsed] = useState(() =>
+		busy && busySince ? Math.floor((Date.now() - busySince) / 1000) : 0,
+	);
 	const [copiedOllama, setCopiedOllama] = useState(false);
 
+	// #112 — lista de archivos en el índice: auto-consulta al montar (si está
+	// instalado), colapso + filtro en vivo del lado del cliente.
+	const idxFiles = state.codebaseIndexFiles;
+	// Abierto por defecto cuando ya hay datos en el store (remount con datos o
+	// guía «sin índice»); colapsado en el primer montaje mientras llega la
+	// consulta. (Los efectos no corren en SSR: la auto-consulta se prueba en
+	// vivo, no con renderToStaticMarkup.)
+	const [filesOpen, setFilesOpen] = useState(idxFiles !== undefined);
+	const [filesQuery, setFilesQuery] = useState("");
 	useEffect(() => {
-		startedAt.current = busy ? Date.now() : null;
-		setElapsed(0);
-	}, [busy]);
+		if (isInstalled && !idxFiles) {
+			post({ type: "codebase_index_action", action: "files" });
+		}
+	}, [isInstalled, idxFiles, post]);
+	const filteredFiles = (idxFiles?.files ?? []).filter((f) =>
+		f.path.toLowerCase().includes(filesQuery.trim().toLowerCase()),
+	);
 
 	useEffect(() => {
-		if (!busy) return;
+		setElapsed(
+			busy && busySince ? Math.floor((Date.now() - busySince) / 1000) : 0,
+		);
+	}, [busy, busySince]);
+
+	useEffect(() => {
+		if (!busy || !busySince) return;
 		const t = setInterval(() => {
-			if (startedAt.current) {
-				setElapsed(Math.floor((Date.now() - startedAt.current) / 1000));
-			}
+			setElapsed(Math.floor((Date.now() - busySince) / 1000));
 		}, 1000);
 		return () => clearInterval(t);
-	}, [busy]);
+	}, [busy, busySince]);
 
 	const handleCopyOllama = () => {
 		const cmd = "ollama pull nomic-embed-text";
@@ -375,6 +396,97 @@ export function IndexTab({
 								</span>
 							</div>
 						</button>
+					</div>
+				</div>
+			)}
+
+			{/* #112 — Archivos presentes en el índice (consulta read-only) */}
+			{isInstalled && (
+				<div className="ci-section-group">
+					<div className="cfg-section">
+						<Codicon name="file" size={13} /> ARCHIVOS EN EL ÍNDICE
+					</div>
+					<div className="ci-files-card">
+						<button
+							type="button"
+							className="ci-files-toggle"
+							onClick={() => setFilesOpen((v) => !v)}
+						>
+							<Codicon name={filesOpen ? "chevron-down" : "chevron-right"} size={13} />
+							<span>
+								Archivos indexados{" "}
+								<strong>
+									{idxFiles ? `(${idxFiles.files.length})` : "(… consultando)"}
+								</strong>
+							</span>
+						</button>
+						{idxFiles && idxFiles.available && (
+							<input
+								type="text"
+								className="ci-files-search"
+								placeholder="Filtrar por ruta…"
+								value={filesQuery}
+								onChange={(e) => setFilesQuery(e.target.value)}
+							/>
+						)}
+						<button
+							type="button"
+							className="ci-files-refresh"
+							title="Volver a consultar el índice"
+							onClick={() =>
+								post({ type: "codebase_index_action", action: "files" })
+							}
+						>
+							<Codicon name="refresh" size={13} />
+						</button>
+
+						{filesOpen && (
+							<div className="ci-files-body">
+								{idxFiles ? idxFiles.available ? (
+									<>
+										<div className="ci-files-list">
+											{filteredFiles.length === 0 && (
+												<div className="ci-files-empty">
+													Ningún archivo coincide con «{filesQuery}».
+												</div>
+											)}
+											{filteredFiles.map((f) => (
+												<div key={f.path} className="ci-file-row">
+													<span className="ci-file-path" title={f.path}>
+														{f.path}
+													</span>
+													<span className="ci-file-meta">{f.language}</span>
+													<span className="ci-file-chunks">{f.chunks}</span>
+												</div>
+											))}
+										</div>
+										{idxFiles.failed.length > 0 && (
+											<div className="ci-files-failed">
+												<div className="ci-files-failed-head">
+													<Codicon name="warning" size={13} /> Fallidos en embedding
+													({idxFiles.failed.length} archivos)
+												</div>
+												{idxFiles.failed.slice(0, 10).map((f) => (
+													<div key={f.path} className="ci-file-row is-failed">
+														<span className="ci-file-path" title={f.path}>
+															{f.path}
+														</span>
+														<span className="ci-file-chunks">{f.chunks}</span>
+													</div>
+												))}
+											</div>
+										)}
+									</>
+								) : (
+									<div className="ci-files-empty">
+										Sin índice construido en este workspace — ejecuta «Indexar»
+										para crearlo.
+									</div>
+								) : (
+									<div className="ci-files-empty">Consultando el índice…</div>
+								)}
+						</div>
+						)}
 					</div>
 				</div>
 			)}
