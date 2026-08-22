@@ -49,7 +49,8 @@ export function ProductivityTab({
 	if (!ur || ur.period !== period || ur.scope !== scope) {
 		return (
 			<div className="cfg-stub">
-				<Codicon name="loading" size={14} spin /> Cargando scorecard de productividad...
+				<Codicon name="loading" size={14} spin /> Cargando scorecard de
+				productividad...
 			</div>
 		);
 	}
@@ -58,7 +59,8 @@ export function ProductivityTab({
 	if (!report || report.kpis.sessions === 0) {
 		return (
 			<div className="cfg-stub">
-				Sin datos de telemetría{scope === "project" ? " de este proyecto" : ""} en este periodo todavía.
+				Sin datos de telemetría{scope === "project" ? " de este proyecto" : ""} en
+				este periodo todavía.
 			</div>
 		);
 	}
@@ -126,9 +128,7 @@ export function ProductivityTab({
 						<button
 							key={p.id}
 							type="button"
-							className={
-								"usage-period-btn" + (period === p.id ? " active" : "")
-							}
+							className={"usage-period-btn" + (period === p.id ? " active" : "")}
 							onClick={() => setPeriod(p.id)}
 						>
 							{p.label}
@@ -180,7 +180,9 @@ export function ProductivityTab({
 							</div>
 						</div>
 						<div className="prod-pillar-footer">
-							<span>{k.turns} turnos en {k.sessions} sesiones</span>
+							<span>
+								{k.turns} turnos en {k.sessions} sesiones
+							</span>
 							<span className="prod-dot">·</span>
 							<span>{(k.turns / Math.max(k.sessions, 1)).toFixed(1)} tur/ses</span>
 						</div>
@@ -213,22 +215,38 @@ export function ProductivityTab({
 				{/* Cobertura de dimensiones SPACE */}
 				<div className="prod-space-card">
 					<div className="prod-space-title">
-						<Codicon name="organization" size={12} /> Cobertura de dimensiones del framework SPACE:
+						<Codicon name="organization" size={12} /> Cobertura de dimensiones del
+						framework SPACE:
 					</div>
 					<div className="prod-space-pills">
-						<div className="prod-space-pill pill-ok" title="Medido exhaustivamente con conteo de turnos, tools y líneas asistidas">
+						<div
+							className="prod-space-pill pill-ok"
+							title="Medido exhaustivamente con conteo de turnos, tools y líneas asistidas"
+						>
 							<Codicon name="check" size={11} /> Activity (100%)
 						</div>
-						<div className="prod-space-pill pill-ok" title="Medido con tiempo activo, cache hit, compactaciones y ritmo de trabajo">
+						<div
+							className="prod-space-pill pill-ok"
+							title="Medido con tiempo activo, cache hit, compactaciones y ritmo de trabajo"
+						>
 							<Codicon name="check" size={11} /> Efficiency & Flow (100%)
 						</div>
-						<div className="prod-space-pill pill-proxy" title="Aproximado con señales de ejecución exitosa de herramientas">
+						<div
+							className="prod-space-pill pill-proxy"
+							title="Aproximado con señales de ejecución exitosa de herramientas"
+						>
 							<Codicon name="symbol-event" size={11} /> Performance (~60%)
 						</div>
-						<div className="prod-space-pill pill-pending" title="Dimensión perceptual: requiere encuestas de satisfacción opt-in">
+						<div
+							className="prod-space-pill pill-pending"
+							title="Dimensión perceptual: requiere encuestas de satisfacción opt-in"
+						>
 							<Codicon name="circle-outline" size={11} /> Satisfaction (Encuesta)
 						</div>
-						<div className="prod-space-pill pill-pending" title="Requiere integración con sistemas de colaboración de equipo">
+						<div
+							className="prod-space-pill pill-pending"
+							title="Requiere integración con sistemas de colaboración de equipo"
+						>
 							<Codicon name="circle-outline" size={11} /> Communication (Org)
 						</div>
 					</div>
@@ -238,7 +256,8 @@ export function ProductivityTab({
 			{/* Sección 2: El Agente como Equipo (DX Agent Lead Model) */}
 			<div className="prod-section">
 				<div className="cfg-section">
-					<Codicon name="organization" size={13} /> EL AGENTE COMO EQUIPO (DX AGENT LEAD MODEL)
+					<Codicon name="organization" size={13} /> EL AGENTE COMO EQUIPO (DX AGENT
+					LEAD MODEL)
 				</div>
 
 				<div className="usage-grid">
@@ -248,7 +267,9 @@ export function ProductivityTab({
 						</div>
 						<div className="prod-orchestration-grid">
 							<div className="prod-orch-item">
-								<span className="prod-orch-val">{report.behavior.subagentsLaunched}</span>
+								<span className="prod-orch-val">
+									{report.behavior.subagentsLaunched}
+								</span>
 								<span className="prod-orch-label">Subagentes lanzados</span>
 							</div>
 							<div className="prod-orch-item">
@@ -278,7 +299,9 @@ export function ProductivityTab({
 									<Codicon name="browser" size={13} />
 									<span>Navegador Web (`agent_browser`)</span>
 								</div>
-								<span className={`prod-cap-status ${report.adoption.browserUsed ? "active" : "ready"}`}>
+								<span
+									className={`prod-cap-status ${report.adoption.browserUsed ? "active" : "ready"}`}
+								>
 									{report.adoption.browserUsed ? "Activo" : "Disponible"}
 								</span>
 							</div>
@@ -288,7 +311,9 @@ export function ProductivityTab({
 									<Codicon name="search" size={13} />
 									<span>Búsqueda Semántica (`codebase-index`)</span>
 								</div>
-								<span className={`prod-cap-status ${report.adoption.contextToolUsed ? "active" : "ready"}`}>
+								<span
+									className={`prod-cap-status ${report.adoption.contextToolUsed ? "active" : "ready"}`}
+								>
 									{report.adoption.contextToolUsed ? "Activo" : "Disponible"}
 								</span>
 							</div>
@@ -298,7 +323,9 @@ export function ProductivityTab({
 									<Codicon name="organization" size={13} />
 									<span>Subagentes Autónomos (`Agent`)</span>
 								</div>
-								<span className={`prod-cap-status ${report.adoption.subagentsUsed ? "active" : "ready"}`}>
+								<span
+									className={`prod-cap-status ${report.adoption.subagentsUsed ? "active" : "ready"}`}
+								>
 									{report.adoption.subagentsUsed ? "Activo" : "Disponible"}
 								</span>
 							</div>
@@ -308,9 +335,7 @@ export function ProductivityTab({
 									<Codicon name="mic" size={13} />
 									<span>Dictado por Voz</span>
 								</div>
-								<span className="prod-cap-status roadmap">
-									Próximo (#95)
-								</span>
+								<span className="prod-cap-status roadmap">Próximo (#95)</span>
 							</div>
 						</div>
 					</div>
@@ -337,7 +362,10 @@ export function ProductivityTab({
 							<Codicon name="zap" size={14} />
 							<div>
 								<div className="prod-flow-val">
-									{fmt(k.avgTurnTokens || Math.round((k.tokensIn + k.tokensOut) / Math.max(k.turns, 1)))}
+									{fmt(
+										k.avgTurnTokens ||
+											Math.round((k.tokensIn + k.tokensOut) / Math.max(k.turns, 1)),
+									)}
 								</div>
 								<div className="prod-flow-lbl">Tokens / turno</div>
 							</div>
@@ -365,7 +393,8 @@ export function ProductivityTab({
 			{/* Sección 4: Preparación DORA & Flow Framework */}
 			<div className="prod-section">
 				<div className="cfg-section">
-					<Codicon name="cloud-upload" size={13} /> PREPARACIÓN DORA & FLOW FRAMEWORK (EXPORT)
+					<Codicon name="cloud-upload" size={13} /> PREPARACIÓN DORA & FLOW FRAMEWORK
+					(EXPORT)
 				</div>
 
 				<div className="prod-dora-card">
@@ -374,7 +403,11 @@ export function ProductivityTab({
 							Principio: «Frida etiqueta telemetría; el concentrador externo cruza»
 						</div>
 						<div className="prod-dora-desc">
-							Los marcos organizacionales como DORA (lead time a producción, deployment frequency) y FLOW Framework (value streams de negocio) requieren cruzar datos de CI/CD y despliegues. Frida genera y etiqueta los insumos de desarrollo en formato estándar versionado <code>frida-usage-report/v1</code>.
+							Los marcos organizacionales como DORA (lead time a producción, deployment
+							frequency) y FLOW Framework (value streams de negocio) requieren cruzar
+							datos de CI/CD y despliegues. Frida genera y etiqueta los insumos de
+							desarrollo en formato estándar versionado{" "}
+							<code>frida-usage-report/v1</code>.
 						</div>
 					</div>
 					<div className="prod-dora-actions">

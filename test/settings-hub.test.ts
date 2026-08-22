@@ -266,7 +266,9 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("productivity-tab");
 		expect(html).toContain("SCORECARD MULTIMARCO (DX AI × SPACE)");
 		// Verificamos que los tabs Uso y Productividad aparecen contiguos
-		expect(html).toContain("<span>Uso</span></button><button type=\"button\" class=\"cfg-tab active\">");
+		expect(html).toContain(
+			'<span>Uso</span></button><button type="button" class="cfg-tab active">',
+		);
 		expect(html).toContain("<span>Productividad</span></button>");
 	});
 

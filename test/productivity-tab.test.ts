@@ -61,11 +61,10 @@ describe("ProductivityTab (#102 — Scorecard Multimarco DX AI × SPACE)", () =>
 				},
 			],
 			byArtifact: [{ kind: "plan", count: 2 }],
-			byDay: [
-				{ date: "2026-08-21", tokens: 670_000, cost: 0.44, turns: 25 },
-			],
+			byDay: [{ date: "2026-08-21", tokens: 670_000, cost: 0.44, turns: 25 }],
 			byHour: [
-				0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 15, 20, 25, 30, 45, 40, 35, 25, 20, 10, 5, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 15, 20, 25, 30, 45, 40, 35, 25, 20, 10, 5, 0,
+				0, 0,
 			], // peak at 14:00 (idx 14 = 45)
 			byDow: Array(7).fill(25),
 		},
@@ -197,7 +196,9 @@ describe("ProductivityTab (#102 — Scorecard Multimarco DX AI × SPACE)", () =>
 		);
 
 		expect(html).toContain("PREPARACIÓN DORA &amp; FLOW FRAMEWORK (EXPORT)");
-		expect(html).toContain("«Frida etiqueta telemetría; el concentrador externo cruza»");
+		expect(html).toContain(
+			"«Frida etiqueta telemetría; el concentrador externo cruza»",
+		);
 		expect(html).toContain("frida-usage-report/v1");
 		expect(html).toContain("Copiar JSON Telemetría (v1)");
 	});
@@ -237,6 +238,8 @@ describe("ProductivityTab (#102 — Scorecard Multimarco DX AI × SPACE)", () =>
 			React.createElement(ProductivityTab, { state, post }),
 		);
 
-		expect(html).toContain("Sin datos de telemetría de este proyecto en este periodo todavía.");
+		expect(html).toContain(
+			"Sin datos de telemetría de este proyecto en este periodo todavía.",
+		);
 	});
 });

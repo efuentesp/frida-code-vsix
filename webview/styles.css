@@ -7852,7 +7852,9 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	font-size: 11.5px;
-	transition: background 0.1s ease, color 0.1s ease;
+	transition:
+		background 0.1s ease,
+		color 0.1s ease;
 }
 .usage-period-btn:hover {
 	background: var(--vscode-list-hoverBackground);
@@ -7890,7 +7892,10 @@ kbd {
 	width: 32px;
 	height: 32px;
 	border-radius: 6px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.15));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.15)
+	);
 	flex-shrink: 0;
 }
 .usage-velocity-icon {
@@ -7955,7 +7960,10 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 	padding: 2px 6px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.12));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.12)
+	);
 }
 
 .usage-kpis {
@@ -8050,7 +8058,10 @@ kbd {
 	gap: 10px;
 	padding: 6px 10px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.08));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.08)
+	);
 }
 .usage-adoption-icon {
 	display: flex;
@@ -8059,7 +8070,10 @@ kbd {
 	width: 24px;
 	height: 24px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.15));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.15)
+	);
 	color: var(--vscode-foreground);
 	flex-shrink: 0;
 }
@@ -8290,7 +8304,10 @@ kbd {
 	border: 1px solid rgba(204, 167, 0, 0.25);
 }
 .prod-space-pill.pill-pending {
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.08));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.08)
+	);
 	color: var(--vscode-descriptionForeground);
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
@@ -8308,7 +8325,10 @@ kbd {
 	align-items: center;
 	justify-content: center;
 	padding: 8px 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.08));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.08)
+	);
 	border-radius: 4px;
 	text-align: center;
 }
@@ -8335,7 +8355,10 @@ kbd {
 	gap: 10px;
 	padding: 5px 8px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.06));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.06)
+	);
 }
 .prod-cap-info {
 	display: flex;
@@ -8381,7 +8404,10 @@ kbd {
 	gap: 10px;
 	padding: 8px 10px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.08));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.08)
+	);
 }
 .prod-flow-val {
 	font-size: 15px;

@@ -407,9 +407,7 @@ export function SettingsHub({
 
 						{tab === "usage" && <UsageDashboard state={state} post={post} />}
 
-						{tab === "productivity" && (
-							<ProductivityTab state={state} post={post} />
-						)}
+						{tab === "productivity" && <ProductivityTab state={state} post={post} />}
 
 						{tab === "codebaseIndex" && <IndexTab state={state} post={post} />}
 
