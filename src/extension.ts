@@ -1420,13 +1420,13 @@ export async function activate(
 			postModels();
 			return;
 		}
-	// #98: SIN re-confirmación aquí. El único emisor de {type:"select_model"}
-	// es el onConfirm del ModelConfirmDialog del webview (comparación actual →
-	// nuevo): toda petición manual YA fue confirmada explícitamente por el
-	// usuario. La tarjeta vieja (model_changes vía ModelChangeBridge) duplicaba
-	// la confirmación en esta ruta. El puente sigue vivo SOLO para la vigilancia
-	// auto-detected en agent_end (divergencia session.model vs activeModel).
-	try {
+		// #98: SIN re-confirmación aquí. El único emisor de {type:"select_model"}
+		// es el onConfirm del ModelConfirmDialog del webview (comparación actual →
+		// nuevo): toda petición manual YA fue confirmada explícitamente por el
+		// usuario. La tarjeta vieja (model_changes vía ModelChangeBridge) duplicaba
+		// la confirmación en esta ruta. El puente sigue vivo SOLO para la vigilancia
+		// auto-detected en agent_end (divergencia session.model vs activeModel).
+		try {
 			await frida.session.setModel(m);
 			activeModel = { provider: providerId, modelId };
 			await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
