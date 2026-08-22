@@ -253,6 +253,8 @@ describe("UsageDashboard (#101 — Opción 2: Developer Velocity & Telemetry Str
 			React.createElement(UsageDashboard, { state, post }),
 		);
 
-		expect(html).toContain("Sin datos de uso de este proyecto en este periodo todavía.");
+		expect(html).toContain(
+			"Sin datos de uso de este proyecto en este periodo todavía.",
+		);
 	});
 });

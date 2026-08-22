@@ -120,7 +120,8 @@ export function UsageDashboard({
 	if (!report || report.kpis.sessions === 0) {
 		return (
 			<div className="cfg-stub">
-				Sin datos de uso{scope === "project" ? " de este proyecto" : ""} en este periodo todavía.
+				Sin datos de uso{scope === "project" ? " de este proyecto" : ""} en este
+				periodo todavía.
 			</div>
 		);
 	}
@@ -157,9 +158,7 @@ export function UsageDashboard({
 						<button
 							key={p.id}
 							type="button"
-							className={
-								"usage-period-btn" + (period === p.id ? " active" : "")
-							}
+							className={"usage-period-btn" + (period === p.id ? " active" : "")}
 							onClick={() => setPeriod(p.id)}
 						>
 							{p.label}
@@ -179,11 +178,17 @@ export function UsageDashboard({
 							Velocidad y Telemetría de Desarrollo
 						</div>
 						<div className="usage-velocity-subtitle">
-							<span>Código Asistido: <strong>{fmt(totalLines)} líneas</strong></span>
+							<span>
+								Código Asistido: <strong>{fmt(totalLines)} líneas</strong>
+							</span>
 							<span className="usage-velocity-dot">·</span>
-							<span>Tokens: <strong>{fmt(k.tokensIn + k.tokensOut)}</strong></span>
+							<span>
+								Tokens: <strong>{fmt(k.tokensIn + k.tokensOut)}</strong>
+							</span>
 							<span className="usage-velocity-dot">·</span>
-							<span>Inversión: <strong>${k.cost.toFixed(2)} USD</strong></span>
+							<span>
+								Inversión: <strong>${k.cost.toFixed(2)} USD</strong>
+							</span>
 						</div>
 					</div>
 				</div>
@@ -258,7 +263,8 @@ export function UsageDashboard({
 					</div>
 					<div className="usage-card">
 						<div className="usage-card-title">
-							<Codicon name="calendar" size={13} /> Actividad por hora y día de la semana
+							<Codicon name="calendar" size={13} /> Actividad por hora y día de la
+							semana
 						</div>
 						<Heatmap
 							hours={report.breakdowns.byHour}
@@ -276,7 +282,8 @@ export function UsageDashboard({
 				<div className="usage-grid">
 					<div className="usage-card">
 						<div className="usage-card-title">
-							<Codicon name="file-code" size={13} /> Código asistido por tipo de archivo (líneas)
+							<Codicon name="file-code" size={13} /> Código asistido por tipo de
+							archivo (líneas)
 						</div>
 						<BarChart
 							horizontal
@@ -333,7 +340,9 @@ export function UsageDashboard({
 								</div>
 								<div className="usage-adoption-info">
 									<span className="usage-adoption-name">Subagentes concurrentes</span>
-									<span className="usage-adoption-desc">Agentes secundarios lanzados en background</span>
+									<span className="usage-adoption-desc">
+										Agentes secundarios lanzados en background
+									</span>
 								</div>
 								<span className="usage-adoption-val">
 									{report.behavior.subagentsLaunched} lanzados
@@ -346,7 +355,9 @@ export function UsageDashboard({
 								</div>
 								<div className="usage-adoption-info">
 									<span className="usage-adoption-name">Preguntas interactivas</span>
-									<span className="usage-adoption-desc">Cuestionarios ask_user_question respondidos</span>
+									<span className="usage-adoption-desc">
+										Cuestionarios ask_user_question respondidos
+									</span>
 								</div>
 								<span className="usage-adoption-val">
 									{report.behavior.questionsAsked} preguntas
@@ -359,7 +370,9 @@ export function UsageDashboard({
 								</div>
 								<div className="usage-adoption-info">
 									<span className="usage-adoption-name">Compactaciones de contexto</span>
-									<span className="usage-adoption-desc">Podas automáticas para ahorrar tokens</span>
+									<span className="usage-adoption-desc">
+										Podas automáticas para ahorrar tokens
+									</span>
 								</div>
 								<span className="usage-adoption-val">
 									{report.behavior.compactations} podas
@@ -391,13 +404,13 @@ export function UsageDashboard({
 											{sessionLabel(s)}
 										</span>
 										{showProj && projOf(s.cwd) ? (
-											<span className="usage-session-proj-badge">
-												{projOf(s.cwd)}
-											</span>
+											<span className="usage-session-proj-badge">{projOf(s.cwd)}</span>
 										) : null}
 									</div>
 									<div className="usage-session-meta-row">
-										<span>{s.turns} {s.turns === 1 ? "turno" : "turnos"}</span>
+										<span>
+											{s.turns} {s.turns === 1 ? "turno" : "turnos"}
+										</span>
 										<span className="usage-session-dot">·</span>
 										<span>{fmt(s.tokensIn + s.tokensOut)} tokens</span>
 										{s.lastTs > s.firstTs ? (
