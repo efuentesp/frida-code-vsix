@@ -468,6 +468,39 @@ export interface CodebaseIndexUiState {
 	lastLine?: string;
 }
 
+export type DependencyCategory = "core" | "extension" | "optional";
+export type SupportedPlatform = "win32" | "darwin" | "linux";
+
+export interface InstallGuide {
+	command: string;
+	guide?: string;
+	url?: string;
+}
+
+export interface DependencyStatus {
+	id: string;
+	name: string;
+	category: DependencyCategory;
+	installed: boolean;
+	version?: string;
+	path?: string;
+	description: string;
+	usedBy: string;
+	notes?: string;
+	installGuides: Record<SupportedPlatform, InstallGuide>;
+}
+
+export interface EnvironmentReport {
+	platform: SupportedPlatform;
+	platformLabel: string;
+	arch: string;
+	checkedAt: number;
+	readyCount: number;
+	totalCount: number;
+	coreReady: boolean;
+	dependencies: DependencyStatus[];
+}
+
 // D16 — resumen de diagnósticos de pi-lens para un turno (publicado por el host
 // en turn_end/agent_end). NO son squiggles del editor; es visibilidad en el panel
 // de lo que pi-lens calculó.
@@ -697,6 +730,9 @@ export interface State {
 	sessionPatterns?: SessionPatternUi[];
 	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
 	codebaseIndex?: CodebaseIndexUiState;
+	/** Reporte de diagnóstico del entorno y dependencias del sistema (#99). */
+	environment?: EnvironmentReport;
+	environmentChecking?: boolean;
 	lens?: LensSummary | null;
 	retry?: RetryState | null;
 	/** Error efímero del provider (401/500/"sin respuesta"): banner en el footer,
@@ -857,6 +893,8 @@ export type InMessage =
 	| { type: "composer_insert"; text: string }
 	| { type: "open_settings"; tab?: string }
 	| { type: "codebase_index_state"; state: CodebaseIndexUiState }
+	| { type: "environment_status"; status: EnvironmentReport }
+	| { type: "environment_checking"; checking: boolean }
 	| { type: "error"; text: string };
 
 // webview → host
@@ -985,4 +1023,5 @@ export type OutMessage =
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status";
-	  };
+	  }
+	| { type: "check_environment" };

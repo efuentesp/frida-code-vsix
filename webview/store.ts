@@ -597,6 +597,12 @@ export function reduce(state: State, msg: InMessage): State {
 		case "codebase_index_state":
 			return { ...state, codebaseIndex: msg.state };
 
+		// Reporte de diagnóstico del entorno y dependencias del sistema (#99).
+		case "environment_status":
+			return { ...state, environment: msg.status, environmentChecking: false };
+		case "environment_checking":
+			return { ...state, environmentChecking: msg.checking };
+
 		// D16 — resumen de diagnósticos de pi-lens del turno (null → oculta el panel).
 		case "lens_diagnostics":
 			return { ...state, lens: msg.summary };

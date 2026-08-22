@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ModuleResources, OutMessage, State } from "../types";
 import { Codicon } from "./Codicon";
 import { ApprovalPanel } from "./ApprovalPanel";
+import { EnvironmentTab } from "./EnvironmentTab";
 import { IndexTab } from "./IndexTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
@@ -14,7 +15,8 @@ export type SettingsTab =
 	| "resources"
 	| "tools"
 	| "usage"
-	| "codebaseIndex";
+	| "codebaseIndex"
+	| "environment";
 
 const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "providers", label: "Proveedores", iconName: "plug" },
@@ -24,6 +26,7 @@ const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "tools", label: "Herramientas", iconName: "tools" },
 	{ id: "usage", label: "Uso", iconName: "graph" },
 	{ id: "codebaseIndex", label: "Index", iconName: "database" },
+	{ id: "environment", label: "Entorno", iconName: "pulse" },
 ];
 
 export function SettingsHub({
@@ -50,6 +53,9 @@ export function SettingsHub({
 		}
 		if (tab === "approval" || searchQuery.trim().length > 0) {
 			post({ type: "get_permissions_config" });
+		}
+		if (tab === "environment" || searchQuery.trim().length > 0) {
+			post({ type: "check_environment" });
 		}
 	}, [tab, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -95,11 +101,22 @@ export function SettingsHub({
 			)
 		: [];
 
+	const matchedEnvDeps = hasQuery
+		? (state.environment?.dependencies ?? []).filter(
+				(d) =>
+					d.name.toLowerCase().includes(q) ||
+					d.description.toLowerCase().includes(q) ||
+					d.usedBy.toLowerCase().includes(q) ||
+					d.id.toLowerCase().includes(q),
+			)
+		: [];
+
 	const totalSearchResults =
 		matchedProviders.length +
 		matchedModules.length +
 		matchedSkills.length +
-		matchedCommands.length;
+		matchedCommands.length +
+		matchedEnvDeps.length;
 
 	return (
 		<div className="cfg-panel">
@@ -259,6 +276,26 @@ export function SettingsHub({
 										</div>
 									</div>
 								)}
+
+								{matchedEnvDeps.length > 0 && (
+									<div className="cfg-search-group">
+										<div className="cfg-section">
+											Dependencias de Entorno ({matchedEnvDeps.length})
+										</div>
+										<div className="cfg-skills-list">
+											{matchedEnvDeps.map((d) => (
+												<div key={d.id} className="cfg-res-card">
+													<div className="cfg-res-head">
+														<Codicon name={d.installed ? "check" : "warning"} size={13} />
+														<span className="cfg-res-name">{d.name}</span>
+														<span className="cfg-res-hint">{d.installed ? (d.version ?? "Instalado") : "No encontrado"}</span>
+													</div>
+													<div className="cfg-res-desc">{d.description} · Usado por: {d.usedBy}</div>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
 							</>
 						)}
 					</div>
@@ -364,6 +401,8 @@ export function SettingsHub({
 						{tab === "usage" && <UsageDashboard state={state} post={post} />}
 
 						{tab === "codebaseIndex" && <IndexTab state={state} post={post} />}
+
+						{tab === "environment" && <EnvironmentTab state={state} post={post} />}
 					</>
 				)}
 			</div>

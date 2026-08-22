@@ -163,6 +163,7 @@ import {
 } from "./tools/frida-codebase-index/installer";
 import { loadUpstreamTools } from "./tools/frida-codebase-index/shim";
 import { upstreamEntryPath } from "./tools/frida-codebase-index/constants";
+import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
 import { notifyCompletion } from "./notify";
@@ -2964,6 +2965,21 @@ export async function activate(
 				}
 				ciBusy = null;
 				postCodebaseIndexState();
+				break;
+			}
+			case "check_environment": {
+				post({ type: "environment_checking", checking: true });
+				try {
+					const report = await checkEnvironment();
+					post({ type: "environment_status", status: report });
+				} catch (err: any) {
+					post({
+						type: "info",
+						text: "Error al verificar dependencias: " + String(err?.message ?? err),
+						level: "error",
+					});
+					post({ type: "environment_checking", checking: false });
+				}
 				break;
 			}
 			case "set_thinking":
