@@ -3,9 +3,10 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Welcome } from "../webview/components/Welcome";
 
-describe("Welcome component (Copilot Canvas & Starter Cards)", () => {
-	it("renderiza el logo, título y subtítulo", () => {
+describe("Welcome component (Copilot Canvas & Categorized Tips Hub)", () => {
+	it("renderiza el wrapper centrado verticalmente, logo, título y subtítulo", () => {
 		const html = renderToStaticMarkup(React.createElement(Welcome, {}));
+		expect(html).toContain("welcome-wrapper");
 		expect(html).toContain("Frida Code");
 		expect(html).toContain("welcome-logo");
 		expect(html).toContain("welcome-sub");
@@ -19,7 +20,7 @@ describe("Welcome component (Copilot Canvas & Starter Cards)", () => {
 		expect(html).toContain("$skills");
 	});
 
-	it("renderiza las Starter Cards interactivas", () => {
+	it("renderiza las Starter Cards 2x2 interactivas", () => {
 		const html = renderToStaticMarkup(React.createElement(Welcome, {}));
 		expect(html).toContain("welcome-cards");
 		expect(html).toContain("Planificar con AiDD");
@@ -28,11 +29,15 @@ describe("Welcome component (Copilot Canvas & Starter Cards)", () => {
 		expect(html).toContain("Explicar Arquitectura");
 	});
 
-	it("renderiza el tip del día y la sección de ayuda colapsable", () => {
+	it("renderiza el panel colapsable con pestañas categorizadas de ayuda", () => {
 		const html = renderToStaticMarkup(React.createElement(Welcome, {}));
-		expect(html).toContain("tip-day");
-		expect(html).toContain("Tip del día");
 		expect(html).toContain("welcome-help");
-		expect(html).toContain("Instrucciones y atajos");
+		expect(html).toContain("Guía rápida de atajos");
+		expect(html).toContain("wh-tabs");
+		expect(html).toContain("Archivos");
+		expect(html).toContain("Workflows");
+		expect(html).toContain("Skills");
+		expect(html).toContain("Teclado");
+		expect(html).toContain("Seguridad");
 	});
 });

@@ -4828,23 +4828,45 @@ button.danger:hover {
 	font-weight: 400;
 }
 
-/* Welcome / estado vacío */
+/* Welcome / estado vacío (Propuesta 1: Copilot Canvas & Categorized Tips Hub) */
+.welcome-wrapper {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	min-height: 100%;
+	width: 100%;
+	padding: 24px 16px;
+	box-sizing: border-box;
+}
 .welcome {
 	max-width: 480px;
-	margin: 2vh auto 0;
+	width: 100%;
+	margin: 0 auto;
 	text-align: center;
-	padding: 0 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.welcome-hero {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 }
 .welcome-logo {
 	display: flex;
 	justify-content: center;
-	margin-bottom: 16px;
+	margin-bottom: 12px;
 }
 .welcome-logo-img {
 	width: 96px;
 	height: 96px;
 	object-fit: contain;
-	filter: drop-shadow(0 4px 16px rgba(106, 90, 205, 0.4));
+	filter: drop-shadow(0 4px 16px rgba(106, 90, 205, 0.45));
+	transition: transform 0.2s ease;
+}
+.welcome-logo-img:hover {
+	transform: scale(1.04);
 }
 .brand-logo {
 	width: 18px;
@@ -4859,22 +4881,30 @@ button.danger:hover {
 .welcome h1 {
 	margin: 0 0 4px;
 	font-size: 1.5em;
+	font-weight: 700;
+	color: var(--vscode-foreground);
 }
 .welcome-sub {
-	opacity: 0.7;
-	margin: 0 0 14px;
-	font-size: 13px;
+	opacity: 0.75;
+	margin: 0;
+	font-size: 12.5px;
 	line-height: 1.45;
+	color: var(--vscode-descriptionForeground);
 }
 
 /* Starter Cards Grid (Copilot Canvas) */
 .welcome-cards {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	grid-template-columns: repeat(2, 1fr);
 	gap: 8px;
-	margin: 14px auto 18px;
-	max-width: 480px;
+	width: 100%;
 	text-align: left;
+}
+
+@media (max-width: 380px) {
+	.welcome-cards {
+		grid-template-columns: 1fr;
+	}
 }
 
 .starter-card {
@@ -4882,7 +4912,7 @@ button.danger:hover {
 	flex-direction: column;
 	gap: 4px;
 	padding: 10px 12px;
-	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
+	background: var(--vscode-editor-background);
 	border: 1px solid
 		var(
 			--vscode-widget-border,
@@ -4894,7 +4924,8 @@ button.danger:hover {
 	transition:
 		background-color 0.12s ease,
 		border-color 0.12s ease,
-		transform 0.1s ease;
+		transform 0.1s ease,
+		box-shadow 0.12s ease;
 	user-select: none;
 }
 
@@ -4902,6 +4933,7 @@ button.danger:hover {
 	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.14));
 	border-color: var(--vscode-textLink-foreground, #4daafc);
 	transform: translateY(-1px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .starter-card-head {
@@ -4919,8 +4951,8 @@ button.danger:hover {
 }
 
 .starter-card-desc {
-	font-size: 11.5px;
-	line-height: 1.4;
+	font-size: 11px;
+	line-height: 1.35;
 	color: var(--vscode-descriptionForeground);
 	margin: 0;
 }
@@ -4932,114 +4964,210 @@ button.danger:hover {
 	justify-content: center;
 	gap: 6px;
 	flex-wrap: wrap;
-	margin: 8px 0 14px;
+	margin: 2px 0 4px;
 }
 
 .welcome-shortcut-btn {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 2px 8px;
+	padding: 3px 10px;
 	border-radius: 12px;
-	background: transparent;
+	background: var(--vscode-editor-background);
 	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
 	color: var(--vscode-descriptionForeground);
-	font-size: 11px;
+	font-size: 11.5px;
+	font-family: var(--vscode-editor-font-family, monospace);
 	cursor: pointer;
-	transition:
-		color 0.1s ease,
-		border-color 0.1s ease;
+	transition: all 0.12s ease;
 }
 
 .welcome-shortcut-btn:hover {
 	color: var(--vscode-foreground);
-	border-color: var(--vscode-foreground);
+	border-color: var(--vscode-textLink-foreground, #4daafc);
+	background: var(--vscode-list-hoverBackground);
+	transform: translateY(-1px);
 }
 
-/* Tip del día */
-.tip-day {
-	max-width: 420px;
-	margin: 0 auto 14px;
+/* Panel Colapsable de Guía y Atajos (Categorized Tips Hub) */
+.welcome-help {
+	width: 100%;
 	text-align: left;
-	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
-	border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.2));
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
 	border-radius: 8px;
-	padding: 10px 14px;
+	background: var(--vscode-editor-background);
+	overflow: hidden;
+	transition: border-color 0.15s ease;
 }
-.tip-day-label {
+
+.welcome-help[open] {
+	border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.wh-summary {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
-	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	opacity: 0.75;
-	margin-bottom: 6px;
-}
-.tip-day-refresh {
-	background: none;
-	border: none;
+	padding: 8px 12px;
+	font-size: 11.5px;
+	font-weight: 600;
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
-	padding: 2px;
-	line-height: 0;
-	border-radius: 4px;
-	display: inline-flex;
-}
-.tip-day-refresh:hover {
-	color: var(--vscode-foreground);
-	background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
-}
-.tip-day-body {
-	margin: 0;
-	font-size: 12px;
-	line-height: 1.7;
-	opacity: 0.9;
-}
-.tip-day-body code,
-.welcome .tips code {
-	font-family: var(--vscode-editor-font-family, monospace);
-	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
-	padding: 1px 5px;
-	border-radius: 4px;
-	font-size: 0.95em;
-	color: var(--vscode-terminal-ansiBrightGreen, var(--vscode-foreground));
+	user-select: none;
+	list-style: none;
+	background: var(--vscode-sideBar-background);
+	transition:
+		color 0.12s ease,
+		background-color 0.12s ease;
 }
 
-/* Instrucciones completas (colapsables por defecto) */
-.welcome-help {
-	max-width: 420px;
-	margin: 0 auto;
-	text-align: left;
-	font-size: 12px;
-	opacity: 0.8;
+.wh-summary::-webkit-details-marker {
+	display: none;
 }
-.welcome-help > summary {
-	cursor: pointer;
-	opacity: 0.75;
-	padding: 4px 0;
-	list-style: none;
-	user-select: none;
+
+.wh-summary:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground);
 }
-.welcome-help > summary::before {
-	content: "▸ ";
+
+.wh-summary-left {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.wh-book-icon {
+	color: #6a5acd;
+}
+
+.wh-chevron {
+	transition: transform 0.18s ease;
 	opacity: 0.7;
 }
-.welcome-help[open] > summary {
+
+.welcome-help[open] .wh-chevron {
+	transform: rotate(180deg);
+}
+
+.wh-content {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px;
+	border-top: 1px solid
+		var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+}
+
+.wh-tabs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+
+.wh-tab-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+}
+
+.wh-tab-btn:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground);
+}
+
+.wh-tab-btn.active {
+	color: var(--vscode-foreground);
+	background: var(
+		--vscode-list-activeSelectionBackground,
+		rgba(106, 90, 205, 0.18)
+	);
+	border-color: var(--vscode-textLink-foreground, #6a5acd);
+	font-weight: 600;
+}
+
+.wh-card {
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: var(--vscode-textBlockQuote-background, rgba(128, 128, 128, 0.06));
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.12));
+	font-size: 12px;
+	line-height: 1.45;
+	color: var(--vscode-foreground);
+}
+
+.wh-card-title {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
 	margin-bottom: 6px;
 }
-.welcome-help[open] > summary::before {
-	content: "▾ ";
+
+.wh-card-body p {
+	margin: 0 0 6px;
 }
-.welcome .tips {
-	text-align: left;
-	max-width: 420px;
-	margin: 0 auto;
-	padding-left: 18px;
-	opacity: 0.85;
-	font-size: 12px;
-	line-height: 1.8;
+
+.wh-card-body p:last-child {
+	margin-bottom: 0;
+}
+
+.wh-card-body code {
+	font-family: var(--vscode-editor-font-family, monospace);
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.15));
+	padding: 1px 4px;
+	border-radius: 3px;
+	font-size: 0.92em;
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+
+.wh-card-body kbd {
+	display: inline-block;
+	padding: 1px 5px;
+	font-size: 10.5px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	line-height: 1.3;
+	color: var(--vscode-foreground);
+	background: var(
+		--vscode-keybindingLabel-background,
+		rgba(128, 128, 128, 0.18)
+	);
+	border: 1px solid
+		var(--vscode-keybindingLabel-border, rgba(128, 128, 128, 0.3));
+	border-radius: 3px;
+	box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.wh-kbd-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.wh-kbd-list li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 11.5px;
+}
+
+.wh-kbd-list li kbd {
+	min-width: 48px;
+	text-align: center;
 }
 
 /* Onboarding */

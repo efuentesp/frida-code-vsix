@@ -1,3 +1,4 @@
+/// <reference path="../assets.d.ts" />
 import { useState } from "react";
 import { Codicon } from "./Codicon";
 import logo from "../assets/frida-logo.png";
@@ -55,86 +56,115 @@ const SHORTCUTS = [
 	{ label: "$skills", text: "$", iconName: "sparkle" },
 ];
 
-interface Feature {
-	key: string;
+interface HelpCategory {
+	id: string;
+	label: string;
+	iconName: string;
 	title: string;
-	body: React.ReactNode;
+	content: React.ReactNode;
 }
 
-const FEATURES: Feature[] = [
+const HELP_CATEGORIES: HelpCategory[] = [
 	{
-		key: "files",
-		title: "Archivos e imágenes",
-		body: (
+		id: "files",
+		label: "Archivos",
+		iconName: "file",
+		title: "Adjuntar archivos e imágenes",
+		content: (
 			<>
-				escribe <code>@</code> para adjuntar archivos (búsqueda difusa, navega
-				carpetas con <code>/</code>, comillas para espacios:{" "}
-				<code>@&quot;ruta con espacios&quot;</code>). Pega una{" "}
-				<strong>imagen</strong> del portapapeles para enviarla al modelo (visión).
+				<p>
+					Escribe <code>@</code> para adjuntar archivos al contexto con
+					búsqueda difusa. Navega carpetas con <code>/</code> y usa comillas
+					para rutas con espacios (ej. <code>@&quot;mi carpeta/archivo.ts&quot;</code>).
+				</p>
+				<p>
+					También puedes pegar directamente una <strong>imagen</strong> desde el
+					portapapeles (<kbd>Ctrl+V</kbd> / <kbd>Cmd+V</kbd>) para razonar con modelos de visión.
+				</p>
 			</>
 		),
 	},
 	{
-		key: "bash",
-		title: "Bash rápido",
-		body: (
+		id: "workflows",
+		label: "Workflows",
+		iconName: "gear",
+		title: "Flujos de trabajo y comandos /",
+		content: (
 			<>
-				<code>!comando</code> envía el resultado al modelo; <code>!!comando</code>{" "}
-				lo ejecuta sin enviarlo (solo lo ves tú).
+				<p>
+					Inicia flujos guiados con <code>/wf aidd-plan</code> (planificación
+					integral) o <code>/wf aidd-ship</code> (desarrollo autónomo).
+				</p>
+				<p>
+					Usa comandos rápidos de control como <code>/compact</code> (resumir
+					contexto), <code>/model</code> (cambiar LLM activo), o <code>/reload</code> para refrescar extensiones.
+				</p>
 			</>
 		),
 	},
 	{
-		key: "slash",
-		title: "Comandos / y Workflows",
-		body: (
+		id: "skills",
+		label: "Skills",
+		iconName: "sparkle",
+		title: "Habilidades especializadas $",
+		content: (
 			<>
-				usa <code>/wf aidd-plan</code>, <code>/wf aidd-ship</code> o escribe{" "}
-				<code>/</code> para ver comandos rápidos como <code>/compact</code>,{" "}
-				<code>/reload</code>, <code>/model</code> o <code>/login</code>.
+				<p>
+					Invoca habilidades del catálogo escribiendo <code>$</code> o{" "}
+					<code>/skill:nombre</code>.
+				</p>
+				<p>
+					Destacadas: <code>$commit</code> (commits estructurados),{" "}
+					<code>$code-review</code> (revisión de estándares y specs),{" "}
+					<code>$research</code> (investigación profunda de código) y{" "}
+					<code>$tdd</code> (desarrollo guiado por pruebas).
+				</p>
 			</>
 		),
 	},
 	{
-		key: "send",
-		title: "Envío y atajos",
-		body: (
+		id: "keyboard",
+		label: "Teclado",
+		iconName: "keyboard",
+		title: "Atajos de teclado y navegación",
+		content: (
 			<>
-				<kbd>Enter</kbd> envía · <kbd>Shift</kbd>+<kbd>Enter</kbd> salto de línea ·{" "}
-				<kbd>Alt</kbd>+<kbd>Enter</kbd> encola un <em>follow-up</em>. <kbd>↑</kbd>/
-				<kbd>↓</kbd> recupera mensajes anteriores.
+				<ul className="wh-kbd-list">
+					<li>
+						<kbd>Enter</kbd> <span>Enviar mensaje o ejecutar acción</span>
+					</li>
+					<li>
+						<kbd>Shift</kbd>+<kbd>Enter</kbd> <span>Insertar salto de línea</span>
+					</li>
+					<li>
+						<kbd>Alt</kbd>+<kbd>Enter</kbd> <span>Encolar un follow-up</span>
+					</li>
+					<li>
+						<kbd>Esc</kbd> <span>Cerrar diálogos (presiona 2 veces para abortar)</span>
+					</li>
+					<li>
+						<kbd>↑</kbd> / <kbd>↓</kbd> <span>Navegar el historial de mensajes anteriores</span>
+					</li>
+				</ul>
 			</>
 		),
 	},
 	{
-		key: "ctx",
-		title: "Contexto y razonamiento",
-		body: (
+		id: "security",
+		label: "Seguridad",
+		iconName: "shield",
+		title: "Aprobaciones y políticas de ejecución",
+		content: (
 			<>
-				la barra inferior muestra uso del contexto y tokens. El botón de
-				razonamiento permite alternar el <em>thinking</em>; <code>/compact</code>{" "}
-				resume el contexto.
-			</>
-		),
-	},
-	{
-		key: "gates",
-		title: "Aprobaciones y seguridad",
-		body: (
-			<>
-				Frida pide confirmar <strong>ediciones</strong> y <strong>bash</strong>.
-				Cambia de modo con el botón de escudo: <strong>manual</strong>,{" "}
-				<strong>auto-edit</strong> o <strong>YOLO (auto)</strong>.
-			</>
-		),
-	},
-	{
-		key: "esc",
-		title: "Detener respuesta",
-		body: (
-			<>
-				haz clic en el botón circular <strong>■</strong> o presiona <kbd>Esc</kbd>{" "}
-				dos veces para detener inmediatamente.
+				<p>
+					Frida solicita autorización antes de editar archivos o ejecutar
+					comandos bash.
+				</p>
+				<p>
+					Configura el modo desde el icono de escudo en el composer:{" "}
+					<strong>Manual</strong> (aprueba todo), <strong>Auto-edit</strong> (auto-aprobar escrituras de código) o{" "}
+					<strong>YOLO</strong> (auto-aprobación con auditoría completa).
+				</p>
 			</>
 		),
 	},
@@ -147,20 +177,7 @@ export function Welcome({
 	onPrompt?: (text: string) => void;
 	onInsert?: (text: string) => void;
 }) {
-	const [tipIndex, setTipIndex] = useState(() =>
-		Math.floor(Math.random() * FEATURES.length),
-	);
-
-	const nextTip = () => {
-		if (FEATURES.length <= 1) return;
-		setTipIndex((prev) => {
-			let n = Math.floor(Math.random() * FEATURES.length);
-			while (n === prev) n = Math.floor(Math.random() * FEATURES.length);
-			return n;
-		});
-	};
-
-	const tip = FEATURES[tipIndex];
+	const [activeCategory, setActiveCategory] = useState("files");
 
 	const handleCardClick = (card: StarterCard) => {
 		if (card.actionType === "insert" && onInsert) {
@@ -170,84 +187,110 @@ export function Welcome({
 		}
 	};
 
+	const currentCat =
+		HELP_CATEGORIES.find((c) => c.id === activeCategory) ?? HELP_CATEGORIES[0];
+
 	return (
-		<div className="welcome">
-			<div className="welcome-logo">
-				<img src={logo} className="welcome-logo-img" alt="Frida Code" />
-			</div>
-			<h1>Frida Code</h1>
-			<p className="welcome-sub">
-				Asistente inteligente de código de Softtek AppDev. ¿En qué podemos trabajar
-				hoy?
-			</p>
-
-			<div className="welcome-shortcuts">
-				{SHORTCUTS.map((s) => (
-					<button
-						key={s.label}
-						type="button"
-						className="welcome-shortcut-btn"
-						onClick={() => onInsert?.(s.text)}
-					>
-						<Codicon name={s.iconName} size={12} />
-						<span>{s.label}</span>
-					</button>
-				))}
-			</div>
-
-			<div className="welcome-cards">
-				{STARTER_CARDS.map((c) => (
-					<div
-						key={c.id}
-						className="starter-card"
-						onClick={() => handleCardClick(c)}
-						role="button"
-						tabIndex={0}
-						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								e.preventDefault();
-								handleCardClick(c);
-							}
-						}}
-					>
-						<div className="starter-card-head">
-							<Codicon name={c.iconName} size={15} className="starter-card-icon" />
-							<span>{c.title}</span>
-						</div>
-						<p className="starter-card-desc">{c.desc}</p>
+		<div className="welcome-wrapper">
+			<div className="welcome">
+				{/* Hero: Logo 96px + Título + Subtítulo */}
+				<div className="welcome-hero">
+					<div className="welcome-logo">
+						<img src={logo} className="welcome-logo-img" alt="Frida Code" />
 					</div>
-				))}
-			</div>
-
-			<div className="tip-day">
-				<div className="tip-day-label">
-					<span>
-						<Codicon name="lightbulb" size={12} /> Tip del día
-					</span>
-					<button
-						className="tip-day-refresh"
-						onClick={nextTip}
-						title="Ver otro tip"
-						aria-label="Ver otro tip"
-					>
-						<Codicon name="refresh" size={13} />
-					</button>
+					<h1>Frida Code</h1>
+					<p className="welcome-sub">
+						Asistente inteligente de código de Softtek AppDev. ¿En qué podemos
+						trabajar hoy?
+					</p>
 				</div>
-				<p className="tip-day-body">
-					<strong>{tip.title}:</strong> {tip.body}
-				</p>
-			</div>
 
-			<details className="welcome-help">
-				<summary>Instrucciones y atajos</summary>
-				<ul className="tips">
-					{FEATURES.map((f) => (
-						<li key={f.key}>
-							<strong>{f.title}:</strong> {f.body}
-						</li>
+				{/* Quick Insert Pills (@ / $) */}
+				<div className="welcome-shortcuts">
+					{SHORTCUTS.map((s) => (
+						<button
+							key={s.label}
+							type="button"
+							className="welcome-shortcut-btn"
+							onClick={() => onInsert?.(s.text)}
+							title={`Insertar prefijo ${s.text} en el prompt`}
+						>
+							<Codicon name={s.iconName} size={12} />
+							<span>{s.label}</span>
+						</button>
 					))}
-				</ul>
-			</details>
+				</div>
+
+				{/* 2x2 Starter Cards (Copilot Canvas) */}
+				<div className="welcome-cards">
+					{STARTER_CARDS.map((c) => (
+						<div
+							key={c.id}
+							className="starter-card"
+							onClick={() => handleCardClick(c)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									handleCardClick(c);
+								}
+							}}
+						>
+							<div className="starter-card-head">
+								<Codicon
+									name={c.iconName}
+									size={14}
+									className="starter-card-icon"
+								/>
+								<span>{c.title}</span>
+							</div>
+							<p className="starter-card-desc">{c.desc}</p>
+						</div>
+					))}
+				</div>
+
+				{/* Collapsible Categorized Tips Hub */}
+				<details className="welcome-help">
+					<summary className="wh-summary">
+						<span className="wh-summary-left">
+							<Codicon name="book" size={13} className="wh-book-icon" />
+							<span>Guía rápida de atajos y capacidades</span>
+						</span>
+						<Codicon name="chevron-down" size={12} className="wh-chevron" />
+					</summary>
+					<div className="wh-content">
+						{/* Category Tabs */}
+						<div className="wh-tabs" role="tablist">
+							{HELP_CATEGORIES.map((cat) => {
+								const active = cat.id === activeCategory;
+								return (
+									<button
+										key={cat.id}
+										type="button"
+										role="tab"
+										aria-selected={active}
+										className={`wh-tab-btn${active ? " active" : ""}`}
+										onClick={() => setActiveCategory(cat.id)}
+									>
+										<Codicon name={cat.iconName} size={12} />
+										<span>{cat.label}</span>
+									</button>
+								);
+							})}
+						</div>
+
+						{/* Active Category Content Card */}
+						<div className="wh-card">
+							<div className="wh-card-title">
+								<Codicon name={currentCat.iconName} size={13} />
+								<span>{currentCat.title}</span>
+							</div>
+							<div className="wh-card-body">{currentCat.content}</div>
+						</div>
+					</div>
+				</details>
+			</div>
 		</div>
 	);
 }
