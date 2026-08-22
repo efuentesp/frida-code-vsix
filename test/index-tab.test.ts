@@ -94,7 +94,9 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 
 		expect(html).toContain("ci-busy-card");
 		expect(html).toContain("ci-busy-bar");
-		expect(html).toContain("Descargando e instalando el paquete open-codebase-index");
+		expect(html).toContain(
+			"Descargando e instalando el paquete open-codebase-index",
+		);
 		expect(html).toContain("Instalando…");
 	});
 
@@ -105,7 +107,8 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			codebaseIndex: {
 				installed: true,
 				version: "0.23.0",
-				lastLine: "Workspace indexado sin errores. 142 archivos procesados en 3.4s.",
+				lastLine:
+					"Workspace indexado sin errores. 142 archivos procesados en 3.4s.",
 			},
 		};
 
@@ -114,6 +117,8 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		);
 
 		expect(html).toContain("ci-log-box");
-		expect(html).toContain("Workspace indexado sin errores. 142 archivos procesados en 3.4s.");
+		expect(html).toContain(
+			"Workspace indexado sin errores. 142 archivos procesados en 3.4s.",
+		);
 	});
 });

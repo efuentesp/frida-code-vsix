@@ -26,7 +26,8 @@ const INDEX_TOOLS: ToolMeta[] = [
 	{
 		name: "semantic_context",
 		title: "Contexto Semántico",
-		desc: "Contexto relevante estructurado para enriquecer los prompts del agente.",
+		desc:
+			"Contexto relevante estructurado para enriquecer los prompts del agente.",
 		icon: "sparkle",
 	},
 	{
@@ -44,13 +45,15 @@ const INDEX_TOOLS: ToolMeta[] = [
 	{
 		name: "index_codebase",
 		title: "Indexador del Workspace",
-		desc: "Indexación incremental de archivos modificados o reconstrucción total.",
+		desc:
+			"Indexación incremental de archivos modificados o reconstrucción total.",
 		icon: "refresh",
 	},
 	{
 		name: "index_status",
 		title: "Salud y Diagnóstico",
-		desc: "Diagnóstico de frescura, archivos indexados y estado del vector store.",
+		desc:
+			"Diagnóstico de frescura, archivos indexados y estado del vector store.",
 		icon: "pulse",
 	},
 ];
@@ -124,12 +127,29 @@ export function IndexTab({
 						<div className="ci-banner-subtitle">
 							{isInstalled ? (
 								<>
-									<span>Paquete: <strong>open-codebase-index{ci.version ? `@${ci.version}` : ""}</strong></span>
+									<span>
+										Paquete:{" "}
+										<strong>
+											open-codebase-index{ci.version ? `@${ci.version}` : ""}
+										</strong>
+									</span>
 									<span className="ci-bullet">·</span>
-									<span>Motor: <strong>{providerMode === "ollama" ? "Ollama Local" : providerMode === "custom" ? "Endpoint Custom" : "Auto (Ollama/OpenAI)"}</strong></span>
+									<span>
+										Motor:{" "}
+										<strong>
+											{providerMode === "ollama"
+												? "Ollama Local"
+												: providerMode === "custom"
+													? "Endpoint Custom"
+													: "Auto (Ollama/OpenAI)"}
+										</strong>
+									</span>
 								</>
 							) : (
-								<span>Requiere descarga on-demand (~256 MB, podado a ~48 MB). 6 tools del agente esperando.</span>
+								<span>
+									Requiere descarga on-demand (~256 MB, podado a ~48 MB). 6 tools del
+									agente esperando.
+								</span>
 							)}
 						</div>
 						{isInstalled && (
@@ -166,7 +186,9 @@ export function IndexTab({
 							type="button"
 							className="pc-save ci-btn-install"
 							disabled={!!busy}
-							onClick={() => post({ type: "codebase_index_action", action: "install" })}
+							onClick={() =>
+								post({ type: "codebase_index_action", action: "install" })
+							}
 						>
 							{busy === "install" ? (
 								<>
@@ -196,7 +218,9 @@ export function IndexTab({
 						</div>
 						<div className="ci-busy-timer">
 							<Codicon name="clock" size={13} />
-							<span>Tiempo: <strong>{fmtElapsed(elapsed)}</strong></span>
+							<span>
+								Tiempo: <strong>{fmtElapsed(elapsed)}</strong>
+							</span>
 						</div>
 					</div>
 
@@ -238,7 +262,9 @@ export function IndexTab({
 							</div>
 							<div className="ci-action-info">
 								<span className="ci-action-title">Indexación Incremental</span>
-								<span className="ci-action-desc">Procesa solo los archivos modificados desde la última indexación.</span>
+								<span className="ci-action-desc">
+									Procesa solo los archivos modificados desde la última indexación.
+								</span>
 							</div>
 						</button>
 
@@ -246,14 +272,18 @@ export function IndexTab({
 							type="button"
 							className="ci-action-card"
 							disabled={!!busy}
-							onClick={() => post({ type: "codebase_index_action", action: "rebuild" })}
+							onClick={() =>
+								post({ type: "codebase_index_action", action: "rebuild" })
+							}
 						>
 							<div className="ci-action-icon">
 								<Codicon name="tools" size={15} />
 							</div>
 							<div className="ci-action-info">
 								<span className="ci-action-title">Reconstruir desde Cero</span>
-								<span className="ci-action-desc">Limpia el vector store local y re-indexa todo el repositorio.</span>
+								<span className="ci-action-desc">
+									Limpia el vector store local y re-indexa todo el repositorio.
+								</span>
 							</div>
 						</button>
 
@@ -268,7 +298,9 @@ export function IndexTab({
 							</div>
 							<div className="ci-action-info">
 								<span className="ci-action-title">Ver Diagnóstico y Salud</span>
-								<span className="ci-action-desc">Verifica frescura de vectores, errores y conteo de archivos.</span>
+								<span className="ci-action-desc">
+									Verifica frescura de vectores, errores y conteo de archivos.
+								</span>
 							</div>
 						</button>
 					</div>
@@ -284,9 +316,13 @@ export function IndexTab({
 					<div className="ci-engine-head">
 						<div className="ci-engine-provider-badge">
 							<Codicon name="server-process" size={14} />
-							<span>Proveedor Activo: <strong>{providerMode.toUpperCase()}</strong></span>
+							<span>
+								Proveedor Activo: <strong>{providerMode.toUpperCase()}</strong>
+							</span>
 						</div>
-						<span className="ci-engine-hint">Configurable en settings: `frida.codebaseIndex.embeddings.*`</span>
+						<span className="ci-engine-hint">
+							Configurable en settings: `frida.codebaseIndex.embeddings.*`
+						</span>
 					</div>
 
 					<div className="ci-engine-options">
@@ -301,7 +337,8 @@ export function IndexTab({
 									<span className="ci-option-tag is-free">100% Local & Gratis</span>
 								</div>
 								<div className="ci-option-desc">
-									Sin costo por token, sin latencia de red y con privacidad total en tu máquina.
+									Sin costo por token, sin latencia de red y con privacidad total en tu
+									máquina.
 								</div>
 								<div className="ci-cmd-snippet">
 									<code>ollama pull nomic-embed-text</code>
@@ -329,7 +366,8 @@ export function IndexTab({
 									<span className="ci-option-tag">Cloud</span>
 								</div>
 								<div className="ci-option-desc">
-									Usa el modelo <code>text-embedding-3-small</code> con la API key de OpenAI ya configurada en Frida.
+									Usa el modelo <code>text-embedding-3-small</code> con la API key de
+									OpenAI ya configurada en Frida.
 								</div>
 							</div>
 						</div>
@@ -341,7 +379,9 @@ export function IndexTab({
 							</div>
 							<div className="ci-option-content">
 								<div className="ci-option-header">
-									<span className="ci-option-name">3. Endpoint Custom (OpenAI-compatible)</span>
+									<span className="ci-option-name">
+										3. Endpoint Custom (OpenAI-compatible)
+									</span>
 									<span className="ci-option-tag">Avanzado</span>
 								</div>
 								<div className="ci-option-desc">
@@ -356,11 +396,15 @@ export function IndexTab({
 			{/* Matriz de Tools activas para el agente */}
 			<div className="ci-section-group">
 				<div className="cfg-section">
-					<Codicon name="symbol-interface" size={13} /> HERRAMIENTAS ACTIVAS PARA EL AGENTE (6 TOOLS)
+					<Codicon name="symbol-interface" size={13} /> HERRAMIENTAS ACTIVAS PARA EL
+					AGENTE (6 TOOLS)
 				</div>
 				<div className="ci-tools-grid">
 					{INDEX_TOOLS.map((t) => (
-						<div key={t.name} className={`ci-tool-card ${isInstalled ? "is-active" : "is-disabled"}`}>
+						<div
+							key={t.name}
+							className={`ci-tool-card ${isInstalled ? "is-active" : "is-disabled"}`}
+						>
 							<div className="ci-tool-head">
 								<div className="ci-tool-icon-wrap">
 									<Codicon name={t.icon} size={15} />
