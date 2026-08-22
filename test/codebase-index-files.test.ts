@@ -136,9 +136,7 @@ describe("codebase-index/files — metadata de embeddings del índice (#114)", (
 		} catch {
 			return;
 		}
-		const d = mkIndex(
-			`INSERT INTO metadata VALUES ('schema_version','7');`,
-		);
+		const d = mkIndex(`INSERT INTO metadata VALUES ('schema_version','7');`);
 		expect(await readIndexMeta(d)).toBeNull(); // DB sin claves embedding
 	});
 });

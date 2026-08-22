@@ -167,7 +167,10 @@ import {
 	parseAutoIndexProgress,
 	type IndexProgress,
 } from "./tools/frida-codebase-index/progress";
-import { readIndexedFiles, readIndexMeta } from "./tools/frida-codebase-index/files";
+import {
+	readIndexedFiles,
+	readIndexMeta,
+} from "./tools/frida-codebase-index/files";
 import type { IndexMeta } from "./tools/frida-codebase-index/files";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
@@ -2966,11 +2969,11 @@ export async function activate(
 			case "codebase_index_action": {
 				const action = msg.action as
 					| "install"
-				| "index"
-				| "rebuild"
-				| "status"
-				| "files"
-				| "stop";
+					| "index"
+					| "rebuild"
+					| "status"
+					| "files"
+					| "stop";
 				// #112 — consulta read-only de archivos indexados: no es una acción
 				// «busy» (no deshabilita botones ni arranca reloj).
 				if (action === "files") {
@@ -2997,9 +3000,7 @@ export async function activate(
 				// corrida recargando el extension host. El webview ya mostró la
 				// confirmación con la explicación; aquí solo se ejecuta.
 				if (action === "stop") {
-					await vscode.commands.executeCommand(
-						"workbench.action.reloadWindow",
-					);
+					await vscode.commands.executeCommand("workbench.action.reloadWindow");
 					break;
 				}
 				ciBusy = action === "install" ? "install" : "index";

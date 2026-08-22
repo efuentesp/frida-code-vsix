@@ -33,10 +33,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 /** Etiqueta del motor del banner: metadata REAL del índice o fallback al
  *  setting (auto/ollama/custom). #114 */
-function engineLabel(
-	providerMode: string,
-	metaLabel: string | null,
-): string {
+function engineLabel(providerMode: string, metaLabel: string | null): string {
 	if (metaLabel) return metaLabel;
 	if (providerMode === "ollama") return "Ollama Local";
 	if (providerMode === "custom") return "Endpoint Custom";
@@ -105,8 +102,7 @@ function FilesBody({
 	if (!idxFiles.available) {
 		return (
 			<div className="ci-files-empty">
-				Sin índice construido en este workspace — ejecuta «Indexar» para
-				crearlo.
+				Sin índice construido en este workspace — ejecuta «Indexar» para crearlo.
 			</div>
 		);
 	}
@@ -171,12 +167,12 @@ export function StopIndexDialog({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") {
 					e.preventDefault();
-				onCancel();
+					onCancel();
 				}
 				if (e.key === "Enter") {
 					e.preventDefault();
-				onConfirm();
-			}
+					onConfirm();
+				}
 			}}
 		>
 			<div className="stp-stop-card ci-stop-card">
@@ -184,27 +180,28 @@ export function StopIndexDialog({
 					<Codicon name="debug-stop" size={16} /> Detener la indexación
 				</div>
 				<div className="ci-stop-text">
-					El paquete no permite cancelar en caliente: se <strong>recargará la
-				ventana de VS Code</strong> para cortar la corrida. Es seguro — el índice
-				es incremental: al volver a indexar <strong>retomará desde donde quedó</strong>
-				(los archivos ya procesados se saltan y los chunks fallidos se reintentan).
+					El paquete no permite cancelar en caliente: se{" "}
+					<strong>recargará la ventana de VS Code</strong> para cortar la corrida. Es
+					seguro — el índice es incremental: al volver a indexar{" "}
+					<strong>retomará desde donde quedó</strong>
+					(los archivos ya procesados se saltan y los chunks fallidos se reintentan).
 				</div>
-			<div className="ci-stop-actions">
-				<button
-					type="button"
-					className="model-diff-btn secondary"
-					onClick={onCancel}
-				>
-					Seguir indexando
-				</button>
-				<button
-					type="button"
-					className="model-diff-btn primary"
-					onClick={onConfirm}
-				>
-					<Codicon name="debug-stop" size={13} /> Detener y recargar
-				</button>
-			</div>
+				<div className="ci-stop-actions">
+					<button
+						type="button"
+						className="model-diff-btn secondary"
+						onClick={onCancel}
+					>
+						Seguir indexando
+					</button>
+					<button
+						type="button"
+						className="model-diff-btn primary"
+						onClick={onConfirm}
+					>
+						<Codicon name="debug-stop" size={13} /> Detener y recargar
+					</button>
+				</div>
 			</div>
 		</div>
 	);
@@ -283,7 +280,9 @@ export function IndexTab({
 	// #114 — proveedor/modelo REALES del índice construido (metadata), con
 	// nombre legible; solo si existe metadata (índice con embeddings).
 	const meta = ci?.indexMeta;
-	const metaProvider = meta ? (PROVIDER_LABELS[meta.provider] ?? meta.provider) : null;
+	const metaProvider = meta
+		? (PROVIDER_LABELS[meta.provider] ?? meta.provider)
+		: null;
 	const metaLabel = meta ? `${metaProvider} · ${meta.model}` : null;
 
 	return (
@@ -292,11 +291,11 @@ export function IndexTab({
 			{stopOpen && busy !== "install" && (
 				<StopIndexDialog
 					onConfirm={() => {
-					setStopOpen(false);
-					post({ type: "codebase_index_action", action: "stop" });
-				}}
-				onCancel={() => setStopOpen(false)}
-			/>
+						setStopOpen(false);
+						post({ type: "codebase_index_action", action: "stop" });
+					}}
+					onCancel={() => setStopOpen(false)}
+				/>
 			)}
 
 			{/* Banner superior de salud del índice */}
@@ -326,8 +325,7 @@ export function IndexTab({
 									</span>
 									<span className="ci-bullet">·</span>
 									<span>
-										Motor:{" "}
-										<strong>{engineLabel(providerMode, metaLabel)}</strong>
+										Motor: <strong>{engineLabel(providerMode, metaLabel)}</strong>
 										{meta && meta.dimensions > 0 && (
 											<span className="ci-tag-dims" title="Dimensiones de los vectores">
 												{meta.dimensions}d

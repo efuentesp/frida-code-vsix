@@ -249,7 +249,11 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		const post = vi.fn();
 		const state: State = {
 			...baseState,
-			codebaseIndex: { installed: true, busy: "index", busySince: Date.now() - 60_000 },
+			codebaseIndex: {
+				installed: true,
+				busy: "index",
+				busySince: Date.now() - 60_000,
+			},
 		};
 
 		const html = renderToStaticMarkup(
@@ -264,13 +268,13 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		const html = renderToStaticMarkup(
 			React.createElement(IndexTab, {
 				state: {
-				...baseState,
-				codebaseIndex: { installed: false, busy: "install" },
-			},
-			post,
+					...baseState,
+					codebaseIndex: { installed: false, busy: "install" },
+				},
+				post,
 			}),
 		);
-		expect(html).not.toContain('ci-stop-btn');
+		expect(html).not.toContain("ci-stop-btn");
 	});
 
 	it("#114 — banner muestra proveedor/modelo REAL del índice cuando existe", () => {
