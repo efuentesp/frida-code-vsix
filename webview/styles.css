@@ -7242,7 +7242,10 @@ kbd {
 	width: 32px;
 	height: 32px;
 	border-radius: 6px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.15));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.15)
+	);
 }
 .cfg-env-banner-icon-ok {
 	color: var(--vscode-testing-iconPassed, #73c991);
@@ -7328,7 +7331,10 @@ kbd {
 	width: 28px;
 	height: 28px;
 	border-radius: 4px;
-	background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.15));
+	background: var(
+		--vscode-inputOption-activeBackground,
+		rgba(128, 128, 128, 0.15)
+	);
 	flex-shrink: 0;
 }
 .cfg-env-info {
@@ -7452,7 +7458,9 @@ kbd {
 	background: transparent;
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
-	transition: background 0.1s ease, color 0.1s ease;
+	transition:
+		background 0.1s ease,
+		color 0.1s ease;
 }
 .cfg-env-os-tab:hover {
 	background: var(--vscode-list-hoverBackground);
@@ -7494,10 +7502,15 @@ kbd {
 	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
 	cursor: pointer;
 	white-space: nowrap;
-	transition: background 0.15s ease, color 0.15s ease;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease;
 }
 .cfg-env-copy-btn:hover {
-	background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		rgba(128, 128, 128, 0.3)
+	);
 }
 .cfg-env-copy-btn.copied {
 	background: var(--vscode-testing-iconPassed, #73c991);

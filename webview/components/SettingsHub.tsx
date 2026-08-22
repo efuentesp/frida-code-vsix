@@ -288,9 +288,13 @@ export function SettingsHub({
 													<div className="cfg-res-head">
 														<Codicon name={d.installed ? "check" : "warning"} size={13} />
 														<span className="cfg-res-name">{d.name}</span>
-														<span className="cfg-res-hint">{d.installed ? (d.version ?? "Instalado") : "No encontrado"}</span>
+														<span className="cfg-res-hint">
+															{d.installed ? (d.version ?? "Instalado") : "No encontrado"}
+														</span>
 													</div>
-													<div className="cfg-res-desc">{d.description} · Usado por: {d.usedBy}</div>
+													<div className="cfg-res-desc">
+														{d.description} · Usado por: {d.usedBy}
+													</div>
 												</div>
 											))}
 										</div>

@@ -1,4 +1,5 @@
-import type { CcPanelRowWs,
+import type {
+	CcPanelRowWs,
 	CompactionReason,
 	InMessage,
 	Segment,
@@ -123,9 +124,7 @@ function markToolResult(
 		const match =
 			s.kind === "tool" &&
 			s.state === "running" &&
-			(toolCallId && s.toolCallId
-				? s.toolCallId === toolCallId
-				: s.tool === tool);
+			(toolCallId && s.toolCallId ? s.toolCallId === toolCallId : s.tool === tool);
 		if (!done && match) {
 			done = true;
 			return {
@@ -298,9 +297,7 @@ export function reduce(state: State, msg: InMessage): State {
 				// evento lo limpiaba → el turn quedaba "pensando" para siempre.
 				turns: msg.busy
 					? state.turns
-					: withLast(state.turns, (t) =>
-							closeOpenThinking({ ...t, status: null }),
-						),
+					: withLast(state.turns, (t) => closeOpenThinking({ ...t, status: null })),
 			};
 		case "turn_active":
 			return {
@@ -320,9 +317,7 @@ export function reduce(state: State, msg: InMessage): State {
 		case "thinking_delta":
 			return {
 				...state,
-				turns: withLast(state.turns, (t) =>
-					appendSegment(t, msg.text, "thinking"),
-				),
+				turns: withLast(state.turns, (t) => appendSegment(t, msg.text, "thinking")),
 			};
 
 		case "tool_start":

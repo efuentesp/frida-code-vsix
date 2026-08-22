@@ -82,9 +82,14 @@ function getPlatformLabel(p: NodeJS.Platform): string {
 
 export async function checkGit(exec: ExecFn): Promise<DependencyStatus> {
 	const res = await exec("git", ["--version"]);
-	const installed = res.code === 0 && res.stdout.toLowerCase().includes("git version");
+	const installed =
+		res.code === 0 && res.stdout.toLowerCase().includes("git version");
 	const versionMatch = res.stdout.match(/git version\s+([^\s]+)/i);
-	const version = versionMatch ? versionMatch[1] : (installed ? res.stdout : undefined);
+	const version = versionMatch
+		? versionMatch[1]
+		: installed
+			? res.stdout
+			: undefined;
 
 	return {
 		id: "git",
@@ -92,22 +97,26 @@ export async function checkGit(exec: ExecFn): Promise<DependencyStatus> {
 		category: "core",
 		installed,
 		version,
-		description: "Control de versiones, worktrees, respaldo automático y gestión de código.",
+		description:
+			"Control de versiones, worktrees, respaldo automático y gestión de código.",
 		usedBy: "Core, Worktrees, Git Sync, Pipeline AIDD, cc-plugins",
 		installGuides: {
 			win32: {
 				command: "winget install --id Git.Git -e --source winget",
-				guide: "Selecciona 'Git from the command line and 3rd-party software' durante el instalador.",
+				guide:
+					"Selecciona 'Git from the command line and 3rd-party software' durante el instalador.",
 				url: "https://git-scm.com/download/win",
 			},
 			darwin: {
 				command: "brew install git",
-				guide: "O ejecuta 'xcode-select --install' para las herramientas de desarrollo de Apple.",
+				guide:
+					"O ejecuta 'xcode-select --install' para las herramientas de desarrollo de Apple.",
 				url: "https://git-scm.com/download/mac",
 			},
 			linux: {
 				command: "sudo apt update && sudo apt install -y git",
-				guide: "En Fedora/RHEL usa 'sudo dnf install git'; en Arch usa 'sudo pacman -S git'.",
+				guide:
+					"En Fedora/RHEL usa 'sudo dnf install git'; en Arch usa 'sudo pacman -S git'.",
 				url: "https://git-scm.com/download/linux",
 			},
 		},
@@ -126,14 +135,25 @@ export async function checkBash(
 	if (platform === "win32") {
 		// En Windows: preferir Git Bash en rutas estándar
 		const candidates = [
-			path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "bin", "bash.exe"),
+			path.join(
+				process.env.ProgramFiles || "C:\\Program Files",
+				"Git",
+				"bin",
+				"bash.exe",
+			),
 			path.join(
 				process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)",
 				"Git",
 				"bin",
 				"bash.exe",
 			),
-			path.join(process.env.LocalAppData || "", "Programs", "Git", "bin", "bash.exe"),
+			path.join(
+				process.env.LocalAppData || "",
+				"Programs",
+				"Git",
+				"bin",
+				"bash.exe",
+			),
 		];
 
 		for (const cand of candidates) {
@@ -193,7 +213,8 @@ export async function checkBash(
 		installGuides: {
 			win32: {
 				command: "winget install --id Git.Git -e --source winget",
-				guide: "Git for Windows incluye Git Bash. El bash de WSL está descartado por diseño.",
+				guide:
+					"Git for Windows incluye Git Bash. El bash de WSL está descartado por diseño.",
 				url: "https://gitforwindows.org/",
 			},
 			darwin: {
@@ -202,7 +223,8 @@ export async function checkBash(
 			},
 			linux: {
 				command: "sudo apt install -y bash",
-				guide: "Prácticamente todas las distribuciones Linux incluyen bash por defecto.",
+				guide:
+					"Prácticamente todas las distribuciones Linux incluyen bash por defecto.",
 			},
 		},
 	};
@@ -233,7 +255,8 @@ export async function checkNodeNpm(exec: ExecFn): Promise<DependencyStatus> {
 		category: "extension",
 		installed,
 		version,
-		description: "Motor JavaScript y gestor de paquetes para instalar módulos bajo demanda.",
+		description:
+			"Motor JavaScript y gestor de paquetes para instalar módulos bajo demanda.",
 		usedBy: "Tab Index (búsqueda semántica) y Base de Conocimiento (frida-learn)",
 		notes: installed
 			? undefined
@@ -251,7 +274,8 @@ export async function checkNodeNpm(exec: ExecFn): Promise<DependencyStatus> {
 			},
 			linux: {
 				command: "sudo apt update && sudo apt install -y nodejs npm",
-				guide: "O bien instala la versión LTS recomendada usando NVM: 'nvm install --lts'.",
+				guide:
+					"O bien instala la versión LTS recomendada usando NVM: 'nvm install --lts'.",
 				url: "https://nodejs.org/en/download/",
 			},
 		},
@@ -260,14 +284,16 @@ export async function checkNodeNpm(exec: ExecFn): Promise<DependencyStatus> {
 
 export async function checkGh(exec: ExecFn): Promise<DependencyStatus> {
 	const res = await exec("gh", ["--version"]);
-	const installed = res.code === 0 && res.stdout.toLowerCase().includes("gh version");
+	const installed =
+		res.code === 0 && res.stdout.toLowerCase().includes("gh version");
 	const vMatch = res.stdout.match(/gh version\s+([^\s]+)/i);
-	const version = vMatch ? `v${vMatch[1]}` : (installed ? "Instalado" : undefined);
+	const version = vMatch ? `v${vMatch[1]}` : installed ? "Instalado" : undefined;
 	let notes: string | undefined;
 
 	if (installed) {
 		const authRes = await exec("gh", ["auth", "status"]);
-		const isAuthed = authRes.code === 0 || authRes.stdout.includes("Logged in to");
+		const isAuthed =
+			authRes.code === 0 || authRes.stdout.includes("Logged in to");
 		if (isAuthed) {
 			notes = "Autenticado en GitHub";
 		} else {
@@ -282,7 +308,8 @@ export async function checkGh(exec: ExecFn): Promise<DependencyStatus> {
 		installed,
 		version,
 		notes,
-		description: "Gestión de issues, pull requests y sincronización de tareas AIDD.",
+		description:
+			"Gestión de issues, pull requests y sincronización de tareas AIDD.",
 		usedBy: "Gestión de issues (AGENTS.md), Flujos AIDD, supi-web",
 		installGuides: {
 			win32: {
@@ -297,16 +324,21 @@ export async function checkGh(exec: ExecFn): Promise<DependencyStatus> {
 			},
 			linux: {
 				command: "sudo apt install -y gh",
-				guide: "En Fedora: 'sudo dnf install gh'; en Arch: 'sudo pacman -S github-cli'.",
+				guide:
+					"En Fedora: 'sudo dnf install gh'; en Arch: 'sudo pacman -S github-cli'.",
 				url: "https://cli.github.com/",
 			},
 		},
 	};
 }
 
-export async function checkAgentBrowser(exec: ExecFn): Promise<DependencyStatus> {
+export async function checkAgentBrowser(
+	exec: ExecFn,
+): Promise<DependencyStatus> {
 	const res = await exec("agent-browser", ["--version"]);
-	const installed = res.code === 0 && (/\d+\.\d+/i.test(res.stdout) || res.stdout.includes("agent-browser"));
+	const installed =
+		res.code === 0 &&
+		(/\d+\.\d+/i.test(res.stdout) || res.stdout.includes("agent-browser"));
 	const version = installed ? res.stdout : undefined;
 
 	return {
@@ -315,7 +347,8 @@ export async function checkAgentBrowser(exec: ExecFn): Promise<DependencyStatus>
 		category: "optional",
 		installed,
 		version,
-		description: "Automatización de navegador real para interacción web, lectura y screenshots.",
+		description:
+			"Automatización de navegador real para interacción web, lectura y screenshots.",
 		usedBy: "Tool agent_browser (Automatización de navegador opt-in)",
 		notes: installed
 			? undefined
@@ -342,9 +375,10 @@ export async function checkAgentBrowser(exec: ExecFn): Promise<DependencyStatus>
 
 export async function checkDocker(exec: ExecFn): Promise<DependencyStatus> {
 	const res = await exec("docker", ["--version"]);
-	const installed = res.code === 0 && res.stdout.toLowerCase().includes("docker version");
+	const installed =
+		res.code === 0 && res.stdout.toLowerCase().includes("docker version");
 	const vMatch = res.stdout.match(/Docker version\s+([^\s,]+)/i);
-	const version = vMatch ? `v${vMatch[1]}` : (installed ? res.stdout : undefined);
+	const version = vMatch ? `v${vMatch[1]}` : installed ? res.stdout : undefined;
 	let notes: string | undefined;
 
 	if (installed) {
@@ -365,7 +399,8 @@ export async function checkDocker(exec: ExecFn): Promise<DependencyStatus> {
 		installed,
 		version,
 		notes,
-		description: "Contenedores para ejecución aislada y segura de comandos del agente.",
+		description:
+			"Contenedores para ejecución aislada y segura de comandos del agente.",
 		usedBy: "Sandboxes aislados (frida-sandboxes)",
 		installGuides: {
 			win32: {
@@ -375,12 +410,15 @@ export async function checkDocker(exec: ExecFn): Promise<DependencyStatus> {
 			},
 			darwin: {
 				command: "brew install --cask docker",
-				guide: "O descarga el instalador de Docker Desktop para Apple Silicon / Intel.",
+				guide:
+					"O descarga el instalador de Docker Desktop para Apple Silicon / Intel.",
 				url: "https://www.docker.com/products/docker-desktop/",
 			},
 			linux: {
-				command: "sudo apt update && sudo apt install -y docker.io && sudo systemctl enable --now docker",
-				guide: "Asegúrate de agregar tu usuario al grupo docker: 'sudo usermod -aG docker $USER'.",
+				command:
+					"sudo apt update && sudo apt install -y docker.io && sudo systemctl enable --now docker",
+				guide:
+					"Asegúrate de agregar tu usuario al grupo docker: 'sudo usermod -aG docker $USER'.",
 				url: "https://docs.docker.com/engine/install/",
 			},
 		},

@@ -867,15 +867,12 @@ export type InMessage =
 			items: HistoryItem[];
 			branchSummaries?: BranchSummaryEntry[];
 	  }
-| { type: "mode"; mode: ApprovalMode }
-| { type: "gate_stats"; stats: GateStats }
-| { type: "version"; version: string }
-| { type: "goal_state"; goal: GoalState | null }
-| { type: "model_info"; provider?: string; model: string; thinking: string }
-	| { type: "tool_toggles";
-			values: ToolToggles;
-			defs: ToolToggleDescriptor[];
-	  }
+	| { type: "mode"; mode: ApprovalMode }
+	| { type: "gate_stats"; stats: GateStats }
+	| { type: "version"; version: string }
+	| { type: "goal_state"; goal: GoalState | null }
+	| { type: "model_info"; provider?: string; model: string; thinking: string }
+	| { type: "tool_toggles"; values: ToolToggles; defs: ToolToggleDescriptor[] }
 	| {
 			type: "permissions_config";
 			config: PermissionsConfigUi;
@@ -1019,7 +1016,11 @@ export type OutMessage =
 	| { type: "perm_set_external"; state: PermState }
 	| { type: "perm_set_audit"; enabled: boolean }
 	| { type: "perm_reset" }
-	| { type: "perm_revoke_session_pattern"; kind: SessionPatternUi["kind"]; pattern: string }
+	| {
+			type: "perm_revoke_session_pattern";
+			kind: SessionPatternUi["kind"];
+			pattern: string;
+	  }
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status";

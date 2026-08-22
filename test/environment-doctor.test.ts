@@ -41,7 +41,11 @@ describe("environment/doctor · detección de dependencias", () => {
 	it("checkBash en Unix detecta bash estándar", async () => {
 		const mockExec: ExecFn = async (cmd) => {
 			if (cmd === "bash") {
-				return { stdout: "GNU bash, version 5.2.26(1)-release", stderr: "", code: 0 };
+				return {
+					stdout: "GNU bash, version 5.2.26(1)-release",
+					stderr: "",
+					code: 0,
+				};
 			}
 			return { stdout: "", stderr: "not found", code: -1 };
 		};
@@ -99,7 +103,11 @@ describe("environment/doctor · detección de dependencias", () => {
 				return { stdout: "gh version 2.45.0 (2024-03-04)", stderr: "", code: 0 };
 			}
 			if (cmd === "gh" && args[0] === "auth") {
-				return { stdout: "Logged in to github.com as testuser", stderr: "", code: 0 };
+				return {
+					stdout: "Logged in to github.com as testuser",
+					stderr: "",
+					code: 0,
+				};
 			}
 			return { stdout: "", stderr: "", code: -1 };
 		};
@@ -126,7 +134,11 @@ describe("environment/doctor · detección de dependencias", () => {
 	it("checkDocker detecta daemon activo", async () => {
 		const mockExec: ExecFn = async (cmd, args) => {
 			if (cmd === "docker" && args[0] === "--version") {
-				return { stdout: "Docker version 26.0.0, build 2ae903e", stderr: "", code: 0 };
+				return {
+					stdout: "Docker version 26.0.0, build 2ae903e",
+					stderr: "",
+					code: 0,
+				};
 			}
 			if (cmd === "docker" && args[0] === "info") {
 				return { stdout: "Containers: 2\n Running: 1", stderr: "", code: 0 };
@@ -142,9 +154,14 @@ describe("environment/doctor · detección de dependencias", () => {
 
 	it("checkEnvironment agrega el reporte global correctamente", async () => {
 		const mockExec: ExecFn = async (cmd, args) => {
-			if (cmd === "git") return { stdout: "git version 2.44.0", stderr: "", code: 0 };
+			if (cmd === "git")
+				return { stdout: "git version 2.44.0", stderr: "", code: 0 };
 			if (cmd === "where" && args[0] === "bash.exe") {
-				return { stdout: "C:\\Program Files\\Git\\bin\\bash.exe", stderr: "", code: 0 };
+				return {
+					stdout: "C:\\Program Files\\Git\\bin\\bash.exe",
+					stderr: "",
+					code: 0,
+				};
 			}
 			if (cmd === "C:\\Program Files\\Git\\bin\\bash.exe") {
 				return { stdout: "GNU bash, version 5.2.0", stderr: "", code: 0 };
@@ -152,7 +169,8 @@ describe("environment/doctor · detección de dependencias", () => {
 			if (cmd === "bash") return { stdout: "version 5.2.0", stderr: "", code: 0 };
 			if (cmd === "node") return { stdout: "v20.10.0", stderr: "", code: 0 };
 			if (cmd === "npm") return { stdout: "10.1.0", stderr: "", code: 0 };
-			if (cmd === "gh") return { stdout: "gh version 2.40.0", stderr: "", code: 0 };
+			if (cmd === "gh")
+				return { stdout: "gh version 2.40.0", stderr: "", code: 0 };
 			return { stdout: "", stderr: "not found", code: 127 };
 		};
 

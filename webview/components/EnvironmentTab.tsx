@@ -47,11 +47,13 @@ interface EnvCardProps {
 }
 
 function EnvCard({ dep, hostPlatform, post }: EnvCardProps) {
-	const [activeOsTab, setActiveOsTab] = useState<SupportedPlatform>(hostPlatform);
+	const [activeOsTab, setActiveOsTab] =
+		useState<SupportedPlatform>(hostPlatform);
 	const [copied, setCopied] = useState(false);
 	const [expanded, setExpanded] = useState(!dep.installed);
 
-	const guide = dep.installGuides[activeOsTab] ?? dep.installGuides[hostPlatform];
+	const guide =
+		dep.installGuides[activeOsTab] ?? dep.installGuides[hostPlatform];
 
 	const handleCopy = () => {
 		if (!guide?.command) return;
@@ -68,7 +70,9 @@ function EnvCard({ dep, hostPlatform, post }: EnvCardProps) {
 	};
 
 	return (
-		<div className={`cfg-env-card ${dep.installed ? "is-installed" : "is-missing"} ${dep.category === "core" && !dep.installed ? "is-critical" : ""}`}>
+		<div
+			className={`cfg-env-card ${dep.installed ? "is-installed" : "is-missing"} ${dep.category === "core" && !dep.installed ? "is-critical" : ""}`}
+		>
 			{/* Encabezado de la tarjeta */}
 			<div className="cfg-env-card-header">
 				<div className="cfg-env-card-left">
@@ -88,7 +92,9 @@ function EnvCard({ dep, hostPlatform, post }: EnvCardProps) {
 					{dep.installed ? (
 						<div className="cfg-env-badge is-ok" title={dep.version || "Instalado"}>
 							<Codicon name="check" size={13} />
-							<span>{dep.version ? `v${dep.version.replace(/^v/i, "")}` : "Instalado"}</span>
+							<span>
+								{dep.version ? `v${dep.version.replace(/^v/i, "")}` : "Instalado"}
+							</span>
 						</div>
 					) : dep.category === "core" ? (
 						<div className="cfg-env-badge is-error" title="Requerido para operar">
@@ -106,7 +112,9 @@ function EnvCard({ dep, hostPlatform, post }: EnvCardProps) {
 						type="button"
 						className="cfg-env-expand-btn"
 						onClick={() => setExpanded(!expanded)}
-						title={expanded ? "Ocultar guía de instalación" : "Ver guía de instalación"}
+						title={
+							expanded ? "Ocultar guía de instalación" : "Ver guía de instalación"
+						}
 					>
 						<Codicon name={expanded ? "chevron-up" : "chevron-down"} size={13} />
 					</button>
@@ -115,7 +123,9 @@ function EnvCard({ dep, hostPlatform, post }: EnvCardProps) {
 
 			{/* Notas o advertencias específicas */}
 			{dep.notes && (
-				<div className={`cfg-env-notes ${dep.installed ? "is-info" : "is-warning"}`}>
+				<div
+					className={`cfg-env-notes ${dep.installed ? "is-info" : "is-warning"}`}
+				>
 					<Codicon name={dep.installed ? "info" : "warning"} size={13} />
 					<span>{dep.notes}</span>
 				</div>
@@ -197,13 +207,17 @@ export function EnvironmentTab({
 	return (
 		<div className="cfg-environment">
 			{/* Banner superior de salud del sistema */}
-			<div className={`cfg-env-banner ${env?.coreReady ? "is-ready" : "is-incomplete"}`}>
+			<div
+				className={`cfg-env-banner ${env?.coreReady ? "is-ready" : "is-incomplete"}`}
+			>
 				<div className="cfg-env-banner-left">
 					<div className="cfg-env-banner-icon-wrap">
 						<Codicon
 							name={env?.coreReady ? "pulse" : "warning"}
 							size={18}
-							className={env?.coreReady ? "cfg-env-banner-icon-ok" : "cfg-env-banner-icon-warn"}
+							className={
+								env?.coreReady ? "cfg-env-banner-icon-ok" : "cfg-env-banner-icon-warn"
+							}
 						/>
 					</div>
 					<div className="cfg-env-banner-info">
@@ -215,7 +229,8 @@ export function EnvironmentTab({
 						<div className="cfg-env-banner-subtitle">
 							<Codicon name={getPlatformIcon(hostPlatform)} size={12} />
 							<span>
-								SO Detectado: <strong>{env?.platformLabel ?? "Detectando..."}</strong> ({env?.arch ?? "..."})
+								SO Detectado: <strong>{env?.platformLabel ?? "Detectando..."}</strong> (
+								{env?.arch ?? "..."})
 							</span>
 							{env && (
 								<span className="cfg-env-banner-tag">
@@ -242,7 +257,8 @@ export function EnvironmentTab({
 			{/* Sin reporte aún (cargando) */}
 			{!env && isChecking && (
 				<div className="cfg-stub">
-					<Codicon name="loading" size={14} spin /> Analizando binarios del sistema (Git, Bash, Node, npm, gh, agent-browser, Docker)...
+					<Codicon name="loading" size={14} spin /> Analizando binarios del sistema
+					(Git, Bash, Node, npm, gh, agent-browser, Docker)...
 				</div>
 			)}
 
@@ -250,7 +266,8 @@ export function EnvironmentTab({
 			{coreDeps.length > 0 && (
 				<div className="cfg-env-section-group">
 					<div className="cfg-section">
-						<Codicon name="shield" size={13} /> NÚCLEO REQUERIDO (Sin esto el agente no puede operar)
+						<Codicon name="shield" size={13} /> NÚCLEO REQUERIDO (Sin esto el agente
+						no puede operar)
 					</div>
 					<div className="cfg-env-cards-list">
 						{coreDeps.map((dep) => (
@@ -269,7 +286,8 @@ export function EnvironmentTab({
 			{extDeps.length > 0 && (
 				<div className="cfg-env-section-group">
 					<div className="cfg-section">
-						<Codicon name="extensions" size={13} /> EXTENSIONES Y MÓDULOS (Funcionalidades por demanda)
+						<Codicon name="extensions" size={13} /> EXTENSIONES Y MÓDULOS
+						(Funcionalidades por demanda)
 					</div>
 					<div className="cfg-env-cards-list">
 						{extDeps.map((dep) => (

@@ -35,7 +35,8 @@ describe("EnvironmentTab (Opción 1: Diagnostic Checklist & Matrix)", () => {
 				category: "core",
 				installed: true,
 				version: "5.2.26",
-				description: "Intérprete de comandos y ejecución de herramientas del agente.",
+				description:
+					"Intérprete de comandos y ejecución de herramientas del agente.",
 				usedBy: "Core (Tool bash, Subagents)",
 				installGuides: {
 					win32: { command: "winget install --id Git.Git -e --source winget" },
