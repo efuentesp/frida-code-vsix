@@ -17,6 +17,24 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.28.0] - 2026-08-22
+### Añadido
+
+- **webview** — añadir diálogo de confirmación de cambio de modelo con diff comparativo side-by-side (Propuesta 1)
+- **webview** — rediseñar pantalla de bienvenida con centrado vertical y Categorized Tips Hub (Propuesta 1)
+- **branding** — actualizar logo oficial de Frida Code a versión robot con guiño { > _ } (V2-1 Classic Purple)
+- **webview** — añadir animación de respiración espectral bipolar en la barra de actividad (Opción 3)
+- **webview** — implementar confirmación de omisión explícita en ask-user-questions (Opción B)
+
+### Corregido
+
+- **branding** — reemplazar icono de Copilot en la barra de herramientas del header por FridaRobotIcon { > _ }
+- **branding** — sincronizar icono oficial { > _ } en Activity Bar, header y avatar de turnos, y ajustar escala en Welcome
+
+### Interno
+
+- **webview** — reformatear líneas largas en App.tsx y styles.css
+
 ## [0.27.0] - 2026-08-21
 ### Añadido
 
