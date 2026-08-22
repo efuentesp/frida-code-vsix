@@ -16,9 +16,17 @@
 // El registro vive en pi-session.ts: modelRuntime.registerProvider(..., config)
 // con oauth + streamSimple propios. El wiring del host importa SOLO de aquí.
 
-import { getApiKey, loginAntigravity, refreshAntigravityToken } from "./auth/oauth";
+import {
+	getApiKey,
+	loginAntigravity,
+	refreshAntigravityToken,
+} from "./auth/oauth";
 import { DEFAULT_ENDPOINT } from "./client/client";
-import { ANTIGRAVITY_MODELS, PROVIDER_ID, PROVIDER_NAME } from "./models/models";
+import {
+	ANTIGRAVITY_MODELS,
+	PROVIDER_ID,
+	PROVIDER_NAME,
+} from "./models/models";
 import { streamAntigravity } from "./stream/stream";
 
 /** ProviderConfigInput para modelRuntime.registerProvider(ANTIGRAVITY_PROVIDER, …).
@@ -111,4 +119,7 @@ export {
 
 export { antigravityEnv, isRecord, sanitizeText } from "./utils/util";
 
-export { PROVIDER_ID as ANTIGRAVITY_PROVIDER, PROVIDER_NAME as ANTIGRAVITY_PROVIDER_DISPLAY };
+export {
+	PROVIDER_ID as ANTIGRAVITY_PROVIDER,
+	PROVIDER_NAME as ANTIGRAVITY_PROVIDER_DISPLAY,
+};

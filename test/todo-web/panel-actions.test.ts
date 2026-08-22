@@ -80,18 +80,14 @@ describe("todo-web · botón resincronizar en slot actions (#66 UI/UX)", () => {
 			// El botón NO pertenece al fbox clicable del header (.panel-header).
 			const header = findNodes(tree, (n) => n.props.cls === "panel-header");
 			expect(header.length).toBe(1);
-			const btnInsideHeader = findNodes(
-				header[0]!,
-				(n) => n.type === "fbutton",
-			);
+			const btnInsideHeader = findNodes(header[0]!, (n) => n.type === "fbutton");
 			expect(btnInsideHeader.length).toBe(0);
 
 			// El padre del botón es el fbox con justifyContent space-between
 			// (la fila header-row del CollapsiblePanel).
 			const row = findNodes(
 				tree,
-				(n) =>
-					n.type === "fbox" && n.props.justifyContent === "space-between",
+				(n) => n.type === "fbox" && n.props.justifyContent === "space-between",
 			);
 			expect(row.length).toBe(1);
 			const btnInRow = findNodes(row[0]!, (n) => n.type === "fbutton");

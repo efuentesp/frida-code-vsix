@@ -29,7 +29,9 @@ describe("frida-antigravity · parseApiKey", () => {
 	});
 
 	it("JSON inválido o incompleto → error con causa", () => {
-		expect(() => parseApiKey("no-json")).toThrow(/Invalid Antigravity credentials/);
+		expect(() => parseApiKey("no-json")).toThrow(
+			/Invalid Antigravity credentials/,
+		);
 		expect(() => parseApiKey('{"token":"t"}')).toThrow(/Invalid/);
 		expect(() => parseApiKey('{"projectId":"p"}')).toThrow(/Invalid/);
 	});
@@ -70,9 +72,9 @@ describe("frida-antigravity · extractProjectId (formas del backend)", () => {
 
 	it("alias conocidos (antigravityProjectId, cloudaicompanionProject…)", () => {
 		expect(extractProjectId({ antigravityProjectId: "p2" })).toBe("p2");
-		expect(
-			extractProjectId({ userDefinedCloudaicompanionProject: "p3" }),
-		).toBe("p3");
+		expect(extractProjectId({ userDefinedCloudaicompanionProject: "p3" })).toBe(
+			"p3",
+		);
 	});
 
 	it("objeto anidado con .id", () => {
@@ -81,9 +83,7 @@ describe("frida-antigravity · extractProjectId (formas del backend)", () => {
 
 	it("listas (projects/cloudaicompanionProjects)", () => {
 		expect(extractProjectId({ cloudaicompanionProjects: ["p5"] })).toBe("p5");
-		expect(
-			extractProjectId({ projects: [{ projectId: "p6" }] }),
-		).toBe("p6");
+		expect(extractProjectId({ projects: [{ projectId: "p6" }] })).toBe("p6");
 	});
 
 	it("sin projectId → undefined", () => {

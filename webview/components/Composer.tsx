@@ -213,12 +213,13 @@ export function Composer({
 		}
 		if (command === "model") {
 			return all
-				.filter((p) => p.authed).flatMap((p) =>
-				p.models.map((m) => ({
-					value: `${p.id}/${m.id}`,
-					label: `${p.name} · ${m.name}`,
-				})),
-			);
+				.filter((p) => p.authed)
+				.flatMap((p) =>
+					p.models.map((m) => ({
+						value: `${p.id}/${m.id}`,
+						label: `${p.name} · ${m.name}`,
+					})),
+				);
 		}
 		return [];
 	}

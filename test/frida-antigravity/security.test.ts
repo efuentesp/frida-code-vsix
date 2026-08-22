@@ -74,9 +74,9 @@ describe("frida-antigravity · assertSafeApiBaseUrl (anti-SSRF)", () => {
 	});
 
 	it("rechaza http (no https)", () => {
-		expect(() => assertSafeApiBaseUrl("http://cloudcode-pa.googleapis.com")).toThrow(
-			/https/,
-		);
+		expect(() =>
+			assertSafeApiBaseUrl("http://cloudcode-pa.googleapis.com"),
+		).toThrow(/https/);
 	});
 
 	it("rechaza hosts fuera de googleapis.com (exfiltración de token)", () => {
@@ -113,9 +113,7 @@ describe("frida-antigravity · resolveCallbackHost (loopback only)", () => {
 
 describe("frida-antigravity · maskEmail", () => {
 	it("enmascara el nombre preservando dominio", () => {
-		expect(maskEmail("edgar.fuentes@softtek.com")).toBe(
-			"e***s@softtek.com",
-		);
+		expect(maskEmail("edgar.fuentes@softtek.com")).toBe("e***s@softtek.com");
 	});
 
 	it("degrada sin romperse con emails malformados", () => {

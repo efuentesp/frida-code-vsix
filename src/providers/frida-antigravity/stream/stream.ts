@@ -61,7 +61,12 @@ import {
   type GeminiTextPart,
   type StreamChunk,
 } from "../types/types.js";
-import { antigravityEnv, isRecord, nowRequestId, sanitizeText } from "../utils/util.js";
+import {
+  antigravityEnv,
+  isRecord,
+  nowRequestId,
+  sanitizeText,
+} from "../utils/util.js";
 
 export { ANTIGRAVITY_API };
 
@@ -77,7 +82,9 @@ let toolCallCounter = 0;
 function sanitizeToolCallId(id: string, fallbackName?: string): string {
   const cleaned = id.replace(/[^a-zA-Z0-9_-]/g, "_");
   const capped = cleaned.slice(0, 64);
-  return capped || `${fallbackName || "tool"}_${Date.now()}_${++toolCallCounter}`;
+  return (
+    capped || `${fallbackName || "tool"}_${Date.now()}_${++toolCallCounter}`
+  );
 }
 
 function toolCallIdNeeded(modelId: string, runtimeModel: string): boolean {
@@ -89,7 +96,10 @@ function toolCallIdNeeded(modelId: string, runtimeModel: string): boolean {
   );
 }
 
-function parseImageData(raw: string, explicitMime?: string): { data: string; mimeType: string } {
+function parseImageData(
+  raw: string,
+  explicitMime?: string,
+): { data: string; mimeType: string } {
   const match = raw.match(/^data:([^;]+);base64,(.+)$/s);
   if (match) {
     return {
@@ -103,25 +113,34 @@ function parseImageData(raw: string, explicitMime?: string): { data: string; mim
   };
 }
 
-function asTextParts(content: unknown): Array<GeminiTextPart | GeminiInlineDataPart> {
+function asTextParts(
+  content: unknown,
+): Array<GeminiTextPart | GeminiInlineDataPart> {
   if (typeof content === "string") return [{ text: sanitizeText(content) }];
   if (!Array.isArray(content)) return [];
-  return content.flatMap((item): Array<GeminiTextPart | GeminiInlineDataPart> => {
-    if (!isRecord(item)) return [];
-    const block = item as ContentBlock;
-    if (block.type === "text") return [{ text: sanitizeText(block.text) }];
-    if (block.type === "image") {
-      const rawData = block.data || block.source?.data;
-      if (!rawData) return [];
-      const explicitMime = block.mimeType || block.mediaType || block.source?.mediaType;
-      const { data, mimeType } = parseImageData(rawData, explicitMime);
-      return data ? [{ inlineData: { mimeType, data } }] : [];
-    }
-    return [];
-  });
+  return content.flatMap(
+    (item): Array<GeminiTextPart | GeminiInlineDataPart> => {
+      if (!isRecord(item)) return [];
+      const block = item as ContentBlock;
+      if (block.type === "text") return [{ text: sanitizeText(block.text) }];
+      if (block.type === "image") {
+        const rawData = block.data || block.source?.data;
+        if (!rawData) return [];
+        const explicitMime =
+          block.mimeType || block.mediaType || block.source?.mediaType;
+        const { data, mimeType } = parseImageData(rawData, explicitMime);
+        return data ? [{ inlineData: { mimeType, data } }] : [];
+      }
+      return [];
+    },
+  );
 }
 
-function appendTurn(contents: GeminiContent[], role: GeminiRole, parts: GeminiPart[]): void {
+function appendTurn(
+  contents: GeminiContent[],
+  role: GeminiRole,
+  parts: GeminiPart[],
+): void {
   if (!parts.length) return;
   const last = contents[contents.length - 1];
   if (last && last.role === role) {
@@ -147,12 +166,17 @@ export function convertMessages(
       for (const block of msg.content) {
         if (block.type === "text" && String(block.text || "").trim()) {
           parts.push({ text: sanitizeText(block.text) });
-        } else if (block.type === "thinking" && String(block.thinking || "").trim()) {
+        } else if (
+          block.type === "thinking" &&
+          String(block.thinking || "").trim()
+        ) {
           if (msg.provider === PROVIDER_ID && msg.model === model.id) {
             parts.push({
               thought: true,
               text: sanitizeText(block.thinking),
-              ...(block.thinkingSignature ? { thoughtSignature: block.thinkingSignature } : {}),
+              ...(block.thinkingSignature
+                ? { thoughtSignature: block.thinkingSignature }
+                : {}),
             });
           } else {
             parts.push({ text: sanitizeText(block.thinking) });
@@ -166,7 +190,9 @@ export function convertMessages(
                 ? { id: sanitizeToolCallId(block.id || "", block.name) }
                 : {}),
             },
-            ...(block.thoughtSignature ? { thoughtSignature: block.thoughtSignature } : {}),
+            ...(block.thoughtSignature
+              ? { thoughtSignature: block.thoughtSignature }
+              : {}),
           });
         }
       }
@@ -180,7 +206,9 @@ export function convertMessages(
       const part: GeminiFunctionResponsePart = {
         functionResponse: {
           name: msg.toolName,
-          response: msg.isError ? { error: responseText } : { output: responseText },
+          response: msg.isError
+            ? { error: responseText }
+            : { output: responseText },
           ...(toolCallIdNeeded(model.id, runtimeModel)
             ? { id: sanitizeToolCallId(msg.toolCallId || "", msg.toolName) }
             : {}),
@@ -229,7 +257,9 @@ function dereferenceSchema(
       if (isRecord(resolved)) {
         const { $ref: _, ...rest } = s;
         const restCleaned = dereferenceSchema(rest, defs, visited);
-        return isRecord(restCleaned) ? { ...resolved, ...restCleaned } : resolved;
+        return isRecord(restCleaned)
+          ? { ...resolved, ...restCleaned }
+          : resolved;
       }
       return resolved;
     }
@@ -253,7 +283,8 @@ function ensureRootObjectSchema(schema: unknown): Record<string, unknown> {
 }
 
 function stripMetaSchema(schema: unknown): unknown {
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  if (!schema || typeof schema !== "object" || Array.isArray(schema))
+    return schema;
   const omit = new Set([
     "$schema",
     "$id",
@@ -310,10 +341,17 @@ function normalizeCustomToolSchema(schema: unknown): unknown {
       if (normalizedType !== undefined) out.type = normalizedType;
       continue;
     }
-    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+    if (
+      key === "properties" &&
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
       // Property names are user-defined, not Schema keywords — never allowlist-filter them.
       const props: Record<string, unknown> = {};
-      for (const [propName, propSchema] of Object.entries(value as Record<string, unknown>)) {
+      for (const [propName, propSchema] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
         props[propName] = normalizeCustomToolSchema(propSchema);
       }
       out.properties = props;
@@ -382,29 +420,42 @@ export function buildRequest(
       role: GeminiRole.User,
       parts: [
         { text: ANTIGRAVITY_SYSTEM_INSTRUCTION },
-        { text: `Please ignore following [ignore]${ANTIGRAVITY_SYSTEM_INSTRUCTION}[/ignore]` },
+        {
+          text: `Please ignore following [ignore]${ANTIGRAVITY_SYSTEM_INSTRUCTION}[/ignore]`,
+        },
         { text: ANTIGRAVITY_NO_PREAMBLE_INSTRUCTION },
-        ...(context.systemPrompt ? [{ text: sanitizeText(context.systemPrompt) }] : []),
+        ...(context.systemPrompt
+          ? [{ text: sanitizeText(context.systemPrompt) }]
+          : []),
       ],
     },
   };
 
   const generationConfig: GeminiGenerationConfig = {};
-  if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
+  if (options.temperature !== undefined)
+    generationConfig.temperature = options.temperature;
   if (runtimeModel === "gemini-3.7-flash-tiered") {
     const effort = options.reasoning ?? "off";
     generationConfig.thinkingConfig = {
       thinkingLevel:
-        effort === "high" || effort === "xhigh" ? "HIGH" : effort === "medium" ? "MEDIUM" : "LOW",
+        effort === "high" || effort === "xhigh"
+          ? "HIGH"
+          : effort === "medium"
+            ? "MEDIUM"
+            : "LOW",
     };
   }
   const maxAllowed = getMaxOutputTokens(model.id, runtimeModel);
   if (options.maxTokens === undefined) {
-    generationConfig.maxOutputTokens = Math.min(maxAllowed, model.maxTokens || maxAllowed);
+    generationConfig.maxOutputTokens = Math.min(
+      maxAllowed,
+      model.maxTokens || maxAllowed,
+    );
   } else {
     generationConfig.maxOutputTokens = Math.min(options.maxTokens, maxAllowed);
   }
-  if (Object.keys(generationConfig).length) request.generationConfig = generationConfig;
+  if (Object.keys(generationConfig).length)
+    request.generationConfig = generationConfig;
 
   const tools = convertTools(
     context.tools,
@@ -453,7 +504,10 @@ export function mapStopReason(reason: string | undefined): StopReason {
 }
 
 /** Exported for unit tests. */
-export function friendlyAntigravityError(status: number | undefined, text: string): string {
+export function friendlyAntigravityError(
+  status: number | undefined,
+  text: string,
+): string {
   const msg = redactSecrets(jsonOrTextError(text)).slice(0, 500);
   if (status === 400) {
     if (/API key not valid|API_KEY_INVALID/i.test(msg)) {
@@ -482,7 +536,8 @@ export function friendlyAntigravityError(status: number | undefined, text: strin
     }
     return `Antigravity could not find the requested resource. Next: retry or switch models. Backend said: ${msg}`;
   }
-  if (status === 408) return "Antigravity timed out. Next: retry the same request.";
+  if (status === 408)
+    return "Antigravity timed out. Next: retry the same request.";
   if (status === 409) {
     return "Antigravity reported a conflict for this request. Next: retry once or start a new chat session.";
   }
@@ -499,14 +554,16 @@ export function friendlyAntigravityError(status: number | undefined, text: strin
   if (status === 500) {
     return "Antigravity had an internal server error. Next: retry in a moment or switch models.";
   }
-  if (status === 502) return "Antigravity returned a bad gateway error. Next: retry in a moment.";
+  if (status === 502)
+    return "Antigravity returned a bad gateway error. Next: retry in a moment.";
   if (status === 503) {
     if (/No capacity available/i.test(msg)) {
       return "This model has no capacity right now. Next: retry later or switch to another model.";
     }
     return "Antigravity is temporarily unavailable. Next: retry in a moment or switch models.";
   }
-  if (status === 504) return "Antigravity timed out upstream. Next: retry in a moment.";
+  if (status === 504)
+    return "Antigravity timed out upstream. Next: retry in a moment.";
   return msg;
 }
 
@@ -531,7 +588,9 @@ function createOutput(model: Model<Api>): AssistantMessage {
   };
 }
 
-function asToolCallArguments(args: Record<string, unknown> | undefined): ToolCall["arguments"] {
+function asToolCallArguments(
+  args: Record<string, unknown> | undefined,
+): ToolCall["arguments"] {
   return (args ?? {}) as ToolCall["arguments"];
 }
 
@@ -625,7 +684,8 @@ async function streamResponse(
           }
           if (isThinking && currentBlock.type === "thinking") {
             currentBlock.thinking += part.text;
-            if (part.thoughtSignature) currentBlock.thinkingSignature = part.thoughtSignature;
+            if (part.thoughtSignature)
+              currentBlock.thinkingSignature = part.thoughtSignature;
             stream.push({
               type: "thinking_delta",
               contentIndex: blockIndex(),
@@ -634,7 +694,8 @@ async function streamResponse(
             });
           } else if (!isThinking && currentBlock.type === "text") {
             currentBlock.text += part.text;
-            if (part.thoughtSignature) currentBlock.textSignature = part.thoughtSignature;
+            if (part.thoughtSignature)
+              currentBlock.textSignature = part.thoughtSignature;
             stream.push({
               type: "text_delta",
               contentIndex: blockIndex(),
@@ -653,11 +714,17 @@ async function streamResponse(
             id: sanitizeToolCallId(rawId, part.functionCall.name),
             name: part.functionCall.name || "",
             arguments: asToolCallArguments(part.functionCall.args),
-            ...(part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {}),
+            ...(part.thoughtSignature
+              ? { thoughtSignature: part.thoughtSignature }
+              : {}),
           };
           blocks.push(toolCall);
           ensureStarted();
-          stream.push({ type: "toolcall_start", contentIndex: blockIndex(), partial: output });
+          stream.push({
+            type: "toolcall_start",
+            contentIndex: blockIndex(),
+            partial: output,
+          });
           stream.push({
             type: "toolcall_delta",
             contentIndex: blockIndex(),
@@ -681,15 +748,23 @@ async function streamResponse(
 
       if (responseData.usageMetadata) {
         const prompt = responseData.usageMetadata.promptTokenCount || 0;
-        const cacheRead = responseData.usageMetadata.cachedContentTokenCount || 0;
+        const cacheRead =
+          responseData.usageMetadata.cachedContentTokenCount || 0;
         output.usage.input = prompt - cacheRead;
         output.usage.output =
           (responseData.usageMetadata.candidatesTokenCount || 0) +
           (responseData.usageMetadata.thoughtsTokenCount || 0);
         output.usage.cacheRead = cacheRead;
-        output.usage.totalTokens = responseData.usageMetadata.totalTokenCount || 0;
+        output.usage.totalTokens =
+          responseData.usageMetadata.totalTokenCount || 0;
         // Keep subscription costs at zero (matches model catalog freeCost).
-        output.usage.cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+        output.usage.cost = {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: 0,
+        };
       }
     }
   }
@@ -712,7 +787,9 @@ export function streamAntigravity(
     try {
       const creds = parseApiKey(opts.apiKey);
       // Skip loadCodeAssist roundtrip when credentials already carry a projectId.
-      const warmedProject = creds.projectId ? null : await loadCodeAssist(creds.token);
+      const warmedProject = creds.projectId
+        ? null
+        : await loadCodeAssist(creds.token);
       const projectId = resolveProjectId({
         token: creds.token,
         warmedProject,
@@ -723,13 +800,18 @@ export function streamAntigravity(
       const effort = opts.reasoning ?? "off";
       const isKnownModel = model.id in ANTIGRAVITY_ROUTING;
       const baseRuntimeModel =
-        antigravityEnv("RUNTIME_MODEL")?.trim() || getAntigravityRequestModelId(model.id, effort);
+        antigravityEnv("RUNTIME_MODEL")?.trim() ||
+        getAntigravityRequestModelId(model.id, effort);
 
       let initialRuntimeModel = baseRuntimeModel;
       // Skip pre-flight model discovery for known static models to optimize TTFT latency.
       // Dynamic lookup is only needed for unmapped custom models.
       if (!isKnownModel && !antigravityEnv("RUNTIME_MODEL")) {
-        const dynamic = await fetchAvailableRuntimeModel(creds.token, projectId, baseRuntimeModel);
+        const dynamic = await fetchAvailableRuntimeModel(
+          creds.token,
+          projectId,
+          baseRuntimeModel,
+        );
         if (dynamic?.id && /^(gemini-|claude-|gpt-oss-)/i.test(dynamic.id)) {
           initialRuntimeModel = dynamic.id;
         }
@@ -741,10 +823,13 @@ export function streamAntigravity(
         runtimeCandidates.push(fallback);
       }
 
-      const isClaudeReasoning = model.id.startsWith("claude-") && model.reasoning;
+      const isClaudeReasoning =
+        model.id.startsWith("claude-") && model.reasoning;
       const requestHeaders: Record<string, string> = {
         ...antigravityHeaders(creds.token),
-        ...(isClaudeReasoning ? { "anthropic-beta": "interleaved-thinking-2025-05-14" } : {}),
+        ...(isClaudeReasoning
+          ? { "anthropic-beta": "interleaved-thinking-2025-05-14" }
+          : {}),
       };
 
       let response: Response | undefined;
@@ -762,21 +847,31 @@ export function streamAntigravity(
         for (let candIdx = 0; candIdx < runtimeCandidates.length; candIdx++) {
           runtimeModel = runtimeCandidates[candIdx]!;
           setLastResolvedRuntimeModel(runtimeModel);
-          const body = JSON.stringify(buildRequest(model, context, projectId, opts, runtimeModel));
+          const body = JSON.stringify(
+            buildRequest(model, context, projectId, opts, runtimeModel),
+          );
 
           for (const endpoint of endpointCandidates()) {
             setLastEndpoint(endpoint);
-            response = await fetch(`${endpoint}/v1internal:streamGenerateContent?alt=sse`, {
-              method: "POST",
-              headers: requestHeaders,
-              body,
-              signal: opts.signal,
-            });
+            response = await fetch(
+              `${endpoint}/v1internal:streamGenerateContent?alt=sse`,
+              {
+                method: "POST",
+                headers: requestHeaders,
+                body,
+                signal: opts.signal,
+              },
+            );
             setLastStatus(response.status);
             if (response.ok) break;
             lastText = await response.text();
-            if (response.status === 429 && /Individual quota reached/i.test(lastText)) break;
-            if (![403, 404, 429, 500, 502, 503, 504].includes(response.status)) break;
+            if (
+              response.status === 429 &&
+              /Individual quota reached/i.test(lastText)
+            )
+              break;
+            if (![403, 404, 429, 500, 502, 503, 504].includes(response.status))
+              break;
           }
 
           if (response?.ok) break;
@@ -857,10 +952,15 @@ export function streamAntigravity(
         if (received) break;
       }
 
-      if (!received) throw new Error("Antigravity API returned an empty response");
+      if (!received)
+        throw new Error("Antigravity API returned an empty response");
       setLastLatencyMs(Date.now() - startTime);
       if (output.stopReason === "error" || output.stopReason === "aborted") {
-        stream.push({ type: "error", reason: output.stopReason, error: output });
+        stream.push({
+          type: "error",
+          reason: output.stopReason,
+          error: output,
+        });
       } else {
         // El union de AssistantMessage.stopReason en pi-ai 0.84.x es más ancho
         // ("pending"|"deferred") que el `reason` del evento done; en runtime el

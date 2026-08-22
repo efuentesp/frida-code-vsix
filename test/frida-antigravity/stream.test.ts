@@ -34,14 +34,16 @@ describe("frida-antigravity · convertTools (puente custom-tools)", () => {
 			{
 				name: "read",
 				description: "lee archivos",
-				parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+				parameters: {
+					type: "object",
+					properties: { path: { type: "string" } },
+					required: ["path"],
+				},
 			} as unknown as Tool,
 		];
 		const out = convertTools(tools, false);
 		expect(out?.[0]?.functionDeclarations[0]?.parametersJsonSchema).toBeDefined();
-		expect(
-			out?.[0]?.functionDeclarations[0]?.parameters,
-		).toBeUndefined();
+		expect(out?.[0]?.functionDeclarations[0]?.parameters).toBeUndefined();
 	});
 
 	it("Claude/GPT usan legacy `parameters` con allowlist Protobuf Schema", () => {
