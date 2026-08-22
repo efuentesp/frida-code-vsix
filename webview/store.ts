@@ -604,6 +604,20 @@ export function reduce(state: State, msg: InMessage): State {
 				},
 			};
 
+		// #116 (Fase A) — resultado del Ping de conectividad del proveedor.
+		case "codebase_index_ping_result":
+			return {
+				...state,
+				codebaseIndexPing: {
+					provider: msg.provider,
+					ok: msg.ok,
+					latencyMs: msg.latencyMs,
+					dimensions: msg.dimensions,
+					error: msg.error,
+					at: Date.now(),
+				},
+			};
+
 		// Reporte de diagnóstico del entorno y dependencias del sistema (#99).
 		case "environment_status":
 			return { ...state, environment: msg.status, environmentChecking: false };

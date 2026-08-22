@@ -103,3 +103,177 @@ export function ensureGitignore(
     return false;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * #116 (Fase A) — syncCodebaseIndexConfig: materializa la elección del
+ * proveedor de embeddings en <ws>/.codebase-index/config.json (el archivo
+ * que el upstream parsea con parseConfig). Merge defensivo
+ * read-modify-write: solo toca las claves de embeddings, preserva scope/
+ * include/exclude/indexing/… que el usuario (u otra tool) haya puesto.
+ *
+ * TRADE-OFF DOCUMENTADO: para frida-enterprise, el idToken OAuth queda en
+ * texto plano dentro de config.json (gitignorado por ensureGitignore, pero
+ * en disco). Alternativa futura: env-var si el upstream la soporta.
+ *──────────────────────────────────────────────────────────────────────────*/
+
+export type EmbeddingsProviderSetting =
+  | "auto"
+  | "frida-enterprise"
+  | "ollama"
+  | "openai"
+  | "custom";
+
+export interface SyncEmbeddingsOpts {
+  provider: EmbeddingsProviderSetting;
+  /** COMPATIBLE_API_URL de la sesión Enterprise (sin /v1 — se añade aquí). */
+  enterpriseBaseUrl?: string;
+  /** idToken OAuth de la sesión activa (Bearer). */
+  enterpriseToken?: string;
+  /** Default "azure-embeddings-default". */
+  enterpriseModel?: string;
+  /** Deducido por pingEmbeddingsProvider — OBLIGATORIO (entero >0) en el
+   *  upstream para customProvider; sin él no se escribe nada. */
+  enterpriseDimensions?: number;
+  /** Default "nomic-embed-text". */
+  ollamaModel?: string;
+  /** Default "text-embedding-3-small". La API key via auth.json (sync
+   *  existente #43), no por config.json. */
+  openaiModel?: string;
+  customBaseUrl?: string;
+  customModel?: string;
+  customDimensions?: number;
+}
+
+export interface SyncEmbeddingsResult {
+  written: boolean;
+  /** auto: el upstream autodetecta, no se escribe. missing-dimensions:
+   *  enterprise sin dimensions verificadas (ping pendiente).
+   *  missing-config: custom incompleto. */
+  skipped?: "auto" | "missing-dimensions" | "missing-config";
+}
+
+/**
+ * Escribe la configuración de embeddings elegida por el usuario al
+ * config.json del proyecto (verificado contra parseConfig del upstream:
+ * claves embeddingProvider/embeddingModel/customProvider). Idempotente y
+ * no destructivo con claves ajenas a embeddings.
+ */
+export function syncCodebaseIndexConfig(
+  workspacePath: string,
+  opts: SyncEmbeddingsOpts,
+  onLog?: (line: string) => void,
+): SyncEmbeddingsResult {
+  if (opts.provider === "auto") return { written: false, skipped: "auto" };
+
+  let next: Record<string, unknown> | null = null;
+  if (opts.provider === "frida-enterprise") {
+    const dims = opts.enterpriseDimensions ?? 0;
+    if (!Number.isInteger(dims) || dims <= 0) {
+      return { written: false, skipped: "missing-dimensions" };
+    }
+    if (!opts.enterpriseBaseUrl || !opts.enterpriseToken) {
+      return { written: false, skipped: "missing-config" };
+    }
+    const base = opts.enterpriseBaseUrl.replace(/\/+$/, "");
+    next = {
+      embeddingProvider: "custom",
+      customProvider: {
+        baseUrl: `${base}/v1`,
+        model: opts.enterpriseModel || "azure-embeddings-default",
+        apiKey: opts.enterpriseToken,
+        dimensions: dims,
+      },
+    };
+  } else if (opts.provider === "ollama") {
+    next = {
+      embeddingProvider: "ollama",
+      embeddingModel: opts.ollamaModel || "nomic-embed-text",
+    };
+  } else if (opts.provider === "openai") {
+    next = {
+      embeddingProvider: "openai",
+      embeddingModel: opts.openaiModel || "text-embedding-3-small",
+    };
+  } else {
+    // custom
+    if (
+      !opts.customBaseUrl ||
+      !opts.customModel ||
+      !opts.customDimensions ||
+      opts.customDimensions <= 0
+    ) {
+      return { written: false, skipped: "missing-config" };
+    }
+    next = {
+      embeddingProvider: "custom",
+      customProvider: {
+        baseUrl: opts.customBaseUrl.replace(/\/+$/, ""),
+        model: opts.customModel,
+        dimensions: opts.customDimensions,
+      },
+    };
+  }
+
+  const cfgDir = path.join(workspacePath, CODEBASE_INDEX_STORAGE_DIR);
+  const cfgPath = path.join(cfgDir, "config.json");
+  let merged: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      merged = parsed as Record<string, unknown>;
+    }
+  } catch {
+    /* ausente o inválido → objeto nuevo */
+  }
+  // Limpia restos de proveedor anterior (p. ej. ollama→custom) para que
+  // parseConfig no mezcle señales: solo se tocan claves de embeddings.
+  delete merged.embeddingModel;
+  delete merged.customProvider;
+  Object.assign(merged, next);
+  try {
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(cfgPath, JSON.stringify(merged, null, 2));
+    return { written: true };
+  } catch (e: any) {
+    onLog?.(
+      `[codebase-index] syncCodebaseIndexConfig falló: ${e?.message ?? e}`,
+    );
+    return { written: false };
+  }
+}
+
+/** Credencial OAuth de Frida Enterprise leída de <agentDir>/auth.json
+ *  (persistida por pi-ai tras el login; clave "frida-enterprise"). #116 */
+export interface EnterpriseEmbeddingsCredential {
+	/** COMPATIBLE_API_URL (sin /v1). */
+	baseUrl: string;
+	/** idToken (access) — Bearer del endpoint compatible. */
+	token: string;
+	/** Epoch ms de expiración del access token. */
+	expiresMs: number;
+	/** true si el access ya expiró (refresh solo lo hace pi-ai al usar el provider). */
+	expired: boolean;
+}
+
+export function readEnterpriseEmbeddingsCredential(
+  agentDir: string,
+): EnterpriseEmbeddingsCredential | null {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(agentDir, "auth.json"), "utf8"),
+    );
+    const cred = (parsed as Record<string, any>)?.["frida-enterprise"];
+    const url = typeof cred?.compatibleApiUrl === "string" ? cred.compatibleApiUrl : "";
+    const token = typeof cred?.access === "string" ? cred.access : "";
+    const expiresMs = Number(cred?.expires) || 0;
+    if (!url || !token || !expiresMs) return null;
+    return {
+      baseUrl: url.replace(/\/+$/, ""),
+      token,
+      expiresMs,
+      expired: Date.now() >= expiresMs,
+    };
+  } catch {
+    return null;
+  }
+}

@@ -278,6 +278,8 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 	});
 
 	it("#114 — banner muestra proveedor/modelo REAL del índice cuando existe", () => {
+		// indexMeta: campo de CodebaseIndexUiState (webview/types.ts) leído de
+		// la metadata real del índice por el host (refreshCiIndexMeta).
 		const post = vi.fn();
 		const state: State = {
 			...baseState,

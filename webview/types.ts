@@ -774,6 +774,15 @@ export interface State {
 		files: { path: string; chunks: number; language: string }[];
 		failed: { path: string; chunks: number }[];
 	};
+	/** Último resultado de Ping por proveedor (#116 Fase A). */
+	codebaseIndexPing?: {
+		provider: string;
+		ok: boolean;
+		latencyMs?: number;
+		dimensions?: number;
+		error?: string;
+		at: number;
+	};
 	/** Reporte de diagnóstico del entorno y dependencias del sistema (#99). */
 	environment?: EnvironmentReport;
 	environmentChecking?: boolean;
@@ -935,11 +944,19 @@ export type InMessage =
 	| { type: "open_settings"; tab?: string }
 	| { type: "codebase_index_state"; state: CodebaseIndexUiState }
 	| {
+			type: "codebase_index_ping_result";
+			provider: string;
+			ok: boolean;
+			latencyMs?: number;
+			dimensions?: number;
+			error?: string;
+		}
+	| {
 			type: "codebase_index_files";
 			available: boolean;
 			files: { path: string; chunks: number; language: string }[];
 			failed: { path: string; chunks: number }[];
-	  }
+		}
 	| { type: "environment_status"; status: EnvironmentReport }
 	| { type: "environment_checking"; checking: boolean }
 	| { type: "error"; text: string };
@@ -1074,5 +1091,11 @@ export type OutMessage =
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status" | "files" | "stop";
+	  }
+	| {
+			/** #116 Fase A — Ping de conectividad del proveedor de embeddings. */
+			type: "codebase_index_ping";
+			provider: "frida-enterprise" | "ollama" | "openai" | "custom";
+			model?: string;
 	  }
 	| { type: "check_environment" };

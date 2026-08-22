@@ -9,6 +9,7 @@
 import * as vscode from "vscode";
 import { TOOL_TOGGLE_BY_KEY, TOOL_TOGGLES } from "./tool-toggles";
 import type { UserRole } from "./usage/report-schema";
+import type { EmbeddingsProviderSetting } from "./tools/frida-codebase-index/host-setup";
 
 export const CONFIG_SECTION = "frida";
 
@@ -246,12 +247,21 @@ export interface CodebaseIndexConfig {
 	enabled: boolean;
 	/** Conservar los natives de otras plataformas tras instalar (debug/multi-target). */
 	keepOtherPlatforms: boolean;
-	/** Provider de embeddings: auto (Ollama→OpenAI→Google) | ollama | custom. */
-	provider: "auto" | "ollama" | "custom";
+	/** Provider de embeddings (#116): auto (Ollama→Copilot→…) | frida-enterprise
+	 *  | ollama | openai | custom. */
+	provider: EmbeddingsProviderSetting;
+	/** Modelo de Frida Enterprise (default azure-embeddings-default). */
+	fridaEnterpriseModel: string;
+	/** Modelo local de Ollama (default nomic-embed-text). */
+	ollamaModel: string;
+	/** Modelo de OpenAI (default text-embedding-3-small). */
+	openaiModel: string;
 	/** Endpoint custom OpenAI-compatible (vacío = no configurado). */
 	customBaseUrl: string;
 	/** Modelo del endpoint custom (vacío = default del upstream). */
 	customModel: string;
+	/** Dimensions del endpoint custom (0 = sin verificar; el Ping las deduce). */
+	customDimensions: number;
 }
 
 /** ¿Está activo frida-codebase-index? Default: true (degrada con guía si falta el paquete). */
@@ -343,19 +353,48 @@ export function readCcPluginsEnabledPlugins(): Record<string, boolean> {
 /** Snapshot de la config del índice de código. */
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
-	const provider = cfg.get<string>("codebaseIndex.embeddings.provider", "auto");
+	const rawProvider = cfg.get<string>(
+		"codebaseIndex.embeddings.provider",
+		"auto",
+	);
+	const provider: EmbeddingsProviderSetting = (
+		[
+			"auto",
+			"frida-enterprise",
+			"ollama",
+			"openai",
+			"custom",
+		] as const
+	).includes(rawProvider as EmbeddingsProviderSetting)
+		? (rawProvider as EmbeddingsProviderSetting)
+		: "auto";
 	return {
 		enabled: isCodebaseIndexEnabled(),
 		keepOtherPlatforms: cfg.get<boolean>(
 			"codebaseIndex.keepOtherPlatforms",
 			false,
 		),
-		provider: provider === "ollama" || provider === "custom" ? provider : "auto",
+		provider,
+		fridaEnterpriseModel: cfg.get<string>(
+			"codebaseIndex.embeddings.fridaEnterprise.model",
+			"azure-embeddings-default",
+		),
+		ollamaModel: cfg.get<string>(
+			"codebaseIndex.embeddings.ollama.model",
+			"nomic-embed-text",
+		),
+		openaiModel: cfg.get<string>(
+			"codebaseIndex.embeddings.openai.model",
+			"text-embedding-3-small",
+		),
 		customBaseUrl: String(
 			cfg.get<string>("codebaseIndex.embeddings.custom.baseUrl", ""),
 		).trim(),
 		customModel: String(
 			cfg.get<string>("codebaseIndex.embeddings.custom.model", ""),
 		).trim(),
+		customDimensions: Number(
+			cfg.get<number>("codebaseIndex.embeddings.custom.dimensions", 0),
+		),
 	};
 }

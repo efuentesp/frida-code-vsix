@@ -336,11 +336,28 @@
           "type": "string",
           "enum": [
             "auto",
+            "frida-enterprise",
             "ollama",
+            "openai",
             "custom"
           ],
           "default": "auto",
-          "markdownDescription": "Proveedor de embeddings del índice. `auto` intenta Ollama → OpenAI (si guardaste la key de OpenAI en Frida) → Google. `ollama` fuerza local (cero datos salen del equipo). `custom` usa el endpoint OpenAI-compatible configurado abajo."
+          "markdownDescription": "Proveedor de embeddings del índice. `auto` intenta Ollama → OpenAI (si guardaste la key de OpenAI en Frida) → Google. `frida-enterprise` usa el endpoint corporativo compatible con la sesión OAuth activa. `ollama` fuerza local (cero datos salen del equipo). `openai` usa tu API key guardada. `custom` usa el endpoint OpenAI-compatible configurado abajo."
+        },
+        "frida.codebaseIndex.embeddings.fridaEnterprise.model": {
+          "type": "string",
+          "default": "azure-embeddings-default",
+          "markdownDescription": "Modelo de embeddings de Frida Enterprise (#116)."
+        },
+        "frida.codebaseIndex.embeddings.ollama.model": {
+          "type": "string",
+          "default": "nomic-embed-text",
+          "markdownDescription": "Modelo de embeddings local de Ollama (#116). Debe estar descargado (`ollama pull …`)."
+        },
+        "frida.codebaseIndex.embeddings.openai.model": {
+          "type": "string",
+          "default": "text-embedding-3-small",
+          "markdownDescription": "Modelo de embeddings de OpenAI (#116). La API key se gestiona en Frida (SecretStorage)."
         },
         "frida.codebaseIndex.embeddings.custom.baseUrl": {
           "type": "string",
@@ -351,6 +368,11 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Modelo de embeddings del endpoint custom. Vacío = el default del upstream."
+        },
+        "frida.codebaseIndex.embeddings.custom.dimensions": {
+          "type": "number",
+          "default": 0,
+          "markdownDescription": "Dimensiones de los vectores del endpoint custom (#116). 0 = sin verificar; el botón Probar conexión las deduce automáticamente."
         },
         "frida.notifyOnComplete": {
           "type": "boolean",

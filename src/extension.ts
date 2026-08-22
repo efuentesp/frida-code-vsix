@@ -172,6 +172,11 @@ import {
 	readIndexMeta,
 } from "./tools/frida-codebase-index/files";
 import type { IndexMeta } from "./tools/frida-codebase-index/files";
+import { pingEmbeddingsProvider } from "./tools/frida-codebase-index/ping";
+import {
+	readEnterpriseEmbeddingsCredential,
+	syncCodebaseIndexConfig,
+} from "./tools/frida-codebase-index/host-setup";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -2973,8 +2978,7 @@ export async function activate(
 					| "rebuild"
 					| "status"
 					| "files"
-					| "stop";
-				// #112 — consulta read-only de archivos indexados: no es una acción
+					| "stop";				// #112 — consulta read-only de archivos indexados: no es una acción
 				// «busy» (no deshabilita botones ni arranca reloj).
 				if (action === "files") {
 					try {
@@ -3086,6 +3090,93 @@ export async function activate(
 				// #114 — la corrida pudo cambiar el motor del índice: refresca la
 				// metadata real del banner (async; publica al resolver).
 				void refreshCiIndexMeta();
+				break;
+			}
+			// #116 (Fase A) — Ping de conectividad del proveedor de embeddings:
+			// POST {base}/embeddings con input "ping" (protocolo OpenAI-compatible
+			// común a los 4). Deduce dimensions reales del vector de respuesta.
+			case "codebase_index_ping": {
+				const provider = msg.provider;
+				const cfg = readCodebaseIndexConfig();
+				let baseUrl = "";
+				let model = msg.model?.trim() || "";
+				let apiKey: string | undefined;
+				if (provider === "frida-enterprise") {
+					const cred = readEnterpriseEmbeddingsCredential(defaultAgentDir());
+					if (!cred) {
+						post({
+							type: "codebase_index_ping_result",
+							provider,
+							ok: false,
+							error:
+								"Sin sesión de Frida Enterprise — inicia sesión primero",
+							});
+						break;
+					}
+					if (cred.expired) {
+						post({
+							type: "codebase_index_ping_result",
+							provider,
+							ok: false,
+							error:
+								"Sesión de Frida Enterprise expirada — vuelve a iniciar sesión",
+							});
+						break;
+					}
+					baseUrl = `${cred.baseUrl}/v1`;
+					model = model || cfg.fridaEnterpriseModel;
+					apiKey = cred.token;
+				} else if (provider === "ollama") {
+					const host = (
+						process.env.OLLAMA_HOST || "http://localhost:11434"
+					).replace(/\/+$/, "");
+					baseUrl = host.endsWith("/v1") ? host : `${host}/v1`;
+					model = model || cfg.ollamaModel;
+				} else if (provider === "openai") {
+					const key = await context.secrets.get("frida.openaiKey");
+					if (!key) {
+						post({
+							type: "codebase_index_ping_result",
+							provider,
+							ok: false,
+							error: "Sin API key de OpenAI guardada en Frida (Configuración)",
+							});
+						break;
+					}
+					baseUrl = "https://api.openai.com/v1";
+					model = model || cfg.openaiModel;
+					apiKey = key;
+				} else {
+					// custom
+					if (!cfg.customBaseUrl || !cfg.customModel) {
+						post({
+							type: "codebase_index_ping_result",
+							provider,
+							ok: false,
+							error:
+								"Endpoint custom incompleto — configura baseUrl y modelo en settings",
+							});
+						break;
+					}
+					baseUrl = cfg.customBaseUrl;
+					model = model || cfg.customModel;
+				}
+				const res = await pingEmbeddingsProvider({ baseUrl, model, apiKey });
+				// Éxito + enterprise: persiste el config.json del upstream con las
+				// dimensions deducidas (customProvider las exige enteras >0).
+				if (res.ok && res.dimensions && provider === "frida-enterprise") {
+					const cred = readEnterpriseEmbeddingsCredential(defaultAgentDir());
+					if (cred) {
+						syncCodebaseIndexConfig(workspaceCwd(), {
+							provider: "frida-enterprise",
+							enterpriseBaseUrl: cred.baseUrl,
+							enterpriseToken: cred.token,
+							enterpriseModel: model,
+							enterpriseDimensions: res.dimensions,
+						});
+					}
+				}
+				post({ type: "codebase_index_ping_result", provider, ...res });
 				break;
 			}
 			case "check_environment": {
