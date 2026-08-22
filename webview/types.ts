@@ -466,6 +466,12 @@ export interface CodebaseIndexUiState {
 	busy?: "install" | "index" | null;
 	/** Última línea de progreso/resultado/error (guía incluida). */
 	lastLine?: string;
+	/** Configuración activa del motor de embeddings (#100). */
+	config?: {
+		provider: "auto" | "ollama" | "custom";
+		customBaseUrl?: string;
+		customModel?: string;
+	};
 }
 
 export type DependencyCategory = "core" | "extension" | "optional";

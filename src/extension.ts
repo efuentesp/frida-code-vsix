@@ -572,6 +572,7 @@ export async function activate(
 	let webviewReady = false;
 
 	function postCodebaseIndexState(): void {
+		const cfg = readCodebaseIndexConfig();
 		post({
 			type: "codebase_index_state",
 			state: {
@@ -579,6 +580,11 @@ export async function activate(
 				version: ciUi.installed ? installedVersion(defaultAgentDir()) : undefined,
 				busy: ciBusy,
 				lastLine: ciLastLine,
+				config: {
+					provider: cfg.provider,
+					customBaseUrl: cfg.customBaseUrl || undefined,
+					customModel: cfg.customModel || undefined,
+				},
 			},
 		});
 	}
