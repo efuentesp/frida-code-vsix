@@ -1420,30 +1420,13 @@ export async function activate(
 			postModels();
 			return;
 		}
-		// Confirmar cambio de PROVEEDOR (no de modelo dentro del mismo provider):
-		// anti-error (click/escritura sin querer). Si cancela, se queda en el actual.
-		const fromProvider = activeModel?.provider;
-		if (fromProvider && fromProvider !== providerId) {
-			modelChangeBridge ??= new ModelChangeBridge((reqs) =>
-				post({ type: "model_changes", items: reqs }),
-			);
-			const resp = await modelChangeBridge.request({
-				id: `mc-${Date.now()}`,
-				from: {
-					provider: fromProvider,
-					modelId: activeModel?.modelId ?? frida.session?.model?.id ?? "",
-				},
-				to: { provider: providerId, modelId },
-				source: "manual",
-				reason: "Cambio manual de proveedor.",
-			});
-			if (resp.decision === "cancel") {
-				post({ type: "info", text: "Cambio de proveedor cancelado." });
-				postModels();
-				return;
-			}
-		}
-		try {
+	// #98: SIN re-confirmación aquí. El único emisor de {type:"select_model"}
+	// es el onConfirm del ModelConfirmDialog del webview (comparación actual →
+	// nuevo): toda petición manual YA fue confirmada explícitamente por el
+	// usuario. La tarjeta vieja (model_changes vía ModelChangeBridge) duplicaba
+	// la confirmación en esta ruta. El puente sigue vivo SOLO para la vigilancia
+	// auto-detected en agent_end (divergencia session.model vs activeModel).
+	try {
 			await frida.session.setModel(m);
 			activeModel = { provider: providerId, modelId };
 			await context.globalState.update(ACTIVE_MODEL_KEY, activeModel);
