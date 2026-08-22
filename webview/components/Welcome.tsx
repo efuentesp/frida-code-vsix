@@ -73,13 +73,14 @@ const HELP_CATEGORIES: HelpCategory[] = [
 		content: (
 			<>
 				<p>
-					Escribe <code>@</code> para adjuntar archivos al contexto con
-					búsqueda difusa. Navega carpetas con <code>/</code> y usa comillas
-					para rutas con espacios (ej. <code>@&quot;mi carpeta/archivo.ts&quot;</code>).
+					Escribe <code>@</code> para adjuntar archivos al contexto con búsqueda
+					difusa. Navega carpetas con <code>/</code> y usa comillas para rutas con
+					espacios (ej. <code>@&quot;mi carpeta/archivo.ts&quot;</code>).
 				</p>
 				<p>
 					También puedes pegar directamente una <strong>imagen</strong> desde el
-					portapapeles (<kbd>Ctrl+V</kbd> / <kbd>Cmd+V</kbd>) para razonar con modelos de visión.
+					portapapeles (<kbd>Ctrl+V</kbd> / <kbd>Cmd+V</kbd>) para razonar con
+					modelos de visión.
 				</p>
 			</>
 		),
@@ -97,7 +98,8 @@ const HELP_CATEGORIES: HelpCategory[] = [
 				</p>
 				<p>
 					Usa comandos rápidos de control como <code>/compact</code> (resumir
-					contexto), <code>/model</code> (cambiar LLM activo), o <code>/reload</code> para refrescar extensiones.
+					contexto), <code>/model</code> (cambiar LLM activo), o <code>/reload</code>{" "}
+					para refrescar extensiones.
 				</p>
 			</>
 		),
@@ -140,10 +142,12 @@ const HELP_CATEGORIES: HelpCategory[] = [
 						<kbd>Alt</kbd>+<kbd>Enter</kbd> <span>Encolar un follow-up</span>
 					</li>
 					<li>
-						<kbd>Esc</kbd> <span>Cerrar diálogos (presiona 2 veces para abortar)</span>
+						<kbd>Esc</kbd>{" "}
+						<span>Cerrar diálogos (presiona 2 veces para abortar)</span>
 					</li>
 					<li>
-						<kbd>↑</kbd> / <kbd>↓</kbd> <span>Navegar el historial de mensajes anteriores</span>
+						<kbd>↑</kbd> / <kbd>↓</kbd>{" "}
+						<span>Navegar el historial de mensajes anteriores</span>
 					</li>
 				</ul>
 			</>
@@ -157,13 +161,14 @@ const HELP_CATEGORIES: HelpCategory[] = [
 		content: (
 			<>
 				<p>
-					Frida solicita autorización antes de editar archivos o ejecutar
-					comandos bash.
+					Frida solicita autorización antes de editar archivos o ejecutar comandos
+					bash.
 				</p>
 				<p>
 					Configura el modo desde el icono de escudo en el composer:{" "}
-					<strong>Manual</strong> (aprueba todo), <strong>Auto-edit</strong> (auto-aprobar escrituras de código) o{" "}
-					<strong>YOLO</strong> (auto-aprobación con auditoría completa).
+					<strong>Manual</strong> (aprueba todo), <strong>Auto-edit</strong>{" "}
+					(auto-aprobar escrituras de código) o <strong>YOLO</strong>{" "}
+					(auto-aprobación con auditoría completa).
 				</p>
 			</>
 		),
@@ -238,11 +243,7 @@ export function Welcome({
 							}}
 						>
 							<div className="starter-card-head">
-								<Codicon
-									name={c.iconName}
-									size={14}
-									className="starter-card-icon"
-								/>
+								<Codicon name={c.iconName} size={14} className="starter-card-icon" />
 								<span>{c.title}</span>
 							</div>
 							<p className="starter-card-desc">{c.desc}</p>

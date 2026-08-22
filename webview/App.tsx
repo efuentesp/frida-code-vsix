@@ -26,6 +26,8 @@ import { Tooltip } from "./components/Tooltip";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { QuestionsPanel } from "./components/QuestionsPanel";
 import { ModelPanel } from "./components/ModelPanel";
+import { ModelConfirmDialog } from "./components/ModelConfirmDialog";
+import type { ModelConfirmTarget } from "./components/ModelConfirmDialog";
 import { SettingsHub, type SettingsTab } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
@@ -84,6 +86,13 @@ export function App() {
 	// no por-panel) y se reenvía al backend al alternar el toggle.
 	const [sessionScope, setSessionScope] = useState<"project" | "all">("project");
 	const [modelsOpen, setModelsOpen] = useState(false);
+	// Confirmación de cambio de modelo: evita conmutaciones accidentales.
+	// El Composer y el ModelPanel piden el cambio; App lo retiene aquí hasta
+	// que el usuario confirma en el ModelConfirmDialog (Propuesta 1: side-by-side).
+	const [pendingModel, setPendingModel] = useState<{
+		provider: string;
+		model: string;
+	} | null>(null);
 	const [forkOpen, setForkOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
 	// Tab pedido del hub (p.ej. el comando frida.codebaseIndex pide "codebaseIndex").
@@ -201,6 +210,26 @@ export function App() {
 	}, [state.busy]);
 
 	const post = (msg: OutMessage) => getVsCode().postMessage(msg);
+
+	// Resuelve los metadatos de un modelo (nombre legible, ventana de contexto,
+	// razonamiento) desde el catálogo `state.models` para pintar el diff del
+	// ModelConfirmDialog. Cae a ids crudos si el catálogo aún no llegó.
+	const resolveModelTarget = (
+		provider: string,
+		modelId: string,
+	): ModelConfirmTarget => {
+		const p = state.models?.providers.find((x) => x.id === provider);
+		const m = p?.models.find((x) => x.id === modelId);
+		return {
+			provider,
+			providerName: p?.name ?? providerLabel(provider),
+			modelId,
+			modelName: m?.name ?? modelId,
+			contextWindow: m?.contextWindow,
+			reasoning: m?.reasoning,
+			input: m?.input,
+		};
+	};
 
 	// Trazado del flujo de Detener: además de la consola del webview (DevTools),
 	// reenvía al host para que caiga en el canal "Frida Abort" y se correlacione
@@ -868,9 +897,13 @@ export function App() {
 							diagLog("botón Detener (Composer) → post {abort}");
 							post({ type: "abort" });
 						}}
-						onSelectModel={(provider, modelId) =>
-							post({ type: "select_model", provider, model: modelId })
+					onSelectModel={(provider, modelId) => {
+						// Retener el cambio hasta confirmar en el ModelConfirmDialog.
+						if (state.models?.active?.provider === provider && state.models?.active?.modelId === modelId) {
+							return; // mismo modelo: nada que confirmar
 						}
+						setPendingModel({ provider, model: modelId });
+					}}
 						onSetThinking={(level) => post({ type: "set_thinking", level })}
 						onCycleMode={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
 					/>
@@ -917,10 +950,14 @@ export function App() {
 					refreshing={state.models.refreshing}
 					refreshErrors={state.models.refreshErrors}
 					deviceCode={state.oauthDeviceCode}
-					onClose={() => setModelsOpen(false)}
-					onSelect={(provider, model) =>
-						post({ type: "select_model", provider, model })
-					}
+						onClose={() => setModelsOpen(false)}
+						onSelect={(provider, model) => {
+							// Retener el cambio hasta confirmar en el ModelConfirmDialog.
+							if (state.models?.active?.provider === provider && state.models?.active?.modelId === model) {
+								return; // mismo modelo: nada que confirmar
+							}
+							setPendingModel({ provider, model });
+						}}
 					onLogin={(provider) => post({ type: "login_provider", provider })}
 					onLogout={(provider) => post({ type: "logout_provider", provider })}
 					onSetKey={(provider) => post({ type: "rotate_key", provider })}
@@ -946,6 +983,24 @@ export function App() {
 						setSettingsTab(undefined);
 					}}
 					initialTab={(settingsTab ?? "providers") as SettingsTab}
+				/>
+			)}
+			{pendingModel && state.models?.active && (
+				<ModelConfirmDialog
+					current={resolveModelTarget(
+						state.models.active.provider,
+						state.models.active.modelId,
+					)}
+					target={resolveModelTarget(pendingModel.provider, pendingModel.model)}
+					onConfirm={() => {
+						post({
+							type: "select_model",
+							provider: pendingModel.provider,
+							model: pendingModel.model,
+						});
+						setPendingModel(null);
+					}}
+					onCancel={() => setPendingModel(null)}
 				/>
 			)}
 		</div>
