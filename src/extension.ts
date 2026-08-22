@@ -163,6 +163,10 @@ import {
 } from "./tools/frida-codebase-index/installer";
 import { loadUpstreamTools } from "./tools/frida-codebase-index/shim";
 import { upstreamEntryPath } from "./tools/frida-codebase-index/constants";
+import {
+	parseAutoIndexProgress,
+	type IndexProgress,
+} from "./tools/frida-codebase-index/progress";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -564,6 +568,9 @@ export async function activate(
 	};
 	let ciBusy: "install" | "index" | null = null;
 	let ciLastLine: string | undefined;
+	// #109 — progreso en vivo de la indexación (sondeo de index_status cada 2s
+	// mientras index/rebuild corren en este mismo proceso → mismo coordinador).
+	let ciProgress: IndexProgress | null = null;
 	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
 	// pierde en arranque frío (el listener del webview monta en webview_ready).
 	let pendingSettingsTab: string | undefined;
@@ -580,6 +587,7 @@ export async function activate(
 				version: ciUi.installed ? installedVersion(defaultAgentDir()) : undefined,
 				busy: ciBusy,
 				lastLine: ciLastLine,
+				progress: ciProgress,
 				config: {
 					provider: cfg.provider,
 					customBaseUrl: cfg.customBaseUrl || undefined,
@@ -2935,6 +2943,7 @@ export async function activate(
 				const action = msg.action as "install" | "index" | "rebuild" | "status";
 				ciBusy = action === "install" ? "install" : "index";
 				ciLastLine = undefined;
+				ciProgress = null;
 				postCodebaseIndexState();
 				try {
 					if (action === "install") {
@@ -2960,20 +2969,57 @@ export async function activate(
 						const tools = await loadUpstreamTools(
 							upstreamEntryPath(defaultAgentDir()),
 						);
-						const toolName = action === "status" ? "index_status" : "index_codebase";
+						const toolName =
+							action === "status" ? "index_status" : "index_codebase";
 						const t = tools.get(toolName);
 						if (!t) throw new Error(`${toolName} no disponible en el paquete`);
-						// toolCallId (etiqueta del registro de la llamada), no una query:
-						// acción validada por la unión de tipos del mensaje.
-						const toolCallId = "host-" + action;
-						const res = await t.execute(
-							toolCallId,
-							{ force: action === "rebuild" },
-							undefined,
-							undefined,
-							{ cwd: workspaceCwd() },
-						);
-						ciLastLine = ciSummarize(res);
+						// #109 — sondeo del progreso en vivo: el AutoIndexCoordinator
+						// mantiene el progreso en memoria de ESTE proceso mientras indexa;
+						// index_status lo reporta. Polling cada 2s, best-effort.
+						let poll: ReturnType<typeof setInterval> | undefined;
+						if (action !== "status") {
+							const statusTool = tools.get("index_status");
+							if (statusTool) {
+								poll = setInterval(() => {
+									void statusTool
+										.execute(
+											"host-progress",
+											{},
+											undefined,
+											undefined,
+											{ cwd: workspaceCwd() },
+										)
+										.then((res: any) => {
+											const txt = res?.content?.[0]?.text;
+											ciProgress =
+												typeof txt === "string"
+													? parseAutoIndexProgress(txt)
+													: null;
+												postCodebaseIndexState();
+										})
+										.catch(() => {
+											/* progreso best-effort */
+										});
+								}, 2000);
+							}
+						}
+						try {
+							// toolCallId (etiqueta del registro de la llamada), no una query:
+							// acción validada por la unión de tipos del mensaje.
+							const toolCallId = `host-${action}`;
+							const res = await t.execute(
+								toolCallId,
+								{ force: action === "rebuild" },
+								undefined,
+								undefined,
+								{ cwd: workspaceCwd() },
+							);
+							ciLastLine = ciSummarize(res);
+						} finally {
+							// #109 — el polling muere SIEMPRE con la acción (sin timers huérfanos)
+							if (poll) clearInterval(poll);
+							ciProgress = null;
+						}
 					}
 				} catch (e: any) {
 					ciLastLine = e?.guide ?? e?.message ?? String(e);

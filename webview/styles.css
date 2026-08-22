@@ -9802,6 +9802,50 @@ kbd {
 	background: var(--vscode-button-background);
 	animation: ci-busy-slide 1.4s ease-in-out infinite;
 }
+/* #109 — barra determinada: fill al % del coordinador (patrón .ctx-fill).
+ * La clase gana por orden+especificidad (`.ci-busy-bar.determinate span`). */
+.ci-busy-bar.determinate span {
+	left: 0;
+	width: 100%;
+	animation: none;
+	transition: width 0.3s ease;
+}
+.ci-busy-bar.determinate {
+	height: 4px;
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15));
+}
+/* #109 — contadores (archivos · chunks) y fase en vivo */
+.ci-busy-counters {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+.ci-busy-count {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.ci-busy-num {
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-foreground);
+	font-weight: 500;
+}
+.ci-busy-pct {
+	margin-left: auto;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.ci-busy-phase {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
 @keyframes ci-busy-slide {
 	0% {
 		left: -30%;

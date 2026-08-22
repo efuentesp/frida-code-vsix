@@ -478,6 +478,16 @@ export interface CodebaseIndexUiState {
 	busy?: "install" | "index" | null;
 	/** Última línea de progreso/resultado/error (guía incluida). */
 	lastLine?: string;
+	/** Progreso en vivo de la indexación (#109) — null cuando el coordinador
+	 *  aún no reporta (la barra se muestra indeterminada). */
+	progress?: {
+		phase: string;
+		percentage: number;
+		filesProcessed: number;
+		totalFiles: number;
+		chunksProcessed: number;
+		totalChunks: number;
+	} | null;
 	/** Configuración activa del motor de embeddings (#100). */
 	config?: {
 		provider: "auto" | "ollama" | "custom";

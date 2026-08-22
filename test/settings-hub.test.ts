@@ -299,7 +299,9 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		}
 		// La clase contenedora existe en el markup (el wrap vive en CSS)
 		expect(html).toContain('class="cfg-tabs"');
-		expect((html.match(/class="cfg-tab[ "]/g) ?? []).length).toBeGreaterThanOrEqual(9);
+		expect(
+			(html.match(/class="cfg-tab[ "]/g) ?? []).length,
+		).toBeGreaterThanOrEqual(9);
 	});
 
 	it("renderiza resultados filtrados cuando hay búsqueda activa", () => {
