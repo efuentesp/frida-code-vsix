@@ -105,11 +105,14 @@ describe("readSessionStats — turns/activeMs (#107)", () => {
 		assert.equal(s.activeMs, (90 + 60) * 1000);
 	});
 
-	it("cuenta un turno aunque su cierre sea una entrada sin usage (p. ej. custom)", () => {
+	it("cuenta un turno aunque su cierre sea una entrada sin usage (p. ej. toolResult)", () => {
 		const file = tmp([
 			user("2026-08-22T10:00:00Z"),
 			assistant("2026-08-22T10:01:00Z"),
-			e("2026-08-22T10:01:30Z", { type: "custom_message" }), // cierre real
+			e("2026-08-22T10:01:30Z", {
+				type: "message",
+				message: { role: "toolResult", content: "x" },
+			}), // cierre real (actividad, sin usage)
 		]);
 		const s = readSessionStats(file);
 		assert.ok(s);
@@ -160,6 +163,54 @@ describe("readSessionStats — turns/activeMs (#107)", () => {
 		assert.ok(s);
 		assert.equal(s.turnCount, 1);
 		assert.equal(s.activeMs, 20_000);
+	});
+
+	it("REGRESIÓN #107: custom_message de sistema horas después NO infla el turno", () => {
+		// Caso real (Personal, 2026-08-22): "hola" anoche, evento de sistema al
+		// reactivar la ventana ~15h después, y turnos nuevos hoy. La entrada de
+		// metadatos entre turnos no puede contar como cierre del turno previo.
+		const file = tmp([
+			user("2026-08-22T03:56:21.154Z"),
+			e("2026-08-22T03:56:21.154Z", { type: "custom_message" }),
+			assistant("2026-08-22T03:56:24.033Z"), // turno 1 real: 2.9s
+			e("2026-08-22T18:54:10.149Z", { type: "custom_message" }), // ¡15h!
+			user("2026-08-22T18:56:26.705Z"),
+			e("2026-08-22T18:56:26.716Z", { type: "custom_message" }),
+			e("2026-08-22T18:56:29.373Z", { type: "session_info" }),
+			assistant("2026-08-22T18:56:34.120Z"), // turno 2: 7.4s
+		]);
+		const s = readSessionStats(file);
+		assert.ok(s);
+		assert.equal(s.turnCount, 2);
+		assert.equal(s.activeMs, 2_879 + 7_415); // 2.9s + 7.4s, NO ~15h
+	});
+
+	it("toolResult intermedio sí cuenta como cuerpo del turno", () => {
+		const file = tmp([
+			user("2026-08-22T18:57:16.377Z"),
+			assistant("2026-08-22T18:57:18.371Z"),
+			e("2026-08-22T18:57:25.750Z", {
+				type: "message",
+				message: { role: "toolResult", content: "adr" },
+			}),
+			assistant("2026-08-22T18:57:40.233Z"), // cierre: 23.9s
+		]);
+		const s = readSessionStats(file);
+		assert.ok(s);
+		assert.equal(s.turnCount, 1);
+		assert.equal(s.activeMs, 23_856);
+	});
+
+	it("compaction dentro del turno sí extiende su cierre", () => {
+		const file = tmp([
+			user("2026-08-22T10:00:00Z"),
+			assistant("2026-08-22T10:01:00Z"),
+			e("2026-08-22T10:02:00Z", { type: "compaction", usage: {} }),
+		]);
+		const s = readSessionStats(file);
+		assert.ok(s);
+		assert.equal(s.turnCount, 1);
+		assert.equal(s.activeMs, 120_000); // hasta la compaction (actividad)
 	});
 
 	it("mantiene campos previos (firstTs/lastTs/totales) intactos", () => {

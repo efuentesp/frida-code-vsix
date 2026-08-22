@@ -49,14 +49,24 @@ const mkTurn = (over: Partial<Turn> = {}): Turn => ({
 describe("computeTiming (#107)", () => {
 	it("suma el turno en curso al total y marca running", () => {
 		const now = Date.now();
-		const t = computeTiming(mkUsage(), true, mkTurn({ startedAt: now - 30_000 }), now);
+		const t = computeTiming(
+			mkUsage(),
+			true,
+			mkTurn({ startedAt: now - 30_000 }),
+			now,
+		);
 		expect(t.running).toBe(true);
 		expect(t.liveMs).toBe(30_000);
 		expect(t.totalMs).toBe(4_980_000 + 30_000);
 	});
 
 	it("no marca running sin startedAt (turn reconstruido) aunque busy", () => {
-		const t = computeTiming(mkUsage(), true, mkTurn({ startedAt: 0 }), Date.now());
+		const t = computeTiming(
+			mkUsage(),
+			true,
+			mkTurn({ startedAt: 0 }),
+			Date.now(),
+		);
 		expect(t.running).toBe(false);
 		expect(t.totalMs).toBe(4_980_000);
 	});
@@ -84,7 +94,12 @@ describe("computeTiming (#107)", () => {
 
 	it("empty=true cuando no hay activo ni turnos", () => {
 		const t = computeTiming(
-			mkUsage({ activeMs: 0, turnCount: 0, turnDurations: [], sessionDurationMs: 0 }),
+			mkUsage({
+				activeMs: 0,
+				turnCount: 0,
+				turnDurations: [],
+				sessionDurationMs: 0,
+			}),
 			false,
 			undefined,
 			0,
@@ -174,7 +189,12 @@ describe("SessionTimingDetail — popover (#107)", () => {
 
 	it("fila running y 13 turnos cuando hay turno en curso", () => {
 		const now = Date.now();
-		const t = computeTiming(mkUsage(), true, mkTurn({ startedAt: now - 45_000 }), now);
+		const t = computeTiming(
+			mkUsage(),
+			true,
+			mkTurn({ startedAt: now - 45_000 }),
+			now,
+		);
 		const html = renderToStaticMarkup(
 			React.createElement(SessionTimingDetail, { usage: mkUsage(), t }),
 		);

@@ -28,7 +28,11 @@ export function computeTiming(
 	now: number,
 ) {
 	const closedMs = usage.activeMs ?? 0;
-	const running = !!(busy && turn?.startedAt !== undefined && turn.startedAt > 0);
+	const running = !!(
+		busy &&
+		turn?.startedAt !== undefined &&
+		turn.startedAt > 0
+	);
 	const liveMs = running ? Math.max(0, now - (turn?.startedAt ?? 0)) : 0;
 	const totalMs = closedMs + liveMs;
 	const turnsClosed = usage.turnCount ?? 0;
@@ -95,8 +99,7 @@ export function SessionTimingDetail({ usage, t }: { usage: Usage; t: Timing }) {
 						<Codicon name="zap" size={12} /> Activo
 					</span>
 					<span className="stp-v">
-						{formatDuration(t.totalMs)} ·{" "}
-						{t.turnsClosed + (t.running ? 1 : 0)} turnos
+						{formatDuration(t.totalMs)} · {t.turnsClosed + (t.running ? 1 : 0)} turnos
 					</span>
 				</div>
 				<div className="stp-row">
@@ -139,8 +142,7 @@ export function SessionTimingDetail({ usage, t }: { usage: Usage; t: Timing }) {
 			</div>
 			{t.running && (
 				<div className="stp-running">
-					<span className="stp-pulse" /> turno en curso +
-					{formatDuration(t.liveMs)}
+					<span className="stp-pulse" /> turno en curso +{formatDuration(t.liveMs)}
 				</div>
 			)}
 		</div>

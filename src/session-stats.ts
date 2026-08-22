@@ -98,12 +98,16 @@ export function readSessionStats(
 		let first = Infinity;
 		let last = 0;
 		// #107 — turno en construcción: abre con el user msg (startMs) y cierra
-		// con la última entrada antes del siguiente user msg (endMs). user sin
-		// timestamp abre turno con startMs null (se descarta al cerrar: no se
-		// puede medir duración) sin romper el recuento del resto.
+		// con la última actividad del MODELO antes del siguiente user msg (endMs).
+		// Solo assistant/toolResult/compaction cierran: los eventos de sistema
+		// (custom_message, session_info, model_change, …) pueden llegar en
+		// background horas después (p. ej. al reactivar la ventana) y NO deben
+		// inflar la duración del turno previo (regresión Personal 2026-08-22:
+		// un "hola" de 2.9s reportó 15h por una custom_message nocturna).
+		// user sin timestamp abre turno con startMs null (se descarta al cerrar:
+		// no se puede medir duración) sin romper el recuento del resto.
 		let openStart: number | null = null;
-		// Última entrada con timestamp vista desde la apertura del turno actual
-		// (el cierre real del turno abierto).
+		// Última entrada de ACTIVIDAD vista desde la apertura del turno actual.
 		let lastOpenEnd = 0;
 		for (const line of raw.split("\n")) {
 			const t = line.trim();
@@ -120,9 +124,14 @@ export function readSessionStats(
 				if (ms < first) first = ms;
 				if (ms > last) last = ms;
 			}
-			// #107 — detección de turno: un mensaje user abre turno; cualquier
-			// otra entrada con timestamp lo va cerrando (actualiza endMs).
-			const isUser = entry?.type === "message" && entry?.message?.role === "user";
+			// #107 — detección de turno: un mensaje user abre turno; la actividad
+			// del modelo (assistant / toolResult / compaction) lo va cerrando.
+			const role = entry?.message?.role;
+			const isUser = entry?.type === "message" && role === "user";
+			const isModelActivity =
+				(entry?.type === "message" &&
+					(role === "assistant" || role === "toolResult")) ||
+				entry?.type === "compaction";
 			if (isUser) {
 				// Cierra el turno previo (si quedó uno abierto con última entrada
 				// conocida) justo antes de abrir el nuevo.
@@ -131,7 +140,7 @@ export function readSessionStats(
 				}
 				openStart = ms !== null && ms > 0 ? ms : null;
 				lastOpenEnd = 0;
-			} else if (ms !== null && ms > 0) {
+			} else if (isModelActivity && ms !== null && ms > 0) {
 				if (ms > lastOpenEnd) lastOpenEnd = ms;
 			}
 			// usage: el assistant message lo trae anidado en entry.message.usage;

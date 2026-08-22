@@ -626,8 +626,7 @@ body {
 	font-size: 12px;
 	background: var(--vscode-editorWidget-background, #252526);
 	color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #ccc));
-	border: 1px solid
-		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
 	border-radius: 8px;
 	box-shadow: var(--vscode-widget-shadow, 0 8px 24px rgba(0, 0, 0, 0.45));
 	animation: overlay-fade 0.14s ease-out;
