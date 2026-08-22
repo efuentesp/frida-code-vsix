@@ -71,6 +71,13 @@ export const PROVIDER_REGISTRY: ProviderMeta[] = [
 		blurb:
 			"SSO corporativo de Frida Platform (Compatible API). Inicia sesión con tu cuenta de Softtek.",
 	},
+	{
+		id: "antigravity",
+		name: "Antigravity (Google)",
+		authType: "oauth",
+		blurb:
+			"Google Antigravity / Cloud Code Assist: Gemini, Claude y GPT-OSS con tu cuenta de Google. Login directo, sin API key.",
+	},
 ];
 
 const FALLBACK_NAME: Record<string, string> = {};

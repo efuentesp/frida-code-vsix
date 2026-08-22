@@ -893,6 +893,12 @@ export function App() {
 						expanded={composerExpanded}
 						onExpandedChange={setComposerExpanded}
 						insertSignal={state.composerInsert}
+						onOpenProviders={() => {
+							// #97: sin proveedores conectados, el select redirige a la
+							// pantalla donde se configuran (Configuración → Proveedores).
+							setConfigOpen(true);
+							setSettingsTab("providers");
+						}}
 						onAbort={() => {
 							diagLog("botón Detener (Composer) → post {abort}");
 							post({ type: "abort" });

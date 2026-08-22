@@ -38,6 +38,10 @@ import {
 	patchFridaSideChannelsOn,
 	FRIDA_ENTERPRISE_PROVIDER,
 } from "./providers/frida-enterprise";
+import {
+	buildAntigravityProviderConfig,
+	ANTIGRAVITY_PROVIDER,
+} from "./providers/frida-antigravity";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
@@ -417,6 +421,15 @@ export async function createFridaSession(
 	modelRuntime.registerProvider(
 		FRIDA_ENTERPRISE_PROVIDER,
 		buildFridaEnterpriseProviderConfig() as any,
+	);
+	// frida-antigravity (#97): Google Antigravity / Cloud Code Assist (port de
+	// pi-antigravity, MIT). OAuth de Google con callback local :51121 + streaming
+	// nativo SSE propio (streamSimple) con puente custom-tools para Claude/GPT.
+	// Catálogo estático de 7 modelos públicos; el discovery dinámico
+	// (fetchAvailableModels) resuelve runtimes no mapeados en cada request.
+	modelRuntime.registerProvider(
+		ANTIGRAVITY_PROVIDER,
+		buildAntigravityProviderConfig() as any,
 	);
 	// Errata-9: el compact/branch-summary llama streamSimple/completeSimple sin
 	// onPayload (el SDK no pasa onPayload en ese canal). Instala el patch lateral

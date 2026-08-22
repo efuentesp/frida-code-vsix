@@ -66,6 +66,10 @@ import {
 	FRIDA_ENTERPRISE_PROVIDER,
 	FRIDA_ENTERPRISE_PROVIDER_DISPLAY,
 } from "./providers/frida-enterprise";
+import {
+	ANTIGRAVITY_PROVIDER,
+	ANTIGRAVITY_PROVIDER_DISPLAY,
+} from "./providers/frida-antigravity";
 import { createVscodePresenter as createCcPluginsPresenter } from "./tools/frida-cc-plugins/presenter";
 import {
 	createForensicAppender,
@@ -215,6 +219,7 @@ const SUPPORTED_PROVIDERS = [
 	...API_KEY_PROVIDER_IDS,
 	FRIDA_ENTERPRISE_PROVIDER,
 	"github-copilot",
+	ANTIGRAVITY_PROVIDER,
 ];
 
 // ¿El proveedor está autenticado? getProviderAuthStatus revisa storedProviders
@@ -1327,6 +1332,9 @@ export async function activate(
 		if (id === OPENAI_PROVIDER) return OPENAI_PROVIDER_DISPLAY;
 		if (id === FRIDA_ENTERPRISE_PROVIDER) {
 			return FRIDA_ENTERPRISE_PROVIDER_DISPLAY;
+		}
+		if (id === ANTIGRAVITY_PROVIDER) {
+			return ANTIGRAVITY_PROVIDER_DISPLAY;
 		}
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;

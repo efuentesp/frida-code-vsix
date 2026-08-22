@@ -28,6 +28,7 @@ import {
 	type ExtensionContext,
 	type SessionStats,
 } from "@earendil-works/pi-coding-agent";
+import type { Model } from "@earendil-works/pi-ai";
 import { executeShellCommand } from "./core/execution";
 import {
 	loadAgentDefinitions,
@@ -438,7 +439,22 @@ export function createFridaAgentSpawner(
 		const modelAliases = resolveWorkflowSettings(ctx.cwd, true).effective
 			.modelAliases;
 		const overrides = resolveRoleOverrides(options, roles, modelAliases);
-		const sessionModel = overrides.model ?? ctx.model;
+		// #97: overrides.model llega como STRING (alias/id de role/tier/model en
+		// las opciones) mientras el SDK espera Model. Antes este punto tipaba como
+		// any (pi-ai no resolvía) y un string habría crasheado al primer uso de
+		// model.provider. Resolvemos vía el ModelRuntime del padre (formato
+		// "provider/model-id" o id pelado); si no resuelve, se omite y el SDK
+		// aplica su selección inicial.
+		const rawModel = (overrides.model as string | undefined) ?? ctx.model;
+		let sessionModel: Model<import("@earendil-works/pi-ai").Api> | undefined;
+		if (typeof rawModel === "string") {
+			const slash = rawModel.indexOf("/");
+			const providerId = slash >= 0 ? rawModel.slice(0, slash) : "";
+			const modelId = slash >= 0 ? rawModel.slice(slash + 1) : rawModel;
+			sessionModel = parentModelRuntime?.getModel(providerId, modelId);
+		} else {
+			sessionModel = rawModel;
+		}
 
 		const { session } = await createAgentSession({
 			cwd: ctx.cwd,

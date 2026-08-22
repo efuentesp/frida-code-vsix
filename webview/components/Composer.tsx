@@ -72,6 +72,7 @@ export function Composer({
 	expanded,
 	onExpandedChange,
 	insertSignal,
+	onOpenProviders,
 }: {
 	onSubmit: (
 		text: string,
@@ -103,6 +104,9 @@ export function Composer({
 	 *  al hacer clic en "insertar $name"). El host lo envía vía mensaje
 	 *  composer_insert; App pasa state.composerInsert aquí. */
 	insertSignal?: { text: string; n: number };
+	/** #97: sin proveedores conectados, el select muestra un mensaje y este
+	 *  callback abre Configuración → Proveedores (donde se conectan). */
+	onOpenProviders?: () => void;
 }) {
 	const [text, setText] = useState("");
 	const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -124,7 +128,9 @@ export function Composer({
 	// textbox en rojo como señal enfática del modo activo (ver .bar.yolo-mode).
 	const yolo = mode === "auto";
 	// Selects de la fila 2: proveedor/modelo/esfuerzo derivados del estado.
-	const provs = models?.providers ?? [];
+	// #97: sólo proveedores CONECTADOS (authed); sin conexión el select no
+	// ofrece nada y redirige a Configuración → Proveedores.
+	const provs = (models?.providers ?? []).filter((p) => p.authed);
 	const activeProvider = provs.find((p) => p.id === active?.provider);
 	const modelOptions = activeProvider?.models ?? [];
 	const modeLabel =
@@ -196,15 +202,18 @@ export function Composer({
 	const skillOpen = skillMatches.length > 0;
 
 	// Opciones del argumento según el comando (derivadas de models).
+	// #97: /model sólo ofrece proveedores CONECTADOS (paridad con el select);
+	// /login ofrece los OAuth sin conectar (para poder conectarse).
 	function argOptions(command: string): { value: string; label: string }[] {
-		const provs = models?.providers ?? [];
+		const all = models?.providers ?? [];
 		if (command === "login" || command === "logout") {
-			return provs
+			return all
 				.filter((p) => p.oauth)
 				.map((p) => ({ value: p.id, label: p.name }));
 		}
 		if (command === "model") {
-			return provs.flatMap((p) =>
+			return all
+				.filter((p) => p.authed).flatMap((p) =>
 				p.models.map((m) => ({
 					value: `${p.id}/${m.id}`,
 					label: `${p.name} · ${m.name}`,
@@ -809,7 +818,7 @@ export function Composer({
 				)}
 				<div className="bar-controls">
 					<div className="bar-left">
-						{provs.length > 0 && (
+						{provs.length > 0 ? (
 							<select
 								className="bar-select"
 								disabled={busy}
@@ -827,6 +836,19 @@ export function Composer({
 									</option>
 								))}
 							</select>
+						) : (
+							// #97: sin proveedores conectados, mensaje + redirect a
+							// Configuración → Proveedores (nada seleccionable aquí).
+							<Tooltip label="Configurar proveedores" side="top">
+								<button
+									className="bar-select bar-select-empty"
+									onClick={onOpenProviders}
+									disabled={busy}
+								>
+									<Codicon name="plug" size={12} /> Sin proveedores conectados —
+									configurar
+								</button>
+							</Tooltip>
 						)}
 						{modelOptions.length > 0 && (
 							<select
