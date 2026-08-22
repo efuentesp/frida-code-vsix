@@ -258,7 +258,8 @@ describe("environment/doctor · detección de dependencias", () => {
 			if (cmd === "ollama" && args[0] === "list") {
 				// daemon activo pero solo modelos de chat, ninguno de embeddings
 				return {
-					stdout: "NAME  ID  SIZE\nllama3.1  abc123  4.7 GB\nqwen2.5  def456  4.4 GB",
+					stdout:
+						"NAME  ID  SIZE\nllama3.1  abc123  4.7 GB\nqwen2.5  def456  4.4 GB",
 					stderr: "",
 					code: 0,
 				};
