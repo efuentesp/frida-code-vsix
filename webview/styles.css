@@ -6700,6 +6700,25 @@ kbd {
 	background: #b3261e;
 	color: #fff;
 }
+/* Variante ghost: botón ícono transparente estilo toolbar nativo de VS Code
+ * (Explorer / Tests view). Sin fondo ni borde; sólo se percibe al hover. */
+.fbutton.ghost {
+	background: transparent;
+	color: var(--vscode-descriptionForeground, #8b949e);
+	padding: 3px;
+	line-height: 1;
+	border-radius: 5px;
+}
+.fbutton.ghost:hover {
+	background: var(
+		--vscode-toolbar-hoverBackground,
+		var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12))
+	);
+	color: var(--vscode-foreground);
+}
+.fbutton.ghost:active {
+	background: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.2));
+}
 /* Botón Detener del WorkflowPanel: compacto, rojo (danger), icono + texto. */
 .fbutton.wf-stop {
 	padding: 2px 8px;

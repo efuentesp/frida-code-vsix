@@ -69,7 +69,9 @@ export interface ButtonProps {
 	key?: string | number;
 	onClick?: () => void;
 	disabled?: boolean;
-	variant?: "primary" | "secondary" | "danger";
+	variant?: "primary" | "secondary" | "danger" | "ghost";
+	/** Tooltip nativo del <button> (title DOM). */
+	title?: string;
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
 	/** Clase CSS extra (passthrough). */

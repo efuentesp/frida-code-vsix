@@ -62,6 +62,40 @@ function TodoWebPanel({
 	const showIds =
 		tasks.length > 1 || tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
+	// Badge del header cuando está colapsado (sin ternarias anidadas).
+	let collapsedBadge: ReactElement | null = null;
+	if (collapsed && activeTask) {
+		collapsedBadge = (
+			<ftext color="var(--vscode-list-warningForeground, #cca700)">
+				◐ {activeTask.activeForm || activeTask.subject}
+			</ftext>
+		);
+	} else if (collapsed && allDone) {
+		collapsedBadge = (
+			<ftext color="var(--vscode-testing-iconPassed, #73c991)">
+				✓ Todas completadas
+			</ftext>
+		);
+	}
+
+	// #66 + UI/UX: botón de re-sincronización en el slot `actions` — justificado a
+	// la derecha y FUERA de la zona clicable del header (mismo patrón del pin del
+	// WorkflowPanel, #84). Icono `sync` (canónico de VS Code para "Synchronize
+	// Changes") en variante ghost: transparente, sólo se percibe al hover.
+	const syncAction = onRefresh ? (
+		<fbutton
+			variant="ghost"
+			title="Resincronizar tareas con el estado interno (replay + conciliación)"
+			onClick={onRefresh}
+		>
+			<ficon
+				name="sync"
+				size={13}
+				color="var(--vscode-descriptionForeground, #8b949e)"
+			/>
+		</fbutton>
+	) : null;
+
 	return (
 		<CollapsiblePanel
 			collapsed={collapsed}
@@ -78,23 +112,10 @@ function TodoWebPanel({
 					<ftext color="var(--vscode-descriptionForeground)">
 						({completed}/{tasks.length})
 					</ftext>
-					{collapsed && activeTask ? (
-						<ftext color="var(--vscode-list-warningForeground, #cca700)">
-							◐ {activeTask.activeForm || activeTask.subject}
-						</ftext>
-					) : collapsed && allDone ? (
-						<ftext color="var(--vscode-testing-iconPassed, #73c991)">
-							✓ Todas completadas
-						</ftext>
-					) : null}
-					{/* #66: re-sincronizar — replay + conciliación manual */}
-					{onRefresh ? (
-						<fbutton variant="secondary" onClick={onRefresh}>
-							<ficon name="rotate-cw" size={11} />
-						</fbutton>
-					) : null}
+					{collapsedBadge}
 				</fbox>
 			}
+			actions={syncAction}
 		>
 			<fbox flexDirection="column" gap={2} cls="todo-tree-container">
 				{tasks.map((t, i) => (

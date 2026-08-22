@@ -32,6 +32,7 @@ const F_ICONS_TO_CODICON: Record<string, string> = {
 	"shield-alert": "shield",
 	shield: "shield",
 	"arrow-right": "arrow-right",
+	sync: "sync",
 	bot: "copilot",
 	brain: "sparkle",
 	sparkle: "sparkle",
