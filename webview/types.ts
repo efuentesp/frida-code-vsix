@@ -481,6 +481,13 @@ export interface CodebaseIndexUiState {
 	busySince?: number | null;
 	/** Última línea de progreso/resultado/error (guía incluida). */
 	lastLine?: string;
+	/** Provider/modelo/dimensiones REALES del índice construido (#114),
+	 *  leídos de su metadata. Ausente si no hay índice o sin claves. */
+	indexMeta?: {
+		provider: string;
+		model: string;
+		dimensions: number;
+	};
 	/** Progreso en vivo de la indexación (#109) — null cuando el coordinador
 	 *  aún no reporta (la barra se muestra indeterminada). */
 	progress?: {
@@ -1066,6 +1073,6 @@ export type OutMessage =
 	  }
 	| {
 			type: "codebase_index_action";
-			action: "install" | "index" | "rebuild" | "status" | "files";
+			action: "install" | "index" | "rebuild" | "status" | "files" | "stop";
 	  }
 	| { type: "check_environment" };

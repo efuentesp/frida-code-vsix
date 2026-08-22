@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseAutoIndexProgress } from "../src/tools/frida-codebase-index/progress";
-import { IndexTab } from "../webview/components/IndexTab";
+import { IndexTab, StopIndexDialog } from "../webview/components/IndexTab";
 import type { State } from "../webview/types";
 
 describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
@@ -243,6 +243,89 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		);
 
 		expect(html).toContain("Sin índice construido");
+	});
+
+	it("#113 — botón Detener visible solo durante index/rebuild (no install)", () => {
+		const post = vi.fn();
+		const state: State = {
+			...baseState,
+			codebaseIndex: { installed: true, busy: "index", busySince: Date.now() - 60_000 },
+		};
+
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, { state, post }),
+		);
+
+		expect(html).toContain("Detener");
+	});
+
+	it("#113 — sin botón Detener durante install ni sin busy", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+				...baseState,
+				codebaseIndex: { installed: false, busy: "install" },
+			},
+			post,
+			}),
+		);
+		expect(html).not.toContain('ci-stop-btn');
+	});
+
+	it("#114 — banner muestra proveedor/modelo REAL del índice cuando existe", () => {
+		const post = vi.fn();
+		const state: State = {
+			...baseState,
+			codebaseIndex: {
+				installed: true,
+				version: "0.23.0",
+				config: { provider: "auto" },
+				indexMeta: {
+					provider: "github-copilot",
+					model: "text-embedding-3-small",
+					dimensions: 1536,
+				},
+			},
+		};
+
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, { state, post }),
+		);
+
+		expect(html).toContain("GitHub Copilot · text-embedding-3-small");
+		expect(html).toContain("1536d");
+		// Nota Auto: el setting era auto pero el índice resolvió a Copilot
+		expect(html).toContain("Auto resolvió a GitHub Copilot");
+	});
+
+	it("#114 — sin metadata del índice: banner conserva la etiqueta del setting", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+					...baseState,
+					codebaseIndex: {
+						installed: true,
+						version: "0.23.0",
+						config: { provider: "auto" },
+					},
+				},
+				post,
+			}),
+		);
+		expect(html).toContain("Auto (Ollama/OpenAI)");
+	});
+
+	it("#113 — el diálogo de confirmación explica recarga e incrementalidad", () => {
+		const html = renderToStaticMarkup(
+			React.createElement(StopIndexDialog, {
+				onConfirm: () => {},
+				onCancel: () => {},
+			}),
+		);
+		expect(html).toContain("recargará la ventana");
+		expect(html).toContain("retomará desde donde quedó");
 	});
 
 	it("#109 — sin datos del coordinador: barra indeterminada y contadores en —", () => {

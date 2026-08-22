@@ -39,6 +39,13 @@ export interface IndexedFilesResult {
 	engine: "node:sqlite" | "sqlite3-cli";
 }
 
+/** Metadata de embeddings persistida en el índice (#114). */
+export interface IndexMeta {
+	provider: string;
+	model: string;
+	dimensions: number;
+}
+
 const SQL_FILES =
 	"SELECT file_path, COUNT(*) AS chunks, language FROM chunks GROUP BY file_path ORDER BY chunks DESC LIMIT 500";
 
@@ -135,9 +142,36 @@ async function queryViaCli(db: string, sql: string): Promise<unknown[] | null> {
 }
 
 /**
- * Consulta los archivos indexados del workspace. null si no hay índice o
- * ningún motor de lectura está disponible.
+ * Lee provider/modelo/dimensiones de embeddings de la metadata del índice
+ * (#114). null si no hay índice o faltan las claves (índice sin embeddings).
  */
+export async function readIndexMeta(cwd: string): Promise<IndexMeta | null> {
+	const db = path.join(indexDir(cwd), "codebase.db");
+	if (!fs.existsSync(db)) return null;
+
+	const SQL_META =
+		"SELECT key, value FROM metadata WHERE key IN ('index.embeddingProvider','index.embeddingModel','index.embeddingDimensions')";
+	let rows: unknown[] | null = await queryViaNodeSqlite(db, SQL_META);
+	if (!rows) rows = await queryViaCli(db, SQL_META);
+	if (!rows) return null;
+
+	const map = new Map<string, string>();
+	for (const r of rows) {
+		const row = r as Record<string, unknown> | string[];
+		const k = String(Array.isArray(row) ? row[0] : row.key);
+		const v = Array.isArray(row) ? row[1] : row.value;
+		if (v !== null && v !== undefined) map.set(k, String(v));
+	}
+	const provider = map.get("index.embeddingProvider");
+	const model = map.get("index.embeddingModel");
+	const dims = Number(map.get("index.embeddingDimensions"));
+	if (!provider || !model) return null;
+	return {
+		provider,
+		model,
+		dimensions: Number.isFinite(dims) ? dims : 0,
+	};
+}
 export async function readIndexedFiles(
 	cwd: string,
 ): Promise<IndexedFilesResult | null> {

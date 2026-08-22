@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
 	aggregateFailed,
 	readIndexedFiles,
+	readIndexMeta,
 } from "../src/tools/frida-codebase-index/files";
 
 function tmpdir(): string {
@@ -90,5 +91,54 @@ describe("codebase-index/files — lista de archivos indexados (#112)", () => {
 		]);
 		expect(res?.failed).toEqual([{ path: "docs/g.md", chunks: 1 }]);
 		expect(["node:sqlite", "sqlite3-cli"]).toContain(res?.engine);
+	});
+});
+
+describe("codebase-index/files — metadata de embeddings del índice (#114)", () => {
+	const dirs: string[] = [];
+	afterAll(() => {
+		for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	function mkIndex(metaSQL: string): string {
+		const d = tmpdir();
+		dirs.push(d);
+		const idx = path.join(d, ".codebase-index", "index");
+		fs.mkdirSync(idx, { recursive: true });
+		execFileSync("sqlite3", [
+			path.join(idx, "codebase.db"),
+			`CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT); ${metaSQL}`,
+		]);
+		return d;
+	}
+
+	it("readIndexMeta: lee provider/modelo/dimensiones de la metadata real", async () => {
+		try {
+			execFileSync("sqlite3", ["--version"]);
+		} catch {
+			return; // sin CLI: cubierto por fallback
+		}
+		const d = mkIndex(
+			`INSERT INTO metadata VALUES ('index.embeddingProvider','github-copilot'),('index.embeddingModel','text-embedding-3-small'),('index.embeddingDimensions','1536');`,
+		);
+		const meta = await readIndexMeta(d);
+		expect(meta).toEqual({
+			provider: "github-copilot",
+			model: "text-embedding-3-small",
+			dimensions: 1536,
+		});
+	});
+
+	it("readIndexMeta: null si no hay índice o faltan claves de embedding", async () => {
+		expect(await readIndexMeta(tmpdir())).toBeNull(); // sin DB
+		try {
+			execFileSync("sqlite3", ["--version"]);
+		} catch {
+			return;
+		}
+		const d = mkIndex(
+			`INSERT INTO metadata VALUES ('schema_version','7');`,
+		);
+		expect(await readIndexMeta(d)).toBeNull(); // DB sin claves embedding
 	});
 });

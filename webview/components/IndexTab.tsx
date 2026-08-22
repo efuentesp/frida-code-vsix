@@ -21,6 +21,28 @@ const PHASE_LABELS: Record<string, string> = {
 	embedding: "vectorizando",
 };
 
+/** Nombres legibles de proveedores de embeddings (#114) — espejo de
+ *  getProviderDisplayName del upstream (open-codebase-index). */
+const PROVIDER_LABELS: Record<string, string> = {
+	"github-copilot": "GitHub Copilot",
+	openai: "OpenAI",
+	google: "Google (Gemini)",
+	ollama: "Ollama (Local)",
+	custom: "Custom (OpenAI-compatible)",
+};
+
+/** Etiqueta del motor del banner: metadata REAL del índice o fallback al
+ *  setting (auto/ollama/custom). #114 */
+function engineLabel(
+	providerMode: string,
+	metaLabel: string | null,
+): string {
+	if (metaLabel) return metaLabel;
+	if (providerMode === "ollama") return "Ollama Local";
+	if (providerMode === "custom") return "Endpoint Custom";
+	return "Auto (Ollama/OpenAI)";
+}
+
 interface ToolMeta {
 	name: string;
 	title: string;
@@ -70,6 +92,124 @@ const INDEX_TOOLS: ToolMeta[] = [
 	},
 ];
 
+/** Cuerpo de la sección Archivos (#112): sin anidar ternarios. */
+function FilesBody({
+	idxFiles,
+	filtered,
+	query,
+}: {
+	idxFiles: NonNullable<State["codebaseIndexFiles"]>;
+	filtered: { path: string; chunks: number; language: string }[];
+	query: string;
+}) {
+	if (!idxFiles.available) {
+		return (
+			<div className="ci-files-empty">
+				Sin índice construido en este workspace — ejecuta «Indexar» para
+				crearlo.
+			</div>
+		);
+	}
+	return (
+		<>
+			<div className="ci-files-list">
+				{filtered.length === 0 && (
+					<div className="ci-files-empty">
+						Ningún archivo coincide con «{query}».
+					</div>
+				)}
+				{filtered.map((f) => (
+					<div key={f.path} className="ci-file-row">
+						<span className="ci-file-path" title={f.path}>
+							{f.path}
+						</span>
+						<span className="ci-file-meta">{f.language}</span>
+						<span className="ci-file-chunks">{f.chunks}</span>
+					</div>
+				))}
+			</div>
+			{idxFiles.failed.length > 0 && (
+				<div className="ci-files-failed">
+					<div className="ci-files-failed-head">
+						<Codicon name="warning" size={13} /> Fallidos en embedding (
+						{idxFiles.failed.length} archivos)
+					</div>
+					{idxFiles.failed.slice(0, 10).map((f) => (
+						<div key={f.path} className="ci-file-row is-failed">
+							<span className="ci-file-path" title={f.path}>
+								{f.path}
+							</span>
+							<span className="ci-file-chunks">{f.chunks}</span>
+						</div>
+					))}
+				</div>
+			)}
+		</>
+	);
+}
+
+/**
+ * #113 — Diálogo de confirmación para detener la indexación.
+ *
+ * El upstream no expone cancelación limpia (la tool descarta la señal de
+ * aborto), así que detener = recargar el extension host. Puro: solo recibe
+ * callbacks. Esc cancela, Enter confirma (patrón ModelConfirmDialog).
+ */
+export function StopIndexDialog({
+	onConfirm,
+	onCancel,
+}: {
+	onConfirm: () => void;
+	onCancel: () => void;
+}) {
+	return (
+		<div
+			className="model-diff-overlay"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Detener indexación"
+			onKeyDown={(e) => {
+				if (e.key === "Escape") {
+					e.preventDefault();
+				onCancel();
+				}
+				if (e.key === "Enter") {
+					e.preventDefault();
+				onConfirm();
+			}
+			}}
+		>
+			<div className="stp-stop-card ci-stop-card">
+				<div className="ci-stop-title">
+					<Codicon name="debug-stop" size={16} /> Detener la indexación
+				</div>
+				<div className="ci-stop-text">
+					El paquete no permite cancelar en caliente: se <strong>recargará la
+				ventana de VS Code</strong> para cortar la corrida. Es seguro — el índice
+				es incremental: al volver a indexar <strong>retomará desde donde quedó</strong>
+				(los archivos ya procesados se saltan y los chunks fallidos se reintentan).
+				</div>
+			<div className="ci-stop-actions">
+				<button
+					type="button"
+					className="model-diff-btn secondary"
+					onClick={onCancel}
+				>
+					Seguir indexando
+				</button>
+				<button
+					type="button"
+					className="model-diff-btn primary"
+					onClick={onConfirm}
+				>
+					<Codicon name="debug-stop" size={13} /> Detener y recargar
+				</button>
+			</div>
+			</div>
+		</div>
+	);
+}
+
 export function IndexTab({
 	state,
 	post,
@@ -100,6 +240,8 @@ export function IndexTab({
 	// vivo, no con renderToStaticMarkup.)
 	const [filesOpen, setFilesOpen] = useState(idxFiles !== undefined);
 	const [filesQuery, setFilesQuery] = useState("");
+	// #113 — confirmación para detener la indexación (recarga de ventana)
+	const [stopOpen, setStopOpen] = useState(false);
 	useEffect(() => {
 		if (isInstalled && !idxFiles) {
 			post({ type: "codebase_index_action", action: "files" });
@@ -138,9 +280,25 @@ export function IndexTab({
 	};
 
 	const providerMode = ci?.config?.provider ?? "auto";
+	// #114 — proveedor/modelo REALES del índice construido (metadata), con
+	// nombre legible; solo si existe metadata (índice con embeddings).
+	const meta = ci?.indexMeta;
+	const metaProvider = meta ? (PROVIDER_LABELS[meta.provider] ?? meta.provider) : null;
+	const metaLabel = meta ? `${metaProvider} · ${meta.model}` : null;
 
 	return (
 		<div className="cfg-resources ci-tab">
+			{/* #113 — diálogo de confirmación para detener (recarga ventana) */}
+			{stopOpen && busy !== "install" && (
+				<StopIndexDialog
+					onConfirm={() => {
+					setStopOpen(false);
+					post({ type: "codebase_index_action", action: "stop" });
+				}}
+				onCancel={() => setStopOpen(false)}
+			/>
+			)}
+
 			{/* Banner superior de salud del índice */}
 			<div className={`ci-banner ${isInstalled ? "is-ready" : "is-missing"}`}>
 				<div className="ci-banner-left">
@@ -169,13 +327,20 @@ export function IndexTab({
 									<span className="ci-bullet">·</span>
 									<span>
 										Motor:{" "}
-										<strong>
-											{providerMode === "ollama"
-												? "Ollama Local"
-												: providerMode === "custom"
-													? "Endpoint Custom"
-													: "Auto (Ollama/OpenAI)"}
-										</strong>
+										<strong>{engineLabel(providerMode, metaLabel)}</strong>
+										{meta && meta.dimensions > 0 && (
+											<span className="ci-tag-dims" title="Dimensiones de los vectores">
+												{meta.dimensions}d
+											</span>
+										)}
+										{metaProvider && providerMode === "auto" && (
+											<span
+												className="ci-tag-auto"
+												title="El motor Auto eligió este proveedor al construir el índice"
+											>
+												Auto resolvió a {metaProvider}
+											</span>
+										)}
 									</span>
 								</>
 							) : (
@@ -255,6 +420,16 @@ export function IndexTab({
 								Tiempo: <strong>{fmtElapsed(elapsed)}</strong>
 							</span>
 						</div>
+						{/* #113 — detener la indexación (no aplica a install) */}
+						{busy !== "install" && (
+							<button
+								type="button"
+								className="ci-stop-btn"
+								onClick={() => setStopOpen(true)}
+							>
+								<Codicon name="debug-stop" size={12} /> Detener
+							</button>
+						)}
 					</div>
 
 					{/* #109 — barra determinada cuando el coordinador reporta
@@ -441,47 +616,11 @@ export function IndexTab({
 						{filesOpen && (
 							<div className="ci-files-body">
 								{idxFiles ? (
-									idxFiles.available ? (
-										<>
-											<div className="ci-files-list">
-												{filteredFiles.length === 0 && (
-													<div className="ci-files-empty">
-														Ningún archivo coincide con «{filesQuery}».
-													</div>
-												)}
-												{filteredFiles.map((f) => (
-													<div key={f.path} className="ci-file-row">
-														<span className="ci-file-path" title={f.path}>
-															{f.path}
-														</span>
-														<span className="ci-file-meta">{f.language}</span>
-														<span className="ci-file-chunks">{f.chunks}</span>
-													</div>
-												))}
-											</div>
-											{idxFiles.failed.length > 0 && (
-												<div className="ci-files-failed">
-													<div className="ci-files-failed-head">
-														<Codicon name="warning" size={13} /> Fallidos en embedding (
-														{idxFiles.failed.length} archivos)
-													</div>
-													{idxFiles.failed.slice(0, 10).map((f) => (
-														<div key={f.path} className="ci-file-row is-failed">
-															<span className="ci-file-path" title={f.path}>
-																{f.path}
-															</span>
-															<span className="ci-file-chunks">{f.chunks}</span>
-														</div>
-													))}
-												</div>
-											)}
-										</>
-									) : (
-										<div className="ci-files-empty">
-											Sin índice construido en este workspace — ejecuta «Indexar» para
-											crearlo.
-										</div>
-									)
+									<FilesBody
+										idxFiles={idxFiles}
+										filtered={filteredFiles}
+										query={filesQuery}
+									/>
 								) : (
 									<div className="ci-files-empty">Consultando el índice…</div>
 								)}

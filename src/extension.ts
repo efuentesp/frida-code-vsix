@@ -167,7 +167,8 @@ import {
 	parseAutoIndexProgress,
 	type IndexProgress,
 } from "./tools/frida-codebase-index/progress";
-import { readIndexedFiles } from "./tools/frida-codebase-index/files";
+import { readIndexedFiles, readIndexMeta } from "./tools/frida-codebase-index/files";
+import type { IndexMeta } from "./tools/frida-codebase-index/files";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -575,6 +576,10 @@ export async function activate(
 	// #111 — epoch ms del inicio de la acción: el reloj del tab deriva de aquí
 	// y sobrevive cambios de pestaña (remount del componente).
 	let ciBusySince: number | null = null;
+	// #114 — metadata REAL de embeddings del índice (provider/modelo/dims).
+	// Async (SQLite read-only): se cachea y se refresca al montar el webview
+	// y al terminar index/rebuild/status. undefined = aún no consultado.
+	let ciIndexMeta: IndexMeta | null | undefined;
 	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
 	// pierde en arranque frío (el listener del webview monta en webview_ready).
 	let pendingSettingsTab: string | undefined;
@@ -593,6 +598,7 @@ export async function activate(
 				busySince: ciBusySince,
 				lastLine: ciLastLine,
 				progress: ciProgress,
+				indexMeta: ciIndexMeta ?? undefined,
 				config: {
 					provider: cfg.provider,
 					customBaseUrl: cfg.customBaseUrl || undefined,
@@ -600,6 +606,17 @@ export async function activate(
 				},
 			},
 		});
+	}
+
+	/** #114 — Refresca la metadata de embeddings del índice (read-only) y la
+	 *  publica. Best-effort: errores de lectura dejan la metadata anterior. */
+	async function refreshCiIndexMeta(): Promise<void> {
+		try {
+			ciIndexMeta = await readIndexMeta(workspaceCwd());
+		} catch {
+			ciIndexMeta = null;
+		}
+		postCodebaseIndexState();
 	}
 
 	// frida-hermes-memory (#21): estado del wrapper. La instalación background
@@ -2435,6 +2452,8 @@ export async function activate(
 				postToolToggles();
 				postPermissionsConfig();
 				postCodebaseIndexState();
+				// #114 — metadata real del motor del índice (async, read-only)
+				void refreshCiIndexMeta();
 				// #20 — re-envía el último snapshot del goal si el webview montó
 				// después del evento (cacheado en postGoalState).
 				if (lastGoalState !== undefined) {
@@ -2947,10 +2966,11 @@ export async function activate(
 			case "codebase_index_action": {
 				const action = msg.action as
 					| "install"
-					| "index"
-					| "rebuild"
-					| "status"
-					| "files";
+				| "index"
+				| "rebuild"
+				| "status"
+				| "files"
+				| "stop";
 				// #112 — consulta read-only de archivos indexados: no es una acción
 				// «busy» (no deshabilita botones ni arranca reloj).
 				if (action === "files") {
@@ -2970,6 +2990,16 @@ export async function activate(
 							failed: [],
 						});
 					}
+					break;
+				}
+				// #113 — detener la indexación: el upstream no expone cancelación
+				// limpia (la tool descarta la señal de aborto), así que se corta la
+				// corrida recargando el extension host. El webview ya mostró la
+				// confirmación con la explicación; aquí solo se ejecuta.
+				if (action === "stop") {
+					await vscode.commands.executeCommand(
+						"workbench.action.reloadWindow",
+					);
 					break;
 				}
 				ciBusy = action === "install" ? "install" : "index";
@@ -3052,6 +3082,9 @@ export async function activate(
 				ciBusy = null;
 				ciBusySince = null;
 				postCodebaseIndexState();
+				// #114 — la corrida pudo cambiar el motor del índice: refresca la
+				// metadata real del banner (async; publica al resolver).
+				void refreshCiIndexMeta();
 				break;
 			}
 			case "check_environment": {

@@ -9453,6 +9453,22 @@ kbd {
 	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
 	color: var(--vscode-badge-foreground, var(--vscode-foreground));
 }
+/* #114 — badges junto al Motor del banner: dimensiones y nota Auto */
+.ci-tag-dims {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 5px;
+	border-radius: 3px;
+	margin-left: 4px;
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15));
+	color: var(--vscode-descriptionForeground);
+}
+.ci-tag-auto {
+	font-size: 10px;
+	margin-left: 6px;
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
 .ci-banner-right {
 	display: flex;
 	align-items: center;
@@ -9722,6 +9738,64 @@ kbd {
 	padding: 10px 8px;
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
+}
+
+/* #113 — botón Detener en la tarjeta de progreso y diálogo de confirmación */
+.ci-stop-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 3px 10px;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+	cursor: pointer;
+}
+.ci-stop-btn:hover {
+	/* Compuesto para vencer al button:hover global (ver
+	 * docs/webview-ui-styles.md — regla de cascada) */
+	background: var(--vscode-statusbar-debuggingBackground, #cc6633);
+	color: var(--vscode-button-foreground, #fff);
+	border-color: transparent;
+}
+.ci-stop-card {
+	width: 92%;
+	max-width: 440px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px;
+	border-radius: 8px;
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.ci-stop-title {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+.ci-stop-text {
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--vscode-descriptionForeground);
+}
+.ci-stop-text strong {
+	color: var(--vscode-foreground);
+}
+.ci-stop-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 4px;
+	border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.12));
 }
 .ci-engine-head {
 	display: flex;
