@@ -1,6 +1,7 @@
 import type { Turn, Segment } from "../types";
 import { useEffect, useState } from "react";
 import { Codicon } from "./Codicon";
+import { FridaRobotIcon } from "./FridaRobotIcon";
 import { Markdown } from "./Markdown";
 import { ToolCard, estimateTokens, fmtTok } from "./ToolCard";
 import { fmtDuration } from "../tool-phrases";
@@ -84,7 +85,7 @@ export function TurnView({
 			{hasAssistant && (
 				<div className="row">
 					<span className="avatar ai">
-						<Codicon name="copilot" size={15} />
+						<FridaRobotIcon size={14} />
 					</span>
 					<div className="body">
 						<div className="who">
