@@ -257,6 +257,7 @@ export function reduce(state: State, msg: InMessage): State {
 				images: msg.images,
 				segments: [],
 				status: null,
+				startedAt: Date.now(), // #107 — apertura del turno (timer en vivo)
 			};
 			return {
 				...state,

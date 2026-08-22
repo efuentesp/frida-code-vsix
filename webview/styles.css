@@ -563,6 +563,190 @@ body {
 .session-stats .ss-sep {
 	opacity: 0.5;
 }
+
+/* === #107 — Chip de tiempo activo + popover de detalle (SessionTimingPopover) ===
+ * Estilo Copilot Chat nativo: superficie editorWidget, z-60 (rung de tooltips
+ * y modales), anclado absoluto bajo el chip (patrón file-popup). */
+.st-wrap {
+	position: relative;
+	display: inline-flex;
+}
+.st-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 6px;
+	padding: 1px 7px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	user-select: none;
+}
+.st-chip:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+.st-chip:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder, #007fd4);
+}
+.st-chip-sep {
+	opacity: 0.5;
+}
+.st-chip-turns {
+	color: var(--vscode-descriptionForeground);
+}
+.st-chip-live {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--vscode-charts-green, #89d185);
+	animation: st-pulse 1.6s ease-in-out infinite;
+}
+@keyframes st-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.25;
+	}
+}
+
+.stp {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 60;
+	min-width: 250px;
+	max-width: 320px;
+	padding: 10px 12px;
+	font-size: 12px;
+	background: var(--vscode-editorWidget-background, #252526);
+	color: var(--vscode-editorWidget-foreground, var(--vscode-foreground, #ccc));
+	border: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+	border-radius: 8px;
+	box-shadow: var(--vscode-widget-shadow, 0 8px 24px rgba(0, 0, 0, 0.45));
+	animation: overlay-fade 0.14s ease-out;
+}
+.stp-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+.stp-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-weight: 600;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--vscode-descriptionForeground);
+}
+.stp-close {
+	display: inline-flex;
+	align-items: center;
+	background: transparent;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	padding: 2px;
+	border-radius: 4px;
+}
+.stp-close:hover {
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.1));
+	color: var(--vscode-foreground, #ccc);
+}
+
+/* Sparkline: mini-barras CSS (estilo BarChart de usage/, sin SVG). */
+.stp-spark {
+	display: flex;
+	align-items: flex-end;
+	gap: 2px;
+	height: 34px;
+	padding: 4px;
+	margin-bottom: 8px;
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
+	border-radius: 4px;
+	overflow: hidden;
+}
+.stp-bar {
+	flex: 1 1 0;
+	min-width: 3px;
+	background: var(--vscode-charts-blue, #3794ff);
+	border-radius: 1px;
+	opacity: 0.85;
+}
+.stp-bar.max {
+	background: var(--vscode-charts-red, #f14c4c);
+	opacity: 1;
+}
+
+.stp-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+}
+.stp-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.stp-k {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+}
+.stp-v {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 11px;
+	white-space: nowrap;
+}
+.stp-prop {
+	display: block;
+	height: 3px;
+	border-radius: 2px;
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15));
+	overflow: hidden;
+}
+.stp-prop-fill {
+	display: block;
+	height: 100%;
+	border-radius: 2px;
+	background: var(--vscode-charts-blue, #3794ff);
+}
+.stp-foot {
+	padding-top: 7px;
+	font-size: 10.5px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-descriptionForeground);
+}
+.stp-running {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 5px;
+	font-size: 10.5px;
+	color: var(--vscode-charts-green, #89d185);
+}
+.stp-pulse {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentColor;
+	animation: st-pulse 1.6s ease-in-out infinite;
+}
 .ctx-label {
 	opacity: 0.7;
 }

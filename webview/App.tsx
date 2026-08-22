@@ -9,6 +9,7 @@ import {
 import { reduce, initialState } from "./store";
 import type { ApprovalMode, InMessage, OutMessage } from "./types";
 import { fmtTokens, formatDuration } from "./format";
+import { SessionTimingPopover } from "./components/SessionTimingPopover";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { TurnView } from "./components/Turn";
 import { CompactionCard } from "./components/CompactionCard";
@@ -405,26 +406,12 @@ export function App() {
 						</button>
 					</Tooltip>
 				)}
-				{state.usage?.sessionDurationMs !== undefined && (
-					<Tooltip
-						label="Tiempo de sesión (primer→último mensaje) · tokens acumulados"
-						side="bottom"
-					>
-						<span className="session-stats">
-							<span className="ss-time">
-								⏱ {formatDuration(state.usage.sessionDurationMs)}
-							</span>
-							{(state.usage.inputTotal > 0 || state.usage.outputTotal > 0) && (
-								<>
-									<span className="ss-sep">·</span>
-									<span className="ss-tokens">
-										↑{fmtTokens(state.usage.inputTotal)} ↓
-										{fmtTokens(state.usage.outputTotal)}
-									</span>
-								</>
-							)}
-						</span>
-					</Tooltip>
+				{state.usage && (
+					<SessionTimingPopover
+						usage={state.usage}
+						busy={state.busy}
+						turn={state.turns[state.turns.length - 1]}
+					/>
 				)}
 				{state.busy &&
 					(state.approvals.length > 0 ||

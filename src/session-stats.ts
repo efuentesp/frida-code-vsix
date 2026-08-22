@@ -18,6 +18,15 @@ export interface SessionStats {
 	cacheRead: number;
 	cacheWrite: number;
 	cost: number;
+	/** #107 — Duración de cada turno cerrado: ts(mensaje user) → ts(última
+	 *  entrada antes del siguiente user msg). El turno ABIERTO se omite (el
+	 *  timer en vivo del webview lo cubre); un turno abortado cuenta hasta su
+	 *  última entrada emitida. */
+	turns: Array<{ startMs: number; endMs: number }>;
+	/** Σ duraciones de turnos cerrados ("tiempo activo", sin gaps de lectura). */
+	activeMs: number;
+	/** nº de turnos cerrados. */
+	turnCount: number;
 }
 
 /** Caché por (archivo, mtime): relee el JSONL sólo cuando cambió en disco. Así
@@ -82,9 +91,20 @@ export function readSessionStats(
 			cacheRead: 0,
 			cacheWrite: 0,
 			cost: 0,
+			turns: [],
+			activeMs: 0,
+			turnCount: 0,
 		};
 		let first = Infinity;
 		let last = 0;
+		// #107 — turno en construcción: abre con el user msg (startMs) y cierra
+		// con la última entrada antes del siguiente user msg (endMs). user sin
+		// timestamp abre turno con startMs null (se descarta al cerrar: no se
+		// puede medir duración) sin romper el recuento del resto.
+		let openStart: number | null = null;
+		// Última entrada con timestamp vista desde la apertura del turno actual
+		// (el cierre real del turno abierto).
+		let lastOpenEnd = 0;
 		for (const line of raw.split("\n")) {
 			const t = line.trim();
 			if (!t) continue;
@@ -99,6 +119,20 @@ export function readSessionStats(
 			if (ms !== null) {
 				if (ms < first) first = ms;
 				if (ms > last) last = ms;
+			}
+			// #107 — detección de turno: un mensaje user abre turno; cualquier
+			// otra entrada con timestamp lo va cerrando (actualiza endMs).
+			const isUser = entry?.type === "message" && entry?.message?.role === "user";
+			if (isUser) {
+				// Cierra el turno previo (si quedó uno abierto con última entrada
+				// conocida) justo antes de abrir el nuevo.
+				if (openStart !== null && openStart > 0 && lastOpenEnd > openStart) {
+					stats.turns.push({ startMs: openStart, endMs: lastOpenEnd });
+				}
+				openStart = ms !== null && ms > 0 ? ms : null;
+				lastOpenEnd = 0;
+			} else if (ms !== null && ms > 0) {
+				if (ms > lastOpenEnd) lastOpenEnd = ms;
 			}
 			// usage: el assistant message lo trae anidado en entry.message.usage;
 			// el evento compaction lo traza en entry.usage (toplevel).
@@ -118,6 +152,15 @@ export function readSessionStats(
 		}
 		stats.firstTs = first === Infinity ? 0 : first;
 		stats.lastTs = last;
+		// Cierra el último turno del archivo (turno final cerrado con entradas).
+		if (openStart !== null && openStart > 0 && lastOpenEnd > openStart) {
+			stats.turns.push({ startMs: openStart, endMs: lastOpenEnd });
+		}
+		stats.activeMs = stats.turns.reduce(
+			(acc, t) => acc + (t.endMs - t.startMs),
+			0,
+		);
+		stats.turnCount = stats.turns.length;
 		cache = { file: sessionFile, mtime: st.mtimeMs, stats };
 		return stats;
 	} catch {

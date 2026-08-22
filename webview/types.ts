@@ -114,6 +114,11 @@ export interface Turn {
 	executingTool?: string;
 	bash?: BashRun;
 	error?: string;
+	/** #107 — epoch ms del envío del mensaje user (apertura del turno). Lo usa
+	 *  el header para el timer en vivo del turno en curso (ahora − startedAt).
+	 *  0 en turns reconstruidos del historial (sin timestamp transportado):
+	 *  el total cerrado ya viene del JSONL vía usage.activeMs. */
+	startedAt?: number;
 	/** Mensaje del sistema (ej. salida de /todos): bloque multiline en el flujo,
 	 *  sin avatares user/assistant. */
 	notice?: string;
@@ -208,6 +213,13 @@ export interface Usage {
 	// Se reconstruye del JSONL en disco vía readSessionStats (robusto ante
 	// compactación/reload) y se combina con el estado en memoria (último turno).
 	sessionDurationMs?: number;
+	// #107 — Tiempo ACTIVO (Σ duraciones de turnos cerrados, sin gaps de
+	// lectura) + conteo + duraciones individuales (sparkline del popover).
+	// Fuente: readSessionStats (JSONL). El turno en curso lo suma el webview
+	// en vivo (ahora − ts del user msg) mientras busy.
+	activeMs?: number;
+	turnCount?: number;
+	turnDurations?: number[];
 	turnInput?: number; // delta de usage del turno (para atribución ~llm)
 	turnOutput?: number;
 }

@@ -1302,6 +1302,12 @@ export async function activate(
 				cost = Math.max(cost, disk.cost);
 			}
 			const sessionDurationMs = firstTs && lastTs ? lastTs - firstTs : 0;
+			// #107 — Tiempo activo por turnos: preferir el JSONL (fuente de
+			// verdad con histórico completo); max con memoria como salvaguarda
+			// ante el lag de flush del disco (mismo criterio que tokens).
+			const activeMs = Math.max(disk?.activeMs ?? 0, 0);
+			const turnCount = Math.max(disk?.turnCount ?? 0, 0);
+			const turnDurations = (disk?.turns ?? []).map((t) => t.endMs - t.startMs);
 			// Delta de usage del turno actual (memoria) vs el baseline de agent_start.
 			// Se reparte entre las tarjetas del último turno como ~llm (atribución).
 			const turnInput = turnUsageBaseline
@@ -1324,6 +1330,9 @@ export async function activate(
 				pressurePercent,
 				reserveTokens,
 				sessionDurationMs,
+				activeMs,
+				turnCount,
+				turnDurations,
 				turnInput,
 				turnOutput,
 			});
