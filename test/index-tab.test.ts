@@ -135,7 +135,9 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			chunksProcessed: 1540,
 			totalChunks: 3404,
 		});
-		expect(parseAutoIndexProgress("Indexed chunks: 1,204\nProvider: openai")).toBeNull();
+		expect(
+			parseAutoIndexProgress("Indexed chunks: 1,204\nProvider: openai"),
+		).toBeNull();
 		expect(parseAutoIndexProgress("")).toBeNull();
 		// clamping de porcentaje fuera de rango
 		expect(

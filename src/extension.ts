@@ -2969,8 +2969,7 @@ export async function activate(
 						const tools = await loadUpstreamTools(
 							upstreamEntryPath(defaultAgentDir()),
 						);
-						const toolName =
-							action === "status" ? "index_status" : "index_codebase";
+						const toolName = action === "status" ? "index_status" : "index_codebase";
 						const t = tools.get(toolName);
 						if (!t) throw new Error(`${toolName} no disponible en el paquete`);
 						// #109 — sondeo del progreso en vivo: el AutoIndexCoordinator
@@ -2982,20 +2981,14 @@ export async function activate(
 							if (statusTool) {
 								poll = setInterval(() => {
 									void statusTool
-										.execute(
-											"host-progress",
-											{},
-											undefined,
-											undefined,
-											{ cwd: workspaceCwd() },
-										)
+										.execute("host-progress", {}, undefined, undefined, {
+											cwd: workspaceCwd(),
+										})
 										.then((res: any) => {
 											const txt = res?.content?.[0]?.text;
 											ciProgress =
-												typeof txt === "string"
-													? parseAutoIndexProgress(txt)
-													: null;
-												postCodebaseIndexState();
+												typeof txt === "string" ? parseAutoIndexProgress(txt) : null;
+											postCodebaseIndexState();
 										})
 										.catch(() => {
 											/* progreso best-effort */

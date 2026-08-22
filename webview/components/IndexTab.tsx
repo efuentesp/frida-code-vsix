@@ -216,99 +216,97 @@ export function IndexTab({
 				</div>
 			</div>
 
-				{/* Barra de progreso y reloj de tiempo transcurrido en vivo */}
-				{busy && (
-					<div className="ci-busy-card">
-						<div className="ci-busy-head">
-							<div className="ci-busy-status">
-								<Codicon name="loading" size={14} spin />
-								<span>
-									{busy === "install"
-										? "Descargando e instalando el paquete open-codebase-index..."
-										: "Indexando archivos del workspace..."}
-								</span>
-							</div>
-							<div className="ci-busy-timer">
-								<Codicon name="clock" size={13} />
-								<span>
-									Tiempo: <strong>{fmtElapsed(elapsed)}</strong>
-								</span>
-							</div>
+			{/* Barra de progreso y reloj de tiempo transcurrido en vivo */}
+			{busy && (
+				<div className="ci-busy-card">
+					<div className="ci-busy-head">
+						<div className="ci-busy-status">
+							<Codicon name="loading" size={14} spin />
+							<span>
+								{busy === "install"
+									? "Descargando e instalando el paquete open-codebase-index..."
+									: "Indexando archivos del workspace..."}
+							</span>
 						</div>
-
-						{/* #109 — barra determinada cuando el coordinador reporta
-						 * progreso (index/rebuild); indeterminada para install o sin datos. */}
-						{busy !== "install" && ci?.progress ? (
-							<div
-								className="ci-busy-bar determinate"
-								role="progressbar"
-								aria-label="Progreso de indexación"
-								aria-valuenow={ci.progress.percentage}
-								aria-valuemin={0}
-								aria-valuemax={100}
-							>
-								<span style={{ width: `${ci.progress.percentage}%` }} />
-							</div>
-						) : (
-							<div
-								className="ci-busy-bar"
-								role="progressbar"
-								aria-label="En progreso"
-							>
-								<span />
-							</div>
-						)}
-
-						{/* #109 — contadores y fase en vivo (solo index/rebuild) */}
-						{busy !== "install" &&
-							(() => {
-								const p = ci?.progress;
-								const dash = p ? null : "—";
-								return (
-									<>
-										<div className="ci-busy-counters">
-											<span className="ci-busy-count">
-												<Codicon name="file" size={12} />
-												<span className="ci-busy-num">
-													{p ? `${fmtCount(p.filesProcessed)}/${fmtCount(p.totalFiles)}` : `${dash}/${dash}`}
-												</span>
-												archivos
-											</span>
-											<span className="ci-bullet">·</span>
-											<span className="ci-busy-count">
-												<Codicon name="symbol-snippet" size={12} />
-												<span className="ci-busy-num">
-													{p
-														? `${fmtCount(p.chunksProcessed)}/${fmtCount(p.totalChunks)}`
-														: `${dash}/${dash}`}
-												</span>
-												chunks
-											</span>
-											{p && <span className="ci-busy-pct">{p.percentage}%</span>}
-										</div>
-										{p ? (
-											<div className="ci-busy-phase">
-												<Codicon name="settings-gear" size={12} />
-												Fase: {PHASE_LABELS[p.phase] ?? p.phase}
-											</div>
-										) : (
-											<div className="ci-busy-desc">
-												Vectorizando archivos y actualizando el grafo de llamadas según
-												el tamaño del repositorio.
-											</div>
-										)}
-								</>
-								);
-							})()}
-
-						{busy === "install" && (
-							<div className="ci-busy-desc">
-								npm no imprime progreso intermedio durante la descarga (~256 MB): el
-								reloj confirma que el instalador sigue activo.
-							</div>
-						)}
+						<div className="ci-busy-timer">
+							<Codicon name="clock" size={13} />
+							<span>
+								Tiempo: <strong>{fmtElapsed(elapsed)}</strong>
+							</span>
+						</div>
 					</div>
-				)}
+
+					{/* #109 — barra determinada cuando el coordinador reporta
+					 * progreso (index/rebuild); indeterminada para install o sin datos. */}
+					{busy !== "install" && ci?.progress ? (
+						<div
+							className="ci-busy-bar determinate"
+							role="progressbar"
+							aria-label="Progreso de indexación"
+							aria-valuenow={ci.progress.percentage}
+							aria-valuemin={0}
+							aria-valuemax={100}
+						>
+							<span style={{ width: `${ci.progress.percentage}%` }} />
+						</div>
+					) : (
+						<div className="ci-busy-bar" role="progressbar" aria-label="En progreso">
+							<span />
+						</div>
+					)}
+
+					{/* #109 — contadores y fase en vivo (solo index/rebuild) */}
+					{busy !== "install" &&
+						(() => {
+							const p = ci?.progress;
+							const dash = p ? null : "—";
+							return (
+								<>
+									<div className="ci-busy-counters">
+										<span className="ci-busy-count">
+											<Codicon name="file" size={12} />
+											<span className="ci-busy-num">
+												{p
+													? `${fmtCount(p.filesProcessed)}/${fmtCount(p.totalFiles)}`
+													: `${dash}/${dash}`}
+											</span>
+											archivos
+										</span>
+										<span className="ci-bullet">·</span>
+										<span className="ci-busy-count">
+											<Codicon name="symbol-snippet" size={12} />
+											<span className="ci-busy-num">
+												{p
+													? `${fmtCount(p.chunksProcessed)}/${fmtCount(p.totalChunks)}`
+													: `${dash}/${dash}`}
+											</span>
+											chunks
+										</span>
+										{p && <span className="ci-busy-pct">{p.percentage}%</span>}
+									</div>
+									{p ? (
+										<div className="ci-busy-phase">
+											<Codicon name="settings-gear" size={12} />
+											Fase: {PHASE_LABELS[p.phase] ?? p.phase}
+										</div>
+									) : (
+										<div className="ci-busy-desc">
+											Vectorizando archivos y actualizando el grafo de llamadas según el
+											tamaño del repositorio.
+										</div>
+									)}
+								</>
+							);
+						})()}
+
+					{busy === "install" && (
+						<div className="ci-busy-desc">
+							npm no imprime progreso intermedio durante la descarga (~256 MB): el
+							reloj confirma que el instalador sigue activo.
+						</div>
+					)}
+				</div>
+			)}
 
 			{/* Última línea de progreso / resultado */}
 			{ci?.lastLine && !busy && (
