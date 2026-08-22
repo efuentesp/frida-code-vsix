@@ -207,6 +207,69 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("Tokens");
 	});
 
+	it("renderiza la pestaña de productividad (ProductivityTab) cuando se inicializa en productivity", () => {
+		const post = vi.fn();
+		const onClose = vi.fn();
+
+		const html = renderToStaticMarkup(
+			React.createElement(SettingsHub, {
+				state: {
+					...baseState,
+					usageReport: {
+						period: "30d",
+						scope: "project",
+						periodFrom: 0,
+						periodTo: 1000,
+						report: {
+							kpis: {
+								tokensIn: 500,
+								tokensOut: 200,
+								cacheRead: 200,
+								cacheWrite: 100,
+								cost: 0.05,
+								sessions: 2,
+								turns: 8,
+								activeMs: 12000,
+								cacheHitPct: 60,
+								avgTurnTokens: 125,
+							},
+							breakdowns: {
+								byModel: [],
+								byProvider: [],
+								byTool: [],
+								byFileType: [],
+								byArtifact: [],
+								byDay: [],
+								byHour: [],
+								byDow: [],
+							},
+							behavior: {
+								compactations: 0,
+								subagentsLaunched: 0,
+								questionsAsked: 0,
+							},
+							adoption: {
+								browserUsed: false,
+								subagentsUsed: false,
+								contextToolUsed: false,
+							},
+							sessions: [],
+						},
+					},
+				},
+				post,
+				onClose,
+				initialTab: "productivity",
+			}),
+		);
+
+		expect(html).toContain("productivity-tab");
+		expect(html).toContain("SCORECARD MULTIMARCO (DX AI × SPACE)");
+		// Verificamos que los tabs Uso y Productividad aparecen contiguos
+		expect(html).toContain("<span>Uso</span></button><button type=\"button\" class=\"cfg-tab active\">");
+		expect(html).toContain("<span>Productividad</span></button>");
+	});
+
 	it("renderiza resultados filtrados cuando hay búsqueda activa", () => {
 		const post = vi.fn();
 		const onClose = vi.fn();

@@ -4,6 +4,7 @@ import { Codicon } from "./Codicon";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { EnvironmentTab } from "./EnvironmentTab";
 import { IndexTab } from "./IndexTab";
+import { ProductivityTab } from "./ProductivityTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { ResourcesContent } from "./ResourcesPanel";
 import { UsageDashboard } from "./UsageDashboard";
@@ -15,6 +16,7 @@ export type SettingsTab =
 	| "resources"
 	| "tools"
 	| "usage"
+	| "productivity"
 	| "codebaseIndex"
 	| "environment";
 
@@ -25,6 +27,7 @@ const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "resources", label: "Recursos", iconName: "library" },
 	{ id: "tools", label: "Herramientas", iconName: "tools" },
 	{ id: "usage", label: "Uso", iconName: "graph" },
+	{ id: "productivity", label: "Productividad", iconName: "rocket" },
 	{ id: "codebaseIndex", label: "Index", iconName: "database" },
 	{ id: "environment", label: "Entorno", iconName: "pulse" },
 ];
@@ -403,6 +406,10 @@ export function SettingsHub({
 						)}
 
 						{tab === "usage" && <UsageDashboard state={state} post={post} />}
+
+						{tab === "productivity" && (
+							<ProductivityTab state={state} post={post} />
+						)}
 
 						{tab === "codebaseIndex" && <IndexTab state={state} post={post} />}
 
