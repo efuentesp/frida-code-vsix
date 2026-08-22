@@ -7266,6 +7266,7 @@ kbd {
 /* Hub de Configuración: pestañas y chips por categorías. */
 .cfg-tabs {
 	display: flex;
+	flex-wrap: wrap; /* #108 — angosto: los tabs fluyen a filas extra, nunca ocultos */
 	gap: 4px;
 	padding: 2px 12px 8px;
 	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));

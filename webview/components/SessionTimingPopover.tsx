@@ -241,11 +241,7 @@ export function SessionTimingPopover({
 				{t.running && <span className="st-chip-live" aria-label="en curso" />}
 			</button>
 			{open && (
-				<SessionTimingDetail
-					usage={usage}
-					t={t}
-					onClose={() => setOpen(false)}
-				/>
+				<SessionTimingDetail usage={usage} t={t} onClose={() => setOpen(false)} />
 			)}
 		</span>
 	);

@@ -272,6 +272,36 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("<span>Productividad</span></button>");
 	});
 
+	it("#108 — barra de tabs completa y responsiva: los 9 tabs presentes y wrap por clase", () => {
+		const post = vi.fn();
+		const onClose = vi.fn();
+
+		const html = renderToStaticMarkup(
+			React.createElement(SettingsHub, {
+				state: baseState,
+				post,
+				onClose,
+			}),
+		);
+		// Los 9 tabs del hub nunca quedan fuera de vista (wrap multi-fila)
+		for (const label of [
+			"Proveedores",
+			"Modelos",
+			"Auto-Aprobación",
+			"Recursos",
+			"Herramientas",
+			"Uso",
+			"Productividad",
+			"Index",
+			"Entorno",
+		]) {
+			expect(html).toContain(`<span>${label}</span>`);
+		}
+		// La clase contenedora existe en el markup (el wrap vive en CSS)
+		expect(html).toContain('class="cfg-tabs"');
+		expect((html.match(/class="cfg-tab[ "]/g) ?? []).length).toBeGreaterThanOrEqual(9);
+	});
+
 	it("renderiza resultados filtrados cuando hay búsqueda activa", () => {
 		const post = vi.fn();
 		const onClose = vi.fn();
