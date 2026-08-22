@@ -8582,7 +8582,8 @@ kbd {
 	font-style: italic;
 	color: var(--vscode-descriptionForeground);
 	opacity: 0.9;
-	max-width: 280px;
+	flex: 0 1 auto;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -8638,10 +8639,12 @@ kbd {
 .tool-flat-title .tc-verb {
 	font-weight: 500;
 	color: var(--vscode-foreground);
+	flex-shrink: 0;
 }
 
 .tool-flat-title .tc-arg {
 	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
 }
 
 .tool-flat-title .tc-icon-check {

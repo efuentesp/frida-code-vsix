@@ -143,6 +143,8 @@ export function summarizeToolGroup(
 
 /**
  * Extrae la última idea o reflexión significativa del texto de razonamiento en streaming.
+ * El corte JS (120) es un techo superior de sanidad; el recorte visual real lo hace
+ * el CSS (.thought-stream-quote, flex + ellipsis) según el ancho disponible del panel.
  */
 export function extractLastThought(text: string | undefined | null): string {
 	if (!text) return "Razonando…";
@@ -157,6 +159,6 @@ export function extractLastThought(text: string | undefined | null): string {
 		.filter((l) => l.length > 3 && !l.startsWith("```"));
 	if (lines.length === 0) return "Razonando…";
 	const last = lines[lines.length - 1];
-	const max = 55;
+	const max = 120;
 	return last.length > max ? `${last.slice(0, max - 1)}…` : last;
 }

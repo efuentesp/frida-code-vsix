@@ -231,11 +231,11 @@ describe("webview/turn-grouping (Fase 3: Estructura de Turnos y Agrupación)", (
 			);
 		});
 
-		it("trunca pensamientos largos a ~55 caracteres", () => {
+		it("trunca pensamientos largos a ~120 caracteres", () => {
 			const long =
-				"Esta es una reflexión sumamente larga que sobrepasa el límite visual del encabezado del pensamiento en vivo";
+				"Esta es una reflexión sumamente larga que sobrepasa el límite visual del encabezado del pensamiento en vivo y que sigue describiendo el razonamiento del agente mientras transmite texto continuamente al usuario";
 			const result = extractLastThought(long);
-			expect(result.length).toBeLessThanOrEqual(55);
+			expect(result.length).toBeLessThanOrEqual(120);
 			expect(result.endsWith("…")).toBe(true);
 		});
 
