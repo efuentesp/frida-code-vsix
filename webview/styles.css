@@ -3785,7 +3785,9 @@ button.sec:hover {
 	font-weight: 600;
 	border-radius: 4px;
 	cursor: pointer;
-	transition: background-color 0.1s ease, border-color 0.1s ease;
+	transition:
+		background-color 0.1s ease,
+		border-color 0.1s ease;
 }
 .model-diff-btn kbd {
 	font-family: var(--vscode-editor-font-family, monospace);
@@ -3812,7 +3814,10 @@ button.sec:hover {
 	border: 1px solid var(--vscode-button-background);
 }
 .model-diff-btn.primary:hover {
-	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+	background: var(
+		--vscode-button-hoverBackground,
+		var(--vscode-button-background)
+	);
 }
 
 /* Panel de sesiones estilo Copilot Chat History (Propuesta 1) */

@@ -897,13 +897,16 @@ export function App() {
 							diagLog("botón Detener (Composer) → post {abort}");
 							post({ type: "abort" });
 						}}
-					onSelectModel={(provider, modelId) => {
-						// Retener el cambio hasta confirmar en el ModelConfirmDialog.
-						if (state.models?.active?.provider === provider && state.models?.active?.modelId === modelId) {
-							return; // mismo modelo: nada que confirmar
-						}
-						setPendingModel({ provider, model: modelId });
-					}}
+						onSelectModel={(provider, modelId) => {
+							// Retener el cambio hasta confirmar en el ModelConfirmDialog.
+							if (
+								state.models?.active?.provider === provider &&
+								state.models?.active?.modelId === modelId
+							) {
+								return; // mismo modelo: nada que confirmar
+							}
+							setPendingModel({ provider, model: modelId });
+						}}
 						onSetThinking={(level) => post({ type: "set_thinking", level })}
 						onCycleMode={() => post({ type: "set_mode", mode: nextMode(state.mode) })}
 					/>
@@ -950,14 +953,17 @@ export function App() {
 					refreshing={state.models.refreshing}
 					refreshErrors={state.models.refreshErrors}
 					deviceCode={state.oauthDeviceCode}
-						onClose={() => setModelsOpen(false)}
-						onSelect={(provider, model) => {
-							// Retener el cambio hasta confirmar en el ModelConfirmDialog.
-							if (state.models?.active?.provider === provider && state.models?.active?.modelId === model) {
-								return; // mismo modelo: nada que confirmar
-							}
-							setPendingModel({ provider, model });
-						}}
+					onClose={() => setModelsOpen(false)}
+					onSelect={(provider, model) => {
+						// Retener el cambio hasta confirmar en el ModelConfirmDialog.
+						if (
+							state.models?.active?.provider === provider &&
+							state.models?.active?.modelId === model
+						) {
+							return; // mismo modelo: nada que confirmar
+						}
+						setPendingModel({ provider, model });
+					}}
 					onLogin={(provider) => post({ type: "login_provider", provider })}
 					onLogout={(provider) => post({ type: "logout_provider", provider })}
 					onSetKey={(provider) => post({ type: "rotate_key", provider })}
