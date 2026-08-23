@@ -117,9 +117,13 @@ export function RolesSection({
 				<Codicon name="route" size={14} />
 				<span className="mr-title">ROLES — cada trabajo usa su modelo</span>
 				<span className="mr-switch-label">Enrutar por roles</span>
-				<span className={`ccp-switch mr-switch${roles.enabled ? " ccp-switch-on" : ""}`}>
-					<span className="ccp-switch-knob" />
-				</span>
+				{/* Pastilla estilo Herramientas (.switch): track neutro visible + ON
+				 * azul textLink; knob via ::after (sin span anidado). La fila
+				 * completa ya es clicable arriba. */}
+				<span
+					className={`switch mr-switch${roles.enabled ? " on" : ""}`}
+					aria-hidden="true"
+				/>
 			</div>
 			{roles.enabled ? (
 				<>
@@ -155,14 +159,12 @@ export function RolesSection({
 							<span>Respaldo (fallback)</span>
 							<button
 								type="button"
-								className={`ccp-switch${roles.fallbackEnabled ? " ccp-switch-on" : ""}`}
+								className={`switch${roles.fallbackEnabled ? " on" : ""}`}
 								role="switch"
 								aria-checked={roles.fallbackEnabled}
 								title="Si el modelo del rol falla (429/cuota), la sesión cae al siguiente proveedor autenticado"
 								onClick={() => onSetRoles({ fallbackEnabled: !roles.fallbackEnabled })}
-							>
-								<span className="ccp-switch-knob" />
-							</button>
+							/>
 						</div>
 						<div className="mr-fallback-copy">
 							Si el modelo del rol falla (429/cuota), la sesión cae al siguiente

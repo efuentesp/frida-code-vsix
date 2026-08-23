@@ -131,7 +131,7 @@ describe("#121 — RolesSection (Opción A) del panel Modelos", () => {
 				onSetRoles,
 			}),
 		);
-		expect(html).toContain("ccp-switch"); // el botón existe y es accionable
+		expect(html).toContain("switch mr-switch"); // pastilla estilo Herramientas, visible sin hover
 		expect(onSetRoles).not.toHaveBeenCalled();
 	});
 });
