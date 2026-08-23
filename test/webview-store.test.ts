@@ -72,3 +72,38 @@ describe("webview store · toast info conserva el level", () => {
 		expect(s.info?.level).toBe("error");
 	});
 });
+
+// /tree (#126) + /fork: regresión del dispatch — App.tsx despacha estos
+// mensajes al reducer (además de abrir el flag local). Si el handler vuelve
+// a hacer `return` antes de dispatch(msg), state.treeData/forkPoints queda
+// undefined y el panel nunca renderiza (bug reportado: "/tree no aparece").
+describe("webview store · tree_data y fork_points llegan al reducer", () => {
+	it("tree_data llena state.treeData (condición de render del TreePanel)", () => {
+		const s = reduce(initialState, {
+			type: "tree_data",
+			nodes: [
+				{
+					id: "n1",
+					parentId: null,
+					timestamp: "t",
+					kind: "user",
+					text: "hola",
+					children: [],
+				},
+			],
+			leafId: "n1",
+			sessionName: "S",
+		});
+		expect(s.treeData?.nodes).toHaveLength(1);
+		expect(s.treeData?.leafId).toBe("n1");
+		expect(s.treeData?.sessionName).toBe("S");
+	});
+
+	it("fork_points llena state.forkPoints (condición de render del ForkPanel)", () => {
+		const s = reduce(initialState, {
+			type: "fork_points",
+			points: [{ entryId: "e1", text: "mensaje" }],
+		});
+		expect(s.forkPoints).toHaveLength(1);
+	});
+});

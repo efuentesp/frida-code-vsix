@@ -137,11 +137,11 @@ export function App() {
 			}
 			if (msg.type === "fork_points") {
 				setForkOpen(true);
-				return;
+				// cae al dispatch: el reducer llena state.forkPoints (render condicional)
 			}
 			if (msg.type === "tree_data") {
 				setTreeOpen(true);
-				return; // no despachar al reducer
+				// cae al dispatch: el reducer llena state.treeData (render condicional)
 			}
 			dispatch(msg);
 		};
@@ -984,9 +984,7 @@ export function App() {
 						});
 						setTreeOpen(false);
 					}}
-					onLabel={(entryId, label) =>
-						post({ type: "tree_label", entryId, label })
-					}
+					onLabel={(entryId, label) => post({ type: "tree_label", entryId, label })}
 				/>
 			)}
 			{configOpen && (
