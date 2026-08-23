@@ -71,7 +71,7 @@ sesiones) sin riesgo de daño colateral.
 | Issue | Qué | Notas |
 | --- | --- | --- |
 | **#35** `frida-sandboxes` (ADR-0047) | Aislamiento por container Docker/devcontainer por agente | Libre, sin blockers |
-| **#13** `frida-worktree` → **#14** sesiones paralelas | Worktrees de git para sesiones paralelas + switcher | #13 commiteado en 0.18.0 pero **issue sigue abierto**; #14 depende de #13 |
+| **#13** `frida-worktree` → **#14** sesiones paralelas | Worktrees de git para sesiones paralelas + switcher | #13 ✅ cerrado (0.18.0, src/worktree/ + docs); #14 sigue abierto — depende de la base #13 ya lista |
 | **#26** `frida-better-subagents` | Subagentes detached/sandboxed | Refuerza el aislamiento |
 | **#16** `frida-plugins` | Sistema de plugins estilo Claude Code (comandos/skills/MCP/hooks empaquetados) | **Mayor palanca del roadmap** pero **ambiguo** (investigación aún abierta). Bloquea #34, #38, #40, #41. **Investigar antes de implementar** |
 | **#2↗ Detener/abort** | El clúster de abort (#2 → hoy #85/#90/#96: `abortRun` sobre undefined, run escapado durante tool) | **Subido de P4**: era "bug UX libre"; el análisis TTSR (F12) lo reveló **bloqueador estructural** — sin abort limpio no hay reglas de stream ni control confiable de workflows/subagents. Corregir ANTES de F12 |
@@ -104,7 +104,8 @@ de dynamic-workflows). No arrancar hasta tener sus dependencias.
 | **F12** TTSR — reglas de stream | Regex/AST sobre el stream → abort + inyecta recordatorio + reintento. Reglas builtin: es-MX, `Refs #N`, tokens `--vscode-*` | **Clúster de abort #85/#90/#96 (= #2↗ en P2)**. Al desbloquearse sube de facto a P2 |
 
 **Cadena crítica:** #18✅/#7✅ destrabaron a **#19** → #41 (TEA); falta #16 →
-# 38 → #40 (CIS) y #2↗ → F12 (TTSR).
+
+# 38 → #40 (CIS) y #2↗ → F12 (TTSR)
 
 ---
 
