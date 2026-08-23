@@ -3206,11 +3206,7 @@ export async function activate(
 			case "codebase_index_select": {
 				const cfg = vscode.workspace.getConfiguration("frida");
 				const target = vscode.ConfigurationTarget.Global;
-				await cfg.update(
-					"codebaseIndex.embeddings.provider",
-					msg.provider,
-					target,
-				);
+				await cfg.update("codebaseIndex.embeddings.provider", msg.provider, target);
 				if (msg.model) {
 					const key =
 						msg.provider === "frida-enterprise"
@@ -3224,7 +3220,7 @@ export async function activate(
 				const fresh = readCodebaseIndexConfig();
 				if (msg.provider !== "auto" && msg.provider !== "openai") {
 					let enterpriseDimensions = 0;
-						if (msg.provider === "frida-enterprise") {
+					if (msg.provider === "frida-enterprise") {
 						// dimensions verificadas por el último ping exitoso guardadas
 						// en el config actual (si existen) — el ping las deduce.
 						const prev = await readIndexMeta(workspaceCwd());

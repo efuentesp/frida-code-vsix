@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseAutoIndexProgress } from "../src/tools/frida-codebase-index/progress";
-import { IndexTab, StopIndexDialog, EmbeddingsEngine, EmbeddingsChangeDialog } from "../webview/components/IndexTab";
+import {
+	IndexTab,
+	StopIndexDialog,
+	EmbeddingsEngine,
+	EmbeddingsChangeDialog,
+} from "../webview/components/IndexTab";
 import type { CodebaseIndexUiState, State } from "../webview/types";
 
 describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
@@ -326,7 +331,9 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 
 	describe("EmbeddingsEngine — tarjetas de proveedor (#117 Fase B)", () => {
 		const noop = () => {};
-		const mkCi = (over: Partial<CodebaseIndexUiState> = {}): CodebaseIndexUiState => ({
+		const mkCi = (
+			over: Partial<CodebaseIndexUiState> = {},
+		): CodebaseIndexUiState => ({
 			installed: true,
 			config: {
 				provider: "ollama",
@@ -341,16 +348,16 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 
 		it("semáforos: enterprise warn sin sesión, openai error sin key, activo en ollama", () => {
 			const html = renderToStaticMarkup(
-					React.createElement(EmbeddingsEngine, {
-						ci: mkCi(),
-						locking: false,
-						onPing: noop,
-						onSelect: noop,
-						onLogin: noop,
-						onCopyOllama: noop,
-						copiedOllama: false,
-						onOpenChangeDialog: noop,
-					}),
+				React.createElement(EmbeddingsEngine, {
+					ci: mkCi(),
+					locking: false,
+					onPing: noop,
+					onSelect: noop,
+					onLogin: noop,
+					onCopyOllama: noop,
+					copiedOllama: false,
+					onOpenChangeDialog: noop,
+				}),
 			);
 			expect(html).toContain("Requiere iniciar sesión");
 			expect(html).toContain("is-warn"); // enterprise
@@ -363,22 +370,22 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 
 		it("ping ok: resultado inline con latencia y dimensions", () => {
 			const html = renderToStaticMarkup(
-					React.createElement(EmbeddingsEngine, {
-						ci: mkCi(),
-						ping: {
-							provider: "ollama",
-							ok: true,
-							latencyMs: 85,
-							dimensions: 768,
-						},
-						locking: false,
-						onPing: noop,
-						onSelect: noop,
-						onLogin: noop,
-						onCopyOllama: noop,
-						copiedOllama: false,
-						onOpenChangeDialog: noop,
-					}),
+				React.createElement(EmbeddingsEngine, {
+					ci: mkCi(),
+					ping: {
+						provider: "ollama",
+						ok: true,
+						latencyMs: 85,
+						dimensions: 768,
+					},
+					locking: false,
+					onPing: noop,
+					onSelect: noop,
+					onLogin: noop,
+					onCopyOllama: noop,
+					copiedOllama: false,
+					onOpenChangeDialog: noop,
+				}),
 			);
 			expect(html).toContain("85ms");
 			expect(html).toContain("768d");
@@ -387,22 +394,22 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 
 		it("candado: con indexMeta muestra bloqueo y selectores disabled", () => {
 			const html = renderToStaticMarkup(
-					React.createElement(EmbeddingsEngine, {
-						ci: mkCi({
-							indexMeta: {
-								provider: "github-copilot",
-								model: "text-embedding-3-small",
-								dimensions: 1536,
-							},
-						}),
-						locking: true,
-						onPing: noop,
-						onSelect: noop,
-						onLogin: noop,
-						onCopyOllama: noop,
-						copiedOllama: false,
-						onOpenChangeDialog: noop,
+				React.createElement(EmbeddingsEngine, {
+					ci: mkCi({
+						indexMeta: {
+							provider: "github-copilot",
+							model: "text-embedding-3-small",
+							dimensions: 1536,
+						},
 					}),
+					locking: true,
+					onPing: noop,
+					onSelect: noop,
+					onLogin: noop,
+					onCopyOllama: noop,
+					copiedOllama: false,
+					onOpenChangeDialog: noop,
+				}),
 			);
 			expect(html).toContain("🔒 Bloqueado");
 			expect(html).toContain("GitHub Copilot · text-embedding-3-small");
@@ -414,15 +421,15 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 	describe("EmbeddingsChangeDialog — modal de reconstrucción (#117 Fase B)", () => {
 		it("comparativa Actual→Nuevo + advertencia de invalidación + acciones", () => {
 			const html = renderToStaticMarkup(
-					React.createElement(EmbeddingsChangeDialog, {
-						current: {
-							provider: "github-copilot",
-							model: "text-embedding-3-small",
-						},
-						target: { provider: "ollama", model: "nomic-embed-text" },
-						onConfirm: () => {},
-						onCancel: () => {},
-					}),
+				React.createElement(EmbeddingsChangeDialog, {
+					current: {
+						provider: "github-copilot",
+						model: "text-embedding-3-small",
+					},
+					target: { provider: "ollama", model: "nomic-embed-text" },
+					onConfirm: () => {},
+					onCancel: () => {},
+				}),
 			);
 			expect(html).toContain("Actual");
 			expect(html).toContain("GitHub Copilot · text-embedding-3-small");

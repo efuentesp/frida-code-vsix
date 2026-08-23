@@ -500,12 +500,7 @@ export interface CodebaseIndexUiState {
 	} | null;
 	/** Configuración activa del motor de embeddings (#100; modelos #116). */
 	config?: {
-		provider:
-			| "auto"
-			| "frida-enterprise"
-			| "ollama"
-			| "openai"
-			| "custom";
+		provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";
 		/** ¿Existe sesión OAuth de Frida Enterprise viva? (Fase B semáforo) */
 		enterpriseAuthed?: boolean;
 		fridaEnterpriseModel?: string;
@@ -1115,12 +1110,7 @@ export type OutMessage =
 			/** #117 Fase B — elegir proveedor/modelo: persiste settings + sync
 			 *  config.json. Con rebuild=true dispara reconstrucción (modal). */
 			type: "codebase_index_select";
-			provider:
-				| "auto"
-				| "frida-enterprise"
-				| "ollama"
-				| "openai"
-				| "custom";
+			provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";
 			model?: string;
 			rebuild?: boolean;
 	  }

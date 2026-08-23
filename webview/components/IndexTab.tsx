@@ -265,7 +265,12 @@ function EmbProviderCard({
 	id: (typeof EMB_CARD_IDS)[number];
 	st: EmbCardState;
 	selected: boolean;
-	result?: { ok: boolean; latencyMs?: number; dimensions?: number; error?: string };
+	result?: {
+		ok: boolean;
+		latencyMs?: number;
+		dimensions?: number;
+		error?: string;
+	};
 	modelOpts?: string[];
 	model?: string;
 	locking: boolean;
@@ -299,7 +304,8 @@ function EmbProviderCard({
 				{selected && <span className="cfg-env-badge is-ok">Activo</span>}
 			</div>
 			<div className="ci-emb-desc">
-				{id === "frida-enterprise" && "Endpoint corporativo con la sesión OAuth de Frida."}
+				{id === "frida-enterprise" &&
+					"Endpoint corporativo con la sesión OAuth de Frida."}
 				{id === "ollama" && "Privacidad total en tu máquina; sin costo por token."}
 				{id === "openai" && "API key gestionada en Frida (SecretStorage)."}
 				{id === "custom" && "vLLM, LiteLLM o servidores OpenAI-compatible."}
@@ -382,7 +388,15 @@ export function EmbeddingsEngine({
 	onOpenChangeDialog,
 }: {
 	ci: CodebaseIndexUiState;
-	ping?: { provider: string; ok: boolean; latencyMs?: number; dimensions?: number; error?: string } | undefined;
+	ping?:
+		| {
+				provider: string;
+				ok: boolean;
+				latencyMs?: number;
+				dimensions?: number;
+				error?: string;
+		  }
+		| undefined;
 	locking: boolean;
 	onPing: (provider: EmbCardState["id"], model?: string) => void;
 	onSelect: (provider: EmbProviderId, model?: string) => void;
@@ -406,7 +420,13 @@ export function EmbeddingsEngine({
 			};
 		}
 		if (id === "ollama") {
-			return { id, name: meta, icon: "device-desktop", level: "neutral", label: "100% Local" };
+			return {
+				id,
+				name: meta,
+				icon: "device-desktop",
+				level: "neutral",
+				label: "100% Local",
+			};
 		}
 		if (id === "openai") {
 			return {
@@ -417,11 +437,23 @@ export function EmbeddingsEngine({
 				label: cfg?.openaiAuthed ? "API key lista" : "Sin API key",
 			};
 		}
-		return { id, name: meta, icon: "settings", level: "neutral", label: "Configurable" };
+		return {
+			id,
+			name: meta,
+			icon: "settings",
+			level: "neutral",
+			label: "Configurable",
+		};
 	};
 
 	const currentModel = (id: EmbCardState["id"]): string | undefined =>
-		id === "frida-enterprise" ? cfg?.fridaEnterpriseModel : id === "ollama" ? cfg?.ollamaModel : id === "openai" ? cfg?.openaiModel : cfg?.customModel;
+		id === "frida-enterprise"
+			? cfg?.fridaEnterpriseModel
+			: id === "ollama"
+				? cfg?.ollamaModel
+				: id === "openai"
+					? cfg?.openaiModel
+					: cfg?.customModel;
 
 	return (
 		<div className="ci-emb-wrap">
@@ -431,9 +463,8 @@ export function EmbeddingsEngine({
 					<span>
 						🔒 Bloqueado · Indexado con{" "}
 						<strong>
-							{(PROVIDER_LABELS[ci.indexMeta?.provider ?? ""] ??
-								ci.indexMeta?.provider)} ·{" "}
-							{ci.indexMeta?.model}
+							{PROVIDER_LABELS[ci.indexMeta?.provider ?? ""] ?? ci.indexMeta?.provider}{" "}
+							· {ci.indexMeta?.model}
 						</strong>
 					</span>
 					<button
@@ -479,7 +510,9 @@ export function EmbeddingsEngine({
 					/>
 					Automático (Ollama → Copilot → …)
 				</label>
-				<span className="ci-engine-hint">El motor Auto elige el primer proveedor disponible al indexar.</span>
+				<span className="ci-engine-hint">
+					El motor Auto elige el primer proveedor disponible al indexar.
+				</span>
 			</div>
 		</div>
 	);
@@ -542,19 +575,27 @@ export function EmbeddingsChangeDialog({
 				</div>
 				<div className="ci-stop-text">
 					Cambiar de modelo <strong>invalidará los vectores existentes</strong> en
-				<code> .codebase-index/</code>. Se requiere una reconstrucción total para
+					<code> .codebase-index/</code>. Se requiere una reconstrucción total para
 					habilitar la búsqueda semántica.
 				</div>
 				<div className="model-diff-actions">
-					<button type="button" className="model-diff-btn secondary" onClick={onCancel}>
+					<button
+						type="button"
+						className="model-diff-btn secondary"
+						onClick={onCancel}
+					>
 						Cancelar
-				</button>
-				<button type="button" className="model-diff-btn primary" onClick={onConfirm}>
+					</button>
+					<button
+						type="button"
+						className="model-diff-btn primary"
+						onClick={onConfirm}
+					>
 						<Codicon name="debug-restart" size={13} /> Cambiar y Reconstruir Índice
-				</button>
+					</button>
+				</div>
 			</div>
 		</div>
-	</div>
 	);
 }
 
@@ -593,15 +634,12 @@ export function IndexTab({
 	// #117 — target del modal de cambio de motor: undefined=cerrado,
 	// null=abierto desde el botón (sin selección previa), objeto=elección.
 	const [changeTarget, setChangeTarget] = useState<
-		{
-			provider:
-				| "auto"
-				| "frida-enterprise"
-				| "ollama"
-				| "openai"
-				| "custom";
-			model?: string;
-		} | null | undefined
+		| {
+				provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";
+				model?: string;
+		  }
+		| null
+		| undefined
 	>(undefined);
 	useEffect(() => {
 		if (isInstalled && !idxFiles) {
