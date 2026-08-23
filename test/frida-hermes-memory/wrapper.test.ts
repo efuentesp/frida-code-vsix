@@ -128,7 +128,7 @@ describe("frida-hermes-memory wrapper", () => {
 			deps: {
 				ensureInstalled: async () => {
 					installCalls++;
-					return { alreadyInstalled: false };
+					return { alreadyInstalled: false, retargeted: false };
 				},
 			},
 		})(asApi(pi));
