@@ -19,10 +19,11 @@ en un issue de GitHub, clasificado con la etiqueta correcta:
 | Mejora de documentación | `documentation` |
 | Trivial / buen primer issue | `good first issue` |
 
-El agente **no crea, modifica, cierra ni reabre** un issue por iniciativa propia:
-confirma con el usuario antes de cualquier acción del ciclo de vida (salvo que
-éste la haya pedido explícitamente en el turno). Operar con
-`gh issue create | view | edit | close | reopen`.
+El agente **no crea, modifica ni reabre** un issue por iniciativa propia:
+confirma con el usuario antes de esas acciones (salvo que éste la haya
+pedido explícitamente en el turno). **Cerrar sí es responsabilidad del
+agente** cuando el issue queda resuelto y verificado (ver *Cierre de
+issues*). Operar con `gh issue create | view | edit | close | reopen`.
 
 Todo commit que aborde un issue debe **referenciarlo** en el cuerpo (footer
 `Refs #N`) para que queden vinculados en GitHub. No usar `Closes #N` (ver
@@ -30,22 +31,25 @@ Todo commit que aborde un issue debe **referenciarlo** en el cuerpo (footer
 
 ## Cierre de issues
 
-Un issue **no se cierra** cuando el código está implementado y pasó las
-pruebas del agente. Se cierra **únicamente después de que el usuario lo
-prueba** en su entorno y confirma que funciona bien. Secuencia:
+Un issue se cierra **cuando el agente lo resuelve y su verificación es
+verde** (compila, typecheck, tests, smoke cuando aplique). No se espera la
+prueba e2e del usuario para cerrar. Secuencia:
 
-1. El agente implementa y prueba de su lado (compila, typecheck, smoke test).
-2. Deja el issue **abierto** y entrega instrucciones para que el usuario
-   pruebe.
-3. El usuario valida y confirma.
-4. Sólo entonces el agente cierra el issue (con `gh issue close`).
+1. El agente implementa y verifica de su lado (compila, typecheck, tests,
+   smoke/e2e automatizado cuando aplique).
+2. Cierra el issue con `gh issue close` dejando un comentario de evidencia:
+   qué se hizo, cómo se verificó y en qué commit.
+3. El usuario valida después en su entorno; si encuentra un defecto, **abre
+   un issue nuevo de `bug`** (o se lo reporta al agente para que lo abra tras
+   confirmar) — no se reabre el original salvo decisión explícita del usuario.
 
-Operativamente: en los commits usa **`Refs #N`** (no `Closes #N`), porque
-`Closes #N` cierra el issue automáticamente en GitHub al pushear. El cierre
-manual ocurre al final del paso 4.
+Operativamente: en los commits usa **`Refs #N`** (no `Closes #N`), porque el
+cierre lo hace el agente con `gh issue close` + comentario de evidencia
+después de la verificación, no automáticamente al pushear.
 
-Excepción: issues puramente internos (tooling, docs, refactor sin UX visible)
-sí pueden cerrarse tras la verificación del agente, sin validación del usuario.
+Si la verificación del agente NO puede cubrir un aspecto crítico del cambio
+(p. ej. flujo interactivo que sólo el usuario puede ejercitar), deja el issue
+abierto y explícalo en el comentario — ese es el único caso de espera.
 
 ## Diagnóstico de defectos en extensiones portadas de Pi
 
