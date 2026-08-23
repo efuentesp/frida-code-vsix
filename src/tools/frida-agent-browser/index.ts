@@ -28,6 +28,7 @@ import {
 import { canRegisterWebSearch } from "./web-search/credentials";
 import { createWebSearchTool } from "./web-search/tool";
 import { resolveAgentBrowserInput } from "./compile";
+import { checkBinaryBaseline } from "./baseline";
 import { ElectronLaunchRegistry } from "./electron/registry";
 import { runElectronAction } from "./electron/host";
 import {
@@ -298,6 +299,11 @@ export function createFridaAgentBrowser(
 					}
 				}
 
+				// Endurecimiento: baseline del binario — si el binario global diverge
+				// (minor+) del contrato portado, el notice se agrega al content. Se
+				// evalúa una vez por proceso (cache en baseline.ts) y no bloquea.
+				const baseline = await checkBinaryBaseline({ runFn });
+
 				const run = await runFn({
 					args: finalArgs,
 					stdin: resolved.stdin,
@@ -389,9 +395,29 @@ export function createFridaAgentBrowser(
 
 				result.details = {
 					args: finalArgs.filter((a) => a !== "--json"),
-					session: ms.name,
+				session: ms.name,
+				// Drift del binario vs contrato portado (undefined si no se pudo determinar).
+					binaryBaseline:
+						baseline.drift === "unknown"
+							? undefined
+							: {
+										version: baseline.version,
+										contract: baseline.contract,
+										drift: baseline.drift,
+									},
 					...(result.details as object),
 				};
+
+				// Notice visible al final del content cuando hay drift minor/major.
+				if (baseline.notice && result.content[0]?.type === "text") {
+					result.content = [
+						{
+							type: "text",
+							text: `${result.content[0].text}\n\n${baseline.notice}`,
+						},
+						...result.content.slice(1),
+					];
+				}
 				return result;
 			},
 		});

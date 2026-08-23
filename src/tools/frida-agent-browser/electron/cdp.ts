@@ -70,6 +70,8 @@ export async function fetchCdpJson(
 	url: string,
 	fetchFn?: CdpFetchFn,
 ): Promise<unknown> {
+	// SAFETY: globalThis.fetch (Node ≥18) cumple la firma (url) => Promise<unknown>;
+	// el doble cast solo reconcilia la declaración DOM de lib.d.ts con CdpFetchFn.
 	const fetch = fetchFn ?? (globalThis.fetch as unknown as CdpFetchFn);
 	if (!fetch) return undefined;
 	const controller = new AbortController();

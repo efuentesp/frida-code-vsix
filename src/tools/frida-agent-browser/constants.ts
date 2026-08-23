@@ -77,3 +77,17 @@ export const LAUNCH_SCOPED_FLAG_LABEL =
 
 /** Nombre del binario upstream que se resuelve desde PATH. */
 export const AGENT_BROWSER_BINARY = "agent-browser";
+
+/**
+ * Versión del binario upstream contra la que se porteó el contrato de este
+ * wrapper (input-modes, argv grammar, formato --json). Fuente: ledger
+ * upstream-pi.json → pi-agent-browser-native@0.3.0, cuyo código replica
+ * explícitamente el contrato de agent-browser 0.33.2 (ver comentarios
+ * "Mirror upstream 0.33.2 ..." en el referencia). Si actualizas el port a
+ * una versión más reciente del upstream, actualiza también esta constante
+ * (y la entrada del ledger).
+ *
+ * Consumidor: baseline.ts — clasifica el drift binario-real vs contrato
+ * portado y emite un notice visible (minor/major) sin bloquear.
+ */
+export const PORTED_BINARY_CONTRACT = "0.33.2";

@@ -44,7 +44,7 @@ export interface RunOptions {
 export type SpawnFn = (
 	command: string,
 	args: string[],
-	options: object,
+	options: Record<string, unknown>,
 ) => unknown;
 
 /** Lanza el binario upstream y captura stdout/stderr. Inyecta dependencia para tests. */

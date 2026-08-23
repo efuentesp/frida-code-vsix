@@ -125,6 +125,8 @@ function providerLabel(provider: WebSearchProvider): string {
 }
 
 export function createWebSearchTool(opts: WebSearchToolOptions) {
+	// SAFETY: globalThis.fetch (Node ≥18) cumple la firma (url, init?) => Promise<Response>;
+	// el doble cast solo reconcilia la declaración DOM de lib.d.ts con FetchFn del port.
 	const fetchFn = opts.fetchFn ?? (globalThis.fetch as unknown as FetchFn);
 	const gate = new RequestGate();
 	return {
