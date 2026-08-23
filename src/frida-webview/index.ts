@@ -29,12 +29,7 @@ export interface BoxProps {
 	/** Sangría izquierda (#79: agentes anidados del timeline vertical). */
 	paddingLeft?: number;
 	margin?: number;
-	alignItems?:
-		| "flex-start"
-		| "center"
-		| "flex-end"
-		| "stretch"
-		| "baseline";
+	alignItems?: "flex-start" | "center" | "flex-end" | "stretch" | "baseline";
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;

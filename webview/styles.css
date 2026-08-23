@@ -7058,139 +7058,158 @@ kbd {
 	border-color: var(--vscode-focusBorder);
 }
 
-/* ===== ContextReport (/context) — instrumento técnico denso (#124, DESIGN.md) =====
- * Estética: instrumento técnico. Mono del editor + tabular-nums, retícula
- * sutil de fondo, barra-instrumento con hover cruzado (segmento↔fila) y hatch
- * en el espacio libre que reusa el mismo patrón. Todo con variables del tema. */
+/* ===== ContextReport (/context) — Estilo Copilot Chat & VS Code Tree View (#124) =====
+ * Estructura limpia y plana nativa de VS Code: resumen de métricas, barra de
+ * progreso segmentada y control Tree View colapsable con chevrons y columnas
+ * numéricas tabulares alineadas a la derecha. */
 .ctxr {
 	box-sizing: border-box;
 	width: 100%;
-	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
-	font-variant-numeric: tabular-nums;
-	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
-	border-radius: 8px;
-	/* Retícula sutil (1px cada 16px) sobre el fondo del widget. */
-	background:
-		repeating-linear-gradient(
-			0deg,
-			rgba(127, 127, 127, 0.045) 0 1px,
-			transparent 1px 16px
-		),
-		repeating-linear-gradient(
-			90deg,
-			rgba(127, 127, 127, 0.045) 0 1px,
-			transparent 1px 16px
-		),
+	font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, sans-serif);
+	background: var(
+		--vscode-editorWidget-background,
+		var(--vscode-sideBar-background, #1e1e1e)
+	);
+	border: 1px solid
 		var(
-			--vscode-editorWidget-background,
-			var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.06))
+			--vscode-widget-border,
+			var(--vscode-panel-border, rgba(128, 128, 128, 0.2))
 		);
-	animation: ctxr-in 0.18s ease-out;
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	animation: ctxr-in 0.15s ease-out;
 }
 @keyframes ctxr-in {
 	from {
 		opacity: 0;
-		transform: translateY(4px);
+		transform: translateY(3px);
 	}
 }
-.ctxr-title {
-	letter-spacing: 1px;
-	text-transform: uppercase;
-	font-size: 12px;
+
+.ctxr-header {
+	border-bottom: 1px solid
+		var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+	padding-bottom: 6px;
 }
-.ctxr-sec {
-	font-size: 10px;
-	letter-spacing: 0.6px;
-	text-transform: uppercase;
-	color: var(--vscode-descriptionForeground);
-}
-.ctxr-pressure {
-	line-height: 1;
-}
+
 .ctxr-pulse {
 	animation: ctxr-blink 1.6s ease-in-out infinite;
 }
 @keyframes ctxr-blink {
 	50% {
-		opacity: 0.55;
+		opacity: 0.5;
 	}
 }
-/* Barra-instrumento: segmentos proporcionales, borde fino, crecimiento
- * escalonado al montar (nth-child sobre los wrappers span de RemoteRoot). */
+
+/* Barra de progreso segmentada limpia */
 .ctxr-bar {
-	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
-	border-radius: 4px;
+	height: 8px;
+	border-radius: 3px;
+	background: var(
+		--vscode-editor-inactiveSelectionBackground,
+		rgba(127, 127, 127, 0.2)
+	);
+	overflow: hidden;
 }
 .ctxr-seg {
-	transform-origin: 50% 100%;
 	cursor: pointer;
 	transition:
 		opacity 0.12s ease,
 		filter 0.12s ease;
-	animation: ctxr-seg 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .ctxr-seg:hover {
-	filter: brightness(1.3);
+	filter: brightness(1.25);
 }
-@keyframes ctxr-seg {
-	from {
-		transform: scaleY(0);
-	}
-}
-.ctxr-bar > span:nth-child(1) .ctxr-seg {
-	animation-delay: 30ms;
-}
-.ctxr-bar > span:nth-child(2) .ctxr-seg {
-	animation-delay: 70ms;
-}
-.ctxr-bar > span:nth-child(3) .ctxr-seg {
-	animation-delay: 110ms;
-}
-.ctxr-bar > span:nth-child(4) .ctxr-seg {
-	animation-delay: 150ms;
-}
-.ctxr-bar > span:nth-child(5) .ctxr-seg {
-	animation-delay: 190ms;
-}
-.ctxr-bar > span:nth-child(6) .ctxr-seg {
-	animation-delay: 230ms;
-}
-.ctxr-bar > span:nth-child(7) .ctxr-seg {
-	animation-delay: 270ms;
-}
-.ctxr-bar > span:nth-child(8) .ctxr-seg {
-	animation-delay: 310ms;
-}
-/* Espacio libre: hatch diagonal (mismo lenguaje de retícula del fondo). */
-.ctxr-seg--free {
-	background: repeating-linear-gradient(
-		135deg,
-		rgba(127, 127, 127, 0.28) 0 1px,
-		transparent 1px 5px
-	);
-}
-/* Hover cruzado: al fijar un key (hover o pin), el resto se atenúa. El fade
- * lo resuelve el navegador (transition), no un re-render. */
-.ctxr-row {
-	cursor: pointer;
-	transition: opacity 0.12s ease;
+
+/* Tree View Container & Rows estilo VS Code Test Explorer / Explorer */
+.ctx-tree-container {
+	border: 1px solid
+		var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
 	border-radius: 4px;
+	background: var(
+		--vscode-sideBar-background,
+		var(--vscode-editor-background, rgba(0, 0, 0, 0.1))
+	);
+	padding: 4px;
+	overflow: hidden;
 }
+
+.ctx-tree-section {
+	border-radius: 3px;
+}
+
+.ctx-tree-section-header {
+	padding: 4px 6px;
+	cursor: pointer;
+	border-radius: 3px;
+	user-select: none;
+	transition: background 0.1s ease;
+}
+.ctx-tree-section-header:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+
+.ctx-tree-subsec-header {
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.ctx-tree-row {
+	padding: 2px 6px;
+	border-radius: 3px;
+	cursor: default;
+	transition:
+		background 0.1s ease,
+		opacity 0.12s ease;
+	font-size: 11.5px;
+	line-height: 1.4;
+}
+.ctx-tree-row:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+.ctx-tree-row.is-hot {
+	background: var(
+		--vscode-list-activeSelectionBackground,
+		rgba(128, 128, 128, 0.15)
+	);
+	color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+
+.ctx-tree-badge {
+	opacity: 0.7;
+}
+
+.ctx-tree-bullet-row {
+	font-size: 11px;
+	line-height: 1.35;
+	padding: 1px 6px;
+}
+
+/* Alineación tabular perfecta para números a la derecha */
+.ctx-tree-tokens,
+.ctx-tree-pct {
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+.ctx-tree-tokens {
+	min-width: 44px;
+}
+.ctx-tree-pct {
+	min-width: 38px;
+}
+
 .ctxr.is-dimming .ctxr-seg:not(.is-hot),
-.ctxr.is-dimming .ctxr-row:not(.is-hot) {
+.ctxr.is-dimming .ctx-tree-row:not(.is-hot) {
 	opacity: 0.35;
 }
-/* Dos columnas densas; colapsan a una en panel angosto. */
-.ctxr-cols {
-	flex-wrap: wrap;
+
+.ctxr-footer {
+	padding-top: 4px;
 }
-.ctxr-col {
-	flex: 1 1 300px;
-	min-width: 280px;
-}
+
 @media (prefers-reduced-motion: reduce) {
 	.ctxr,
-	.ctxr-seg,
 	.ctxr-pulse {
 		animation: none;
 	}

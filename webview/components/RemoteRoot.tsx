@@ -186,11 +186,7 @@ function renderNode(
 				<div
 					className={cls}
 					style={flexStyle(node.props)}
-					title={
-						typeof node.props.title === "string"
-							? node.props.title
-							: undefined
-					}
+					title={typeof node.props.title === "string" ? node.props.title : undefined}
 					{...handlers}
 				>
 					{children}

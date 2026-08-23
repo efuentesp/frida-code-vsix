@@ -1,63 +1,47 @@
-// ContextReport — UI del reporte /context (fase B, ADR-0015; rediseño #124 bajo
-// la dirección estética de DESIGN.md: instrumento técnico denso). Paridad de
-// datos con supi-context; el render evoluciona a dos columnas densas con
-// barra-instrumento interactiva. Se monta vía WebBridge.mountPersistent al
-// ejecutar /context; se cierra con el botón (Compactar también lo cierra).
+// ContextReport — UI del reporte /context (fase B, ADR-0015; rediseñado #124 bajo
+// la dirección estética de DESIGN.md: estilo nativo Copilot Chat con Tree View).
 //
-// Tags intrinsic de frida-webview (fbox/ftext/fbutton).
+// Se monta vía WebBridge.mountPersistent al ejecutar /context; se cierra con el
+// botón (o al Compactar). Tags intrinsic de frida-webview (fbox/ftext/fbutton/ficon).
 //
-// Interacción (el diferenciador): hover en un segmento de la barra resalta su
-// fila de leyenda y atenúa el resto (y viceversa); click fija (pin) el
-// resaltado. El estado vive aquí con useState — el renderer remoto soporta
-// hooks (precedente: CollapsiblePanel). El atenuado en sí lo resuelve CSS
-// (.ctxr.is-dimming → :not(.is-hot)) para que el fade sea una transición del
-// navegador y no un re-render por frame.
-//
-// Las listas usan conectores de árbol (├ intermedio, └ último) con indentación,
-// para distinguir el header de la sección (en bold, sin conector) de los items.
+// Componentes clave:
+//   - Resumen métrico y barra de progreso segmentada limpia con paleta de charts.
+//   - Tree View jerárquico y colapsable (estilo VS Code Explorer / Test Explorer)
+//     con chevrons vectoriales, iconos Codicon y alineación tabular a la derecha.
+//   - Hover/Click interactivo cruzado entre la barra y las filas de categoría.
 
 import { useState, type ReactElement, type ReactNode } from "react";
 import type { ContextAnalysis } from "./analysis";
 
-/** Paleta por categoría (variables charts de VS Code). */
+/** Paleta por categoría (variables charts de VS Code con fallbacks). */
 const COLORS = {
-	systemPrompt: "var(--vscode-charts-blue)",
-	toolSnippets: "var(--vscode-charts-purple)",
-	messages: "var(--vscode-charts-green)",
-	toolCalls: "var(--vscode-charts-orange)",
-	toolResults: "var(--vscode-charts-yellow)",
-	other: "var(--vscode-charts-red)",
+	systemPrompt: "var(--vscode-charts-blue, #3794ff)",
+	toolSnippets: "var(--vscode-charts-purple, #b180d7)",
+	messages: "var(--vscode-charts-green, #89d185)",
+	toolCalls: "var(--vscode-charts-orange, #d18616)",
+	toolResults: "var(--vscode-charts-yellow, #cca700)",
+	other: "var(--vscode-charts-red, #f14c4c)",
+	free: "var(--vscode-editor-inactiveSelectionBackground, rgba(127, 127, 127, 0.25))",
 } as const;
+
 const TENUE = "var(--vscode-descriptionForeground)";
-/** Indent de los items respecto al header (nbsp para preservarlo siempre). */
-const INDENT = "\u00A0\u00A0";
 
-/** Color del % de presión por umbral (paridad con ContextBar del footer). */
-function pressureColor(pct: number | null): string {
-	if (pct == null) return TENUE;
-	if (pct >= 90) return "var(--vscode-errorForeground, #f14c4c)";
-	if (pct >= 70) return "var(--vscode-editorWarning-foreground, #cca700)";
-	return "var(--vscode-charts-green, #3fb950)";
-}
-
+/** Formato numérico compacto (ej. 87.2k, 1.4M). */
 function fmt(n: number): string {
 	if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
 	if (n >= 1000) return (n / 1000).toFixed(n >= 10_000 ? 0 : 1) + "k";
 	return String(n);
 }
 
-/** Conectores de árbol para una lista de `count` items: ├ para todos salvo el
- *  último, que lleva └. El último item visible puede llevar ├ si hay un elemento
- *  "… y N más" detrás (pasar hasMore=true). */
-function treeConnectors(count: number, hasMore = false): string[] {
-	return Array.from({ length: count }, (_, i) => {
-		const isLast = i === count - 1;
-		if (!isLast) return "├";
-		return hasMore ? "├" : "└";
-	});
+/** Color del semáforo de presión por umbral (paridad con ContextBar). */
+function pressureColor(pct: number | null): string {
+	if (pct == null) return TENUE;
+	if (pct >= 90) return "var(--vscode-errorForeground, #f14c4c)";
+	if (pct >= 70) return "var(--vscode-list-warningForeground, #cca700)";
+	return "var(--vscode-testing-iconPassed, #73c991)";
 }
 
-/** Acciones del reporte: las inyecta extension.ts al crear el elemento. */
+/** Acciones del reporte inyectadas por extension.ts. */
 export interface ContextReportActions {
 	/** Cierra el reporte (unmount del root persistente). */
 	onClose: () => void;
@@ -72,22 +56,12 @@ export function createContextReportElement(
 	return <ContextReport analysis={analysis} actions={actions} />;
 }
 
-/** Un segmento de la barra-instrumento. `color` ausente = hatch CSS (free). */
+/** Un segmento de la barra de progreso. */
 interface Seg {
 	key: string;
 	label: string;
 	tokens: number;
-	color?: string;
-}
-
-/** Fila de leyenda de "Uso por categoría" con su segmento vinculado (link). */
-interface LegendRow {
-	key: string;
-	label: string;
-	tokens: number;
-	color?: string;
-	/** Key del segmento al que se vincula el hover (user/assistant → "msg"). */
-	link: string;
+	color: string;
 }
 
 function ContextReport({
@@ -97,7 +71,22 @@ function ContextReport({
 	analysis: ContextAnalysis;
 	actions: ContextReportActions;
 }): ReactElement {
-	// Hover cruzado segmento↔fila + pin por click. `hot` = lo que manda ahora.
+	// Estado de secciones colapsadas del Tree View
+	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
+		categories: false, // Uso por categoría (expandido por defecto)
+		systemPrompt: false, // Composición del System prompt (expandido)
+		instructionFiles: false, // Instruction files (expandido)
+		skills: true, // Skills (colapsado)
+		guidelines: true, // Guidelines (colapsado)
+		toolSnippets: true, // Tool snippets (colapsado)
+		tools: true, // Definición de herramientas (colapsado por defecto)
+	});
+
+	const toggle = (section: string) => {
+		setCollapsed((prev) => ({ ...prev, [section]: !prev[section] }));
+	};
+
+	// Hover cruzado segmento ↔ fila de categoría + pin por click
 	const [hovered, setHovered] = useState<string | null>(null);
 	const [pinned, setPinned] = useState<string | null>(null);
 	const hot = hovered ?? pinned;
@@ -111,303 +100,343 @@ function ContextReport({
 	const free = Math.max(0, cw - s.usedTokens);
 	const pct = (t: number) => (cw > 0 ? Math.round((t / cw) * 100) : 0);
 	const flexOf = (t: number) => Math.max(1, Math.round(t / 100));
-	// Presión accionable (ajustada por reserve); fallback al % bruto.
 	const pressure = s.pressurePercent ?? s.usagePercent ?? null;
 
 	const segments: Seg[] = [
 		{ key: "sp", label: "System prompt", tokens: cat.systemPrompt, color: COLORS.systemPrompt },
 		{ key: "ts", label: "Tool snippets", tokens: b.toolSnippets, color: COLORS.toolSnippets },
-		{ key: "msg", label: "Messages", tokens: messages, color: COLORS.messages },
+		{ key: "msg", label: "Mensajes", tokens: messages, color: COLORS.messages },
 		{ key: "tc", label: "Tool calls", tokens: cat.toolCalls, color: COLORS.toolCalls },
 		{ key: "tr", label: "Tool results", tokens: cat.toolResults, color: COLORS.toolResults },
 		...(cat.other > 0
 			? [{ key: "ot", label: "Otros", tokens: cat.other, color: COLORS.other }]
 			: []),
-		// Free: sin color prop — el hatch lo pinta CSS (.ctxr-seg--free).
-		{ key: "fs", label: "Free space", tokens: free },
+		{ key: "fs", label: "Espacio libre", tokens: free, color: COLORS.free },
 	];
-	const visible = segments.filter((seg) => seg.tokens > 0);
-
-	const legendRows: LegendRow[] = [
-		{ key: "sp", label: "System prompt", tokens: cat.systemPrompt, color: COLORS.systemPrompt, link: "sp" },
-		{ key: "um", label: "User messages", tokens: cat.userMessages, color: COLORS.messages, link: "msg" },
-		{ key: "am", label: "Assistant messages", tokens: cat.assistantMessages, color: COLORS.messages, link: "msg" },
-		{ key: "tc", label: "Tool calls", tokens: cat.toolCalls, color: COLORS.toolCalls, link: "tc" },
-		{ key: "tr", label: "Tool results", tokens: cat.toolResults, color: COLORS.toolResults, link: "tr" },
-		...(cat.other > 0
-			? [{ key: "ot", label: "Otros", tokens: cat.other, color: COLORS.other, link: "ot" }]
-			: []),
-		{ key: "fs", label: "Free space", tokens: free, link: "fs" },
-	];
+	const visibleSegments = segments.filter((seg) => seg.tokens > 0);
 
 	const instructionTotal = b.instructionFiles.reduce((a, c) => a + c.tokens, 0);
 	const skillsTotal = b.skills.reduce((a, c) => a + c.tokens, 0);
 
-	// Composición del system prompt (columna derecha).
-	const compItems: { key: string; label: string; tokens: number }[] = [
-		{ key: "base", label: "Base (pi core)", tokens: b.base },
-		...(instructionTotal > 0
-			? [
-					{
-						key: "if",
-						label: `Instruction files (${b.instructionFiles.length})`,
-						tokens: instructionTotal,
-					},
-				]
-			: []),
-		{ key: "sk", label: `Skills (${b.skills.length})`, tokens: skillsTotal },
-		{ key: "gl", label: "Guidelines", tokens: b.guidelines },
-		{ key: "ts", label: `Tool snippets (${b.toolSnippetDetails.length})`, tokens: b.toolSnippets },
-		...(b.appendText > 0
-			? [{ key: "ap", label: "Append text", tokens: b.appendText }]
-			: []),
-	];
-
-	// Skills con truncamiento opcional ("… y N más" cierra el árbol con └).
-	const skillsShown = b.skills.slice(0, 12);
-	const skillsMore = b.skills.length - 12;
-	const skillsConns = treeConnectors(skillsShown.length, skillsMore > 0);
-
-	// Tool definitions con truncamiento.
-	const toolsShown = td.tools.slice(0, 10);
-	const toolsMore = td.tools.length - 10;
-	const toolsConns = treeConnectors(toolsShown.length, toolsMore > 0);
-
-	// Guidelines: fuentes (lista) + bullets de ejemplo (notas indentadas).
-	const sourcesConns = treeConnectors(b.guidelineSources.length);
-	const compConns = treeConnectors(compItems.length);
-	const ifConns = treeConnectors(b.instructionFiles.length);
-	const legendConns = treeConnectors(legendRows.length);
-	const bulletsShown = b.guidelineBullets.slice(0, 3);
-	const bulletsMore = b.guidelineBullets.length - 3;
-	const bulletsConns = treeConnectors(bulletsShown.length, bulletsMore > 0);
-
-	/** Clases del elemento interactivo: is-hot cuando su key es la activa. */
 	const hotCls = (key: string) => (hot === key ? " is-hot" : "");
 
 	return (
 		<fbox
 			flexDirection="column"
-			gap={12}
-			padding={14}
+			gap={10}
+			padding={12}
 			cls={"ctxr" + (hot ? " is-dimming" : "")}
 		>
-			{/* Header */}
+			{/* 1. Header estilo Copilot Chat */}
 			<fbox
 				flexDirection="row"
 				justifyContent="space-between"
 				alignItems="center"
+				cls="ctxr-header"
 			>
-				<ftext bold cls="ctxr-title" wrap={false}>
-					Context Usage
-				</ftext>
-				<ftext color={TENUE} wrap={false}>
-					{s.modelName}
-				</ftext>
-			</fbox>
-
-			{/* Hero: presión grande + uso */}
-			<fbox flexDirection="row" alignItems="flex-end" gap={12}>
-				<fbox flexDirection="column" gap={1} alignItems="flex-start">
-					<fbox flexDirection="row" alignItems="baseline" gap={1}>
-						<ftext
-							bold
-							size={30}
-							color={pressureColor(pressure)}
-							cls={"ctxr-pressure" + (pressure != null && pressure >= 70 ? " ctxr-pulse" : "")}
-							wrap={false}
-						>
-							{pressure == null ? "?" : String(pressure)}
-						</ftext>
-						<ftext size={12} color={pressureColor(pressure)} wrap={false}>
-							%
-						</ftext>
-					</fbox>
-					<ftext color={TENUE} size={10} wrap={false}>
-						presión
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ficon name="server" size={14} color="var(--vscode-textLink-foreground, #4daafc)" />
+					<ftext bold size={13}>Uso de Contexto</ftext>
+					<ftext color={TENUE} size={12}>
+						({s.modelName})
 					</ftext>
 				</fbox>
-				<fbox flexDirection="column" gap={2} flex={1}>
-					<ftext bold wrap={false}>
-						{fmt(s.usedTokens)} / {cw ? fmt(cw) : "?"} tokens
-						{s.usagePercent == null ? "" : ` (${s.usagePercent}%)`}
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ftext
+						bold
+						size={12}
+						color={pressureColor(pressure)}
+						cls={pressure != null && pressure >= 70 ? "ctxr-pulse" : undefined}
+					>
+						● {pressure == null ? "?" : `${pressure}%`} presión
 					</ftext>
-					<ftext color={TENUE} wrap={false}>
-						{s.headroomTokens == null ? "headroom ?" : `headroom ${fmt(s.headroomTokens)}`}
-						{" · "}
+				</fbox>
+			</fbox>
+
+			{/* 2. Barra de progreso segmentada limpia estilo VS Code */}
+			<fbox flexDirection="column" gap={4}>
+				<fbox flexDirection="row" cls="ctxr-bar" overflow="hidden" height={8}>
+					{visibleSegments.map((seg) => (
+						<fbox
+							key={seg.key}
+							flex={flexOf(seg.tokens)}
+							background={seg.color}
+							cls={"ctxr-seg" + hotCls(seg.key)}
+							onMouseEnter={() => setHovered(seg.key)}
+							onMouseLeave={() => setHovered(null)}
+							onClick={() => setPinned((p) => (p === seg.key ? null : seg.key))}
+							title={`${seg.label}: ${fmt(seg.tokens)} tokens (${pct(seg.tokens)}%)`}
+						/>
+					))}
+				</fbox>
+				<fbox flexDirection="row" justifyContent="space-between" alignItems="center">
+					<ftext size={11} color={TENUE}>
+						{fmt(s.usedTokens)} de {cw ? fmt(cw) : "?"} tokens ({s.usagePercent ?? 0}%)
+					</ftext>
+					<ftext size={11} color={TENUE}>
+						headroom: {s.headroomTokens == null ? "?" : fmt(s.headroomTokens)} ·{" "}
 						{s.compacted ? "compactada" : "sin compactar"}
-						{" · compaction "}
-						{s.compactionEnabled ? "on" : "off"}
-						{s.compactionEnabled ? ` (reserve ${fmt(s.reserveTokens)})` : ""}
+						{s.compactionEnabled ? ` (reserva ${fmt(s.reserveTokens)})` : ""}
 					</ftext>
 				</fbox>
 			</fbox>
 
-			{/* Barra-instrumento: segmentos con hover cruzado + pin por click */}
-			<fbox flexDirection="row" cls="ctxr-bar" overflow="hidden" height={22}>
-				{visible.map((seg) => (
-					<fbox
-						key={seg.key}
-						flex={flexOf(seg.tokens)}
-						background={seg.color}
-						cls={
-							"ctxr-seg" +
-							(seg.color ? "" : " ctxr-seg--free") +
-							hotCls(seg.key)
-						}
-						onMouseEnter={() => setHovered(seg.key)}
-						onMouseLeave={() => setHovered(null)}
-						onClick={() =>
-							setPinned((p) => (p === seg.key ? null : seg.key))
-						}
-						title={`${seg.label} · ${fmt(seg.tokens)} · ${pct(seg.tokens)}%`}
-					/>
-				))}
-			</fbox>
 			{analysis.approximationNote ? (
-				<ftext color="var(--vscode-editorWarning-foreground)" wrap={true}>
-					⚠ {analysis.approximationNote}
-				</ftext>
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ficon name="warning" size={13} color="var(--vscode-editorWarning-foreground, #cca700)" />
+					<ftext color="var(--vscode-editorWarning-foreground, #cca700)" size={11}>
+						{analysis.approximationNote}
+					</ftext>
+				</fbox>
 			) : null}
 
-			{/* Dos columnas densas (colapsan a una en panel angosto vía CSS wrap) */}
-			<fbox flexDirection="row" cls="ctxr-cols" gap={16}>
-				{/* Columna izquierda: conversación */}
-				<fbox flexDirection="column" cls="ctxr-col" gap={12}>
-					<Section title="Uso por categoría">
-						{legendRows.map((it, i) => (
-							<fbox
-								key={it.key}
-								flexDirection="row"
-								gap={6}
-								alignItems="center"
-								cls={"ctxr-row" + hotCls(it.link)}
-								onMouseEnter={() => setHovered(it.link)}
-								onMouseLeave={() => setHovered(null)}
-								onClick={() =>
-									setPinned((p) => (p === it.link ? null : it.link))
-								}
-							>
-								<ftext color={TENUE} wrap={false}>
-									{INDENT}
-									{legendConns[i]}
-								</ftext>
-								{it.color ? <ftext color={it.color}>■</ftext> : null}
-								<ftext wrap={false}>{it.label}</ftext>
-								<fbox flex={1} />
-								<ftext color={TENUE} wrap={false}>
-									{fmt(it.tokens)} ({pct(it.tokens)}%)
-								</ftext>
-							</fbox>
-						))}
-					</Section>
+			{/* 3. Control Tree View Principal */}
+			<fbox flexDirection="column" gap={6} cls="ctx-tree-container">
+				{/* 3.1. Sección: Uso por categoría */}
+				<TreeSection
+					title="Uso por categoría"
+					icon="chart-pie"
+					expanded={!collapsed.categories}
+					onToggle={() => toggle("categories")}
+					badge={`${fmt(s.usedTokens)} usados`}
+				>
+					<TreeRow
+						icon="copilot"
+						swatchColor={COLORS.systemPrompt}
+						label="System prompt"
+						tokens={cat.systemPrompt}
+						pct={pct(cat.systemPrompt)}
+						isHot={hot === "sp"}
+						onMouseEnter={() => setHovered("sp")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "sp" ? null : "sp"))}
+					/>
+					<TreeRow
+						icon="comment-discussion"
+						swatchColor={COLORS.messages}
+						label="Mensajes de usuario"
+						tokens={cat.userMessages}
+						pct={pct(cat.userMessages)}
+						isHot={hot === "msg"}
+						onMouseEnter={() => setHovered("msg")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "msg" ? null : "msg"))}
+					/>
+					<TreeRow
+						icon="bot"
+						swatchColor={COLORS.messages}
+						label="Mensajes del asistente"
+						tokens={cat.assistantMessages}
+						pct={pct(cat.assistantMessages)}
+						isHot={hot === "msg"}
+						onMouseEnter={() => setHovered("msg")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "msg" ? null : "msg"))}
+					/>
+					<TreeRow
+						icon="tools"
+						swatchColor={COLORS.toolCalls}
+						label="Tool calls (llamadas)"
+						tokens={cat.toolCalls}
+						pct={pct(cat.toolCalls)}
+						isHot={hot === "tc"}
+						onMouseEnter={() => setHovered("tc")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "tc" ? null : "tc"))}
+					/>
+					<TreeRow
+						icon="terminal"
+						swatchColor={COLORS.toolResults}
+						label="Tool results (resultados)"
+						tokens={cat.toolResults}
+						pct={pct(cat.toolResults)}
+						isHot={hot === "tr"}
+						onMouseEnter={() => setHovered("tr")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "tr" ? null : "tr"))}
+					/>
+					{cat.other > 0 ? (
+						<TreeRow
+							icon="circle"
+							swatchColor={COLORS.other}
+							label="Otros mensajes"
+							tokens={cat.other}
+							pct={pct(cat.other)}
+							isHot={hot === "ot"}
+							onMouseEnter={() => setHovered("ot")}
+							onMouseLeave={() => setHovered(null)}
+							onClick={() => setPinned((p) => (p === "ot" ? null : "ot"))}
+						/>
+					) : null}
+					<TreeRow
+						icon="circle-outline"
+						swatchColor={COLORS.free}
+						label="Espacio libre"
+						tokens={free}
+						pct={pct(free)}
+						isHot={hot === "fs"}
+						onMouseEnter={() => setHovered("fs")}
+						onMouseLeave={() => setHovered(null)}
+						onClick={() => setPinned((p) => (p === "fs" ? null : "fs"))}
+					/>
+				</TreeSection>
 
-					{b.skills.length > 0 ? (
-						<Section title={`Skills (${b.skills.length})`}>
-							{skillsShown.map((sk, i) => (
-								<TreeItem key={`sk-${i}`} connector={skillsConns[i]}>
-									<Row label={sk.name} tokens={sk.tokens} />
-								</TreeItem>
+				{/* 3.2. Sección: Composición del System Prompt */}
+				<TreeSection
+					title="Composición del System Prompt"
+					icon="copilot"
+					expanded={!collapsed.systemPrompt}
+					onToggle={() => toggle("systemPrompt")}
+					tokens={cat.systemPrompt}
+					pct={pct(cat.systemPrompt)}
+				>
+					<TreeRow
+						icon="package"
+						label="Base (pi core)"
+						tokens={b.base}
+						pct={pct(b.base)}
+					/>
+
+					{/* Subsección: Archivos de instrucción */}
+					{b.instructionFiles.length > 0 ? (
+						<TreeSubSection
+							title={`Archivos de instrucción (${b.instructionFiles.length})`}
+							icon="file-text"
+							expanded={!collapsed.instructionFiles}
+							onToggle={() => toggle("instructionFiles")}
+							tokens={instructionTotal}
+						>
+							{b.instructionFiles.map((f, i) => (
+								<TreeRow
+									key={`if-${i}`}
+									level={1}
+									icon="file-code"
+									label={f.path}
+									badge={f.origin}
+									extra={`${f.lines}L`}
+									tokens={f.tokens}
+								/>
 							))}
-							{skillsMore > 0 ? (
-								<TreeItem connector="└">
-									<ftext color={TENUE}>… y {skillsMore} más</ftext>
-								</TreeItem>
-							) : null}
-						</Section>
+						</TreeSubSection>
 					) : null}
 
-					{b.guidelineSources.length > 0 ? (
-						<Section title={`Guidelines (${b.guidelineBullets.length} bullets)`}>
-							{b.guidelineSources.map((g, i) => (
-								<TreeItem key={`gs-${i}`} connector={sourcesConns[i]}>
-									<Row
-										label={g.source}
-										tokens={g.tokens}
-										extra={`${g.bulletCount} bullets`}
-									/>
-								</TreeItem>
+					{/* Subsección: Skills */}
+					{b.skills.length > 0 ? (
+						<TreeSubSection
+							title={`Skills habilitadas (${b.skills.length})`}
+							icon="sparkle"
+							expanded={!collapsed.skills}
+							onToggle={() => toggle("skills")}
+							tokens={skillsTotal}
+						>
+							{b.skills.map((sk, i) => (
+								<TreeRow
+									key={`sk-${i}`}
+									level={1}
+									icon="sparkles"
+									label={sk.name}
+									tokens={sk.tokens}
+								/>
 							))}
-							{bulletsShown.map((bl, i) => (
-								<TreeItem key={`gb-${i}`} connector={bulletsConns[i]}>
-									<ftext color={TENUE} wrap={true}>
+						</TreeSubSection>
+					) : null}
+
+					{/* Subsección: Directrices / Guidelines */}
+					{b.guidelineSources.length > 0 ? (
+						<TreeSubSection
+							title={`Directrices / Guidelines (${b.guidelineBullets.length} reglas)`}
+							icon="list-checks"
+							expanded={!collapsed.guidelines}
+							onToggle={() => toggle("guidelines")}
+							tokens={b.guidelines}
+						>
+							{b.guidelineSources.map((g, i) => (
+								<TreeRow
+									key={`gs-${i}`}
+									level={1}
+									icon="checklist"
+									label={g.source}
+									extra={`${g.bulletCount} reglas`}
+									tokens={g.tokens}
+								/>
+							))}
+							{b.guidelineBullets.slice(0, 3).map((bl, i) => (
+								<fbox
+									key={`gb-${i}`}
+									flexDirection="row"
+									gap={6}
+									paddingLeft={28}
+									cls="ctx-tree-bullet-row"
+								>
+									<ftext color={TENUE} size={11} wrap={true}>
 										• {bl}
 									</ftext>
-								</TreeItem>
+								</fbox>
 							))}
-							{bulletsMore > 0 ? (
-								<TreeItem connector="└">
-									<ftext color={TENUE}>… y {bulletsMore} más</ftext>
-								</TreeItem>
-							) : null}
-						</Section>
-					) : null}
-				</fbox>
-
-				{/* Columna derecha: system prompt */}
-				<fbox flexDirection="column" cls="ctxr-col" gap={12}>
-					<Section
-						title={`System prompt · ${fmt(cat.systemPrompt)} tokens`}
-					>
-						{compItems.map((it, i) => (
-							<TreeItem key={it.key} connector={compConns[i]}>
-								<Row label={it.label} tokens={it.tokens} pct={pct(it.tokens)} />
-							</TreeItem>
-						))}
-					</Section>
-
-					{b.instructionFiles.length > 0 ? (
-						<Section title="Instruction files (AGENTS.md / CLAUDE.md)">
-							{b.instructionFiles.map((f, i) => (
-								<TreeItem key={`if-${i}`} connector={ifConns[i]}>
-									<Row
-										label={`${f.path} · ${f.origin}`}
-										tokens={f.tokens}
-										extra={`${f.lines}L`}
-									/>
-								</TreeItem>
-							))}
-						</Section>
+						</TreeSubSection>
 					) : null}
 
-					{td.count > 0 ? (
-						<Section
-							title={`Tool definitions (${td.count} activos · ${fmt(td.tokens)} tokens)`}
+					{/* Subsección: Tool Snippets */}
+					{b.toolSnippetDetails.length > 0 ? (
+						<TreeSubSection
+							title={`Tool Snippets (${b.toolSnippetDetails.length})`}
+							icon="terminal"
+							expanded={!collapsed.toolSnippets}
+							onToggle={() => toggle("toolSnippets")}
+							tokens={b.toolSnippets}
 						>
-							{toolsShown.map((t, i) => (
-								<TreeItem key={`td-${i}`} connector={toolsConns[i]}>
-									<fbox flexDirection="row" gap={8} alignItems="center">
-										<ftext bold wrap={false}>
-											{t.name}
-										</ftext>
-										<ftext color={TENUE} wrap={true}>
-											{truncate(t.description, 60)}
-										</ftext>
-										<fbox flex={1} />
-										<ftext color={TENUE} wrap={false}>
-											{fmt(t.tokens)}
-										</ftext>
-									</fbox>
-								</TreeItem>
+							{b.toolSnippetDetails.map((ts, i) => (
+								<TreeRow
+									key={`ts-${i}`}
+									level={1}
+									icon="tools"
+									label={ts.name}
+									tokens={ts.tokens}
+								/>
 							))}
-							{toolsMore > 0 ? (
-								<TreeItem connector="└">
-									<ftext color={TENUE}>… y {toolsMore} más</ftext>
-								</TreeItem>
-							) : null}
-						</Section>
+						</TreeSubSection>
 					) : null}
-				</fbox>
+
+					{b.appendText > 0 ? (
+						<TreeRow
+							icon="note"
+							label="Append System Prompt"
+							tokens={b.appendText}
+						/>
+					) : null}
+				</TreeSection>
+
+				{/* 3.3. Sección: Definición de Herramientas (Tools) */}
+				{td.count > 0 ? (
+					<TreeSection
+						title={`Definición de Herramientas (${td.count} activas)`}
+						icon="tools"
+						expanded={!collapsed.tools}
+						onToggle={() => toggle("tools")}
+						tokens={td.tokens}
+					>
+						{td.tools.map((t, i) => (
+							<TreeRow
+								key={`td-${i}`}
+								icon="terminal"
+								label={t.name}
+								extra={truncate(t.description, 50)}
+								tokens={t.tokens}
+							/>
+						))}
+					</TreeSection>
+				) : null}
 			</fbox>
 
-			{/* Footer */}
-			<fbox flexDirection="row" justifyContent="flex-end" gap={8}>
+			{/* 4. Footer con acciones estilo Copilot */}
+			<fbox flexDirection="row" justifyContent="flex-end" gap={8} cls="ctxr-footer">
 				{actions.onCompact && s.compactionEnabled ? (
 					<fbutton
 						variant="secondary"
 						onClick={actions.onCompact}
-						title="Compacta el historial de la sesión (resume el contexto)"
+						title="Compactar historial de la sesión para liberar espacio de contexto"
 					>
+						<ficon name="collapse-all" size={12} />
 						Compactar
 					</fbutton>
 				) : null}
@@ -423,74 +452,189 @@ function truncate(s: string, n: number): string {
 	return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-/** Sección con título (header distinguible: bold + mayúsculas vía CSS). */
-function Section({
+/** Encabezado de sección raíz colapsable estilo Tree View. */
+function TreeSection({
 	title,
+	icon,
+	expanded,
+	onToggle,
+	badge,
+	tokens,
+	pct,
 	children,
 }: {
 	title: string;
+	icon: string;
+	expanded: boolean;
+	onToggle: () => void;
+	badge?: string;
+	tokens?: number;
+	pct?: number;
 	children: ReactNode;
 }): ReactElement {
 	return (
-		<fbox flexDirection="column" gap={3}>
-			<ftext bold cls="ctxr-sec">
-				{title}
-			</ftext>
-			{children}
+		<fbox flexDirection="column" gap={1} cls="ctx-tree-section">
+			<fbox
+				flexDirection="row"
+				alignItems="center"
+				gap={6}
+				cls="ctx-tree-section-header"
+				onClick={onToggle}
+			>
+				<ficon
+					name={expanded ? "chevron-down" : "chevron-right"}
+					size={12}
+					color={TENUE}
+				/>
+				<ficon name={icon} size={13} color="var(--vscode-textLink-foreground, #4daafc)" />
+				<ftext bold size={12}>
+					{title}
+				</ftext>
+				{badge ? (
+					<ftext size={11} color={TENUE}>
+						({badge})
+					</ftext>
+				) : null}
+				<fbox flex={1} />
+				{tokens == null ? null : (
+					<ftext size={11} color={TENUE} cls="ctx-tree-tokens" wrap={false}>
+						{fmt(tokens)}
+					</ftext>
+				)}
+				{pct == null ? null : (
+					<ftext size={11} color={TENUE} cls="ctx-tree-pct" wrap={false}>
+						({pct}%)
+					</ftext>
+				)}
+			</fbox>
+			{expanded ? (
+				<fbox flexDirection="column" gap={1} cls="ctx-tree-branch">
+					{children}
+				</fbox>
+			) : null}
 		</fbox>
 	);
 }
 
-/** Item de lista con conector de árbol (├/└) indentado a la izquierda. Envuelve
- *  cualquier contenido (Row, ftext, fbox) y lo separa del header de la sección. */
-function TreeItem({
-	connector,
+/** Subsección colapsable anidada (nivel 1). */
+function TreeSubSection({
+	title,
+	icon,
+	expanded,
+	onToggle,
+	tokens,
 	children,
 }: {
-	connector: string;
+	title: string;
+	icon: string;
+	expanded: boolean;
+	onToggle: () => void;
+	tokens?: number;
 	children: ReactNode;
 }): ReactElement {
 	return (
-		<fbox flexDirection="row" gap={6} alignItems="flex-start">
-			<ftext color={TENUE} wrap={false}>
-				{INDENT}
-				{connector}
-			</ftext>
-			<fbox flex={1} flexDirection="column">
-				{children}
+		<fbox flexDirection="column" gap={1} paddingLeft={12}>
+			<fbox
+				flexDirection="row"
+				alignItems="center"
+				gap={6}
+				cls="ctx-tree-row ctx-tree-subsec-header"
+				onClick={onToggle}
+			>
+				<ficon
+					name={expanded ? "chevron-down" : "chevron-right"}
+					size={11}
+					color={TENUE}
+				/>
+				<ficon name={icon} size={12} color={TENUE} />
+				<ftext bold size={11.5}>
+					{title}
+				</ftext>
+				<fbox flex={1} />
+				{tokens == null ? null : (
+					<ftext size={11} color={TENUE} cls="ctx-tree-tokens" wrap={false}>
+						{fmt(tokens)}
+					</ftext>
+				)}
 			</fbox>
+			{expanded ? (
+				<fbox flexDirection="column" gap={1}>
+					{children}
+				</fbox>
+			) : null}
 		</fbox>
 	);
 }
 
-/** Fila label · tokens (pct) [extra]. */
-function Row({
+/** Fila individual de nodo hoja en el Tree View con alineación en columnas. */
+function TreeRow({
+	icon,
+	swatchColor,
 	label,
+	badge,
+	extra,
 	tokens,
 	pct,
-	color,
-	extra,
+	level = 0,
+	isHot,
+	onMouseEnter,
+	onMouseLeave,
+	onClick,
 }: {
+	icon?: string;
+	swatchColor?: string;
 	label: string;
-	tokens: number;
-	pct?: number;
-	color?: string;
+	badge?: string;
 	extra?: string;
+	tokens?: number;
+	pct?: number;
+	level?: number;
+	isHot?: boolean;
+	onMouseEnter?: () => void;
+	onMouseLeave?: () => void;
+	onClick?: () => void;
 }): ReactElement {
 	return (
-		<fbox flexDirection="row" gap={8} alignItems="center">
-			{color ? <ftext color={color}>■</ftext> : null}
-			<ftext wrap={false}>{label}</ftext>
+		<fbox
+			flexDirection="row"
+			alignItems="center"
+			gap={6}
+			paddingLeft={level === 1 ? 26 : 14}
+			cls={`ctx-tree-row${isHot ? " is-hot" : ""}`}
+			onMouseEnter={onMouseEnter}
+			onMouseLeave={onMouseLeave}
+			onClick={onClick}
+		>
+			{swatchColor ? (
+				<ftext color={swatchColor} wrap={false} size={10}>
+					■
+				</ftext>
+			) : null}
+			{icon ? <ficon name={icon} size={12} color={TENUE} /> : null}
+			<ftext size={11.5} wrap={false}>
+				{label}
+			</ftext>
+			{badge ? (
+				<ftext size={10} color={TENUE} cls="ctx-tree-badge" wrap={false}>
+					[{badge}]
+				</ftext>
+			) : null}
 			{extra ? (
-				<ftext color={TENUE} wrap={false}>
+				<ftext size={11} color={TENUE} wrap={false}>
 					{extra}
 				</ftext>
 			) : null}
 			<fbox flex={1} />
-			<ftext color={TENUE} wrap={false}>
-				{fmt(tokens)}
-				{pct == null ? "" : ` (${pct}%)`}
-			</ftext>
+			{tokens == null ? null : (
+				<ftext size={11} color={TENUE} cls="ctx-tree-tokens" wrap={false}>
+					{fmt(tokens)}
+				</ftext>
+			)}
+			{pct == null ? null : (
+				<ftext size={11} color={TENUE} cls="ctx-tree-pct" wrap={false}>
+					({pct}%)
+				</ftext>
+			)}
 		</fbox>
 	);
 }
