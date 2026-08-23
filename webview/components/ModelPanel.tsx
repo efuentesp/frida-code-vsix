@@ -99,23 +99,27 @@ export function RolesSection({
 		providers.find((p) => p.id === id)?.name ?? id ?? "—";
 	return (
 		<div className="mr-roles">
-			<div className="mr-head">
+			{/* Fila completa clicable (idioma de settings de VS Code): el switch
+			 * es pequeño y sin etiqueta era invisible en práctica (#121). */}
+			<div
+				className="mr-head"
+				role="switch"
+				aria-checked={roles.enabled}
+				tabIndex={0}
+				onClick={() => onSetRoles({ enabled: !roles.enabled })}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onSetRoles({ enabled: !roles.enabled });
+					}
+				}}
+			>
 				<Codicon name="route" size={14} />
 				<span className="mr-title">ROLES — cada trabajo usa su modelo</span>
-				<button
-					type="button"
-					className={`ccp-switch${roles.enabled ? " ccp-switch-on" : ""}`}
-					role="switch"
-					aria-checked={roles.enabled}
-					title={
-						roles.enabled
-							? "Enrutar por roles — click para apagar (todo usa el modelo Principal)"
-							: "Enrutar por roles — click para encender"
-					}
-					onClick={() => onSetRoles({ enabled: !roles.enabled })}
-				>
+				<span className="mr-switch-label">Enrutar por roles</span>
+				<span className={`ccp-switch mr-switch${roles.enabled ? " ccp-switch-on" : ""}`}>
 					<span className="ccp-switch-knob" />
-				</button>
+				</span>
 			</div>
 			{roles.enabled ? (
 				<>

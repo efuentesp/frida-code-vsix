@@ -5889,6 +5889,28 @@ button.danger:hover {
 	align-items: center;
 	gap: 7px;
 	color: var(--vscode-foreground);
+	cursor: pointer;
+	padding: 2px 4px;
+	margin: -2px -4px;
+	border-radius: 4px;
+}
+.mr-head:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+.mr-head:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: 1px;
+}
+.mr-switch-label {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+.mr-head:hover .mr-switch-label {
+	color: var(--vscode-foreground);
+}
+.mr-switch {
+	margin-left: auto;
 }
 .mr-title {
 	font-size: 11px;
