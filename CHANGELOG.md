@@ -17,6 +17,39 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.30.0] - 2026-08-23
+### Añadido
+
+- **webview** — toggle de indexación automática con guía UX de cuándo usarlo
+- **webview** — línea de último archivo confirmado durante la indexación
+- **webview** — Fase C de motores de embeddings — banner honesto "pendiente de confirmar" sin embeddings confirmados
+- **webview** — Fase B de motores de embeddings — tarjetas interactivas, Ping, candado y modal de reconstrucción
+- **codebase-index** — Fase A de motores de embeddings — settings 4 proveedores, sync config.json y ping con dimensions
+- **webview** — detener indexación (#113) y motor real del índice en el banner (#114)
+- **environment** — checkOllama valida el modelo de embeddings del catálogo upstream
+- **webview** — Ollama en Entorno, reloj estable del index y lista de archivos indexados
+- **webview** — progreso de indexación en vivo en el tab Index
+- **webview** — tabs de Configuración responsivos con wrap multi-fila
+- **webview** — tiempo activo por turnos + popover de detalle en el header
+
+### Corregido
+
+- **codebase-index** — fallidos duplicados — dedup de chunks ya recuperados en la DB
+- **webview** — el botón Cambiar motor no abría el modal — guard falsy para null
+- **webview** — botón ✕ del popover de tiempo de sesión no cerraba
+- **webview** — turno inflado por eventos de sistema horas después
+
+### Interno
+
+- reformat biome post-turno (#120)
+- reformat biome post-turno (#119)
+- reformat biome post-turno (#118)
+- reformat biome post-turno (#115)
+- reformat biome post-turno (#117)
+- reformat biome post-turno (#113, #114)
+- reformat biome post-turno (#110)
+- reformat biome post-turno (#109)
+
 ## [0.29.0] - 2026-08-22
 ### Añadido
 
