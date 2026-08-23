@@ -68,23 +68,20 @@ export function passesFilter(
 
 /** Entradas de bookkeeping ocultas en el modo default (espejo de Pi). */
 function isBookkeeping(n: TreeEntryNode): boolean {
-	// custom_message con display:false es material interno del host (wiki/git
-	// context inyectado cada turno) — no es conversación visible para el
-	// usuario, así que el modo Conversación lo oculta. El modo Todo lo muestra.
-	if (n.kind === "customMessage") return n.display !== true;
-	return (
-		n.kind === "modelChange" ||
-		n.kind === "thinking" ||
-		n.kind === "other"
-	);
+	// custom_message: material interno del host (wiki/git-context/pipeline
+	// inyectado por turno, con o sin display). "Conversación" lo oculta
+	// siempre — el transcript del chat tampoco lo pinta como turno; "Todo"
+	// lo muestra etiquetado como ⟨customType⟩.
+	if (n.kind === "customMessage") return true;
+	return n.kind === "modelChange" || n.kind === "thinking" || n.kind === "other";
 }
 
-/** Asistentes sin texto se ocultan salvo error/abort o que sean la hoja actual. */
+/** Asistentes sin texto se ocultan (errores incluidos) salvo que sean la
+ *  posición efectiva. Las respuestas fallidas se ven en modo "Todo" con su
+ *  preview ⚠. */
 function showsAssistant(n: TreeEntryNode, isLeaf: boolean): boolean {
 	if (n.kind !== "assistant" || isLeaf) return true;
-	const stop = n.stopReason ?? "";
-	const isErrorOrAborted = !!stop && stop !== "stop" && stop !== "toolUse";
-	return !!n.hasText || isErrorOrAborted;
+	return !!n.hasText;
 }
 
 function searchableText(n: TreeEntryNode): string {
@@ -177,7 +174,29 @@ export function TreePanel({
 	const panelRef = useRef<HTMLDivElement>(null);
 	const searchRef = useRef<HTMLInputElement>(null);
 
-	// Ruta activa: hoja → raíz (para resaltar y atenuar hermanas).
+	// Posición efectiva (#126): si la hoja REAL es una entrada interna
+	// (custom_message de recarga, model_change, …), la hoja que se muestra
+	// regresa hacia el último ancestro que pase el filtro — el usuario ve su
+	// ● en la última entrada de conversación, no en ⟨frida-pipeline-index⟩.
+	// En modo "Todo" la hoja real SIEMPRE se ve (nada se oculta).
+	const effectiveLeafId = useMemo(() => {
+		if (filterMode === "all" || !data.leafId) return data.leafId;
+		const byId = new Map<string, TreeEntryNode>();
+		const collect = (list: TreeEntryNode[]) => {
+			for (const n of list) {
+				byId.set(n.id, n);
+				collect(n.children);
+			}
+		};
+		collect(data.nodes);
+		let cur: TreeEntryNode | undefined = byId.get(data.leafId);
+		while (cur && !passesFilter(cur, filterMode, false)) {
+			cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+		}
+		return cur?.id ?? data.leafId;
+	}, [data, filterMode]);
+
+	// Ruta activa: hoja efectiva → raíz (para resaltar y atenuar hermanas).
 	const activePath = useMemo(() => {
 		const set = new Set<string>();
 		const byId = new Map<string, TreeEntryNode>();
@@ -188,13 +207,13 @@ export function TreePanel({
 			}
 		};
 		walk(data.nodes);
-		let cur = data.leafId ? byId.get(data.leafId) : undefined;
+		let cur = effectiveLeafId ? byId.get(effectiveLeafId) : undefined;
 		while (cur) {
 			set.add(cur.id);
 			cur = cur.parentId ? byId.get(cur.parentId) : undefined;
 		}
 		return set;
-	}, [data]);
+	}, [data, effectiveLeafId]);
 
 	// IDs visibles (paridad applyFilter de Pi): pasan el filtro + búsqueda; la
 	// hoja actual SIEMPRE visible (posición activa perceptible); los hijos de
@@ -221,11 +240,10 @@ export function TreePanel({
 		};
 		collect(data.nodes);
 		for (const n of byId.values()) {
-			const isLeaf = n.id === data.leafId;
+			const isLeaf = n.id === effectiveLeafId;
 			const passes =
 				passesFilter(n, filterMode, isLeaf) &&
-				(tokens.length === 0 ||
-					tokens.every((t) => searchableText(n).includes(t)));
+				(tokens.length === 0 || tokens.every((t) => searchableText(n).includes(t)));
 			if (passes || isLeaf) keep.add(n.id);
 		}
 		// Plegado: descendientes de un nodo plegado desaparecen (sólo sin búsqueda).
@@ -238,7 +256,7 @@ export function TreePanel({
 			for (const id of drop) keep.delete(id);
 		}
 		return keep;
-	}, [data, filterMode, search, folded]);
+	}, [data, filterMode, search, folded, effectiveLeafId]);
 
 	// Lista plana visible en orden DFS (para navegación por teclado).
 	const flatVisible = useMemo(() => {
@@ -258,7 +276,14 @@ export function TreePanel({
 	}, []);
 
 	useEffect(() => {
-		if (!selectedId && flatVisible.length > 0)
+		// Selección inicial/fallback: si la hoja real quedó invisible (entrada
+		// interna bajo el filtro), la selección salta a la última fila visible.
+		if (
+			(flatVisible.length > 0 && !selectedId) ||
+			(flatVisible.length > 0 &&
+				selectedId &&
+				!flatVisible.some((n) => n.id === selectedId))
+		)
 			setSelectedId(flatVisible[flatVisible.length - 1].id);
 	}, [flatVisible, selectedId]);
 
@@ -303,7 +328,7 @@ export function TreePanel({
 	}, [data]);
 
 	const onRowActivate = (id: string) => {
-		if (id === data.leafId) {
+		if (id === effectiveLeafId) {
 			setStatus("Ya estás en este punto de la conversación.");
 			return;
 		}
@@ -368,7 +393,7 @@ export function TreePanel({
 
 	const renderRow = (n: TreeEntryNode, depth: number) => {
 		if (!visibleIds.has(n.id)) return null;
-		const isLeaf = n.id === data.leafId;
+		const isLeaf = n.id === effectiveLeafId;
 		const sel = n.id === selectedId;
 		const foldable = n.children.some((c) => visibleIds.has(c.id));
 		const isOpen = !folded.has(n.id);

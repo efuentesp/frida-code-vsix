@@ -11052,7 +11052,9 @@ kbd {
 	border-radius: 3px;
 	cursor: pointer;
 	color: var(--vscode-foreground);
-	transition: background 0.1s ease, opacity 0.1s ease;
+	transition:
+		background 0.1s ease,
+		opacity 0.1s ease;
 }
 .tree-row:hover {
 	background: var(--vscode-list-hoverBackground);
@@ -11081,7 +11083,9 @@ kbd {
 	color: var(--vscode-descriptionForeground);
 	cursor: pointer;
 	opacity: 0;
-	transition: transform 0.15s ease, opacity 0.1s ease;
+	transition:
+		transform 0.15s ease,
+		opacity 0.1s ease;
 }
 .tree-row:hover .tree-chevron,
 .tree-chevron.open,
@@ -11304,7 +11308,10 @@ kbd {
 	color: var(--vscode-button-foreground);
 }
 .tree-confirm-actions .btn-primary:hover {
-	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+	background: var(
+		--vscode-button-hoverBackground,
+		var(--vscode-button-background)
+	);
 }
 .tree-confirm-actions .btn-secondary {
 	border: none;

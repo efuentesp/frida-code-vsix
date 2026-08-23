@@ -5,7 +5,13 @@ import { SessionsPanel } from "../webview/components/SessionsPanel";
 import type { SessionItem } from "../webview/types";
 
 describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", () => {
+	// Fechas relativas al DÍA CALENDARIO (no a horas corridas): correr la suite
+	// entre 00:00 y 02:00 AM hacia que now-26h cayera dos días atrás y el grupo
+	// "Ayer" nunca aparecía (flake reportado en #126).
 	const now = Date.now();
+	const hoyStart = new Date();
+	hoyStart.setHours(0, 0, 0, 0);
+	const ayer = hoyStart.getTime() - 1000 * 60 * 60 * 23; // = ayer 01:00 — siempre "Ayer"
 	const sampleSessions: SessionItem[] = [
 		{
 			path: "/sessions/s1.jsonl",
@@ -24,7 +30,7 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 			name: "Diagnóstico Error 400",
 			firstMessage: "revisando buildFridaPayload",
 			messageCount: 6,
-			modified: now - 1000 * 60 * 60 * 26, // hace 26h (Ayer)
+			modified: ayer, // inicio de ayer +1h (Ayer) — robusto a la hora de corrida
 			durationMs: 1000 * 60 * 12,
 			inputTotal: 12000,
 			outputTotal: 2500,

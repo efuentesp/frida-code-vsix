@@ -148,27 +148,38 @@ describe("passesFilter — paridad applyFilter de Pi (#126)", () => {
 		expect(passesFilter(user, "default", false)).toBe(true);
 	});
 
-	it("custom_message con display:true SÍ se ve en Conversación", () => {
-		const visible = node({
+	it("custom_message con display:true también se oculta en Conversación (es material interno)", () => {
+		const notice = node({
 			id: "w2",
 			kind: "customMessage",
-			text: "⟨custom⟩ …",
+			text: "⟨wiki-session-notice⟩ 🧠 …",
 			display: true,
 		});
-		expect(passesFilter(visible, "default", false)).toBe(true);
+		expect(passesFilter(notice, "default", false)).toBe(false);
+		expect(passesFilter(notice, "all", false)).toBe(true);
 	});
 
 	it("Sólo usuario deja únicamente kind=user", () => {
-		expect(passesFilter(node({ id: "a", kind: "user" }), "user-only", false)).toBe(true);
 		expect(
-			passesFilter(node({ id: "b", kind: "assistant", hasText: true }), "user-only", false),
+			passesFilter(node({ id: "a", kind: "user" }), "user-only", false),
+		).toBe(true);
+		expect(
+			passesFilter(
+				node({ id: "b", kind: "assistant", hasText: true }),
+				"user-only",
+				false,
+			),
 		).toBe(false);
 		expect(
-			passesFilter(node({ id: "c", kind: "customMessage", display: true }), "user-only", false),
+			passesFilter(
+				node({ id: "c", kind: "customMessage", display: true }),
+				"user-only",
+				false,
+			),
 		).toBe(false);
 	});
 
-	it("asistente sin texto se oculta en default salvo error/abort o ser hoja", () => {
+	it("asistente sin texto se oculta en default (errores incluidos, van en Todo); hoja efectiva visible", () => {
 		const mudo = node({ id: "s1", kind: "assistant", text: "", hasText: false });
 		const error = node({
 			id: "s2",
@@ -178,14 +189,21 @@ describe("passesFilter — paridad applyFilter de Pi (#126)", () => {
 			stopReason: "error",
 		});
 		expect(passesFilter(mudo, "default", false)).toBe(false);
-		expect(passesFilter(error, "default", false)).toBe(true);
+		expect(passesFilter(error, "default", false)).toBe(false);
+		expect(passesFilter(error, "all", false)).toBe(true);
 		expect(passesFilter(mudo, "default", true)).toBe(true); // hoja siempre visible
 	});
 
 	it("Todo muestra todo", () => {
 		expect(
-			passesFilter(node({ id: "x", kind: "customMessage", display: false }), "all", false),
+			passesFilter(
+				node({ id: "x", kind: "customMessage", display: false }),
+				"all",
+				false,
+			),
 		).toBe(true);
-		expect(passesFilter(node({ id: "y", kind: "modelChange" }), "all", false)).toBe(true);
+		expect(
+			passesFilter(node({ id: "y", kind: "modelChange" }), "all", false),
+		).toBe(true);
 	});
 });
