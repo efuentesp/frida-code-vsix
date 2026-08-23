@@ -31,6 +31,7 @@ import { ModelConfirmDialog } from "./components/ModelConfirmDialog";
 import type { ModelConfirmTarget } from "./components/ModelConfirmDialog";
 import { SettingsHub, type SettingsTab } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
+import { TreePanel } from "./components/TreePanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
@@ -95,6 +96,9 @@ export function App() {
 		model: string;
 	} | null>(null);
 	const [forkOpen, setForkOpen] = useState(false);
+	// /tree (#126): overlay del árbol de la sesión activa. Se abre al recibir
+	// tree_data del host (mismo patrón que fork_points → forkOpen).
+	const [treeOpen, setTreeOpen] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
 	// Tab pedido del hub (p.ej. el comando frida.codebaseIndex pide "codebaseIndex").
 	// Fuerza re-monte del SettingsHub vía key para entrar al tab correcto incluso
@@ -134,6 +138,10 @@ export function App() {
 			if (msg.type === "fork_points") {
 				setForkOpen(true);
 				return;
+			}
+			if (msg.type === "tree_data") {
+				setTreeOpen(true);
+				return; // no despachar al reducer
 			}
 			dispatch(msg);
 		};
@@ -961,6 +969,24 @@ export function App() {
 					points={state.forkPoints}
 					onClose={() => setForkOpen(false)}
 					onFork={(entryId) => post({ type: "fork_at", entryId })}
+				/>
+			)}
+			{treeOpen && state.treeData && state.treeData.nodes.length > 0 && (
+				<TreePanel
+					data={state.treeData}
+					onClose={() => setTreeOpen(false)}
+					onNavigate={(entryId, summarize, customInstructions) => {
+						post({
+							type: "tree_navigate",
+							entryId,
+							summarize,
+							customInstructions,
+						});
+						setTreeOpen(false);
+					}}
+					onLabel={(entryId, label) =>
+						post({ type: "tree_label", entryId, label })
+					}
 				/>
 			)}
 			{configOpen && (

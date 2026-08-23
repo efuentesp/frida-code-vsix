@@ -110,6 +110,7 @@ El panel es un chat (webview React) que se comunica con el host por `postMessage
 | Comando | Acción |
 | --- | --- |
 | `/ask [tema]` | Formular preguntas o decisiones interactivas con opciones (`ask_user_question`) |
+| `/tree` | Navegar el árbol de la sesión activa: saltar a cualquier punto, ramificar desde un mensaje, etiquetar y resumir ramas (misma sesión; ver [Árbol de sesión](#árbol-de-sesión-tree)) |
 | `/help [herramienta]` | Abre esta ayuda (o la doc de la herramienta indicada) en el preview de markdown |
 | `/new` | Nueva sesión |
 | `/clone` · `/fork` | Clonar / bifurcar la sesión actual |

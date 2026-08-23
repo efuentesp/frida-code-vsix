@@ -26,7 +26,9 @@ describe("expandAskPrompt (/ask slash command)", () => {
 	});
 
 	it("limpia espacios al inicio y final del argumento", () => {
-		const res = expandAskPrompt("/ask    arquitectura de microservicios vs monolito   ");
+		const res = expandAskPrompt(
+			"/ask    arquitectura de microservicios vs monolito   ",
+		);
 		expect(res).not.toBeNull();
 		expect(res).toContain('"arquitectura de microservicios vs monolito"');
 	});

@@ -2935,6 +2935,84 @@ export async function activate(
 			case "fork_at":
 				await forkAt(String(msg.entryId ?? ""));
 				break;
+			case "tree":
+				await postTreeCommand();
+				break;
+			// /tree (#126): el TreePanel confirmó la navegación. Delegamos en
+			// session.navigateTree (misma API que la TUI de Pi): mueve la hoja EN EL
+			// MISMO ARCHIVO (sin createBranchedSession), opcionalmente resume la rama
+			// abandonada y devuelve editorText si el destino era mensaje de usuario
+			// (ese texto regresa al Composer para editarlo y reenviar → rama hermana).
+			case "tree_navigate": {
+				const entryId = String(msg.entryId ?? "");
+				if (!frida?.session?.session || !entryId) return;
+				const s: any = frida.session.session;
+				if (s.isStreaming) {
+					post({
+						type: "info",
+						level: "warning",
+						text:
+							"Espera a que termine la respuesta en curso para navegar el árbol (o pulsa Esc para detenerla).",
+					});
+					return;
+				}
+				const summarize = !!msg.summarize;
+				const custom =
+					typeof msg.customInstructions === "string" && msg.customInstructions.trim()
+						? msg.customInstructions.trim()
+						: undefined;
+				try {
+					const result = await s.navigateTree(entryId, {
+						summarize,
+						customInstructions: custom,
+					});
+					if (result?.cancelled) {
+						post({ type: "info", text: "Navegación cancelada." });
+						return;
+					}
+					// Igual que compaction_end: la hoja se movió → reconstruir transcript
+					// + barras de contexto/workspace desde la nueva posición.
+					postHistory();
+					postUsage(frida.session);
+					void postWorkspace();
+					if (result?.editorText) {
+						// Mensaje de usuario seleccionado: su texto regresa al Composer
+						// (nonce propio para disparar el useEffect aun con texto igual).
+						post({ type: "composer_insert", text: String(result.editorText) });
+					}
+					post({
+						type: "info",
+						text: "Navegación en el árbol completada (misma sesión).",
+					});
+				} catch (e: any) {
+					post({
+						type: "error",
+						text: "No se pudo navegar: " + String(e?.message ?? e),
+					});
+				}
+				break;
+			}
+			// /tree (#126): etiqueta de checkpoint (paridad Shift+L de Pi). El SDK la
+			// persiste como entrada label (targetId + texto); re-publicamos el árbol
+			// para que la fila refleje el cambio.
+			case "tree_label": {
+				const entryId = String(msg.entryId ?? "");
+				if (!frida?.session?.sessionManager || !entryId) return;
+				const label =
+					typeof msg.label === "string" && msg.label.trim()
+						? msg.label.trim().slice(0, 40)
+						: undefined;
+				try {
+					frida.session.sessionManager.appendLabelChange(entryId, label);
+					await postTreeCommand();
+				} catch (e: any) {
+					post({
+						type: "error",
+						text: "No se pudo guardar la etiqueta: " + String(e?.message ?? e),
+					});
+				}
+				break;
+			}
 			case "workspace":
 				await postWorkspace();
 				break;
@@ -3452,6 +3530,11 @@ export async function activate(
 			description: "Mostrar la lista de tareas agrupada por estado",
 		},
 		{
+			name: "tree",
+			description:
+				"Navegar el árbol de la sesión (ramas, etiquetas, cambiar de hoja)",
+		},
+		{
 			name: "context",
 			description:
 				"Reporte de uso del contexto (presión, categorías, system prompt)",
@@ -3571,6 +3654,9 @@ export async function activate(
 				break;
 			case "todos":
 				postTodosCommand();
+				break;
+			case "tree":
+				await postTreeCommand();
 				break;
 			case "context":
 				postContextCommand(arg);
@@ -4120,6 +4206,104 @@ export async function activate(
 			for (const t of done) lines.push(fmt(t));
 		}
 		post({ type: "notice", text: lines.join("\n") });
+	}
+
+	// /tree (#126): serializa un nodo del árbol de sesión (SessionTreeNode del
+	// SDK) a la vista compacta que consume el TreePanel del webview. Sólo los
+	// campos que la UI necesita — el entry completo puede traer contents grandes.
+	function serializeTreeNode(node: any): any {
+		const entry = node?.entry ?? {};
+		const label: string | undefined =
+			typeof node?.label === "string" && node.label ? node.label : undefined;
+		const ts = String(entry.timestamp ?? "");
+		const base = {
+			id: String(entry.id ?? ""),
+			parentId: entry.parentId == null ? null : String(entry.parentId),
+			timestamp: ts,
+			label,
+			children: (Array.isArray(node?.children) ? node.children : []).map(
+				serializeTreeNode,
+			),
+		};
+		// Determinar kind + preview según el tipo de entrada. Paridad con los
+		// filtros de TreeSelectorComponent (Pi TUI): default oculta bookkeeping
+		// y asistentes sin texto (salvo error/abort).
+		if (entry.type === "message") {
+			const role = String(entry.message?.role ?? "");
+			const text = extractText(entry.message);
+			if (role === "user")
+				return { ...base, kind: "user" as const, text: text.slice(0, 160) };
+			if (role === "assistant") {
+				// Los tool_calls van como partes del mensaje: contamos y armamos
+				// un preview sintético para que la fila tenga contexto sin inflar.
+				const c = Array.isArray(entry.message?.content)
+					? entry.message.content
+					: [];
+				const toolCalls = c.filter((p: any) => p?.type === "toolCall").length;
+				const stop = String(entry.message?.stopReason ?? "");
+				return {
+					...base,
+					kind: "assistant" as const,
+					text: text.slice(0, 160),
+					hasText: text.trim().length > 0,
+					toolCalls,
+					stopReason: stop || undefined,
+				};
+			}
+			if (role === "toolResult")
+				return { ...base, kind: "toolResult" as const, text: text.slice(0, 160) };
+			return { ...base, kind: "other" as const, text: text.slice(0, 160) };
+		}
+		if (entry.type === "branch_summary")
+			return {
+				...base,
+				kind: "branchSummary" as const,
+				text: String(entry.summary ?? "").slice(0, 160),
+			};
+		if (entry.type === "compaction")
+			return {
+				...base,
+				kind: "compaction" as const,
+				text: String(entry.summary ?? "").slice(0, 160),
+			};
+		if (entry.type === "model_change")
+			return {
+				...base,
+				kind: "modelChange" as const,
+				text: `${entry.provider ?? ""}/${entry.modelId ?? ""}`,
+			};
+		if (entry.type === "thinking_level_change")
+			return {
+				...base,
+				kind: "thinking" as const,
+				text: String(entry.thinkingLevel ?? ""),
+			};
+		return { ...base, kind: "other" as const, text: "" };
+	}
+
+	// /tree (#126): publica el árbol completo de la sesión + hoja activa al
+	// webview (getTree/getLeafId del SessionManager). El TreePanel decide
+	// filtros/plegado; la navegación regresa por tree_navigate.
+	async function postTreeCommand(): Promise<void> {
+		let session: FridaSession;
+		try {
+			session = await ensureSession();
+		} catch (e: any) {
+			post({ type: "error", text: String(e?.message ?? e) });
+			return;
+		}
+		const sm = session.sessionManager;
+		const roots = sm?.getTree?.() ?? [];
+		if (roots.length === 0) {
+			post({ type: "info", text: "No hay entradas en la sesión todavía." });
+			return;
+		}
+		post({
+			type: "tree_data",
+			nodes: roots.map(serializeTreeNode),
+			leafId: sm?.getLeafId?.() ?? null,
+			sessionName: sm?.getSessionName?.() ?? undefined,
+		});
 	}
 
 	// /context: reporte de uso del contexto como panel overlay (barra segmentada
@@ -4803,8 +4987,7 @@ export async function activate(
 		// skills (/skill: o $skill) ambos son el bloque; para /ask es el prompt estructurado;
 		// para @files/normal se preserva el comportamiento actual (post raw, send expandido con @files
 		// ya sustituidos).
-		const toSend =
-			askPrompt ?? multiSkill?.transformed ?? skillBlock ?? expanded;
+		const toSend = askPrompt ?? multiSkill?.transformed ?? skillBlock ?? expanded;
 		const toPost = multiSkill?.transformed ?? skillBlock ?? trimmed;
 
 		// Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.

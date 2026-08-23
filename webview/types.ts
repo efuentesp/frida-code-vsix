@@ -322,6 +322,46 @@ export interface SessionItem {
 	outputTotal?: number;
 }
 
+// ── /tree (#126): árbol de la sesión activa ──
+// Nodo serializado por el host (serializeTreeNode): sólo los campos que la UI
+// necesita. La forma espeja SessionTreeNode del SDK, con preview corto y kind
+// normalizado para iconos/filtros (paridad TreeSelectorComponent de Pi).
+export type TreeEntryKind =
+	| "user"
+	| "assistant"
+	| "toolResult"
+	| "branchSummary"
+	| "compaction"
+	| "modelChange"
+	| "thinking"
+	| "other";
+
+export interface TreeEntryNode {
+	id: string;
+	parentId: string | null;
+	timestamp: string;
+	/** Etiqueta de checkpoint (label entry del SDK), si la entrada tiene una. */
+	label?: string;
+	kind: TreeEntryKind;
+	/** Preview corto del contenido (≤160 chars, host-side). */
+	text: string;
+	/** Assistant: tiene partes de texto (para el filtro default de Pi). */
+	hasText?: boolean;
+	/** Assistant: número de tool_calls en el mensaje. */
+	toolCalls?: number;
+	/** Assistant: stopReason (error/abort visibles en modo default). */
+	stopReason?: string;
+	children: TreeEntryNode[];
+}
+
+/** Snapshot del árbol publicado por el host al abrir /tree. */
+export interface TreeData {
+	nodes: TreeEntryNode[];
+	/** Hoja activa (posición actual de la sesión). */
+	leafId: string | null;
+	sessionName?: string;
+}
+
 // Recursos cargados por el resourceLoader de pi (ver panel de recursos).
 export interface ResourceExtension {
 	path: string;
@@ -785,6 +825,8 @@ export interface State {
 	/** #20 — snapshot del goal activo (chip 🎯 del footer); undefined = sin goal. */
 	goal?: GoalState;
 	forkPoints?: { entryId: string; text: string }[];
+	/** /tree (#126): árbol de la sesión activa publicado por el host. */
+	treeData?: TreeData;
 	oauthDeviceCode?: { userCode: string; verificationUri: string };
 	queued: QueueItem[];
 	isCompacting: boolean;
@@ -953,6 +995,13 @@ export type InMessage =
 	| { type: "oauth_clear" }
 	| { type: "fork_points"; points: { entryId: string; text: string }[] }
 	| {
+			/** /tree (#126): snapshot del árbol de la sesión activa. */
+			type: "tree_data";
+			nodes: TreeEntryNode[];
+			leafId: string | null;
+			sessionName?: string;
+	  }
+	| {
 			type: "history";
 			name?: string;
 			items: HistoryItem[];
@@ -1101,6 +1150,22 @@ export type OutMessage =
 	| { type: "logout_provider"; provider: string }
 	| { type: "fork" }
 	| { type: "fork_at"; entryId: string }
+	| { type: "tree" }
+	| {
+			/** /tree: confirmar navegación a una entrada (misma sesión). */
+			type: "tree_navigate";
+			entryId: string;
+			/** Resumir la rama abandonada (branch summary). */
+			summarize?: boolean;
+			customInstructions?: string;
+	  }
+	| {
+			/** /tree: poner/quitar etiqueta de checkpoint en una entrada. */
+			type: "tree_label";
+			entryId: string;
+			/** Vacío/undefined limpia la etiqueta. */
+			label?: string;
+	  }
 	| { type: "switch_session"; path: string }
 	| { type: "rename_session"; path: string; name: string }
 	| { type: "delete_session"; path: string }

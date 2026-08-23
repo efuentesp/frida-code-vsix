@@ -86,9 +86,7 @@ function declined(): ToolResult {
 }
 function invalid(error: string, message: string): ToolResult {
 	return {
-		content: [
-			{ type: "text", text: `Pregunta inválida (${error}): ${message}` },
-		],
+		content: [{ type: "text", text: `Pregunta inválida (${error}): ${message}` }],
 		details: { answers: [], cancelled: true, error },
 	};
 }

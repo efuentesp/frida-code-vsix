@@ -567,6 +567,18 @@ export function reduce(state: State, msg: InMessage): State {
 		case "fork_points":
 			return { ...state, forkPoints: msg.points };
 
+		// /tree (#126): el host publicó el árbol de la sesión activa. El panel
+		// se abre desde App al ver el mensaje (mismo patrón que fork_points).
+		case "tree_data":
+			return {
+				...state,
+				treeData: {
+					nodes: msg.nodes,
+					leafId: msg.leafId,
+					sessionName: msg.sessionName,
+				},
+			};
+
 		case "mode":
 			return { ...state, mode: msg.mode };
 

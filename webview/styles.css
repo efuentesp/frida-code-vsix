@@ -10955,3 +10955,374 @@ kbd {
 		animation: none !important;
 	}
 }
+
+/* ═══ /tree (#126): overlay del árbol de la sesión activa ═══
+   Reutiliza .sessions-overlay/.sessions-panel para el cascarón. Filas estilo
+   Explorer (chevron fantasma + icono de tipo + preview + hora tabular),
+   ruta activa resaltada y hermanas atenuadas. 100% variables del tema. */
+.tree-panel {
+	max-width: 640px;
+}
+
+.tree-subtitle {
+	padding: 6px 14px 0;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.tree-toolbar {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 14px 8px;
+	border-bottom: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+
+.tree-search {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+}
+.tree-search:focus-within {
+	border-color: var(--vscode-focusBorder);
+}
+.tree-search input {
+	flex: 1;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: inherit;
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+}
+
+.tree-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.tree-filter-chip {
+	border: none;
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 3px;
+	cursor: pointer;
+	font-family: var(--vscode-font-family);
+}
+.tree-filter-chip:hover {
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+}
+.tree-filter-chip.active {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	box-shadow: inset 0 -2px 0 0 var(--vscode-textLink-foreground, #4daafc);
+}
+
+.tree-scroll {
+	flex: 1;
+	overflow: auto;
+	padding: 6px 8px;
+}
+
+.tree-branch {
+	display: flex;
+	flex-direction: column;
+}
+.tree-children {
+	margin-left: 13px;
+	padding-left: 4px;
+	border-left: 1px solid
+		var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.25));
+}
+
+.tree-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 22px;
+	padding: 2px 8px 2px 6px;
+	border-radius: 3px;
+	cursor: pointer;
+	color: var(--vscode-foreground);
+	transition: background 0.1s ease, opacity 0.1s ease;
+}
+.tree-row:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.tree-row.is-sel {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+.tree-row.off-path {
+	opacity: 0.55;
+}
+.tree-row.off-path:hover,
+.tree-row.off-path.is-sel {
+	opacity: 1;
+}
+
+.tree-chevron {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border: none;
+	background: none;
+	padding: 0;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	opacity: 0;
+	transition: transform 0.15s ease, opacity 0.1s ease;
+}
+.tree-row:hover .tree-chevron,
+.tree-chevron.open,
+.tree-chevron:focus-visible {
+	opacity: 0.8;
+}
+.tree-chevron:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+
+.tree-kind {
+	color: var(--vscode-descriptionForeground);
+	flex-shrink: 0;
+}
+.tree-row.is-leaf .tree-kind {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+
+.tree-label-badge {
+	flex-shrink: 0;
+	max-width: 110px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 10px;
+	padding: 0 5px;
+	border-radius: 3px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	line-height: 16px;
+}
+.tree-label-input {
+	flex-shrink: 0;
+	width: 130px;
+	font-size: 11px;
+	padding: 1px 5px;
+	border: 1px solid var(--vscode-focusBorder);
+	border-radius: 3px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	outline: none;
+	font-family: var(--vscode-font-family);
+}
+
+.tree-text {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+}
+
+.tree-leaf-dot {
+	color: var(--vscode-charts-green, #73c991);
+	font-size: 10px;
+	flex-shrink: 0;
+	line-height: 1;
+}
+
+.tree-ts {
+	flex-shrink: 0;
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	font-variant-numeric: tabular-nums;
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+}
+.tree-row.is-sel .tree-ts {
+	color: var(--vscode-list-activeSelectionForeground);
+	opacity: 0.8;
+}
+
+.tree-label-btn {
+	display: inline-flex;
+	align-items: center;
+	border: none;
+	background: none;
+	padding: 0 2px;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+.tree-row:hover .tree-label-btn,
+.tree-row.is-sel .tree-label-btn {
+	opacity: 0.8;
+}
+.tree-label-btn:hover {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+
+.tree-empty {
+	padding: 24px 16px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground);
+	font-size: 12px;
+}
+
+.tree-statusbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 14px;
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+.tree-status {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.tree-fork-hint {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+.tree-fork-hint kbd {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	padding: 0 3px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3));
+	border-radius: 3px;
+}
+
+/* Diálogo de branch summary (paso 2 del /tree) */
+.tree-confirm-overlay {
+	z-index: 60;
+	background: rgba(0, 0, 0, 0.35);
+}
+.tree-confirm {
+	width: 92%;
+	max-width: 480px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+	background: var(
+		--vscode-editorWidget-background,
+		var(--vscode-sideBar-background, #252526)
+	);
+	border: 1px solid
+		var(
+			--vscode-widget-border,
+			var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25))
+		);
+	border-radius: 8px;
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+	font-size: 12.5px;
+	color: var(--vscode-foreground);
+}
+.tree-confirm-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+.tree-confirm-body {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	line-height: 1.5;
+}
+.tree-opts {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.tree-opt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	border: none;
+	background: transparent;
+	color: var(--vscode-foreground);
+	font-size: 12px;
+	text-align: left;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: var(--vscode-font-family);
+}
+.tree-opt:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.tree-opt.sel {
+	background: var(--vscode-list-activeSelectionBackground);
+	color: var(--vscode-list-activeSelectionForeground);
+}
+.tree-custom {
+	resize: vertical;
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	padding: 6px 8px;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	outline: none;
+}
+.tree-custom:focus {
+	border-color: var(--vscode-focusBorder);
+}
+.tree-confirm-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+.tree-confirm-actions .btn-primary,
+.tree-confirm-actions .btn-secondary {
+	font-size: 12px;
+	padding: 4px 12px;
+	border-radius: 3px;
+	cursor: pointer;
+}
+.tree-confirm-actions .btn-primary {
+	border: none;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+.tree-confirm-actions .btn-primary:hover {
+	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+}
+.tree-confirm-actions .btn-secondary {
+	border: none;
+	background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
+	color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+}
+.tree-confirm-actions .btn-secondary:hover {
+	background: var(
+		--vscode-button-secondaryHoverBackground,
+		rgba(128, 128, 128, 0.3)
+	);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tree-chevron {
+		transition: none !important;
+	}
+	.tree-row {
+		transition: none !important;
+	}
+}
