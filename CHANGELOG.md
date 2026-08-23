@@ -17,6 +17,58 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.31.0] - 2026-08-23
+### Añadido
+
+- **sessions** — incorporar tiempo activo y turnos al historial de sesiones
+- **agent-browser** — modo script sandbox + presentación compacta (0.4.0)
+- **agent-browser** — sync contractual con binario 0.34.0 (upstream 0.4.2/0.4.3)
+- **agent-browser** — baseline del binario + smoke e2e real contra 0.34.0
+- **commands** — agregar /tree para navegar el arbol de sesion en el mismo archivo
+- **commands** — agregar slash command /ask para invocar cuestionarios estructurados
+- **context** — rediseño instrumento técnico del reporte /context + DESIGN.md
+- **providers** — Ollama Cloud — registro dinamico, auth y seleccion completa (#122)
+- **providers** — Ollama local como proveedor de chat — daemon, modelos instalados y seleccionables (#123)
+- **webview** — toggle "Ocultar razonamiento" del header a Configuracion > Modelos (#121)
+- **models** — roles de modelo y routing por intencion — F7 (#121)
+
+### Cambiado
+
+- **context** — migrar reporte /context a Tree View estilo Copilot Chat + actualizar DESIGN.md
+
+### Corregido
+
+- **test** — 2 drifts de tipo en tests live de frida-enterprise
+- **test** — mock de ensureInstalled con retargeted (drift con EnsureInstalledResult)
+- **tree** — icono de asistente = robot oficial de Frida, no copilot de GitHub
+- **tree** — nodos con ancestros ocultos emergen a raiz visual (Conversacion vacia)
+- **tree** — renormalizar profundidad visual al filtrar (sin escalera ni | huerfanos)
+- **tree** — modo Conversacion limpio y punto verde en posicion efectiva
+- **tree** — filtros visibles y sin renglones ruido en el arbol de sesion
+- **webview** — despachar tree_data/fork_points al reducer para que los paneles rendericen
+- **providers** — ocultar Ollama local de las listas de seleccion cuando no hay modelos de chat (#123)
+- **webview** — icono del tab Modelos — "sliders" no existe en codicons (#121)
+- **webview** — switch maestro de Roles invisible — etiqueta + fila clicable (#121)
+- **webview** — copy del estado OFF de Roles — "abajo" no existe en Configuracion (#121)
+- **webview** — seccion Roles en el tab Modelos de Configuracion (#121)
+
+### Interno
+
+- **webview** — assets compilados (historial con tiempo activo #107, tree, /ask)
+- **sessions** — reformato pi-lens post-commit (c7ea0e0)
+- **agents** — cierre de issues por el agente tras verificación propia
+- **agent-browser** — reformato pi-lens post-commit (Refs #131, #132)
+- **agent-browser** — reformato pi-lens post-commit (59517f7)
+- **test** — reformato pi-lens post-commit (5f83584)
+- guía portable de entorno dev confiable con agentes IA
+- **agent-browser** — reformato pi-lens post-commit (61f43c4)
+- **design** — enriquecer DESIGN.md con la arquitectura del core de VS Code (frida-llops reference)
+- **design** — complementar DESIGN.md con especificacion completa de Chat, Settings Hub y Modales
+- **webview** — switches de Roles al estilo .switch de Herramientas (#121)
+- **roadmap** — refresh post-cierre de issues implementados
+- **roadmap** — integrar fases 7-13 (oh-my-pi) al framework de prioridades y refresh de estado
+- **roadmap** — fases 7-13 — capacidades del harness inspiradas en oh-my-pi
+
 ## [0.30.0] - 2026-08-23
 ### Añadido
 
