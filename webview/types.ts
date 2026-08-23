@@ -425,6 +425,18 @@ export interface ProviderOption {
 	models: ModelOption[];
 }
 
+/** #121 (F7) — snapshot de la config de roles para la UI. */
+export interface ModelRolesUi {
+	/** Switch maestro: OFF = todo por el modelo activo (modo clásico). */
+	enabled: boolean;
+	/** Rol Rápido (subagents/extracciones). null = hereda default. */
+	smol: { provider: string; modelId: string } | null;
+	/** Rol Commits (changelogs). null = hereda default. */
+	commit: { provider: string; modelId: string } | null;
+	/** Respaldo por turno: cadena al siguiente proveedor autenticado. */
+	fallbackEnabled: boolean;
+}
+
 export type ApprovalMode = "manual" | "auto-edit" | "auto";
 
 /** Stats footer (Fase 3): contadores del gate de la sesión actual. */
@@ -762,6 +774,8 @@ export interface State {
 		/** ADR-0018 Fase B: estado del refresh asíncrono de catálogos. */
 		refreshing?: boolean;
 		refreshErrors?: string[];
+		/** #121 (F7) — config de roles de modelo para el panel. */
+		roles?: ModelRolesUi;
 	};
 	/** #20 — snapshot del goal activo (chip 🎯 del footer); undefined = sin goal. */
 	goal?: GoalState;
@@ -920,6 +934,8 @@ export type InMessage =
 			active?: { provider: string; modelId: string };
 			refreshing?: boolean;
 			refreshErrors?: string[];
+			/** #121 (F7) — config de roles de modelo (lo que el usuario puso). */
+			roles?: ModelRolesUi;
 	  }
 	| { type: "open_models" }
 	| { type: "refresh_models" }
@@ -1123,5 +1139,14 @@ export type OutMessage =
 			provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";
 			model?: string;
 			rebuild?: boolean;
+	  }
+	| {
+			/** #121 (F7) — la UI cambia la config de roles; el host persiste en
+			 *  settings y re-publica el estado de modelos. */
+			type: "model_roles_set";
+			enabled?: boolean;
+			smol?: { provider: string; modelId: string } | null;
+			commit?: { provider: string; modelId: string } | null;
+			fallbackEnabled?: boolean;
 	  }
 	| { type: "check_environment" };

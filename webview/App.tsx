@@ -945,6 +945,10 @@ export function App() {
 					active={state.models.active}
 					refreshing={state.models.refreshing}
 					refreshErrors={state.models.refreshErrors}
+				roles={state.models.roles}
+				onSetRoles={(patch) =>
+					post({ type: "model_roles_set", ...patch })
+				}
 					deviceCode={state.oauthDeviceCode}
 					onClose={() => setModelsOpen(false)}
 					onSelect={(provider, model) => {

@@ -546,6 +546,7 @@ export function reduce(state: State, msg: InMessage): State {
 					active: msg.active,
 					refreshing: msg.refreshing,
 					refreshErrors: msg.refreshErrors,
+					roles: msg.roles,
 				},
 			};
 

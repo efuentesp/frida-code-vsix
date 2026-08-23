@@ -10,6 +10,7 @@ import * as vscode from "vscode";
 import { TOOL_TOGGLE_BY_KEY, TOOL_TOGGLES } from "./tool-toggles";
 import type { UserRole } from "./usage/report-schema";
 import type { EmbeddingsProviderSetting } from "./tools/frida-codebase-index/host-setup";
+import type { ModelRolesConfig } from "./model-roles";
 
 export const CONFIG_SECTION = "frida";
 
@@ -350,7 +351,36 @@ export function readCcPluginsEnabledPlugins(): Record<string, boolean> {
 	return raw ?? {};
 }
 
-/** Snapshot de la config del índice de código. */
+/** #121 — F7: config de roles de modelo desde settings de VS Code.
+ * `default` llega del modelo activo actual (único origen de verdad);
+ * smol/commit solo si el usuario los puso (vacío = hereda). */
+export function readModelRolesConfig(
+	activeProvider: string,
+	activeModelId: string,
+): ModelRolesConfig {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const readRole = (role: "smol" | "commit") => {
+		const provider = String(
+			cfg.get<string>(`modelRoles.${role}.provider`, ""),
+		).trim();
+		const model = String(
+			cfg.get<string>(`modelRoles.${role}.model`, ""),
+		).trim();
+		return provider && model ? { provider, modelId: model } : null;
+	};
+	const fallbackEnabled = cfg.get<boolean>("modelRoles.fallback.enabled", false);
+	// #121 — switch maestro: default false (opt-in). OFF = modo clásico:
+	// el resolvedor ignora roles/fallback y todo resuelve al modelo activo.
+	const enabled = cfg.get<boolean>("modelRoles.enabled", false);
+	return {
+		enabled,
+		default: { provider: activeProvider, modelId: activeModelId },
+		smol: readRole("smol"),
+		commit: readRole("commit"),
+		// [] = AUTO (otros providers authed en orden estable); null = OFF.
+		fallback: fallbackEnabled ? [] : null,
+	};
+}
 export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
 	const rawProvider = cfg.get<string>(

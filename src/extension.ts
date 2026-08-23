@@ -180,6 +180,7 @@ import {
 	syncCodebaseIndexConfig,
 	setAutoIndexEnabled,
 } from "./tools/frida-codebase-index/host-setup";
+import { readModelRolesConfig } from "./settings";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -1456,12 +1457,23 @@ export async function activate(
 			})),
 		}));
 		const m = frida.session?.model;
+		// #121 (F7) — snapshot de roles para la sección Roles del panel.
+		const rolesCfg = readModelRolesConfig(
+			m ? m.provider : "",
+			m ? m.id : "",
+		);
 		post({
 			type: "models",
 			providers,
 			active: m ? { provider: m.provider, modelId: m.id } : undefined,
 			refreshing: opts.refreshing,
 			refreshErrors: opts.refreshErrors,
+			roles: {
+				enabled: rolesCfg.enabled ?? false,
+				smol: rolesCfg.smol ?? null,
+				commit: rolesCfg.commit ?? null,
+				fallbackEnabled: rolesCfg.fallback != null,
+			},
 		});
 	}
 
@@ -3003,7 +3015,33 @@ export async function activate(
 				frida?.sessionApprovals.remove(msg.kind, String(msg.pattern ?? ""));
 				postPermissionsConfig();
 				break;
-			case "codebase_index_action": {
+				// #121 (F7) — cambio de config de roles desde la sección Roles del
+				// panel Modelos: persiste en settings y re-publica el snapshot.
+				case "model_roles_set": {
+					const cfg = vscode.workspace.getConfiguration("frida");
+					const target = vscode.ConfigurationTarget.Global;
+					if (typeof msg.enabled === "boolean") {
+						await cfg.update("modelRoles.enabled", msg.enabled, target);
+					}
+					if (msg.smol !== undefined) {
+						await cfg.update("modelRoles.smol.provider", msg.smol?.provider ?? "", target);
+						await cfg.update("modelRoles.smol.model", msg.smol?.modelId ?? "", target);
+					}
+					if (msg.commit !== undefined) {
+						await cfg.update("modelRoles.commit.provider", msg.commit?.provider ?? "", target);
+						await cfg.update("modelRoles.commit.model", msg.commit?.modelId ?? "", target);
+					}
+					if (typeof msg.fallbackEnabled === "boolean") {
+						await cfg.update(
+							"modelRoles.fallback.enabled",
+							msg.fallbackEnabled,
+							target,
+						);
+					}
+					postModels();
+					break;
+				}
+				case "codebase_index_action": {
 				const action = msg.action as
 					| "install"
 					| "index"

@@ -1,478 +1,508 @@
 {
-  "name": "frida-code",
-  "displayName": "Frida Code",
-  "description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
-  "version": "0.30.0",
-  "publisher": "softtek",
-  "license": "UNLICENSED",
-  "private": true,
-  "engines": {
-    "vscode": "^1.90.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "main": "./dist/extension.js",
-  "icon": "media/frida-logo.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/efuentesp/frida-code-vsix.git"
-  },
-  "contributes": {
-    "commands": [
-      {
-        "command": "frida.openPanel",
-        "title": "Frida: Abrir panel"
-      },
-      {
-        "command": "frida.showWorkflows",
-        "title": "Frida: Mostrar panel de workflows"
-      },
-      {
-        "command": "frida.openHelp",
-        "title": "Frida: Abrir ayuda"
-      },
-      {
-        "command": "frida.setKey",
-        "title": "Frida: Actualizar API key"
-      },
-      {
-        "command": "frida.compact",
-        "title": "Frida: Compactar contexto"
-      },
-      {
-        "command": "frida.reload",
-        "title": "Frida: Recargar extensiones y recursos"
-      },
-      {
-        "command": "frida.abort",
-        "title": "Frida: Detener respuesta"
-      },
-      {
-        "command": "frida.exportUsage",
-        "title": "Frida: Exportar reporte de uso"
-      },
-      {
-        "command": "frida.newSession",
-        "title": "Frida: Nueva sesión"
-      },
-      {
-        "command": "frida.approvalMode",
-        "title": "Frida: Cambiar modo de aprobación"
-      },
-      {
-        "command": "frida.diagnoseGateway",
-        "title": "Frida: Diagnosticar gateway DevEngine"
-      },
-      {
-        "command": "frida.demoWebReact",
-        "title": "Frida: Demo Remote React (UI web de extensión)"
-      },
-      {
-        "command": "frida.demoWebQuestionnaire",
-        "title": "Frida: Demo WebQuestionnaire (ask_user_question web)"
-      },
-      {
-        "command": "frida.demoWebPersistent",
-        "title": "Frida: Demo Web Persistente (panel que vive toda la sesión)"
-      },
-      {
-        "command": "frida.diagnoseThinking",
-        "title": "Frida: Diagnosticar thinking del proveedor"
-      },
-      {
-        "command": "frida.generateCommitMessage",
-        "title": "Frida: Generar mensaje de commit",
-        "icon": "$(sparkle)"
-      },
-      {
-        "command": "frida.worktree",
-        "title": "Frida: Worktrees",
-        "icon": "$(git-branch)"
-      },
-      {
-        "command": "frida.codebaseIndex",
-        "title": "Frida: Codebase Index"
-      }
-    ],
-    "menus": {
-      "scm/title": [
-        {
-          "command": "frida.generateCommitMessage",
-          "group": "navigation",
-          "when": "scmProvider == git"
-        },
-        {
-          "command": "frida.worktree",
-          "group": "navigation",
-          "when": "scmProvider == git"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "frida.generateCommitMessage",
-          "when": "scmProvider == git"
-        },
-        {
-          "command": "frida.worktree",
-          "when": "scmProvider == git"
-        }
-      ]
-    },
-    "keybindings": [
-      {
-        "command": "frida.generateCommitMessage",
-        "key": "ctrl+alt+c",
-        "mac": "cmd+alt+c",
-        "when": "scmRepositoryState"
-      }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "frida-sidebar",
-          "title": "Frida Code",
-          "icon": "media/activity-icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "frida-sidebar": [
-        {
-          "id": "frida.codeView",
-          "name": "Frida Code",
-          "type": "webview"
-        }
-      ]
-    },
-    "configuration": {
-      "title": "Frida Code",
-      "properties": {
-        "frida.user.email": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Email para el reporte de uso (en claro; solo se incluye si activas el opt-in al exportar con `Frida: Exportar reporte de uso`). Si está vacío, se usa `git config user.email`."
-        },
-        "frida.org": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Organización/empresa para el reporte de uso."
-        },
-        "frida.user.role": {
-          "type": "string",
-          "enum": [
-            "dev",
-            "qa",
-            "architect",
-            "lead",
-            "devops",
-            "other"
-          ],
-          "default": "other",
-          "markdownDescription": "Rol declarado para el reporte de uso (lo evalúa el concentrador; Frida no juzga)."
-        },
-        "frida.telemetry.optIn": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Permite incluir tu identidad (email/org) al exportar el reporte de uso. Se pide también inline al exportar."
-        },
-        "frida.askUserQuestion.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita el tool `ask_user_question` para que el agente pregunte con opciones concretas en vez de adivinar. Se aplica al recargar (botón Configuración o `/reload`)."
-        },
-        "frida.todo.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita el tool `todo` y el panel de Tareas para seguimiento multi-paso. Se aplica al recargar (botón Configuración o `/reload`)."
-        },
-        "frida.context.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita el tool `context` (snapshot de presión del contexto) para que el agente se auto-regule antes de operaciones grandes. El medidor para el humano (ContextBar) siempre está visible. Se aplica al recargar (botón Configuración o `/reload`)."
-        },
-        "frida.gates.sensitiveExtensions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Extensiones de archivo adicionales que el gate de aprobación bloquea sin preguntar (sin el punto). Ej.: `[properties, keystore]`. Se suman a las incluidas por defecto (`.env`, `.pem`, `.key`, `.p12`, …). Aplica en vivo, sin recargar."
-        },
-        "frida.gates.sensitiveBasenames": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Nombres de archivo exactos adicionales que el gate bloquea sin preguntar. Ej.: `[credentials.json, service-account.json]`. Se comparan sin distinguir mayúsculas. Aplica en vivo."
-        },
-        "frida.gates.sensitiveAllowBasenames": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Nombres de archivo a PERMITIR aunque coincidan con un patrón sensible (allowlist propia). Ej.: `[.env.local.dev]`. Se suman al allowlist por defecto (`.env.example`, `.env.sample`, …) y se comprueban antes que cualquier bloqueo. Aplica en vivo."
-        },
-        "frida.gates.dangerousCommandSubstrings": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
-        },
-        "frida.devengine.contextWindow": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "default": null,
-          "markdownDescription": "Override manual de la ventana de contexto (tokens) del modelo DevEngine. Si se omite (null), Frida la resuelve automáticamente por prioridad: (1) `GET /models` del gateway DevEngine (context_window real), (2) catálogo canónico del modelo (gpt-5.4-mini → 400000), (3) 300000 conservador. Pon un número SÓLO si quieres forzar un límite (ej. el gateway da `500` con historial grande). Ver ADR-0019."
-        },
-        "frida.devengine.maxTokens": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "default": null,
-          "markdownDescription": "Override manual del máximo de tokens de salida (`max_tokens`) del modelo DevEngine. Si se omite (null), se usa el del catálogo canónico (128000). Ver ADR-0019."
-        },
-        "frida.zai.baseUrl": {
-          "type": "string",
-          "default": "https://api.z.ai/api/coding/paas/v4",
-          "markdownDescription": "Base URL del proveedor Z.ai (API compatible OpenAI, Authorization: Bearer). ADR-0017."
-        },
-        "frida.zai.contextWindow": {
-          "type": "number",
-          "default": 200000,
-          "markdownDescription": "Ventana de contexto (tokens) por defecto para los modelos Z.ai descubiertos que no estén en la tabla conocida (GLM-4.6, etc.). ADR-0017."
-        },
-        "frida.zai.maxTokens": {
-          "type": "number",
-          "default": 16000,
-          "markdownDescription": "Máximo de tokens de salida (`max_tokens`) por defecto para los modelos Z.ai descubiertos. ADR-0017."
-        },
-        "frida.codebaseIndex.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-codebase-index**: búsqueda semántica de código, grafo de llamadas y lookup de implementaciones (wrapper de `open-codebase-index`, instalado on-demand en `~/.frida/npm`). Si el paquete no está instalado, las tools responden con la guía de instalación."
-        },
-        "frida.hermesMemory.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-hermes-memory**: memoria persistente cross-session del agente — background learning, detección de correcciones, memoria de fallos e inyección de contexto relevante (wrapper de `pi-hermes-memory`, instalado on-demand en `~/.frida/npm`; storage en `~/.frida/`). El learning loop consume tokens del modelo: desactívalo si prefieres memoria manual vía las tools `memory_*`."
-        },
-        "frida.knowledgeBase.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-knowledge-base**: base de conocimiento OKF v0.2 del proyecto, Obsidian-compatible (wrapper de `@zosmaai/pi-llm-wiki`, instalado on-demand en `~/.frida/npm`; vault en `<proyecto>/.llm-wiki/`). Añade las tools `wiki_*` + `kb_search`/`kb_neighbors`, los comandos `/wiki-*` y la skill `llm-wiki`. La capa de grafo/backlinks para el humano la provee Foam (dependencia del VSIX)."
-        },
-        "frida.sandboxes.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-sandboxes** (#35): containers Docker locales por agente (el «own computer» — tier-2 de aislamiento). Añade las tools `sandbox_*` y el comando `/sandbox`. Si Docker no está en el host, todo degrada con un aviso honesto de una línea (nada truena)."
-        },
-        "frida.sandboxes.defaultImage": {
-          "type": "string",
-          "default": "node:22",
-          "markdownDescription": "Imagen Docker para nuevos sandboxes. Debe incluir `git` y el runtime del proyecto (default `node:22`: Debian con git+npm) — `sandbox_changes`/`sandbox_merge` usan `git status` in-container."
-        },
-        "frida.sandboxes.allowDomains": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Allowlist de dominios de red permitidos DENTRO del sandbox (patrones glob: `*.npmjs.org`). Vacía = sin restricción (el container es el boundary; esto es refinamiento, patrón pi-sandbox)."
-        },
-        "frida.ccPlugins.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-cc-plugins**: instalación de plugins de Claude Code desde sus marketplaces (`/ccplugin marketplace add owner/repo`, `/ccplugin add <plugin>@<marketplace>`). Skills y commands se convierten a recursos nativos (namespaced `<plugin>-<nombre>`); los servers MCP se registran en `~/.frida/mcp.json` con su nombre original. La extensión nunca instala nada por sí sola: todo install requiere `/ccplugin add` explícito."
-        },
-        "frida.subagents.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-subagents**: tools `Agent`/`get_subagent_result`/`steer_subagent`, modo detached (subagente en proceso propio que sobrevive al padre, #26) y panel `/detached`. Apágalo para aislar el comportamiento del agente principal en pruebas."
-        },
-        "frida.agentBrowser.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-agent-browser**: tool `agent_browser` (automation de navegador real vía el binario agent-browser)."
-        },
-        "frida.supiWeb.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-supi-web**: tools `web_fetch_md` (URL pública → Markdown), `web_docs_search` y `web_docs_fetch` (docs de librerías vía Context7)."
-        },
-        "frida.mcpAdapter.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-mcp-adapter**: tool proxy `mcp` + comandos `/mcp` y `/mcp-auth` — acceso a servidores MCP con un solo tool (~200 tokens)."
-        },
-        "frida.extensibleWorkflows.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-extensible-workflows**: tool `workflow` (orquestación multi-agente determinista)."
-        },
-        "frida.gitSync.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-git-sync**: comando `/fridasync` (status/diff) — sincroniza el agentDir `~/.frida` entre máquinas vía un repo Git privado."
-        },
-        "frida.worktree.enabled": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Habilita **frida-worktree**: comando `/worktree` y botón SCM (worktrees Git ligeros). Si está apagado, el botón avisa en vez de fallar."
-        },
-        "frida.codebaseIndex.keepOtherPlatforms": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Conserva los binarios nativos (`.node`) de otras plataformas tras la instalación on-demand. Por defecto se podan (solo queda el de tu plataforma) para ahorrar disco."
-        },
-        "frida.codebaseIndex.embeddings.provider": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "frida-enterprise",
-            "ollama",
-            "openai",
-            "custom"
-          ],
-          "default": "auto",
-          "markdownDescription": "Proveedor de embeddings del índice. `auto` intenta Ollama → OpenAI (si guardaste la key de OpenAI en Frida) → Google. `frida-enterprise` usa el endpoint corporativo compatible con la sesión OAuth activa. `ollama` fuerza local (cero datos salen del equipo). `openai` usa tu API key guardada. `custom` usa el endpoint OpenAI-compatible configurado abajo."
-        },
-        "frida.codebaseIndex.embeddings.fridaEnterprise.model": {
-          "type": "string",
-          "default": "azure-embeddings-default",
-          "markdownDescription": "Modelo de embeddings de Frida Enterprise (#116)."
-        },
-        "frida.codebaseIndex.embeddings.ollama.model": {
-          "type": "string",
-          "default": "nomic-embed-text",
-          "markdownDescription": "Modelo de embeddings local de Ollama (#116). Debe estar descargado (`ollama pull …`)."
-        },
-        "frida.codebaseIndex.embeddings.openai.model": {
-          "type": "string",
-          "default": "text-embedding-3-small",
-          "markdownDescription": "Modelo de embeddings de OpenAI (#116). La API key se gestiona en Frida (SecretStorage)."
-        },
-        "frida.codebaseIndex.embeddings.custom.baseUrl": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Endpoint OpenAI-compatible para embeddings (`POST {baseUrl}/embeddings`). Vacío = no configurado."
-        },
-        "frida.codebaseIndex.embeddings.custom.model": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Modelo de embeddings del endpoint custom. Vacío = el default del upstream."
-        },
-        "frida.codebaseIndex.embeddings.custom.dimensions": {
-          "type": "number",
-          "default": 0,
-          "markdownDescription": "Dimensiones de los vectores del endpoint custom (#116). 0 = sin verificar; el botón Probar conexión las deduce automáticamente."
-        },
-        "frida.notifyOnComplete": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Emite un sonido del sistema y muestra una notificación cuando Frida termina una petición o necesita tu atención (un permiso o una pregunta) y la ventana de VS Code no tiene el foco (estás en otra aplicación). Sonido distinto para cada caso: listo (Glass) al terminar, atención (Ping) al pedir permiso o pregunta. Útil para regresar a Frida tras cambiar de ventana."
-        },
-        "frida.commitMessage.format": {
-          "type": "string",
-          "enum": [
-            "conventional",
-            "free"
-          ],
-          "default": "conventional",
-          "markdownDescription": "Formato del mensaje que genera **Frida: Generar mensaje de commit**. `conventional` = Conventional Commits con scope inferido del módulo tocado (`feat(scope): …`); `free` = descripción libre. Coherente con [docs/versioning.md](docs/versioning.md)."
-        },
-        "frida.commitMessage.language": {
-          "type": "string",
-          "enum": [
-            "es",
-            "en"
-          ],
-          "default": "es",
-          "markdownDescription": "Idioma del mensaje generado por **Frida: Generar mensaje de commit**."
-        },
-        "frida.commitMessage.includeBody": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Incluir un cuerpo con viñetas cuando el diff lo justifica (cambio complejo). Si el cambio es simple, se omite el cuerpo."
-        },
-        "frida.commitMessage.maxSubjectLength": {
-          "type": "number",
-          "default": 50,
-          "markdownDescription": "Longitud máxima de la primera línea (asunto) del mensaje de commit."
-        },
-        "frida.commitMessage.templatePath": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Ruta (absoluta o relativa al workspace) a un archivo markdown que **reemplaza** el system prompt default del generador. Útil para reglas de equipo (ticket JIRA obligatorio, scope fijo, sin emoji, etc.). Soporta los placeholders `{language}`, `{maxSubjectLength}` y `{types}`. Vacío = prompt default de Conventional Commits; si existe `~/.frida/commit-message-prompt.md`, se usa ese."
-        },
-        "frida.ccPlugins.extraMarketplaces": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Marketplaces del equipo que frida instala automáticamente al cargar (paridad `extraKnownMarketplaces` de Claude Code). Cada entrada es una ref: shorthand GitHub `owner/repo[#ref]`, URL git https/ssh, o path local con `.claude-plugin/marketplace.json`."
-        },
-        "frida.ccPlugins.enabledPlugins": {
-          "type": "object",
-          "default": {},
-          "markdownDescription": "Plugins que se instalan automáticamente al cargar si no lo están (paridad `enabledPlugins` de Claude Code). Claves `\"plugin@marketplace\"`, valor `true`. Con `--scope project` del comando o registro del workspace se comparten por repo."
-        }
-      }
-    }
-  },
-  "scripts": {
-    "build": "node esbuild.js && vite build",
-    "build:host": "node esbuild.js",
-    "build:webview": "vite build",
-    "watch": "node esbuild.js --watch",
-    "package": "npm run build && vsce package --allow-missing-repository",
-    "release": "node scripts/release.mjs",
-    "upstream:drift": "node scripts/upstream-drift.mjs",
-    "upstream:feasible": "node scripts/upstream-feasibility.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.84.2",
-    "@mozilla/readability": "^0.6.0",
-    "@napi-rs/keyring": "^1.3.0",
-    "acorn": "^8.17.0",
-    "jiti": "^2.7.0",
-    "jsdom": "^30.0.1",
-    "react-reconciler": "^0.29.2",
-    "turndown": "^7.2.4",
-    "turndown-plugin-gfm": "^1.0.2",
-    "typebox": "1.1.38"
-  },
-  "devDependencies": {
-    "@types/jsdom": "^28.0.3",
-    "@types/node": "^18.19.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@types/turndown": "^5.0.6",
-    "@types/vscode": "^1.90.0",
-    "@vitejs/plugin-react": "^4.3.0",
-    "@vscode/codicons": "^0.0.46-24",
-    "@vscode/vsce": "^3.2.0",
-    "esbuild": "^0.24.0",
-    "pi-mcp-adapter": "^2.17.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-markdown": "^9.0.1",
-    "rehype-highlight": "^7.0.1",
-    "remark-gfm": "^4.0.0",
-    "typescript": "^5.6.0",
-    "vite": "^5.4.0",
-    "vitest": "^2.1.9"
-  }
+	"name": "frida-code",
+	"displayName": "Frida Code",
+	"description": "Asistente de código (estilo Claude Code) sobre Pi + Softtek DevEngine Gateway.",
+	"version": "0.30.0",
+	"publisher": "softtek",
+	"license": "UNLICENSED",
+	"private": true,
+	"engines": {
+		"vscode": "^1.90.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./dist/extension.js",
+	"icon": "media/frida-logo.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/efuentesp/frida-code-vsix.git"
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "frida.openPanel",
+				"title": "Frida: Abrir panel"
+			},
+			{
+				"command": "frida.showWorkflows",
+				"title": "Frida: Mostrar panel de workflows"
+			},
+			{
+				"command": "frida.openHelp",
+				"title": "Frida: Abrir ayuda"
+			},
+			{
+				"command": "frida.setKey",
+				"title": "Frida: Actualizar API key"
+			},
+			{
+				"command": "frida.compact",
+				"title": "Frida: Compactar contexto"
+			},
+			{
+				"command": "frida.reload",
+				"title": "Frida: Recargar extensiones y recursos"
+			},
+			{
+				"command": "frida.abort",
+				"title": "Frida: Detener respuesta"
+			},
+			{
+				"command": "frida.exportUsage",
+				"title": "Frida: Exportar reporte de uso"
+			},
+			{
+				"command": "frida.newSession",
+				"title": "Frida: Nueva sesión"
+			},
+			{
+				"command": "frida.approvalMode",
+				"title": "Frida: Cambiar modo de aprobación"
+			},
+			{
+				"command": "frida.diagnoseGateway",
+				"title": "Frida: Diagnosticar gateway DevEngine"
+			},
+			{
+				"command": "frida.demoWebReact",
+				"title": "Frida: Demo Remote React (UI web de extensión)"
+			},
+			{
+				"command": "frida.demoWebQuestionnaire",
+				"title": "Frida: Demo WebQuestionnaire (ask_user_question web)"
+			},
+			{
+				"command": "frida.demoWebPersistent",
+				"title": "Frida: Demo Web Persistente (panel que vive toda la sesión)"
+			},
+			{
+				"command": "frida.diagnoseThinking",
+				"title": "Frida: Diagnosticar thinking del proveedor"
+			},
+			{
+				"command": "frida.generateCommitMessage",
+				"title": "Frida: Generar mensaje de commit",
+				"icon": "$(sparkle)"
+			},
+			{
+				"command": "frida.worktree",
+				"title": "Frida: Worktrees",
+				"icon": "$(git-branch)"
+			},
+			{
+				"command": "frida.codebaseIndex",
+				"title": "Frida: Codebase Index"
+			}
+		],
+		"menus": {
+			"scm/title": [
+				{
+					"command": "frida.generateCommitMessage",
+					"group": "navigation",
+					"when": "scmProvider == git"
+				},
+				{
+					"command": "frida.worktree",
+					"group": "navigation",
+					"when": "scmProvider == git"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "frida.generateCommitMessage",
+					"when": "scmProvider == git"
+				},
+				{
+					"command": "frida.worktree",
+					"when": "scmProvider == git"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "frida.generateCommitMessage",
+				"key": "ctrl+alt+c",
+				"mac": "cmd+alt+c",
+				"when": "scmRepositoryState"
+			}
+		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "frida-sidebar",
+					"title": "Frida Code",
+					"icon": "media/activity-icon.svg"
+				}
+			]
+		},
+		"views": {
+			"frida-sidebar": [
+				{
+					"id": "frida.codeView",
+					"name": "Frida Code",
+					"type": "webview"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Frida Code",
+			"properties": {
+				"frida.user.email": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Email para el reporte de uso (en claro; solo se incluye si activas el opt-in al exportar con `Frida: Exportar reporte de uso`). Si está vacío, se usa `git config user.email`."
+				},
+				"frida.org": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Organización/empresa para el reporte de uso."
+				},
+				"frida.user.role": {
+					"type": "string",
+					"enum": [
+						"dev",
+						"qa",
+						"architect",
+						"lead",
+						"devops",
+						"other"
+					],
+					"default": "other",
+					"markdownDescription": "Rol declarado para el reporte de uso (lo evalúa el concentrador; Frida no juzga)."
+				},
+				"frida.telemetry.optIn": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Permite incluir tu identidad (email/org) al exportar el reporte de uso. Se pide también inline al exportar."
+				},
+				"frida.askUserQuestion.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita el tool `ask_user_question` para que el agente pregunte con opciones concretas en vez de adivinar. Se aplica al recargar (botón Configuración o `/reload`)."
+				},
+				"frida.todo.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita el tool `todo` y el panel de Tareas para seguimiento multi-paso. Se aplica al recargar (botón Configuración o `/reload`)."
+				},
+				"frida.context.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita el tool `context` (snapshot de presión del contexto) para que el agente se auto-regule antes de operaciones grandes. El medidor para el humano (ContextBar) siempre está visible. Se aplica al recargar (botón Configuración o `/reload`)."
+				},
+				"frida.gates.sensitiveExtensions": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Extensiones de archivo adicionales que el gate de aprobación bloquea sin preguntar (sin el punto). Ej.: `[properties, keystore]`. Se suman a las incluidas por defecto (`.env`, `.pem`, `.key`, `.p12`, …). Aplica en vivo, sin recargar."
+				},
+				"frida.gates.sensitiveBasenames": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Nombres de archivo exactos adicionales que el gate bloquea sin preguntar. Ej.: `[credentials.json, service-account.json]`. Se comparan sin distinguir mayúsculas. Aplica en vivo."
+				},
+				"frida.gates.sensitiveAllowBasenames": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Nombres de archivo a PERMITIR aunque coincidan con un patrón sensible (allowlist propia). Ej.: `[.env.local.dev]`. Se suman al allowlist por defecto (`.env.example`, `.env.sample`, …) y se comprueban antes que cualquier bloqueo. Aplica en vivo."
+				},
+				"frida.gates.dangerousCommandSubstrings": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
+				},
+				"frida.devengine.contextWindow": {
+					"type": [
+						"number",
+						"null"
+					],
+					"default": null,
+					"markdownDescription": "Override manual de la ventana de contexto (tokens) del modelo DevEngine. Si se omite (null), Frida la resuelve automáticamente por prioridad: (1) `GET /models` del gateway DevEngine (context_window real), (2) catálogo canónico del modelo (gpt-5.4-mini → 400000), (3) 300000 conservador. Pon un número SÓLO si quieres forzar un límite (ej. el gateway da `500` con historial grande). Ver ADR-0019."
+				},
+				"frida.devengine.maxTokens": {
+					"type": [
+						"number",
+						"null"
+					],
+					"default": null,
+					"markdownDescription": "Override manual del máximo de tokens de salida (`max_tokens`) del modelo DevEngine. Si se omite (null), se usa el del catálogo canónico (128000). Ver ADR-0019."
+				},
+				"frida.zai.baseUrl": {
+					"type": "string",
+					"default": "https://api.z.ai/api/coding/paas/v4",
+					"markdownDescription": "Base URL del proveedor Z.ai (API compatible OpenAI, Authorization: Bearer). ADR-0017."
+				},
+				"frida.zai.contextWindow": {
+					"type": "number",
+					"default": 200000,
+					"markdownDescription": "Ventana de contexto (tokens) por defecto para los modelos Z.ai descubiertos que no estén en la tabla conocida (GLM-4.6, etc.). ADR-0017."
+				},
+				"frida.zai.maxTokens": {
+					"type": "number",
+					"default": 16000,
+					"markdownDescription": "Máximo de tokens de salida (`max_tokens`) por defecto para los modelos Z.ai descubiertos. ADR-0017."
+				},
+				"frida.codebaseIndex.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-codebase-index**: búsqueda semántica de código, grafo de llamadas y lookup de implementaciones (wrapper de `open-codebase-index`, instalado on-demand en `~/.frida/npm`). Si el paquete no está instalado, las tools responden con la guía de instalación."
+				},
+				"frida.hermesMemory.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-hermes-memory**: memoria persistente cross-session del agente — background learning, detección de correcciones, memoria de fallos e inyección de contexto relevante (wrapper de `pi-hermes-memory`, instalado on-demand en `~/.frida/npm`; storage en `~/.frida/`). El learning loop consume tokens del modelo: desactívalo si prefieres memoria manual vía las tools `memory_*`."
+				},
+				"frida.knowledgeBase.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-knowledge-base**: base de conocimiento OKF v0.2 del proyecto, Obsidian-compatible (wrapper de `@zosmaai/pi-llm-wiki`, instalado on-demand en `~/.frida/npm`; vault en `<proyecto>/.llm-wiki/`). Añade las tools `wiki_*` + `kb_search`/`kb_neighbors`, los comandos `/wiki-*` y la skill `llm-wiki`. La capa de grafo/backlinks para el humano la provee Foam (dependencia del VSIX)."
+				},
+				"frida.sandboxes.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-sandboxes** (#35): containers Docker locales por agente (el «own computer» — tier-2 de aislamiento). Añade las tools `sandbox_*` y el comando `/sandbox`. Si Docker no está en el host, todo degrada con un aviso honesto de una línea (nada truena)."
+				},
+				"frida.sandboxes.defaultImage": {
+					"type": "string",
+					"default": "node:22",
+					"markdownDescription": "Imagen Docker para nuevos sandboxes. Debe incluir `git` y el runtime del proyecto (default `node:22`: Debian con git+npm) — `sandbox_changes`/`sandbox_merge` usan `git status` in-container."
+				},
+				"frida.sandboxes.allowDomains": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Allowlist de dominios de red permitidos DENTRO del sandbox (patrones glob: `*.npmjs.org`). Vacía = sin restricción (el container es el boundary; esto es refinamiento, patrón pi-sandbox)."
+				},
+				"frida.ccPlugins.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-cc-plugins**: instalación de plugins de Claude Code desde sus marketplaces (`/ccplugin marketplace add owner/repo`, `/ccplugin add <plugin>@<marketplace>`). Skills y commands se convierten a recursos nativos (namespaced `<plugin>-<nombre>`); los servers MCP se registran en `~/.frida/mcp.json` con su nombre original. La extensión nunca instala nada por sí sola: todo install requiere `/ccplugin add` explícito."
+				},
+				"frida.subagents.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-subagents**: tools `Agent`/`get_subagent_result`/`steer_subagent`, modo detached (subagente en proceso propio que sobrevive al padre, #26) y panel `/detached`. Apágalo para aislar el comportamiento del agente principal en pruebas."
+				},
+				"frida.agentBrowser.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-agent-browser**: tool `agent_browser` (automation de navegador real vía el binario agent-browser)."
+				},
+				"frida.supiWeb.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-supi-web**: tools `web_fetch_md` (URL pública → Markdown), `web_docs_search` y `web_docs_fetch` (docs de librerías vía Context7)."
+				},
+				"frida.mcpAdapter.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-mcp-adapter**: tool proxy `mcp` + comandos `/mcp` y `/mcp-auth` — acceso a servidores MCP con un solo tool (~200 tokens)."
+				},
+				"frida.extensibleWorkflows.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-extensible-workflows**: tool `workflow` (orquestación multi-agente determinista)."
+				},
+				"frida.gitSync.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-git-sync**: comando `/fridasync` (status/diff) — sincroniza el agentDir `~/.frida` entre máquinas vía un repo Git privado."
+				},
+				"frida.worktree.enabled": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Habilita **frida-worktree**: comando `/worktree` y botón SCM (worktrees Git ligeros). Si está apagado, el botón avisa en vez de fallar."
+				},
+				"frida.codebaseIndex.keepOtherPlatforms": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Conserva los binarios nativos (`.node`) de otras plataformas tras la instalación on-demand. Por defecto se podan (solo queda el de tu plataforma) para ahorrar disco."
+				},
+				"frida.codebaseIndex.embeddings.provider": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"frida-enterprise",
+						"ollama",
+						"openai",
+						"custom"
+					],
+					"default": "auto",
+					"markdownDescription": "Proveedor de embeddings del índice. `auto` intenta Ollama → OpenAI (si guardaste la key de OpenAI en Frida) → Google. `frida-enterprise` usa el endpoint corporativo compatible con la sesión OAuth activa. `ollama` fuerza local (cero datos salen del equipo). `openai` usa tu API key guardada. `custom` usa el endpoint OpenAI-compatible configurado abajo."
+				},
+				"frida.codebaseIndex.embeddings.fridaEnterprise.model": {
+					"type": "string",
+					"default": "azure-embeddings-default",
+					"markdownDescription": "Modelo de embeddings de Frida Enterprise (#116)."
+				},
+				"frida.codebaseIndex.embeddings.ollama.model": {
+					"type": "string",
+					"default": "nomic-embed-text",
+					"markdownDescription": "Modelo de embeddings local de Ollama (#116). Debe estar descargado (`ollama pull …`)."
+				},
+				"frida.codebaseIndex.embeddings.openai.model": {
+					"type": "string",
+					"default": "text-embedding-3-small",
+					"markdownDescription": "Modelo de embeddings de OpenAI (#116). La API key se gestiona en Frida (SecretStorage)."
+				},
+				"frida.codebaseIndex.embeddings.custom.baseUrl": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Endpoint OpenAI-compatible para embeddings (`POST {baseUrl}/embeddings`). Vacío = no configurado."
+				},
+				"frida.codebaseIndex.embeddings.custom.model": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Modelo de embeddings del endpoint custom. Vacío = el default del upstream."
+				},
+				"frida.codebaseIndex.embeddings.custom.dimensions": {
+					"type": "number",
+					"default": 0,
+					"markdownDescription": "Dimensiones de los vectores del endpoint custom (#116). 0 = sin verificar; el botón Probar conexión las deduce automáticamente."
+				},
+				"frida.notifyOnComplete": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Emite un sonido del sistema y muestra una notificación cuando Frida termina una petición o necesita tu atención (un permiso o una pregunta) y la ventana de VS Code no tiene el foco (estás en otra aplicación). Sonido distinto para cada caso: listo (Glass) al terminar, atención (Ping) al pedir permiso o pregunta. Útil para regresar a Frida tras cambiar de ventana."
+				},
+				"frida.commitMessage.format": {
+					"type": "string",
+					"enum": [
+						"conventional",
+						"free"
+					],
+					"default": "conventional",
+					"markdownDescription": "Formato del mensaje que genera **Frida: Generar mensaje de commit**. `conventional` = Conventional Commits con scope inferido del módulo tocado (`feat(scope): …`); `free` = descripción libre. Coherente con [docs/versioning.md](docs/versioning.md)."
+				},
+				"frida.commitMessage.language": {
+					"type": "string",
+					"enum": [
+						"es",
+						"en"
+					],
+					"default": "es",
+					"markdownDescription": "Idioma del mensaje generado por **Frida: Generar mensaje de commit**."
+				},
+				"frida.commitMessage.includeBody": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "Incluir un cuerpo con viñetas cuando el diff lo justifica (cambio complejo). Si el cambio es simple, se omite el cuerpo."
+				},
+				"frida.commitMessage.maxSubjectLength": {
+					"type": "number",
+					"default": 50,
+					"markdownDescription": "Longitud máxima de la primera línea (asunto) del mensaje de commit."
+				},
+				"frida.commitMessage.templatePath": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Ruta (absoluta o relativa al workspace) a un archivo markdown que **reemplaza** el system prompt default del generador. Útil para reglas de equipo (ticket JIRA obligatorio, scope fijo, sin emoji, etc.). Soporta los placeholders `{language}`, `{maxSubjectLength}` y `{types}`. Vacío = prompt default de Conventional Commits; si existe `~/.frida/commit-message-prompt.md`, se usa ese."
+				},
+				"frida.ccPlugins.extraMarketplaces": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Marketplaces del equipo que frida instala automáticamente al cargar (paridad `extraKnownMarketplaces` de Claude Code). Cada entrada es una ref: shorthand GitHub `owner/repo[#ref]`, URL git https/ssh, o path local con `.claude-plugin/marketplace.json`."
+				},
+				"frida.ccPlugins.enabledPlugins": {
+					"type": "object",
+					"default": {},
+					"markdownDescription": "Plugins que se instalan automáticamente al cargar si no lo están (paridad `enabledPlugins` de Claude Code). Claves `\"plugin@marketplace\"`, valor `true`. Con `--scope project` del comando o registro del workspace se comparten por repo."
+				},
+				"frida.modelRoles.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "#121 (F7) — switch maestro de roles. OFF (default): todo usa el modelo activo, modo clásico. ON: cada rol (Rápido/Commits) usa su modelo configurado y el respaldo queda disponible."
+				},
+				"frida.modelRoles.smol.provider": {
+					"type": "string",
+					"default": "",
+					"description": "#121 (F7) — proveedor del rol Rápido (smol: subagents, extracciones, resúmenes). Vacío = hereda el Principal."
+				},
+				"frida.modelRoles.smol.model": {
+					"type": "string",
+					"default": "",
+					"description": "#121 (F7) — modelo del rol Rápido (smol). Vacío = hereda el Principal."
+				},
+				"frida.modelRoles.commit.provider": {
+					"type": "string",
+					"default": "",
+					"description": "#121 (F7) — proveedor del rol Commits (changelogs y mensajes de commit). Vacío = hereda el Principal."
+				},
+				"frida.modelRoles.commit.model": {
+					"type": "string",
+					"default": "",
+					"description": "#121 (F7) — modelo del rol Commits. Vacío = hereda el Principal."
+				},
+				"frida.modelRoles.fallback.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "#121 (F7) — respaldo por turno: si el modelo del rol falla (429/cuota), el turno cae al siguiente proveedor autenticado y se restaura al enfriarse."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"build": "node esbuild.js && vite build",
+		"build:host": "node esbuild.js",
+		"build:webview": "vite build",
+		"watch": "node esbuild.js --watch",
+		"package": "npm run build && vsce package --allow-missing-repository",
+		"release": "node scripts/release.mjs",
+		"upstream:drift": "node scripts/upstream-drift.mjs",
+		"upstream:feasible": "node scripts/upstream-feasibility.mjs",
+		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
+		"typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@earendil-works/pi-coding-agent": "^0.84.2",
+		"@mozilla/readability": "^0.6.0",
+		"@napi-rs/keyring": "^1.3.0",
+		"acorn": "^8.17.0",
+		"jiti": "^2.7.0",
+		"jsdom": "^30.0.1",
+		"react-reconciler": "^0.29.2",
+		"turndown": "^7.2.4",
+		"turndown-plugin-gfm": "^1.0.2",
+		"typebox": "1.1.38"
+	},
+	"devDependencies": {
+		"@types/jsdom": "^28.0.3",
+		"@types/node": "^18.19.0",
+		"@types/react": "^18.3.0",
+		"@types/react-dom": "^18.3.0",
+		"@types/turndown": "^5.0.6",
+		"@types/vscode": "^1.90.0",
+		"@vitejs/plugin-react": "^4.3.0",
+		"@vscode/codicons": "^0.0.46-24",
+		"@vscode/vsce": "^3.2.0",
+		"esbuild": "^0.24.0",
+		"pi-mcp-adapter": "^2.17.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"react-markdown": "^9.0.1",
+		"rehype-highlight": "^7.0.1",
+		"remark-gfm": "^4.0.0",
+		"typescript": "^5.6.0",
+		"vite": "^5.4.0",
+		"vitest": "^2.1.9"
+	}
 }

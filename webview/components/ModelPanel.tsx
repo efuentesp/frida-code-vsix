@@ -1,4 +1,4 @@
-import type { ProviderOption } from "../types";
+import type { ModelRolesUi, ProviderOption } from "../types";
 import { Tooltip } from "./Tooltip";
 import { Codicon } from "./Codicon";
 
@@ -8,6 +8,175 @@ function fmtTokens(n: number): string {
 		return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`;
 	if (n >= 1000) return `${Math.round(n / 1000)}K`;
 	return String(n);
+}
+
+/** #121 (F7) — tarjeta de rol con selects proveedor→modelo y opción
+ * "Hereda Principal". Pura: solo renderiza lo que recibe. */
+function RoleCard({
+	icon,
+	title,
+	hint,
+	value,
+	providers,
+	onChange,
+}: {
+	icon: string;
+	title: string;
+	hint: string;
+	value: { provider: string; modelId: string } | null;
+	providers: ProviderOption[];
+	onChange: (next: { provider: string; modelId: string } | null) => void;
+}) {
+	const authed = providers.filter((p) => p.authed && p.models.length > 0);
+	const current = authed.find((p) => p.id === value?.provider);
+	const costHint =
+		value?.provider === "ollama" ? "costo: local · 0 tokens de cuota" : null;
+	return (
+		<div className="mr-card">
+			<div className="mr-card-head">
+				<Codicon name={icon} size={13} />
+				<span className="mr-card-title">{title}</span>
+				{costHint && <span className="mr-card-cost">{costHint}</span>}
+			</div>
+			<div className="mr-card-hint">{hint}</div>
+			<div className="mr-selects">
+				<select
+					className="bar-select"
+					aria-label={`${title}: proveedor`}
+					value={value?.provider ?? ""}
+					onChange={(e) => {
+						const pid = e.target.value;
+						if (!pid) {
+							onChange(null); // "" = hereda default
+							return;
+						}
+						const first = authed.find((p) => p.id === pid)?.models.at(0);
+						onChange(first ? { provider: pid, modelId: first.id } : null);
+					}}
+				>
+					<option value="">Hereda Principal</option>
+					{authed.map((p) => (
+						<option key={p.id} value={p.id}>
+							{p.name}
+						</option>
+					))}
+				</select>
+				{value && (
+					<select
+						className="bar-select"
+						aria-label={`${title}: modelo`}
+						value={value.modelId}
+						onChange={(e) =>
+							onChange({ provider: value.provider, modelId: e.target.value })
+						}
+					>
+						{(current?.models ?? []).map((mm) => (
+							<option key={mm.id} value={mm.id}>
+								{mm.name}
+							</option>
+						))}
+					</select>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/** #121 (F7) — sección Roles (Opción A del diseño): switch maestro +
+ * tarjetas por rol + fila de respaldo. OFF = modo clásico con nota. */
+export function RolesSection({
+	roles,
+	active,
+	providers,
+	onSetRoles,
+}: {
+	roles: ModelRolesUi;
+	active?: { provider: string; modelId: string };
+	providers: ProviderOption[];
+	onSetRoles: (patch: Partial<ModelRolesUi>) => void;
+}) {
+	const providerName = (id?: string) =>
+		providers.find((p) => p.id === id)?.name ?? id ?? "—";
+	return (
+		<div className="mr-roles">
+			<div className="mr-head">
+				<Codicon name="route" size={14} />
+				<span className="mr-title">ROLES — cada trabajo usa su modelo</span>
+				<button
+					type="button"
+					className={`ccp-switch${roles.enabled ? " ccp-switch-on" : ""}`}
+					role="switch"
+					aria-checked={roles.enabled}
+					title={
+						roles.enabled
+							? "Enrutar por roles — click para apagar (todo usa el modelo Principal)"
+							: "Enrutar por roles — click para encender"
+					}
+					onClick={() => onSetRoles({ enabled: !roles.enabled })}
+				>
+					<span className="ccp-switch-knob" />
+				</button>
+			</div>
+			{roles.enabled ? (
+				<>
+					<div className="mr-card mr-card-default">
+					<div className="mr-card-head">
+						<Codicon name="settings-gear" size={13} />
+						<span className="mr-card-title">Principal (default)</span>
+					</div>
+					<div className="mr-card-val">
+						{providerName(active?.provider)}
+						{active?.modelId ? ` · ${active.modelId}` : ""} — el modelo que
+						eliges en esta misma lista.
+					</div>
+				</div>
+					<RoleCard
+						icon="zap"
+						title="Rápido (smol)"
+						hint="Subagents, extracciones y resúmenes"
+						value={roles.smol}
+						providers={providers}
+						onChange={(smol) => onSetRoles({ smol })}
+				/>
+					<RoleCard
+						icon="edit"
+						title="Commits (commit)"
+						hint="Changelogs y mensajes de commit"
+						value={roles.commit}
+						providers={providers}
+						onChange={(commit) => onSetRoles({ commit })}
+				/>
+					<div className="mr-fallback">
+					<div className="mr-fallback-head">
+						<span>Respaldo (fallback)</span>
+						<button
+							type="button"
+							className={`ccp-switch${roles.fallbackEnabled ? " ccp-switch-on" : ""}`}
+							role="switch"
+							aria-checked={roles.fallbackEnabled}
+							title="Si el modelo del rol falla (429/cuota), la sesión cae al siguiente proveedor autenticado"
+							onClick={() =>
+								onSetRoles({ fallbackEnabled: !roles.fallbackEnabled })
+							}
+						>
+							<span className="ccp-switch-knob" />
+						</button>
+					</div>
+					<div className="mr-fallback-copy">
+					Si el modelo del rol falla (429/cuota), la sesión cae al siguiente
+					proveedor autenticado y se restaura al enfriarse.
+					</div>
+				</div>
+				</>
+			) : (
+				<div className="mr-off-note">
+					Todo lo resuelve el <strong>modelo Principal</strong> que elegiste abajo
+					(comportamiento clásico). Enciende los roles para enviar subagents y
+					commits a un modelo más barato.
+				</div>
+			)}
+		</div>
+	);
 }
 
 export function ModelPanel({
@@ -22,6 +191,8 @@ export function ModelPanel({
 	onDiscoverModels,
 	refreshing,
 	refreshErrors,
+	roles,
+	onSetRoles,
 }: {
 	providers: ProviderOption[];
 	active?: { provider: string; modelId: string };
@@ -34,6 +205,9 @@ export function ModelPanel({
 	onDiscoverModels: (provider: string) => void;
 	refreshing?: boolean;
 	refreshErrors?: string[];
+	/** #121 (F7) — roles de modelo; sin esto no se renderiza la sección. */
+	roles?: ModelRolesUi;
+	onSetRoles?: (patch: Partial<ModelRolesUi>) => void;
 }) {
 	return (
 		<div className="sessions-overlay" onClick={onClose}>
@@ -74,6 +248,16 @@ export function ModelPanel({
 					</div>
 				)}
 
+				{roles && onSetRoles && (
+					<RolesSection
+						roles={roles}
+						active={active}
+						providers={providers}
+						onSetRoles={onSetRoles}
+					/>
+				)}
+
+				<div className="cfg-section">PROVEEDORES</div>
 				<div className="sessions-list">
 					{providers.map((p) => {
 						const isActiveProvider = active?.provider === p.id;

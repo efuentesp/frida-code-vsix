@@ -27,6 +27,14 @@ import {
 } from "./providers/provider-audit";
 import { resolveActiveModel } from "./resolve-active-model";
 import {
+	KNOWN_MODEL_PROVIDERS,
+	pickChildModel,
+	pickStartupFallback,
+	resolveModelRoles,
+	type ModelRolesConfig,
+	type ResolvedRole,
+} from "./model-roles";
+import {
 	buildZaiCatalogOverride,
 	createZaiProviderHooks,
 	discoverZaiModels,
@@ -56,6 +64,7 @@ import { ApprovalLogger } from "./gates/approval-logger";
 import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
 import {
 	readDevengineConfig,
+	readModelRolesConfig,
 	readZaiConfig,
 	type GatePatterns,
 } from "./settings";
@@ -135,6 +144,18 @@ export interface FridaSession {
 	 *  frida-args no se registró o aún no corrió el factory. */
 	extensionApi: any;
 	modelRuntime: any;
+	/** #121 (F7) — routing por roles resuelto al crear la sesión: config leída
+	 *  de settings + resolución efectiva por rol + si las hijas corren en smol.
+	 *  Para la UI (sección Roles del panel Modelos, chip del Composer). */
+	modelRoles: {
+		config: ModelRolesConfig;
+		resolution: {
+			default: ResolvedRole;
+			smol: ResolvedRole;
+			commit: ResolvedRole;
+		};
+		childModelActive: boolean;
+	};
 	bridge: ApprovalBridge;
 	uiBridge: UiBridge;
 	webBridge: WebBridge;
@@ -898,11 +919,40 @@ export async function createFridaSession(
 	// al fallback; si aún así cae, notice HONESTO por el que se entera el
 	// usuario (antes: swap silencioso → sesión corría en devengine mientras el
 	// selector mostraba el elegido — provider-audit.log 2026-08-19).
+	// #121 (F7) — Routing por roles: resolvedor + catálogo autenticado
+	// (getModels(p) no vacío = autenticado y con modelos). Se recalcula por
+	// sesión (createFridaSession) con el modelo activo como rol default.
+	const modelRolesConfig = readModelRolesConfig(
+		opts.activeModel?.provider ?? "",
+		opts.activeModel?.modelId ?? "",
+	);
+	const authedCatalog: Record<string, string[]> = {};
+	for (const p of KNOWN_MODEL_PROVIDERS) {
+		const ids = (modelRuntime.getModels?.(p) ?? []).map(
+			(m: any) => String(m?.id ?? ""),
+		).filter(Boolean);
+		if (ids.length > 0) authedCatalog[p] = ids;
+	}
+	const modelRoles = resolveModelRoles({
+		config: modelRolesConfig,
+		authedCatalog,
+	});
+	// Modelo para sesiones hijas (subagents/workflows): rol smol si está
+	// activo y explícito; null = modelo de la padre (comportamiento clásico).
+	const childModel = pickChildModel(modelRolesConfig, modelRoles, (p, m) =>
+		modelRuntime.getModel(p, m),
+	);
+
 	const resolved = await resolveActiveModel(opts.activeModel, {
 		getModel: (p, m) => modelRuntime.getModel(p, m),
 		getModels: (p) => modelRuntime.getModels?.(p) ?? [],
 		refresh: (o) => modelRuntime.refresh(o as any),
-		fallbackModel: () => modelRuntime.getModel(SOFTTEK_PROVIDER, SOFTTEK_MODEL),
+		// #121 — respaldo por roles ANTES del fallback DevEngine de siempre:
+		// primer candidato de la cadena del rol default que el runtime tenga.
+		fallbackModel: () =>
+			pickStartupFallback(modelRolesConfig, modelRoles, (p, m) =>
+				modelRuntime.getModel(p, m),
+			) ?? modelRuntime.getModel(SOFTTEK_PROVIDER, SOFTTEK_MODEL),
 	});
 	const model: any = resolved.model;
 	if (resolved.usedFallback && resolved.notice) {
@@ -943,6 +993,13 @@ export async function createFridaSession(
 		session,
 		extensionApi: capturedExtensionApi,
 		modelRuntime,
+		// #121 (F7) — routing por roles resuelto (para la UI: sección Roles del
+		// panel Modelos + chip del Composer) y el modelo efectivo de hijas.
+		modelRoles: {
+			config: modelRolesConfig,
+			resolution: modelRoles,
+			childModelActive: !!childModel,
+		},
 		bridge,
 		uiBridge,
 		webBridge,
@@ -1045,7 +1102,10 @@ export async function createFridaSession(
 			const { session: childSession } = await createAgentSession({
 				resourceLoader: childLoader,
 				modelRuntime,
-				model: session.model, // mismo modelo que la interactiva
+				// #121 (F7) — sesiones hijas con el rol smol cuando los roles están
+				// activos (subagents/extracciones → Ollama local, costo 0); sin
+				// roles o heredado: el modelo de la padre, como siempre.
+				model: childModel ?? session.model,
 				settingsManager,
 				sessionManager: childSM,
 				agentDir: opts.agentDir,

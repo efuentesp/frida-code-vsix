@@ -5873,6 +5873,99 @@ button.danger:hover {
 .icon-btn.primary:hover {
 	opacity: 0.9;
 }
+/* ── #121 (F7) — sección Roles del panel Modelos (Opción A) ── */
+.mr-roles {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px;
+	margin-bottom: 10px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-radius: 8px;
+	background: var(--vscode-editor-background);
+}
+.mr-head {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--vscode-foreground);
+}
+.mr-title {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	flex: 1;
+}
+.mr-off-note {
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--vscode-descriptionForeground);
+	padding: 6px 8px;
+	border-left: 2px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3));
+}
+.mr-card {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 7px 9px;
+	border-radius: 6px;
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+.mr-card-default {
+	background: transparent;
+}
+.mr-card-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--vscode-foreground);
+}
+.mr-card-title {
+	font-size: 11.5px;
+	font-weight: 600;
+}
+.mr-card-cost {
+	font-size: 10px;
+	color: var(--vscode-testing-iconPassed, #73c991);
+	margin-left: auto;
+}
+.mr-card-hint,
+.mr-card-val {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.45;
+}
+.mr-selects {
+	display: flex;
+	gap: 6px;
+	margin-top: 3px;
+}
+.mr-selects .bar-select {
+	flex: 1;
+	min-width: 0;
+}
+.mr-fallback {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-top: 6px;
+	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+}
+.mr-fallback-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+.mr-fallback-copy {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.45;
+}
+
 .model-list {
 	display: flex;
 	flex-direction: column;
