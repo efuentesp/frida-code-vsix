@@ -556,10 +556,10 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 							chunksProcessed: 500,
 							totalChunks: 1100,
 						},
-						},
 					},
-					post,
-				}),
+				},
+				post,
+			}),
 		);
 		expect(html).toContain("raw/Best Free Open Source Backend.md");
 		expect(html).toContain("último archivo confirmado");
@@ -575,10 +575,10 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 						installed: false,
 						busy: "install",
 						lastFile: "x/y.ts",
-						},
 					},
-					post,
-				}),
+				},
+				post,
+			}),
 		);
 		expect(html).not.toContain("último archivo confirmado");
 	});
