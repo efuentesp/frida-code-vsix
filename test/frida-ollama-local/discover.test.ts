@@ -18,7 +18,10 @@ const TAGS_BODY = {
 	],
 };
 
-function res(body: unknown, ok = true): { ok: boolean; json(): Promise<unknown> } {
+function res(
+	body: unknown,
+	ok = true,
+): { ok: boolean; json(): Promise<unknown> } {
 	return { ok, json: async () => body };
 }
 

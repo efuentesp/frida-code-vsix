@@ -3,6 +3,7 @@ import {
 	OLLAMA_PROVIDER,
 	OLLAMA_PROVIDER_DISPLAY,
 	buildOllamaProviderConfig,
+	filterVisibleChatProviders,
 	parseTagsResponse,
 	type OllamaTagsResponse,
 } from "../../src/providers/frida-ollama-local/catalog";
@@ -94,9 +95,9 @@ describe("#123 — parser de /api/tags (proveedor Ollama local)", () => {
 		expect(buildOllamaProviderConfig("localhost:11434", []).baseUrl).toBe(
 			"http://localhost:11434/v1",
 		);
-		expect(
-			buildOllamaProviderConfig("http://host:11434/v1/", []).baseUrl,
-		).toBe("http://host:11434/v1");
+		expect(buildOllamaProviderConfig("http://host:11434/v1/", []).baseUrl).toBe(
+			"http://host:11434/v1",
+		);
 		expect(buildOllamaProviderConfig("http://host:11434/", []).baseUrl).toBe(
 			"http://host:11434/v1",
 		);
@@ -123,5 +124,26 @@ describe("#122/#123 — etiqueta de ubicación local vs nube en las filas", () =
 	it("otros proveedores no llevan etiqueta (sin ruido)", () => {
 		expect(providerLocationTag("frida-enterprise")).toBeNull();
 		expect(providerLocationTag("openai")).toBeNull();
+	});
+});
+
+describe("#123 — filterVisibleChatProviders (ocultar ollama sin modelos)", () => {
+	const base = ["frida-enterprise", "ollama", "openai"];
+
+	it("ollama SIN modelos de chat se oculta de las listas", () => {
+		expect(
+			filterVisibleChatProviders(base, (id) => id !== "ollama"),
+		).toEqual(["frida-enterprise", "openai"]);
+	});
+
+	it("ollama CON modelos visible (tras ollama pull)", () => {
+		expect(filterVisibleChatProviders(base, () => true)).toEqual(base);
+	});
+
+	it("otros proveedores siempre visibles aunque no tengan modelos", () => {
+		expect(filterVisibleChatProviders(["openai", "zai"], () => false)).toEqual([
+			"openai",
+			"zai",
+		]);
 	});
 });

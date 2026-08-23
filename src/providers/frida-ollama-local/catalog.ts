@@ -50,7 +50,9 @@ function isChatModel(m: {
 }): boolean {
 	const name = (m.name ?? "").toLowerCase();
 	// Modelos de embeddings/feature-extraction no sirven para chat.
-	if (/^(nomic-embed|mxbai-embed|all-minilm|bge-|snowflake-arctic-embed)/.test(name))
+	if (
+		/^(nomic-embed|mxbai-embed|all-minilm|bge-|snowflake-arctic-embed)/.test(name)
+	)
 		return false;
 	const family = (m.details?.family ?? "").toLowerCase();
 	if (["nomic-bert", "bert"].includes(family)) return false;
@@ -102,7 +104,10 @@ export function parseTagsResponse(
 }
 
 /** Config del provider pi para registerProvider("ollama", …). */
-export function buildOllamaProviderConfig(host: string, models: OllamaLocalModelDef[]) {
+export function buildOllamaProviderConfig(
+	host: string,
+	models: OllamaLocalModelDef[],
+) {
 	// Normaliza: acepta OLLAMA_HOST con o sin esquema/puerto/path /v1.
 	const withScheme = host.startsWith("http") ? host : `http://${host}`;
 	const base = withScheme.replace(/\/+$/, "").replace(/\/v1$/, "");
@@ -124,4 +129,16 @@ export function buildOllamaProviderConfig(host: string, models: OllamaLocalModel
 			cost: m.cost,
 		})),
 	};
+}
+
+/** #123 — Proveedores visibles en las listas de modelos del chat: oculta
+ * `ollama` (local, sin auth/flujo de login) cuando no tiene modelos de chat
+ * descargados — sin modelos no hay nada que seleccionar y el bloque "sin
+ * conexión" es ruido. La guía (ollama pull…) vive en Entorno (doctor #110).
+ * El resto de proveedores siempre visibles (su auth es independiente). */
+export function filterVisibleChatProviders(
+	ids: readonly string[],
+	hasModels: (providerId: string) => boolean,
+): string[] {
+	return ids.filter((id) => id !== OLLAMA_PROVIDER || hasModels(id));
 }
