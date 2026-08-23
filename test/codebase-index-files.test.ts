@@ -63,8 +63,8 @@ describe("codebase-index/files — lista de archivos indexados (#112)", () => {
 				chunks: ids.map((id) => ({
 					id,
 					metadata: { filePath: file },
-			})),
-		});
+				})),
+			});
 		const lines = [
 			batch("modulo-01.md", ["c1", "c2"]), // c1 recuperado, c2 pendiente
 			batch("docs/otro.md", ["c3"]), // pendiente
