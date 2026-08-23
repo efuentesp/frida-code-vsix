@@ -105,7 +105,9 @@ describe("TreePanel (/tree, #126)", () => {
 		expect(html).toContain("Utiliza índices…");
 		expect(html).toContain("Mejor el enfoque B");
 		expect(html).toContain("codicon-account");
-		expect(html).toContain("codicon-copilot");
+		// Asistente = robot oficial de Frida (paridad Turn.tsx), no copilot.
+		expect(html).toContain("frida-robot-icon");
+		expect(html).not.toContain("codicon-copilot");
 		expect(html).toContain("refactor");
 	});
 

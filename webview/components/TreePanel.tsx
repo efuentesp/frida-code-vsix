@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TreeData, TreeEntryNode } from "../types";
 import { Tooltip } from "./Tooltip";
 import { Codicon } from "./Codicon";
+import { FridaRobotIcon } from "./FridaRobotIcon";
 
 /**
  * /tree (#126): navegación del árbol de la sesión ACTIVA (misma sesión, se
@@ -34,7 +35,6 @@ const FILTER_LABELS: Record<FilterMode, string> = {
 
 const KIND_ICONS: Record<string, string> = {
 	user: "account",
-	assistant: "copilot",
 	toolResult: "tools",
 	branchSummary: "git-branch",
 	compaction: "fold",
@@ -517,7 +517,12 @@ export function TreePanel({
 				>
 					<Codicon name={isOpen ? "chevron-down" : "chevron-right"} size={14} />
 				</button>
-				<Codicon name={icon} size={13} className="tree-kind" />
+				{/* Asistente = robot oficial de Frida (paridad Turn.tsx); el resto, codicons */}
+				{n.kind === "assistant" ? (
+					<FridaRobotIcon size={13} className="tree-kind" />
+				) : (
+					<Codicon name={icon} size={13} className="tree-kind" />
+				)}
 				{editing?.id === n.id ? (
 					<input
 						className="tree-label-input"
@@ -662,9 +667,7 @@ export function TreePanel({
 							Nada que mostrar con este filtro. Prueba “Todo” o limpia la búsqueda.
 						</div>
 					) : (
-						renderLevel(
-							visualTree.roots.map((id) => visualTree.byId.get(id)!),
-						)
+						renderLevel(visualTree.roots.map((id) => visualTree.byId.get(id)!))
 					)}
 				</div>
 				<div className="tree-statusbar">
