@@ -363,7 +363,7 @@ export function TreePanel({
 			case "ArrowRight":
 				if (selectedId) {
 					// Plegable = hijos visibles (directos o emergentes), no estructurales.
-					const kids = visibleChildIds.get(selectedId) ?? [];
+					const kids = visualTree.children.get(selectedId) ?? [];
 					if (kids.length > 0 && folded.has(selectedId)) {
 						e.preventDefault();
 						toggleFold(selectedId);
@@ -372,7 +372,7 @@ export function TreePanel({
 				break;
 			case "ArrowLeft":
 				if (selectedId) {
-					const kids = visibleChildIds.get(selectedId) ?? [];
+					const kids = visualTree.children.get(selectedId) ?? [];
 					if (kids.length > 0 && !folded.has(selectedId)) {
 						e.preventDefault();
 						toggleFold(selectedId);
@@ -413,7 +413,7 @@ export function TreePanel({
 			const cached = depth.get(id);
 			if (cached !== undefined) return cached;
 			const p = parentOf.get(id) ?? null;
-			const d = p ? visibleIds.has(p) ? compute(p) + 1 : compute(p) : 0;
+			const d = p ? (visibleIds.has(p) ? compute(p) + 1 : compute(p)) : 0;
 			depth.set(id, d);
 			return d;
 		};
@@ -429,11 +429,13 @@ export function TreePanel({
 		return depth;
 	}, [data, visibleIds]);
 
-	// Hijos VISIBLES directos de un nodo (para plegado y guías). Un hijo cuyo
-	// padre real está oculto "emerge" al nivel del ancestro visible más cercano:
-	// el contenedor .tree-children del ancestro lo incluye.
-	const visibleChildIds = useMemo(() => {
-		const m = new Map<string, string[]>();
+	// Hijos VISIBLES + RAÍCES VISUALES (#126): un hijo cuyo padre real está
+	// oculto "emerge" al ancestro visible más cercano (su contenedor
+	// .tree-children lo incluye). Un nodo visible cuyos ancestros están TODOS
+	// ocultos (p.ej. el primer mensaje colgando de un model_change raíz que el
+	// filtro esconde) es RAÍZ VISUAL — sin esto, renderLevel top (que itera
+	// data.nodes estructurales) lo saltaba y el modo Conversación quedaba vacío.
+	const visualTree = useMemo(() => {
 		const parentOf = new Map<string, string | null>();
 		const walk = (list: TreeEntryNode[], parent: string | null) => {
 			for (const n of list) {
@@ -459,15 +461,20 @@ export function TreePanel({
 			}
 			return null;
 		};
+		const children = new Map<string, string[]>();
+		const roots: string[] = [];
 		for (const n of byId.values()) {
 			if (!visibleIds.has(n.id)) continue;
 			const owner = nearestVisibleAncestor(n.id);
-			if (!owner) continue; // raíz visual: la maneja renderLevel top
-			const arr = m.get(owner) ?? [];
+			if (!owner) {
+				roots.push(n.id); // raíz visual: arranca el render
+				continue;
+			}
+			const arr = children.get(owner) ?? [];
 			arr.push(n.id);
-			m.set(owner, arr);
+			children.set(owner, arr);
 		}
-		return m;
+		return { roots, children, byId };
 	}, [data, visibleIds]);
 
 	const renderRow = (n: TreeEntryNode, depth: number) => {
@@ -475,8 +482,8 @@ export function TreePanel({
 		const isLeaf = n.id === effectiveLeafId;
 		const sel = n.id === selectedId;
 		// Plegable = tiene hijos visibles directos O emergentes (a través de
-		// ancestros ocultos por el filtro). Usa visibleChildIds, no children.
-		const foldable = (visibleChildIds.get(n.id) ?? []).length > 0;
+		// ancestros ocultos por el filtro). Usa visualTree.children, no children.
+		const foldable = (visualTree.children.get(n.id) ?? []).length > 0;
 		const isOpen = !folded.has(n.id);
 		const icon = KIND_ICONS[n.kind] ?? "circle-outline";
 		return (
@@ -578,9 +585,8 @@ export function TreePanel({
 	// sin guías │ colgando de ancestros ocultos por el filtro.
 	const renderLevel = (list: TreeEntryNode[]): React.ReactNode =>
 		list.flatMap((n) => {
-			if (!visibleIds.has(n.id)) return [];
-			const kids = (visibleChildIds.get(n.id) ?? []).map(
-				(id) => byId.get(id)!,
+			const kids = (visualTree.children.get(n.id) ?? []).map(
+				(id) => visualTree.byId.get(id)!,
 			);
 			const d = visualDepth.get(n.id) ?? 0;
 			return [
@@ -656,7 +662,9 @@ export function TreePanel({
 							Nada que mostrar con este filtro. Prueba “Todo” o limpia la búsqueda.
 						</div>
 					) : (
-						renderLevel(data.nodes)
+						renderLevel(
+							visualTree.roots.map((id) => visualTree.byId.get(id)!),
+						)
 					)}
 				</div>
 				<div className="tree-statusbar">

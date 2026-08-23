@@ -287,3 +287,77 @@ function renderTree(d: TreeData) {
 	);
 	return { html };
 }
+
+// Regresión #126 ("ya no muestra nada en Conversación, solo en Todo"): la raíz
+// ESTRUCTURAL del árbol real suele ser bookkeeping (model_change → thinking →
+// custom_message de arranque). Si el filtro la oculta, el primer mensaje de
+// usuario queda sin ancestro visible → debe emerger como RAÍZ VISUAL (depth 0),
+// no desaparecer. El fixture replica la sesión real reportada.
+describe("TreePanel · raíz estructural oculta (emergencia a raíz visual)", () => {
+	it("Conversación renderiza el primer mensaje aunque toda su cadena de ancestros esté oculta", () => {
+		const session: TreeData = {
+			leafId: "a1",
+			nodes: [
+				node({
+					id: "mc",
+					kind: "modelChange",
+					text: "github-copilot/kimi-k3",
+					children: [
+						node({
+							id: "th",
+							parentId: "mc",
+							kind: "thinking",
+							text: "medium",
+							children: [
+								node({
+									id: "pi",
+									parentId: "th",
+									kind: "customMessage",
+									text: "⟨frida-pipeline-index⟩ …",
+									display: false,
+									children: [
+										node({
+											id: "u1",
+											parentId: "pi",
+											kind: "user",
+											text: "Explícame en una frase qué es un índice compuesto en SQL",
+											children: [
+												node({
+													id: "w1",
+													parentId: "u1",
+													kind: "customMessage",
+													text: "⟨wiki-recall-context⟩ …",
+													display: false,
+													children: [
+														node({
+															id: "a1",
+															parentId: "w1",
+															kind: "assistant",
+															text: "Un índice compuesto…",
+															hasText: true,
+														}),
+													],
+												}),
+											],
+										}),
+									],
+								}),
+							],
+						}),
+					],
+				}),
+			],
+		};
+		const { html } = renderTree(session);
+		// El mensaje de usuario emerge a raíz visual (6px) y la respuesta queda
+		// a un nivel (8px): nada de la cadena oculta previa aparece ni desplaza.
+		expect(html).toContain("Explícame en una frase qué es un índice compuesto");
+		expect(html).toContain("Un índice compuesto…");
+		expect(html).toContain('style="padding-left:6px"');
+		expect(html).toContain('style="padding-left:8px"');
+		expect(html).not.toContain("padding-left:10px");
+		expect(html).not.toContain("padding-left:12px");
+		expect(html).not.toContain("kimi-k3"); // bookkeeping oculto en Conversación
+		expect(html).not.toContain("⟨wiki-recall-context⟩");
+	});
+});
