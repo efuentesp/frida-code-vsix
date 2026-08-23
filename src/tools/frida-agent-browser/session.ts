@@ -15,10 +15,7 @@
 
 import { createHash } from "node:crypto";
 import { AGENT_BROWSER_BINARY, LAUNCH_SCOPED_FLAGS } from "./constants";
-import {
-	findCommandStartIndex,
-	isBooleanFlagEnabled,
-} from "./argv-grammar";
+import { findCommandStartIndex, isBooleanFlagEnabled } from "./argv-grammar";
 import { guardRefMutation, type GuardState } from "./ref-guard";
 
 /** Flags que, de aparecer, hacen que el prefijo de sesión se omita (sesión explícita). */
@@ -44,17 +41,13 @@ export function hasExplicitSession(args: string[]): boolean {
  */
 export function hasLaunchScopedFlag(args: string[]): boolean {
 	const commandStart = findCommandStartIndex(args);
-	const command =
-		commandStart === undefined ? undefined : args[commandStart];
+	const command = commandStart === undefined ? undefined : args[commandStart];
 	return args.some((token, index) => {
 		const isHit = LAUNCH_SCOPED_FLAGS.some(
 			(flag) => token === flag || token.startsWith(`${flag}=`),
 		);
 		if (!isHit) return false;
-		if (
-			token === "--auto-connect" ||
-			token.startsWith("--auto-connect=")
-		) {
+		if (token === "--auto-connect" || token.startsWith("--auto-connect=")) {
 			return isBooleanFlagEnabled(args, "--auto-connect");
 		}
 		if (
@@ -177,15 +170,11 @@ export class ManagedSession {
 		try {
 			const { spawn } = await import("node:child_process");
 			await new Promise<void>((resolve) => {
-				const child = spawn(
-					AGENT_BROWSER_BINARY,
-					["--session", name, "close"],
-					{
-						cwd: this.cwd,
-						stdio: ["ignore", "ignore", "ignore"],
-						windowsHide: true,
-					},
-				);
+				const child = spawn(AGENT_BROWSER_BINARY, ["--session", name, "close"], {
+					cwd: this.cwd,
+					stdio: ["ignore", "ignore", "ignore"],
+					windowsHide: true,
+				});
 				child.on("error", () => resolve()); // binario ausente → nada que cerrar
 				child.on("close", () => resolve());
 				setTimeout(() => {

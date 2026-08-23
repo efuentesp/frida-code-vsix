@@ -183,9 +183,7 @@ describe("applyOutputPath", () => {
 
 describe("bash-guard", () => {
 	it("detecta agent-browser por bash", () => {
-		expect(looksLikeAgentBrowserBash("agent-browser open https://x")).toBe(
-			true,
-		);
+		expect(looksLikeAgentBrowserBash("agent-browser open https://x")).toBe(true);
 		expect(looksLikeAgentBrowserBash("ls -la")).toBe(false);
 	});
 	it("permite --help/--version", () => {
@@ -193,9 +191,7 @@ describe("bash-guard", () => {
 		expect(isHarmlessAgentBrowserInspection("agent-browser --version")).toBe(
 			true,
 		);
-		expect(isHarmlessAgentBrowserInspection("agent-browser open x")).toBe(
-			false,
-		);
+		expect(isHarmlessAgentBrowserInspection("agent-browser open x")).toBe(false);
 	});
 });
 
@@ -221,9 +217,7 @@ describe("ManagedSession", () => {
 		expect(s.prefixFor(["--session", "mine", "open", "x"], false)).toEqual([]);
 	});
 	it("detecta flags launch-scoped", () => {
-		expect(hasLaunchScopedFlag(["--profile", "Default", "open", "x"])).toBe(
-			true,
-		);
+		expect(hasLaunchScopedFlag(["--profile", "Default", "open", "x"])).toBe(true);
 		expect(hasLaunchScopedFlag(["open", "x"])).toBe(false);
 		expect(hasExplicitSession(["--session-name", "s", "open", "x"])).toBe(true);
 	});
@@ -231,17 +225,15 @@ describe("ManagedSession", () => {
 	it("contrato 0.34.0: flags que pasaron a ser launch-scoped", () => {
 		// 0.4.3: caller --args y --user-agent son launch-scoped (0.34.0 trata
 		// override vacío como nueva config de launch).
-		expect(hasLaunchScopedFlag(["--args", "--headless", "open", "x"])).toBe(
-			true,
-		);
+		expect(hasLaunchScopedFlag(["--args", "--headless", "open", "x"])).toBe(true);
 		expect(hasLaunchScopedFlag(["--user-agent=X", "open", "x"])).toBe(true);
 		expect(hasLaunchScopedFlag(["--headed", "open", "x"])).toBe(true);
 		expect(hasLaunchScopedFlag(["--idle-timeout", "30000", "open", "x"])).toBe(
 			true,
 		);
-		expect(
-			hasLaunchScopedFlag(["--allowed-domains", "a.com", "open", "x"]),
-		).toBe(true);
+		expect(hasLaunchScopedFlag(["--allowed-domains", "a.com", "open", "x"])).toBe(
+			true,
+		);
 		expect(
 			hasLaunchScopedFlag(["--restore-check-url", "http://x", "open", "y"]),
 		).toBe(true);
@@ -259,9 +251,9 @@ describe("ManagedSession", () => {
 
 	it("--auto-connect sólo cuando habilitado (last-wins)", () => {
 		expect(hasLaunchScopedFlag(["--auto-connect", "open", "x"])).toBe(true);
-		expect(
-			hasLaunchScopedFlag(["--auto-connect", "false", "open", "x"]),
-		).toBe(false);
+		expect(hasLaunchScopedFlag(["--auto-connect", "false", "open", "x"])).toBe(
+			false,
+		);
 		expect(hasLaunchScopedFlag(["--auto-connect=false", "open", "x"])).toBe(
 			false,
 		);
@@ -269,12 +261,8 @@ describe("ManagedSession", () => {
 
 	it("--pin-tab es sticky (booleano global, NO launch-scoped)", () => {
 		expect(hasLaunchScopedFlag(["--pin-tab", "snapshot", "-i"])).toBe(false);
-		expect(hasLaunchScopedFlag(["--no-pin-tab", "snapshot", "-i"])).toBe(
-			false,
-		);
+		expect(hasLaunchScopedFlag(["--no-pin-tab", "snapshot", "-i"])).toBe(false);
 		// Puede operar sobre sesión viva: no debe disparar política de fresh.
-		expect(hasLaunchScopedFlag(["--pin-tab", "false", "get", "url"])).toBe(
-			false,
-		);
+		expect(hasLaunchScopedFlag(["--pin-tab", "false", "get", "url"])).toBe(false);
 	});
 });

@@ -112,12 +112,9 @@ export function getTabSummary(
 		const tabSelector =
 			typeof tab.tabId === "string" && tab.tabId.trim().length > 0
 				? tab.tabId.trim()
-				: label ??
-						(typeof tab.index === "number"
-							? String(tab.index)
-							: String(index));
-		const labelText =
-			label && label !== tabSelector ? ` label=${label}` : "";
+				: (label ??
+					(typeof tab.index === "number" ? String(tab.index) : String(index)));
+		const labelText = label && label !== tabSelector ? ` label=${label}` : "";
 		const targetId =
 			typeof tab.targetId === "string" && tab.targetId.trim().length > 0
 				? tab.targetId.trim()
@@ -148,8 +145,7 @@ export function presentAgentBrowserResult(
 				kind: artifactKind,
 			})
 		: [];
-	const artifactVerification =
-		buildArtifactVerificationSummary(artifactEntries);
+	const artifactVerification = buildArtifactVerificationSummary(artifactEntries);
 
 	const category = buildCategoryDetails(succeeded, {
 		command,

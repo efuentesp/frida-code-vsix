@@ -39,9 +39,7 @@ describe("categories — classifyFailureCategory", () => {
 
 	it("selector-not-found (locator miss con hint)", () => {
 		expect(
-			F(
-				"Element not found: @e1. Verify the selector, role, or name is correct.",
-			),
+			F("Element not found: @e1. Verify the selector, role, or name is correct."),
 		).toBe("selector-not-found");
 		expect(F("No element found: role=button")).toBe("selector-not-found");
 	});
@@ -64,9 +62,7 @@ describe("categories — classifyFailureCategory", () => {
 		expect(F("Unknown ref: @e5")).toBe("stale-ref");
 	});
 	it("stale-ref inferido: ref usado + element not found", () => {
-		expect(F("element not found", { args: ["click", "@e3"] })).toBe(
-			"stale-ref",
-		);
+		expect(F("element not found", { args: ["click", "@e3"] })).toBe("stale-ref");
 	});
 	it("upstream-error por defecto", () => {
 		expect(F("something broke")).toBe("upstream-error");
@@ -94,11 +90,7 @@ describe("categories — buildCategoryDetails", () => {
 
 describe("snapshot — refs", () => {
 	it("compareRefIds numérico (no lexicográfico)", () => {
-		expect(["e10", "e2", "e1"].sort(compareRefIds)).toEqual([
-			"e1",
-			"e2",
-			"e10",
-		]);
+		expect(["e10", "e2", "e1"].sort(compareRefIds)).toEqual(["e1", "e2", "e10"]);
 	});
 	it('renderRefList: @eN role "name"', () => {
 		const list = renderRefList({
@@ -144,8 +136,7 @@ describe("next-actions", () => {
 	});
 	it("stale-ref → refresh-interactive-refs", () => {
 		expect(
-			buildNextActions({ succeeded: false, failureCategory: "stale-ref" })[0]
-				.id,
+			buildNextActions({ succeeded: false, failureCategory: "stale-ref" })[0].id,
 		).toBe("refresh-interactive-refs");
 	});
 	it("timeout → recover-after-timeout", () => {
@@ -245,66 +236,66 @@ describe("presentAgentBrowserResult", () => {
 			["click", "@e1"],
 			1,
 		);
-			expect(r.isError).toBe(true);
-			const d = r.details as {
-						failureCategory: string;
-						nextActions?: { id: string }[];
-			};
-			expect(d.failureCategory).toBe("selector-not-found");
-			expect(d.nextActions?.[0]?.id).toBe("refresh-interactive-refs");
-		});
-		it("tab list → resumen con selector + label + CDP targetId (0.34.0)", () => {
-			const r = present(
+		expect(r.isError).toBe(true);
+		const d = r.details as {
+			failureCategory: string;
+			nextActions?: { id: string }[];
+		};
+		expect(d.failureCategory).toBe("selector-not-found");
+		expect(d.nextActions?.[0]?.id).toBe("refresh-interactive-refs");
+	});
+	it("tab list → resumen con selector + label + CDP targetId (0.34.0)", () => {
+		const r = present(
+			{
+				success: true,
+				data: {
+					tabs: [
 						{
-								success: true,
-								data: {
-										tabs: [
-												{
-														active: true,
-														tabId: "t1",
-														title: "Docs",
-														url: "https://docs.x",
-														targetId: "ABC123",
-												},
-												{
-														active: false,
-														label: "admin",
-														title: "Admin",
-														url: "https://admin.x",
-												},
-										],
-								},
-								error: null,
+							active: true,
+							tabId: "t1",
+							title: "Docs",
+							url: "https://docs.x",
+							targetId: "ABC123",
 						},
-						["tab", "list"],
-			);
-			expect(r.isError).toBe(false);
-			const text = r.content[0].text;
-			expect(text).toContain("* [t1] target=ABC123 Docs — https://docs.x");
-			// Cuando el label ES el selector, no se repite (mirror de getTabSummary).
-			expect(text).toContain("- [admin] Admin — https://admin.x");
-		});
-		it("tab_gone → failureCategory tab-gone + nextActions de rebind", () => {
-			const r = present(
 						{
-								success: false,
-								data: null,
-								error: "tab_gone: pinned tab vanished (lastUrl: about:blank)",
+							active: false,
+							label: "admin",
+							title: "Admin",
+							url: "https://admin.x",
 						},
-						["get", "url"],
-						1,
-			);
-			expect(r.isError).toBe(true);
-			const d = r.details as {
-						failureCategory: string;
-						nextActions?: { id: string; params: { args: string[] } }[];
-			};
-			expect(d.failureCategory).toBe("tab-gone");
-			expect(d.nextActions?.map((a) => a.id)).toEqual([
-						"list-tabs-after-tab-gone",
-						"open-tab-after-tab-gone",
-			]);
-			expect(d.nextActions?.[0]?.params.args).toEqual(["tab", "list"]);
-			expect(d.nextActions?.[1]?.params.args).toEqual(["tab", "new"]);
-		});
+					],
+				},
+				error: null,
+			},
+			["tab", "list"],
+		);
+		expect(r.isError).toBe(false);
+		const text = r.content[0].text;
+		expect(text).toContain("* [t1] target=ABC123 Docs — https://docs.x");
+		// Cuando el label ES el selector, no se repite (mirror de getTabSummary).
+		expect(text).toContain("- [admin] Admin — https://admin.x");
+	});
+	it("tab_gone → failureCategory tab-gone + nextActions de rebind", () => {
+		const r = present(
+			{
+				success: false,
+				data: null,
+				error: "tab_gone: pinned tab vanished (lastUrl: about:blank)",
+			},
+			["get", "url"],
+			1,
+		);
+		expect(r.isError).toBe(true);
+		const d = r.details as {
+			failureCategory: string;
+			nextActions?: { id: string; params: { args: string[] } }[];
+		};
+		expect(d.failureCategory).toBe("tab-gone");
+		expect(d.nextActions?.map((a) => a.id)).toEqual([
+			"list-tabs-after-tab-gone",
+			"open-tab-after-tab-gone",
+		]);
+		expect(d.nextActions?.[0]?.params.args).toEqual(["tab", "list"]);
+		expect(d.nextActions?.[1]?.params.args).toEqual(["tab", "new"]);
+	});
 });
