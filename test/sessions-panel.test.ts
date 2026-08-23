@@ -95,8 +95,8 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 
 	it("muestra el chip fusionado ⚡ activo·turnos con Σ en el pie y fallback al reloj legacy", () => {
 		const html = renderToStaticMarkup(
-				React.createElement(SessionsPanel, {
-					sessions: {
+			React.createElement(SessionsPanel, {
+				sessions: {
 					items: sampleSessions,
 					currentPath: "/sessions/s1.jsonl",
 				},

@@ -179,47 +179,47 @@ export function SessionsPanel({
 						<Codicon name="history" size={15} />
 						<span>Historial de Sesiones</span>
 					</div>
-				<div className="seg-toggle" role="tablist">
-					<button
-						className={"seg" + (scope === "project" ? " active" : "")}
-						onClick={() => onScopeChange("project")}
-						title="Solo sesiones de este proyecto"
-					>
-						Este proyecto
-					</button>
-					<button
-						className={"seg" + (scope === "all" ? " active" : "")}
-						onClick={() => onScopeChange("all")}
-						title="Sesiones de todos los proyectos"
-					>
-						Todas
-					</button>
-				</div>
-				{/* #107 — orden por actividad: recencia (grupos de fecha) o ranking
+					<div className="seg-toggle" role="tablist">
+						<button
+							className={"seg" + (scope === "project" ? " active" : "")}
+							onClick={() => onScopeChange("project")}
+							title="Solo sesiones de este proyecto"
+						>
+							Este proyecto
+						</button>
+						<button
+							className={"seg" + (scope === "all" ? " active" : "")}
+							onClick={() => onScopeChange("all")}
+							title="Sesiones de todos los proyectos"
+						>
+							Todas
+						</button>
+					</div>
+					{/* #107 — orden por actividad: recencia (grupos de fecha) o ranking
 				    global por tiempo activo / turnos. */}
-				<div className="seg-toggle" role="tablist" title="Ordenar sesiones">
-					<button
-						className={"seg" + (sort === "recent" ? " active" : "")}
-						onClick={() => setSort("recent")}
-						title="Grupos cronológicos (por fecha de modificación)"
-					>
-						<Codicon name="calendar" size={12} />
-					</button>
-					<button
-						className={"seg" + (sort === "active" ? " active" : "")}
-						onClick={() => setSort("active")}
-						title="Más tiempo activo primero (lista plana)"
-					>
-						<Codicon name="zap" size={12} />
-					</button>
-					<button
-						className={"seg" + (sort === "turns" ? " active" : "")}
-						onClick={() => setSort("turns")}
-						title="Más turnos primero (lista plana)"
-					>
-						<Codicon name="repeat" size={12} />
-					</button>
-				</div>
+					<div className="seg-toggle" role="tablist" title="Ordenar sesiones">
+						<button
+							className={"seg" + (sort === "recent" ? " active" : "")}
+							onClick={() => setSort("recent")}
+							title="Grupos cronológicos (por fecha de modificación)"
+						>
+							<Codicon name="calendar" size={12} />
+						</button>
+						<button
+							className={"seg" + (sort === "active" ? " active" : "")}
+							onClick={() => setSort("active")}
+							title="Más tiempo activo primero (lista plana)"
+						>
+							<Codicon name="zap" size={12} />
+						</button>
+						<button
+							className={"seg" + (sort === "turns" ? " active" : "")}
+							onClick={() => setSort("turns")}
+							title="Más turnos primero (lista plana)"
+						>
+							<Codicon name="repeat" size={12} />
+						</button>
+					</div>
 					<button
 						className="icon-btn sessions-close-btn"
 						onClick={onClose}
@@ -382,29 +382,28 @@ export function SessionsPanel({
 																<Codicon name="comment" size={11} />
 																<span>{s.messageCount} msgs</span>
 															</span>
-																{/* #107 — chip fusionado ⚡ tiempo activo · Nt (paridad con el
+															{/* #107 — chip fusionado ⚡ tiempo activo · Nt (paridad con el
 																    header); fallback al reloj de pared si el JSONL no trajo
 																    turns (p. ej. sesiones pre-#107). Tooltip = vocabulario
 																    del popover del header. */}
-																	{(s.activeMs ?? 0) > 0 || (s.turnCount ?? 0) > 0 ? (
-																		<Tooltip label={timingTip(s)} side="top">
-																			<span className="session-meta-chip session-timing-chip">
-																				<Codicon name="zap" size={11} />
-																				<span>
-																					{formatDuration(s.activeMs ?? 0)} ·{" "}
-																					{s.turnCount ?? 0}t
-																				</span>
-																			</span>
-																		</Tooltip>
-																	) : (
-																		s.durationMs !== undefined &&
-																		s.durationMs > 0 && (
-																			<span className="session-meta-chip">
-																				<Codicon name="clock" size={11} />
-																				<span>{formatDuration(s.durationMs)}</span>
-																			</span>
-																		)
-																	)}
+															{(s.activeMs ?? 0) > 0 || (s.turnCount ?? 0) > 0 ? (
+																<Tooltip label={timingTip(s)} side="top">
+																	<span className="session-meta-chip session-timing-chip">
+																		<Codicon name="zap" size={11} />
+																		<span>
+																			{formatDuration(s.activeMs ?? 0)} · {s.turnCount ?? 0}t
+																		</span>
+																	</span>
+																</Tooltip>
+															) : (
+																s.durationMs !== undefined &&
+																s.durationMs > 0 && (
+																	<span className="session-meta-chip">
+																		<Codicon name="clock" size={11} />
+																		<span>{formatDuration(s.durationMs)}</span>
+																	</span>
+																)
+															)}
 															{totalTokens > 0 && (
 																<span className="session-meta-chip">
 																	<Codicon name="database" size={11} />
@@ -474,21 +473,21 @@ export function SessionsPanel({
 							<span>Nueva Sesión</span>
 						</button>
 					)}
-				<span className="sessions-footer-count">
-					{filteredItems.length === 1
-						? "1 sesión"
-						: `${filteredItems.length} sesiones`}
-					{search && ` (de ${rawItems.length})`}
-				</span>
-				{/* Σ de las filtradas — mismo vocabulario del chip (#107). */}
-				{totals.any && (
-					<span className="sessions-footer-total">
-						<Codicon name="zap" size={11} />
-						<span>
-							{formatDuration(totals.active)} · {totals.turns}t
-						</span>
+					<span className="sessions-footer-count">
+						{filteredItems.length === 1
+							? "1 sesión"
+							: `${filteredItems.length} sesiones`}
+						{search && ` (de ${rawItems.length})`}
 					</span>
-				)}
+					{/* Σ de las filtradas — mismo vocabulario del chip (#107). */}
+					{totals.any && (
+						<span className="sessions-footer-total">
+							<Codicon name="zap" size={11} />
+							<span>
+								{formatDuration(totals.active)} · {totals.turns}t
+							</span>
+						</span>
+					)}
 					<button type="button" className="sec" onClick={onClose}>
 						Cerrar
 					</button>
