@@ -10,6 +10,16 @@ function fmtTokens(n: number): string {
 	return String(n);
 }
 
+/** #122/#123 — etiqueta de ubicación para distinguir modelos Ollama local
+ * vs nube en cualquier lista de modelos. null = provider sin ambigüedad. */
+export function providerLocationTag(
+	providerId: string,
+): { label: string; icon: string } | null {
+	if (providerId === "ollama") return { label: "local", icon: "device-desktop" };
+	if (providerId === "ollama-cloud") return { label: "nube", icon: "cloud" };
+	return null;
+}
+
 /** #121 (F7) — tarjeta de rol con selects proveedor→modelo y opción
  * "Hereda Principal". Pura: solo renderiza lo que recibe. */
 function RoleCard({
@@ -336,8 +346,17 @@ export function ModelPanel({
 												<span className="model-radio">
 													{selected && <Codicon name="record" size={14} />}
 												</span>
-												<span className="model-name">{mm.name}</span>
-												{(mm.contextWindow ||
+										<span className="model-name">{mm.name}</span>
+											{(() => {
+												// #122/#123 — distinguir local vs nube en cada fila
+												const loc = providerLocationTag(p.id);
+												return loc ? (
+													<span className="model-meta">
+														<Codicon name={loc.icon} size={11} /> {loc.label}
+													</span>
+												) : null;
+											})()}
+											{(mm.contextWindow ||
 													mm.reasoning ||
 													mm.input?.includes("image")) && (
 													<span className="model-meta">

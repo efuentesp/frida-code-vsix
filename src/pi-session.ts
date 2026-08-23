@@ -50,6 +50,12 @@ import {
 	buildAntigravityProviderConfig,
 	ANTIGRAVITY_PROVIDER,
 } from "./providers/frida-antigravity";
+import {
+	buildOllamaProviderConfig,
+	OLLAMA_PROVIDER,
+	type OllamaLocalModelDef,
+} from "./providers/frida-ollama-local/catalog";
+import { discoverOllamaLocalModels } from "./providers/frida-ollama-local/discover";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
@@ -452,6 +458,28 @@ export async function createFridaSession(
 		ANTIGRAVITY_PROVIDER,
 		buildAntigravityProviderConfig() as any,
 	);
+	// #123 — Ollama LOCAL: registra el daemon (OLLAMA_HOST o localhost:11434)
+	// con los modelos de chat instalados (/api/tags + /api/show best-effort).
+	// Daemon caído o sin modelos → provider con models: [] (aparece "sin
+	// conexión" en Proveedores; nunca rompe el arranque). El semáforo de la UI
+	// es getModels no vacío — mismo criterio que el resolvedor de roles F7.
+	{
+		const ollamaHost =
+			process.env.OLLAMA_HOST?.trim() || "http://localhost:11434";
+		let ollamaLocalModels: OllamaLocalModelDef[] = [];
+		try {
+			ollamaLocalModels = await discoverOllamaLocalModels(
+				ollamaHost,
+				(url, init) => fetch(url, init),
+			);
+		} catch {
+			/* daemon caído: registro vacío, fail-soft */
+		}
+		modelRuntime.registerProvider(
+			OLLAMA_PROVIDER,
+			buildOllamaProviderConfig(ollamaHost, ollamaLocalModels) as any,
+		);
+	}
 	// Errata-9: el compact/branch-summary llama streamSimple/completeSimple sin
 	// onPayload (el SDK no pasa onPayload en ese canal). Instala el patch lateral
 	// para inyectar identidad (user_id/email) y role developer→system en Enterprise.

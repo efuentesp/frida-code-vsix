@@ -330,41 +330,41 @@ export function SettingsHub({
 										providers={state.models.providers}
 										onSetRoles={(patch) => post({ type: "model_roles_set", ...patch })}
 									/>
-							) : (
-								<div className="cfg-stub">Cargando roles de modelo…</div>
-							)}
-							{/* #121 — Transcript: el toggle "Ocultar razonamiento" vivía en el
-							 * header sin persistir; ahora aquí, persistido y estilo casa. */}
-							<div className="mr-roles">
-								<div className="mr-head">
-									<Codicon name="sparkle" size={14} />
-									<span className="mr-title">TRANSCRIPT</span>
-								</div>
-								<div className="mr-card">
-									<div className="mr-card-head">
-										<span className="mr-card-title">Mostrar razonamiento del modelo</span>
-										<button
-											type="button"
-											className={`switch${
-												state.ui?.hideThinking === false ? " on" : ""
-											}`}
-											role="switch"
-											aria-checked={state.ui?.hideThinking === false}
-											aria-label="Mostrar razonamiento del modelo"
-											onClick={() =>
-												post({
-													type: "ui_hide_thinking_set",
-													value: !(state.ui?.hideThinking === false),
-												})
-											}
-										/>
+								) : (
+									<div className="cfg-stub">Cargando roles de modelo…</div>
+								)}
+								{/* #121 — Transcript: el toggle "Ocultar razonamiento" vivía en el
+								 * header sin persistir; ahora aquí, persistido y estilo casa. */}
+								<div className="mr-roles">
+									<div className="mr-head">
+										<Codicon name="sparkle" size={14} />
+										<span className="mr-title">TRANSCRIPT</span>
 									</div>
-									<div className="mr-card-hint">
+									<div className="mr-card">
+										<div className="mr-card-head">
+											<span className="mr-card-title">
+												Mostrar razonamiento del modelo
+											</span>
+											<button
+												type="button"
+												className={`switch${state.ui?.hideThinking === false ? " on" : ""}`}
+												role="switch"
+												aria-checked={state.ui?.hideThinking === false}
+												aria-label="Mostrar razonamiento del modelo"
+												onClick={() =>
+													post({
+														type: "ui_hide_thinking_set",
+														value: !(state.ui?.hideThinking === false),
+													})
+												}
+											/>
+										</div>
+										<div className="mr-card-hint">
 											Los turnos muestran “Razonó 3.2s · 420 tok” expandible por turno.
-										Apagado: solo se ve la respuesta.
+											Apagado: solo se ve la respuesta.
+										</div>
 									</div>
 								</div>
-							</div>
 								<div className="cfg-stub">
 									La selección rápida de modelo (intercambio en vivo) está en el botón de
 									modelo de la barra superior; los roles de arriba aplican desde la

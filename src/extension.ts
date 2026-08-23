@@ -181,6 +181,8 @@ import {
 	setAutoIndexEnabled,
 } from "./tools/frida-codebase-index/host-setup";
 import { readModelRolesConfig } from "./settings";
+import { OLLAMA_PROVIDER_DISPLAY } from "./providers/frida-ollama-local/catalog";
+import { OLLAMA_CLOUD_DISPLAY } from "./providers/frida-ollama-cloud/catalog";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
 import { createPersistentDemoElement } from "./demo/persistent-demo";
@@ -239,6 +241,7 @@ const SUPPORTED_PROVIDERS = [
 	FRIDA_ENTERPRISE_PROVIDER,
 	"github-copilot",
 	ANTIGRAVITY_PROVIDER,
+	"ollama", // #123 — daemon local; modelos descubiertos al crear sesión
 ];
 
 // ¿El proveedor está autenticado? getProviderAuthStatus revisa storedProviders
@@ -1417,6 +1420,9 @@ export async function activate(
 		if (id === ANTIGRAVITY_PROVIDER) {
 			return ANTIGRAVITY_PROVIDER_DISPLAY;
 		}
+		// #123 — distinguir del cloud (#122): "Ollama (local)" vs "Ollama Cloud".
+		if (id === "ollama") return OLLAMA_PROVIDER_DISPLAY;
+		if (id === "ollama-cloud") return OLLAMA_CLOUD_DISPLAY;
 		if (id === "github-copilot") return "GitHub Copilot";
 		return frida?.modelRuntime?.getProvider?.(id)?.name ?? id;
 	}
@@ -3363,7 +3369,7 @@ export async function activate(
 			case "ui_hide_thinking_set": {
 				await vscode.workspace
 					.getConfiguration("frida")
-				.update("ui.hideThinking", !!msg.value, vscode.ConfigurationTarget.Global);
+					.update("ui.hideThinking", !!msg.value, vscode.ConfigurationTarget.Global);
 				postUiPrefs();
 				break;
 			}
