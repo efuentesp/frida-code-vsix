@@ -7,6 +7,7 @@ import {
 	StopIndexDialog,
 	EmbeddingsEngine,
 	EmbeddingsChangeDialog,
+	shouldShowChangeDialog,
 } from "../webview/components/IndexTab";
 import type { CodebaseIndexUiState, State } from "../webview/types";
 
@@ -514,6 +515,17 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			expect(html).toContain("reconstrucción total");
 			expect(html).toContain("Cambiar y Reconstruir Índice");
 			expect(html).toContain("Cancelar");
+		});
+
+		it("REGRESIÓN #117: shouldShowChangeDialog — null (botón) SÍ abre, undefined NO", () => {
+			// El bug: el guard `changeTarget &&` es falsy para null y el modal
+			// abierto desde "Cambiar motor…" nunca renderizaba.
+			expect(shouldShowChangeDialog(true, null)).toBe(true); // ← el bug
+			expect(shouldShowChangeDialog(true, undefined)).toBe(false);
+			expect(
+				shouldShowChangeDialog(true, { provider: "ollama" }),
+			).toBe(true);
+			expect(shouldShowChangeDialog(false, { provider: "ollama" })).toBe(false);
 		});
 	});
 

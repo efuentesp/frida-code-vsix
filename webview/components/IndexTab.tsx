@@ -245,6 +245,19 @@ const EMB_CARD_IDS = [
 	"custom",
 ] as const;
 
+/**
+ * #117 — ¿renderizar el modal de cambio de motor? Tri-estado del target:
+ * undefined = cerrado · null = abierto desde el botón (sin elección previa,
+ * default Ollama) · objeto = elección desde una tarjeta. REGRESIÓN: un simple
+ * `changeTarget &&` es falsy para null y el modal del botón nunca abría.
+ */
+export function shouldShowChangeDialog(
+	locked: boolean,
+	target: { provider: string; model?: string } | null | undefined,
+): boolean {
+	return locked && target !== undefined;
+}
+
 /** Tarjeta individual de proveedor (#117). Extraída para bajar complejidad. */
 function EmbProviderCard({
 	id,
@@ -291,7 +304,9 @@ function EmbProviderCard({
 	return (
 		<div
 			className={`cfg-env-card ${selected ? "is-installed" : ""} ci-emb-card`}
-			onClick={() => !locking && onSelect(id)}
+			// Con candado, el click NO queda muerto: el padre enruta a
+			// setChangeTarget → modal de reconstrucción pre-seleccionado (#117).
+			onClick={() => onSelect(id)}
 		>
 			<div className="ci-emb-head">
 				<Codicon name={st.icon} size={15} />
@@ -1084,9 +1099,16 @@ export function IndexTab({
 			)}
 
 			{/* #117 — modal de cambio de motor (reindexación obligatoria) */}
-			{ci?.indexMeta && changeTarget && (
+			{shouldShowChangeDialog(!!ci?.indexMeta, changeTarget) && (
 				<EmbeddingsChangeDialog
-					current={{ provider: ci.indexMeta.provider, model: ci.indexMeta.model }}
+					current={
+						ci?.indexMeta
+							? {
+									provider: ci.indexMeta.provider,
+									model: ci.indexMeta.model,
+								}
+							: undefined
+					}
 					target={changeTarget ?? { provider: "ollama" }}
 					onConfirm={() => {
 						post({
