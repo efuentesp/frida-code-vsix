@@ -738,9 +738,7 @@ export function IndexTab({
 									<span className="ci-bullet">·</span>
 									<span>
 										Motor:{" "}
-										<strong
-											className={motorPending ? "ci-motor-pending" : undefined}
-										>
+										<strong className={motorPending ? "ci-motor-pending" : undefined}>
 											{motorPending
 												? "pendiente de confirmar"
 												: engineLabel(providerMode, metaLabel)}
@@ -750,8 +748,8 @@ export function IndexTab({
 												className="ci-motor-warn"
 												title="Ningún embedding confirmado — el índice aún no tiene motor usable"
 											>
-												<Codicon name="warning" size={12} /> los embeddings están
-												fallando — revisa el proveedor (tab Entorno y Ping de tarjetas)
+												<Codicon name="warning" size={12} /> los embeddings están fallando —
+												revisa el proveedor (tab Entorno y Ping de tarjetas)
 											</span>
 										)}
 										{meta && meta.dimensions > 0 && (

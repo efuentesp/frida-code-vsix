@@ -316,13 +316,13 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		const html = renderToStaticMarkup(
 			React.createElement(IndexTab, {
 				state: {
-				...baseState,
-				codebaseIndex: {
-					installed: true,
-					version: "0.23.0",
-					config: { provider: "auto" },
+					...baseState,
+					codebaseIndex: {
+						installed: true,
+						version: "0.23.0",
+						config: { provider: "auto" },
+					},
 				},
-			},
 				post,
 			}),
 		);
