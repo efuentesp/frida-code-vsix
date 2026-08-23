@@ -4154,7 +4154,15 @@ export async function activate(
 			contextReportHandle?.unmount();
 			contextReportHandle = frida.webBridge.mountPersistent(
 				() =>
-					createContextReportElement(analysis, () => contextReportHandle?.unmount()),
+					createContextReportElement(analysis, {
+						onClose: () => contextReportHandle?.unmount(),
+						// Compacta (compactContext) y cierra: los eventos
+						// compaction_start/end del SDK dan el feedback en el chat.
+						onCompact: () => {
+							contextReportHandle?.unmount();
+							void compactContext();
+						},
+					}),
 				"overlay",
 			);
 		} catch (e) {

@@ -29,7 +29,12 @@ export interface BoxProps {
 	/** Sangría izquierda (#79: agentes anidados del timeline vertical). */
 	paddingLeft?: number;
 	margin?: number;
-	alignItems?: "flex-start" | "center" | "flex-end" | "stretch";
+	alignItems?:
+		| "flex-start"
+		| "center"
+		| "flex-end"
+		| "stretch"
+		| "baseline";
 	justifyContent?: "flex-start" | "center" | "flex-end" | "space-between";
 	onMouseEnter?: () => void;
 	onMouseLeave?: () => void;
@@ -47,6 +52,8 @@ export interface BoxProps {
 	overflow?: "hidden" | "visible" | "auto";
 	/** Clase CSS extra (passthrough) para estilizar vía stylesheet del webview. */
 	cls?: string;
+	/** Tooltip nativo del elemento (title DOM; ej. segmentos de la barra /context). */
+	title?: string;
 }
 
 /** Props de texto (ftext → <span>). */

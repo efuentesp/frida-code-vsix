@@ -7058,6 +7058,144 @@ kbd {
 	border-color: var(--vscode-focusBorder);
 }
 
+/* ===== ContextReport (/context) — instrumento técnico denso (#124, DESIGN.md) =====
+ * Estética: instrumento técnico. Mono del editor + tabular-nums, retícula
+ * sutil de fondo, barra-instrumento con hover cruzado (segmento↔fila) y hatch
+ * en el espacio libre que reusa el mismo patrón. Todo con variables del tema. */
+.ctxr {
+	box-sizing: border-box;
+	width: 100%;
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+	font-variant-numeric: tabular-nums;
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+	border-radius: 8px;
+	/* Retícula sutil (1px cada 16px) sobre el fondo del widget. */
+	background:
+		repeating-linear-gradient(
+			0deg,
+			rgba(127, 127, 127, 0.045) 0 1px,
+			transparent 1px 16px
+		),
+		repeating-linear-gradient(
+			90deg,
+			rgba(127, 127, 127, 0.045) 0 1px,
+			transparent 1px 16px
+		),
+		var(
+			--vscode-editorWidget-background,
+			var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.06))
+		);
+	animation: ctxr-in 0.18s ease-out;
+}
+@keyframes ctxr-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+.ctxr-title {
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	font-size: 12px;
+}
+.ctxr-sec {
+	font-size: 10px;
+	letter-spacing: 0.6px;
+	text-transform: uppercase;
+	color: var(--vscode-descriptionForeground);
+}
+.ctxr-pressure {
+	line-height: 1;
+}
+.ctxr-pulse {
+	animation: ctxr-blink 1.6s ease-in-out infinite;
+}
+@keyframes ctxr-blink {
+	50% {
+		opacity: 0.55;
+	}
+}
+/* Barra-instrumento: segmentos proporcionales, borde fino, crecimiento
+ * escalonado al montar (nth-child sobre los wrappers span de RemoteRoot). */
+.ctxr-bar {
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+	border-radius: 4px;
+}
+.ctxr-seg {
+	transform-origin: 50% 100%;
+	cursor: pointer;
+	transition:
+		opacity 0.12s ease,
+		filter 0.12s ease;
+	animation: ctxr-seg 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.ctxr-seg:hover {
+	filter: brightness(1.3);
+}
+@keyframes ctxr-seg {
+	from {
+		transform: scaleY(0);
+	}
+}
+.ctxr-bar > span:nth-child(1) .ctxr-seg {
+	animation-delay: 30ms;
+}
+.ctxr-bar > span:nth-child(2) .ctxr-seg {
+	animation-delay: 70ms;
+}
+.ctxr-bar > span:nth-child(3) .ctxr-seg {
+	animation-delay: 110ms;
+}
+.ctxr-bar > span:nth-child(4) .ctxr-seg {
+	animation-delay: 150ms;
+}
+.ctxr-bar > span:nth-child(5) .ctxr-seg {
+	animation-delay: 190ms;
+}
+.ctxr-bar > span:nth-child(6) .ctxr-seg {
+	animation-delay: 230ms;
+}
+.ctxr-bar > span:nth-child(7) .ctxr-seg {
+	animation-delay: 270ms;
+}
+.ctxr-bar > span:nth-child(8) .ctxr-seg {
+	animation-delay: 310ms;
+}
+/* Espacio libre: hatch diagonal (mismo lenguaje de retícula del fondo). */
+.ctxr-seg--free {
+	background: repeating-linear-gradient(
+		135deg,
+		rgba(127, 127, 127, 0.28) 0 1px,
+		transparent 1px 5px
+	);
+}
+/* Hover cruzado: al fijar un key (hover o pin), el resto se atenúa. El fade
+ * lo resuelve el navegador (transition), no un re-render. */
+.ctxr-row {
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+	border-radius: 4px;
+}
+.ctxr.is-dimming .ctxr-seg:not(.is-hot),
+.ctxr.is-dimming .ctxr-row:not(.is-hot) {
+	opacity: 0.35;
+}
+/* Dos columnas densas; colapsan a una en panel angosto. */
+.ctxr-cols {
+	flex-wrap: wrap;
+}
+.ctxr-col {
+	flex: 1 1 300px;
+	min-width: 280px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.ctxr,
+	.ctxr-seg,
+	.ctxr-pulse {
+		animation: none;
+	}
+}
+
 /* ===== Onboarding wizard + Proveedores + Hub de Configuración (UX onboarding) ===== */
 
 /* Wizard de onboarding: tarjeta centrada con pasos. */
