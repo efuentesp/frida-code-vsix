@@ -334,6 +334,7 @@ export type TreeEntryKind =
 	| "compaction"
 	| "modelChange"
 	| "thinking"
+	| "customMessage"
 	| "other";
 
 export interface TreeEntryNode {
@@ -351,6 +352,8 @@ export interface TreeEntryNode {
 	toolCalls?: number;
 	/** Assistant: stopReason (error/abort visibles en modo default). */
 	stopReason?: string;
+	/** custom_message: display del entry (false = material interno del host). */
+	display?: boolean;
 	children: TreeEntryNode[];
 }
 

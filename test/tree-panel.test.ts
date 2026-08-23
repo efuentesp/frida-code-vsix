@@ -30,6 +30,14 @@ const data: TreeData = {
 			text: "¿Cómo optimizo esta consulta SQL?",
 			children: [
 				node({
+					id: "wiki1",
+					parentId: "root",
+					kind: "customMessage",
+					text: "⟨wiki-recall-context⟩ ## Relevant Wiki",
+					display: false,
+					children: [],
+				}),
+				node({
 					id: "a1",
 					parentId: "root",
 					kind: "assistant",
@@ -43,7 +51,13 @@ const data: TreeData = {
 							text: "Probemos el enfoque A",
 							label: "refactor",
 							children: [
-								node({ id: "leaf", parentId: "a2", kind: "assistant", text: "Listo", hasText: true }),
+								node({
+									id: "leaf",
+									parentId: "a2",
+									kind: "assistant",
+									text: "Listo",
+									hasText: true,
+								}),
 							],
 						}),
 						node({
@@ -110,5 +124,68 @@ describe("TreePanel (/tree, #126)", () => {
 		expect(html).toContain("Conversación");
 		expect(html).toContain("Sólo etiquetadas");
 		expect(html).toContain("Buscar en el árbol");
+	});
+});
+
+// Regresión #126 ("los tabs de filtro no hacen diferencia"): en una sesión
+// lineal, forzar la visibilidad de ancestros re-mostraba TODO bajo cualquier
+// filtro. passesFilter debe ocultar custom_message internas (display:false)
+// en Conversación, y "Sólo usuario" debe dejar únicamente mensajes de usuario.
+import { passesFilter } from "../webview/components/TreePanel";
+
+describe("passesFilter — paridad applyFilter de Pi (#126)", () => {
+	it("Conversación (default) oculta custom_message internas y bookkeeping", () => {
+		const wiki = node({
+			id: "w1",
+			kind: "customMessage",
+			text: "⟨wiki-recall-context⟩ …",
+			display: false,
+		});
+		const model = node({ id: "m1", kind: "modelChange", text: "p/m" });
+		const user = node({ id: "u1", kind: "user", text: "hola" });
+		expect(passesFilter(wiki, "default", false)).toBe(false);
+		expect(passesFilter(model, "default", false)).toBe(false);
+		expect(passesFilter(user, "default", false)).toBe(true);
+	});
+
+	it("custom_message con display:true SÍ se ve en Conversación", () => {
+		const visible = node({
+			id: "w2",
+			kind: "customMessage",
+			text: "⟨custom⟩ …",
+			display: true,
+		});
+		expect(passesFilter(visible, "default", false)).toBe(true);
+	});
+
+	it("Sólo usuario deja únicamente kind=user", () => {
+		expect(passesFilter(node({ id: "a", kind: "user" }), "user-only", false)).toBe(true);
+		expect(
+			passesFilter(node({ id: "b", kind: "assistant", hasText: true }), "user-only", false),
+		).toBe(false);
+		expect(
+			passesFilter(node({ id: "c", kind: "customMessage", display: true }), "user-only", false),
+		).toBe(false);
+	});
+
+	it("asistente sin texto se oculta en default salvo error/abort o ser hoja", () => {
+		const mudo = node({ id: "s1", kind: "assistant", text: "", hasText: false });
+		const error = node({
+			id: "s2",
+			kind: "assistant",
+			text: "",
+			hasText: false,
+			stopReason: "error",
+		});
+		expect(passesFilter(mudo, "default", false)).toBe(false);
+		expect(passesFilter(error, "default", false)).toBe(true);
+		expect(passesFilter(mudo, "default", true)).toBe(true); // hoja siempre visible
+	});
+
+	it("Todo muestra todo", () => {
+		expect(
+			passesFilter(node({ id: "x", kind: "customMessage", display: false }), "all", false),
+		).toBe(true);
+		expect(passesFilter(node({ id: "y", kind: "modelChange" }), "all", false)).toBe(true);
 	});
 });

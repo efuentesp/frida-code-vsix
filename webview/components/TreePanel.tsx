@@ -40,19 +40,22 @@ const KIND_ICONS: Record<string, string> = {
 	compaction: "fold",
 	modelChange: "settings",
 	thinking: "lightbulb",
+	customMessage: "symbol-snake",
 	other: "circle-outline",
 };
 
 /** ¿Visible bajo el modo de filtro? Paridad con applyFilter de Pi. */
-function passesFilter(n: TreeEntryNode, mode: FilterMode, isLeaf: boolean): boolean {
+export function passesFilter(
+	n: TreeEntryNode,
+	mode: FilterMode,
+	isLeaf: boolean,
+): boolean {
 	switch (mode) {
 		case "user-only":
 			return n.kind === "user";
 		case "no-tools":
 			return (
-				!isBookkeeping(n) &&
-				n.kind !== "toolResult" &&
-				showsAssistant(n, isLeaf)
+				!isBookkeeping(n) && n.kind !== "toolResult" && showsAssistant(n, isLeaf)
 			);
 		case "labeled-only":
 			return !!n.label;
@@ -65,6 +68,10 @@ function passesFilter(n: TreeEntryNode, mode: FilterMode, isLeaf: boolean): bool
 
 /** Entradas de bookkeeping ocultas en el modo default (espejo de Pi). */
 function isBookkeeping(n: TreeEntryNode): boolean {
+	// custom_message con display:false es material interno del host (wiki/git
+	// context inyectado cada turno) — no es conversación visible para el
+	// usuario, así que el modo Conversación lo oculta. El modo Todo lo muestra.
+	if (n.kind === "customMessage") return n.display !== true;
 	return (
 		n.kind === "modelChange" ||
 		n.kind === "thinking" ||
@@ -86,8 +93,13 @@ function searchableText(n: TreeEntryNode): string {
 
 function previewOf(n: TreeEntryNode): string {
 	if (n.text) return n.text;
-	if (n.kind === "assistant" && n.toolCalls)
-		return `${n.toolCalls} ${n.toolCalls === 1 ? "herramienta" : "herramientas"}`;
+	if (n.kind === "assistant") {
+		if (n.toolCalls)
+			return `${n.toolCalls} ${n.toolCalls === 1 ? "herramienta" : "herramientas"}`;
+		const stop = n.stopReason ?? "";
+		if (stop && stop !== "stop" && stop !== "toolUse")
+			return `⚠ sin respuesta (${stop})`;
+	}
 	if (n.kind === "toolResult") return "(resultado de herramienta)";
 	return "—";
 }
@@ -184,34 +196,39 @@ export function TreePanel({
 		return set;
 	}, [data]);
 
-	// IDs visibles tras filtro + búsqueda (+ ancestros de matches) − plegados.
+	// IDs visibles (paridad applyFilter de Pi): pasan el filtro + búsqueda; la
+	// hoja actual SIEMPRE visible (posición activa perceptible); los hijos de
+	// nodos plegados desaparecen (sólo sin búsqueda). NOTA: NO se conservan
+	// ancestros — en una cadena lineal forzarlos re-mostraría todo y los filtros
+	// no harían nada (bug #126 reporte: "los tabs no hacen diferencia").
 	const visibleIds = useMemo(() => {
 		const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
 		const keep = new Set<string>();
-		const byId = new Map<string, TreeEntryNode>();
 		const parentOf = new Map<string, string | null>();
 		const walk = (list: TreeEntryNode[], parent: string | null) => {
 			for (const n of list) {
-				byId.set(n.id, n);
 				parentOf.set(n.id, parent);
 				walk(n.children, n.id);
 			}
 		};
 		walk(data.nodes, null);
+		const byId = new Map<string, TreeEntryNode>();
+		const collect = (list: TreeEntryNode[]) => {
+			for (const n of list) {
+				byId.set(n.id, n);
+				collect(n.children);
+			}
+		};
+		collect(data.nodes);
 		for (const n of byId.values()) {
 			const isLeaf = n.id === data.leafId;
-			if (!passesFilter(n, filterMode, isLeaf)) continue;
-			if (tokens.length > 0 && !tokens.every((t) => searchableText(n).includes(t)))
-				continue;
-			keep.add(n.id);
-			// Ancestros visibles para no huérfanos.
-			let p = parentOf.get(n.id) ?? null;
-			while (p) {
-				keep.add(p);
-				p = parentOf.get(p) ?? null;
-			}
+			const passes =
+				passesFilter(n, filterMode, isLeaf) &&
+				(tokens.length === 0 ||
+					tokens.every((t) => searchableText(n).includes(t)));
+			if (passes || isLeaf) keep.add(n.id);
 		}
-		// Plegado: descender de un nodo plegado desaparece (sólo sin búsqueda).
+		// Plegado: descendientes de un nodo plegado desaparecen (sólo sin búsqueda).
 		if (tokens.length === 0 && folded.size > 0) {
 			const drop = new Set<string>();
 			for (const n of byId.values()) {
@@ -219,15 +236,6 @@ export function TreePanel({
 				if (p && (folded.has(p) || drop.has(p))) drop.add(n.id);
 			}
 			for (const id of drop) keep.delete(id);
-		}
-		// La hoja actual siempre visible (posición activa perceptible).
-		if (data.leafId) {
-			keep.add(data.leafId);
-			let p = parentOf.get(data.leafId) ?? null;
-			while (p) {
-				keep.add(p);
-				p = parentOf.get(p) ?? null;
-			}
 		}
 		return keep;
 	}, [data, filterMode, search, folded]);
@@ -469,7 +477,9 @@ export function TreePanel({
 		));
 
 	const target = pending ? byId.get(pending) : undefined;
-	const abandoned = pending ? countAbandoned(data.nodes, data.leafId, pending) : 0;
+	const abandoned = pending
+		? countAbandoned(data.nodes, data.leafId, pending)
+		: 0;
 
 	return (
 		<div className="sessions-overlay" onClick={onClose}>
@@ -513,9 +523,7 @@ export function TreePanel({
 						{FILTER_ORDER.map((m) => (
 							<button
 								key={m}
-								className={
-									"tree-filter-chip" + (filterMode === m ? " active" : "")
-								}
+								className={"tree-filter-chip" + (filterMode === m ? " active" : "")}
 								onClick={() => setFilterMode(m)}
 								role="tab"
 								aria-selected={filterMode === m}
@@ -562,8 +570,8 @@ export function TreePanel({
 							{abandoned > 0 ? (
 								<>
 									Vas a abandonar la rama actual ({abandoned}{" "}
-									{abandoned === 1 ? "entrada" : "entradas"}). ¿Resumirla y
-									anclar el resumen en la nueva posición?
+									{abandoned === 1 ? "entrada" : "entradas"}). ¿Resumirla y anclar el
+									resumen en la nueva posición?
 									<div className="tree-opts">
 										<button
 											className={"tree-opt" + (sumChoice === "no" ? " sel" : "")}
@@ -590,9 +598,7 @@ export function TreePanel({
 											onClick={() => setSumChoice("custom")}
 										>
 											<Codicon
-												name={
-													sumChoice === "custom" ? "circle-filled" : "circle-outline"
-												}
+												name={sumChoice === "custom" ? "circle-filled" : "circle-outline"}
 												size={13}
 											/>
 											Resumir con instrucciones personalizadas…
@@ -610,8 +616,7 @@ export function TreePanel({
 								</>
 							) : (
 								<>
-									Volverás a este punto de la ruta actual: no se abandona
-									ninguna rama.
+									Volverás a este punto de la ruta actual: no se abandona ninguna rama.
 								</>
 							)}
 						</div>

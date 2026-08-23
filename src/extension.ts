@@ -4278,6 +4278,20 @@ export async function activate(
 				kind: "thinking" as const,
 				text: String(entry.thinkingLevel ?? ""),
 			};
+		// custom_message (#126 ruido): el wiki/git-context/pipeline inyecta una
+		// por turno. El preview "⟨customType⟩" hace visible qué es; el filtro
+		// Conversación las oculta (display:false = material interno del host).
+		if (entry.type === "custom_message") {
+			const ct = String(entry.customType ?? "");
+			const content =
+				typeof entry.content === "string" ? entry.content : extractText(entry);
+			return {
+				...base,
+				kind: "customMessage" as const,
+				text: `⟨${ct}⟩ ${content.slice(0, 120)}`.trim(),
+				display: !!entry.display,
+			};
+		}
 		return { ...base, kind: "other" as const, text: "" };
 	}
 
