@@ -28,7 +28,11 @@ async function runReal(args: string[], timeoutMs = 30_000) {
 	const resolved = resolveAgentBrowserInput({ args });
 	if ("error" in resolved) throw new Error(resolved.error);
 	const finalArgs = [...resolved.args, "--json"];
-	const run = await runAgentBrowser({ args: finalArgs, cwd: process.cwd(), timeoutMs });
+	const run = await runAgentBrowser({
+		args: finalArgs,
+		cwd: process.cwd(),
+		timeoutMs,
+	});
 	return {
 		run,
 		result: parseAgentBrowserOutput({
@@ -43,40 +47,34 @@ async function runReal(args: string[], timeoutMs = 30_000) {
 }
 
 describe.skipIf(!RUN)("smoke e2e: binario real + capas del port", () => {
-	it(
-		"open about:blank → snapshot -i se compilan, corren y PARSEAN correctamente",
-		async () => {
-			// 1) Baseline informativo: ¿qué versión corre y cuánto diverge?
-			const baseline = await checkBinaryBaseline({ force: true });
-			console.log(`[smoke] binario=${baseline.version ?? "?"} contrato=${baseline.contract} drift=${baseline.drift}`);
+	it("open about:blank → snapshot -i se compilan, corren y PARSEAN correctamente", async () => {
+		// 1) Baseline informativo: ¿qué versión corre y cuánto diverge?
+		const baseline = await checkBinaryBaseline({ force: true });
+		console.log(
+			`[smoke] binario=${baseline.version ?? "?"} contrato=${baseline.contract} drift=${baseline.drift}`,
+		);
 
-			// 2) open
-			const open = await runReal(["open", "about:blank"], 60_000);
-			expect(open.run.exitCode).toBe(0);
-			expect(open.result.isError).toBeFalsy();
-			expect(open.run.stdout.trim()).not.toBe("");
+		// 2) open
+		const open = await runReal(["open", "about:blank"], 60_000);
+		expect(open.run.exitCode).toBe(0);
+		expect(open.result.isError).toBeFalsy();
+		expect(open.run.stdout.trim()).not.toBe("");
 
-			// 3) snapshot interactivo (el path crítico del port: @refs)
-			const snap = await runReal(["snapshot", "-i"]);
-			expect(snap.run.exitCode).toBe(0);
-			expect(snap.result.isError).toBeFalsy();
-			expect(snap.result.content[0]?.type).toBe("text");
-			const d = snap.result.details as { command?: string };
-			expect(d.command).toBe("snapshot");
+		// 3) snapshot interactivo (el path crítico del port: @refs)
+		const snap = await runReal(["snapshot", "-i"]);
+		expect(snap.run.exitCode).toBe(0);
+		expect(snap.result.isError).toBeFalsy();
+		expect(snap.result.content[0]?.type).toBe("text");
+		const d = snap.result.details as { command?: string };
+		expect(d.command).toBe("snapshot");
 
-			console.log("[smoke] snapshot OK — envelope parseado por el port");
-		},
-		120_000,
-	);
+		console.log("[smoke] snapshot OK — envelope parseado por el port");
+	}, 120_000);
 
-	it(
-		"close limpia la sesión upstream",
-		async () => {
-			const close = await runReal(["close"]);
-			// close puede devolver 0 o ya-stderr si no había sesión; no debe CROsar el parseo.
-			expect(typeof close.run.exitCode).toBe("number");
-			expect(close.result.content.length).toBeGreaterThan(0);
-		},
-		30_000,
-	);
+	it("close limpia la sesión upstream", async () => {
+		const close = await runReal(["close"]);
+		// close puede devolver 0 o ya-stderr si no había sesión; no debe CROsar el parseo.
+		expect(typeof close.run.exitCode).toBe("number");
+		expect(close.result.content.length).toBeGreaterThan(0);
+	}, 30_000);
 });

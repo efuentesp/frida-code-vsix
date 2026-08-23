@@ -137,9 +137,7 @@ export function createFridaAgentBrowser(
 			if (
 				event.toolName === "bash" &&
 				typeof (event.input as { command?: unknown })?.command === "string" &&
-				looksLikeAgentBrowserBash(
-					(event.input as { command: string }).command,
-				) &&
+				looksLikeAgentBrowserBash((event.input as { command: string }).command) &&
 				!isHarmlessAgentBrowserInspection(
 					(event.input as { command: string }).command,
 				)
@@ -182,9 +180,7 @@ export function createFridaAgentBrowser(
 				);
 				if ("error" in resolved) {
 					return {
-						content: [
-							{ type: "text", text: `Validation error: ${resolved.error}` },
-						],
+						content: [{ type: "text", text: `Validation error: ${resolved.error}` }],
 						details: { failureCategory: "validation", error: resolved.error },
 						isError: true,
 					};
@@ -215,8 +211,7 @@ export function createFridaAgentBrowser(
 					(params as { sessionMode?: string }).sessionMode === "fresh";
 				const cmd = commandOf(resolved.args);
 				const plainText = isPlainTextInspection(resolved.args);
-				const sessionless =
-					isSessionlessCommand(cmd, resolved.args) || plainText;
+				const sessionless = isSessionlessCommand(cmd, resolved.args) || plainText;
 
 				// Fase 6: flag launch-scoped sobre sesión implícita ACTIVA sin fresh → fail
 				// claro (upstream ignoraría el flag; evitamos comportamiento silencioso).
@@ -267,10 +262,7 @@ export function createFridaAgentBrowser(
 				// Fase 4: pre-spawn — crea dirs padre para paths de artefacto solicitados
 				// (screenshot/pdf/download/…) antes de lanzar el binario.
 				if (isArtifactCommand(commandOf(resolved.args), resolved.args)) {
-					ensureArtifactParentDirs(
-						ctx.cwd,
-						extractRequestedPaths(resolved.args),
-					);
+					ensureArtifactParentDirs(ctx.cwd, extractRequestedPaths(resolved.args));
 				}
 
 				// Fase 2: stale-ref guard — rehúsa @ref de mutación si la página navegó o el
@@ -279,9 +271,7 @@ export function createFridaAgentBrowser(
 					const g = ms.guardRefMutation(resolved.args);
 					if (!g.ok) {
 						return {
-							content: [
-								{ type: "text", text: `Blocked (stale-ref): ${g.reason}` },
-							],
+							content: [{ type: "text", text: `Blocked (stale-ref): ${g.reason}` }],
 							details: {
 								mode: resolved.mode,
 								command: commandOf(resolved.args),
@@ -395,16 +385,16 @@ export function createFridaAgentBrowser(
 
 				result.details = {
 					args: finalArgs.filter((a) => a !== "--json"),
-				session: ms.name,
-				// Drift del binario vs contrato portado (undefined si no se pudo determinar).
+					session: ms.name,
+					// Drift del binario vs contrato portado (undefined si no se pudo determinar).
 					binaryBaseline:
 						baseline.drift === "unknown"
 							? undefined
 							: {
-										version: baseline.version,
-										contract: baseline.contract,
-										drift: baseline.drift,
-									},
+									version: baseline.version,
+									contract: baseline.contract,
+									drift: baseline.drift,
+								},
 					...(result.details as object),
 				};
 
