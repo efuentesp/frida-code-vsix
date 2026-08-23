@@ -1,7 +1,7 @@
 {
   "_comment": "Ledger de proveniencia Frida↔pi. Source of truth para scripts/upstream-drift.mjs. Init clean-slate (basedOn = instalado/latest a 2026-08-09). Mapeos 'reference' y fridaAdditions se refinan en auditoría manual (enfoque híbrido). Feature: issue #11.",
   "_schema": "v1",
-  "updated": "2026-08-09",
+  "updated": "2026-08-23",
   "platform": {
     "package": "@earendil-works/pi-coding-agent",
     "kind": "runtime",
@@ -56,10 +56,10 @@
       "upstream": "pi-agent-browser-native",
       "kind": "port",
       "mode": "fork",
-      "basedOn": "0.3.0",
+      "basedOn": "0.5.0",
       "repo": "https://github.com/fitchmultz/pi-agent-browser-native",
-      "fridaAdditions": "TODO (auditoría manual)",
-      "lastSync": "2026-08-09"
+      "fridaAdditions": "Sync contractual 0.34.0 (upstream 0.4.2/0.4.3): launch-scoped flags ampliados (--args/--user-agent/--headed/--idle-timeout/--allowed-domains/--restore-check-*), --pin-tab sticky no-launch-scoped, argv-grammar mirror (findCommandStartIndex/getBooleanFlagValue), categoría tab-gone + recovery actions, targetId CDP en tab list, PORTED_BINARY_CONTRACT=0.34.0. Diferido: modo script (0.4.0) y presentación compacta.",
+      "lastSync": "2026-08-23"
     },
     {
       "wrapper": "src/tools/frida-permission-system",

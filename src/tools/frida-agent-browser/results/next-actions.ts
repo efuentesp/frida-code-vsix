@@ -90,7 +90,26 @@ export function buildNextActions(opts: BuildNextActionsOptions): NextAction[] {
 				tool: "agent_browser",
 			});
 			break;
-		case "missing-binary":
+		case "tab-gone":
+		// Contrato 0.34.0: sesiones compartidas (--cdp/--auto-connect) pierden el
+		// tab pineado → rebind con tab list (ids/labels/CDP targetId válidos) o
+		// tab new. Mirror de tabGoneListTabs/tabGoneNewTab del referencia.
+		push({
+			id: "list-tabs-after-tab-gone",
+			params: { args: ["tab", "list"] },
+			reason:
+				"The pinned bound tab is gone; inspect remaining tabs before acting on a neighbor.",
+			tool: "agent_browser",
+		});
+		push({
+			id: "open-tab-after-tab-gone",
+			params: { args: ["tab", "new"] },
+			reason:
+			"Bind a fresh tab after tab_gone instead of continuing on another session's page.",
+			tool: "agent_browser",
+		});
+		break;
+	case "missing-binary":
 		case "parse-failure":
 		case "aborted":
 		case "upstream-error":

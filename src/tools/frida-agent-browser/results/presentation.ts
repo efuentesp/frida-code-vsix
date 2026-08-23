@@ -26,9 +26,8 @@ import {
 } from "./envelope";
 import { buildNextActions } from "./next-actions";
 import { renderSnapshot } from "./snapshot";
+import { findCommandStartIndex } from "../argv-grammar";
 
-/** Flags globales que consumen un valor (para saltarlos al detectar el comando). */
-const VALUE_FLAGS = new Set(["--session", "--namespace", "--session-name"]);
 const INSPECTION_COMMANDS = new Set([
 	"--help",
 	"-h",
@@ -43,26 +42,14 @@ const INSPECTION_COMMANDS = new Set([
 	"session",
 ]);
 
-/** Primer token posicional de argv (salta --session <val> y flags sueltos). */
+/**
+ * Primer token de comando de argv. Mirror 0.34.0: usa findCommandStartIndex
+ * (salta flags globales con payload y booleanos con true/false), así
+ * `--profile Default open x` → `open` y `wait --state visible` → `wait`.
+ */
 export function commandOf(args: string[]): string | undefined {
-	let i = 0;
-	while (i < args.length) {
-		const a = args[i];
-		if (a === "--json") {
-			i++;
-			continue;
-		}
-		if (VALUE_FLAGS.has(a)) {
-			i += 2;
-			continue;
-		}
-		if (a.startsWith("-")) {
-			i++;
-			continue;
-		}
-		return a;
-	}
-	return undefined;
+	const start = findCommandStartIndex(args);
+	return start === undefined ? undefined : args[start];
 }
 
 function extractReadableText(
@@ -94,6 +81,52 @@ export interface PresentOptions {
 	args: string[];
 	sessionName?: string;
 	cwd: string;
+}
+
+/**
+ * Resumen de tabs para cualquier sobre con `data.tabs` (contrato 0.34.0:
+ * el listado incluye el CDP targetId de cada tab cuando el binario lo
+ * reporta, y esos ids sirven como refs de tab). Mirror de getTabSummary
+ * del referencia; simplificación: sin redacción model-facing (el port pasa
+ * el texto tal cual en el resto de comandos).
+ */
+export function getTabSummary(
+	data: AgentBrowserData | null | undefined,
+): string | undefined {
+	const tabs = Array.isArray(data?.tabs) ? (data?.tabs as unknown[]) : undefined;
+	if (!tabs) return undefined;
+	const lines = tabs.map((raw, index) => {
+		const tab =
+			raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+		const marker = tab.active === true ? "*" : "-";
+		const title =
+			typeof tab.title === "string" && tab.title.length > 0
+				? tab.title
+				: "(untitled)";
+		const url =
+			typeof tab.url === "string" && tab.url.length > 0 ? tab.url : "(no url)";
+		const label =
+			typeof tab.label === "string" && tab.label.trim().length > 0
+				? tab.label.trim()
+				: undefined;
+		const tabSelector =
+			typeof tab.tabId === "string" && tab.tabId.trim().length > 0
+				? tab.tabId.trim()
+				: label ??
+						(typeof tab.index === "number"
+							? String(tab.index)
+							: String(index));
+		const labelText =
+			label && label !== tabSelector ? ` label=${label}` : "";
+		const targetId =
+			typeof tab.targetId === "string" && tab.targetId.trim().length > 0
+				? tab.targetId.trim()
+				: undefined;
+		const targetText =
+			targetId && targetId !== tabSelector ? ` target=${targetId}` : "";
+		return `${marker} [${tabSelector}]${labelText}${targetText} ${title} — ${url}`;
+	});
+	return lines.join("\n");
 }
 
 /** Construye el BrowserToolResult a partir de un sobre JSON ya parseado. */
@@ -175,6 +208,10 @@ export function presentAgentBrowserResult(
 			}
 		} else if (category.successCategory === "inspection") {
 			text = opts.stdout.trim() || JSON.stringify(envelope, null, 2);
+		} else if (getTabSummary(data)) {
+			// Contrato 0.34.0: listados de tab con selector + label + CDP targetId
+			// (los tres sirven como refs de tab en comandos posteriores).
+			text = getTabSummary(data)!;
 		} else {
 			text = extractReadableText(data) ?? JSON.stringify(envelope, null, 2);
 		}

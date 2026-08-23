@@ -21,6 +21,7 @@ export type FailureCategory =
 	| "selector-not-found"
 	| "stale-ref"
 	| "timeout"
+	| "tab-gone"
 	| "missing-binary"
 	| "parse-failure"
 	| "aborted"
@@ -83,6 +84,11 @@ export function classifyFailureCategory(
 		.join("\n");
 	const command = opts.command ?? "";
 	const usedRef = opts.args?.some((arg) => /^@e\d+\b/.test(arg)) ?? false;
+
+	// Prefijo canónico del upstream 0.34.0 (tab pin perdido en sesiones
+	// compartidas --cdp/--auto-connect): se evalúa PRIMERO porque el lastUrl
+	// que arrastra el error puede contener about:blank/aborted y clasificar mal.
+	if (/\btab_gone:/i.test(text)) return "tab-gone";
 
 	// Locator miss (getByRole/text=/role=/Element not found con hint de verificación).
 	const isLocatorMiss =

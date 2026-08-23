@@ -71,6 +71,11 @@ describe("categories — classifyFailureCategory", () => {
 	it("upstream-error por defecto", () => {
 		expect(F("something broke")).toBe("upstream-error");
 	});
+	it("tab-gone (prefijo canónico 0.34.0, se evalúa primero)", () => {
+		expect(F("tab_gone: pinned tab vanished")).toBe("tab-gone");
+		// El lastUrl arrastrado (about:blank) no debe reclasificar el fallo.
+		expect(F("tab_gone: gone (lastUrl: about:blank)")).toBe("tab-gone");
+	});
 });
 
 describe("categories — buildCategoryDetails", () => {
@@ -177,6 +182,15 @@ describe("commandOf", () => {
 	it("sólo flags → undefined (inspección)", () => {
 		expect(commandOf(["--help"])).toBeUndefined();
 	});
+	it("mirror 0.34.0: salta flags globales con payload", () => {
+		expect(commandOf(["--profile", "Default", "open", "x"])).toBe("open");
+		expect(commandOf(["--user-agent=X", "open", "x"])).toBe("open");
+		expect(commandOf(["--args", "--headless", "open", "x"])).toBe("open");
+		expect(commandOf(["--pin-tab", "snapshot", "-i"])).toBe("snapshot");
+		expect(commandOf(["wait", "--state", "visible"])).toBe("wait");
+		// Booleano con literal true/false: consume el valor, no lo toma como comando.
+		expect(commandOf(["--headed", "false", "open", "x"])).toBe("open");
+	});
 });
 
 describe("presentAgentBrowserResult", () => {
@@ -231,12 +245,66 @@ describe("presentAgentBrowserResult", () => {
 			["click", "@e1"],
 			1,
 		);
-		expect(r.isError).toBe(true);
-		const d = r.details as {
-			failureCategory: string;
-			nextActions?: { id: string }[];
-		};
-		expect(d.failureCategory).toBe("selector-not-found");
-		expect(d.nextActions?.[0]?.id).toBe("refresh-interactive-refs");
-	});
+			expect(r.isError).toBe(true);
+			const d = r.details as {
+						failureCategory: string;
+						nextActions?: { id: string }[];
+			};
+			expect(d.failureCategory).toBe("selector-not-found");
+			expect(d.nextActions?.[0]?.id).toBe("refresh-interactive-refs");
+		});
+		it("tab list → resumen con selector + label + CDP targetId (0.34.0)", () => {
+			const r = present(
+						{
+								success: true,
+								data: {
+										tabs: [
+												{
+														active: true,
+														tabId: "t1",
+														title: "Docs",
+														url: "https://docs.x",
+														targetId: "ABC123",
+												},
+												{
+														active: false,
+														label: "admin",
+														title: "Admin",
+														url: "https://admin.x",
+												},
+										],
+								},
+								error: null,
+						},
+						["tab", "list"],
+			);
+			expect(r.isError).toBe(false);
+			const text = r.content[0].text;
+			expect(text).toContain("* [t1] target=ABC123 Docs — https://docs.x");
+			// Cuando el label ES el selector, no se repite (mirror de getTabSummary).
+			expect(text).toContain("- [admin] Admin — https://admin.x");
+		});
+		it("tab_gone → failureCategory tab-gone + nextActions de rebind", () => {
+			const r = present(
+						{
+								success: false,
+								data: null,
+								error: "tab_gone: pinned tab vanished (lastUrl: about:blank)",
+						},
+						["get", "url"],
+						1,
+			);
+			expect(r.isError).toBe(true);
+			const d = r.details as {
+						failureCategory: string;
+						nextActions?: { id: string; params: { args: string[] } }[];
+			};
+			expect(d.failureCategory).toBe("tab-gone");
+			expect(d.nextActions?.map((a) => a.id)).toEqual([
+						"list-tabs-after-tab-gone",
+						"open-tab-after-tab-gone",
+			]);
+			expect(d.nextActions?.[0]?.params.args).toEqual(["tab", "list"]);
+			expect(d.nextActions?.[1]?.params.args).toEqual(["tab", "new"]);
+		});
 });

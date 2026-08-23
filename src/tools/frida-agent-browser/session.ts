@@ -15,6 +15,10 @@
 
 import { createHash } from "node:crypto";
 import { AGENT_BROWSER_BINARY, LAUNCH_SCOPED_FLAGS } from "./constants";
+import {
+	findCommandStartIndex,
+	isBooleanFlagEnabled,
+} from "./argv-grammar";
 import { guardRefMutation, type GuardState } from "./ref-guard";
 
 /** Flags que, de aparecer, hacen que el prefijo de sesión se omita (sesión explícita). */
@@ -25,9 +29,44 @@ export function hasExplicitSession(args: string[]): boolean {
 	return args.some((a) => EXPLICIT_SESSION_FLAGS.includes(a));
 }
 
-/** ¿Trae args flags launch-scoped (que requieren lanzamiento fresco)? */
+/**
+ * ¿Trae args flags launch-scoped (que requieren lanzamiento fresco)?
+ *
+ * Mirror de hasLaunchScopedFlagToken del referencia (contrato 0.34.0), con
+ * sus matices:
+ *  - `wait --state <predicado>`: `--state` tras el comando `wait` es un
+ *    predicado de espera (visible/hidden/…), NO estado de launch → no cuenta.
+ *  - `--auto-connect` sólo cuenta cuando el booleano está habilitado
+ *    (last-wins; `--auto-connect false` no attacha nada → no es launch-scoped).
+ *  - Formas `--flag=valor` cuentan (p. ej. `--profile=X`).
+ *  - `--pin-tab`/`--no-pin-tab` NO están en LAUNCH_SCOPED_FLAGS: son booleanos
+ *    globales sticky que pueden operar sobre una sesión viva.
+ */
 export function hasLaunchScopedFlag(args: string[]): boolean {
-	return args.some((a) => LAUNCH_SCOPED_FLAGS.includes(a as never));
+	const commandStart = findCommandStartIndex(args);
+	const command =
+		commandStart === undefined ? undefined : args[commandStart];
+	return args.some((token, index) => {
+		const isHit = LAUNCH_SCOPED_FLAGS.some(
+			(flag) => token === flag || token.startsWith(`${flag}=`),
+		);
+		if (!isHit) return false;
+		if (
+			token === "--auto-connect" ||
+			token.startsWith("--auto-connect=")
+		) {
+			return isBooleanFlagEnabled(args, "--auto-connect");
+		}
+		if (
+			token === "--state" &&
+			command === "wait" &&
+			commandStart !== undefined &&
+			index > commandStart
+		) {
+			return false;
+		}
+		return true;
+	});
 }
 
 function shortHash(input: string): string {

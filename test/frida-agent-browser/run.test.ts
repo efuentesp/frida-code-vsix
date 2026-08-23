@@ -227,4 +227,54 @@ describe("ManagedSession", () => {
 		expect(hasLaunchScopedFlag(["open", "x"])).toBe(false);
 		expect(hasExplicitSession(["--session-name", "s", "open", "x"])).toBe(true);
 	});
+
+	it("contrato 0.34.0: flags que pasaron a ser launch-scoped", () => {
+		// 0.4.3: caller --args y --user-agent son launch-scoped (0.34.0 trata
+		// override vacío como nueva config de launch).
+		expect(hasLaunchScopedFlag(["--args", "--headless", "open", "x"])).toBe(
+			true,
+		);
+		expect(hasLaunchScopedFlag(["--user-agent=X", "open", "x"])).toBe(true);
+		expect(hasLaunchScopedFlag(["--headed", "open", "x"])).toBe(true);
+		expect(hasLaunchScopedFlag(["--idle-timeout", "30000", "open", "x"])).toBe(
+			true,
+		);
+		expect(
+			hasLaunchScopedFlag(["--allowed-domains", "a.com", "open", "x"]),
+		).toBe(true);
+		expect(
+			hasLaunchScopedFlag(["--restore-check-url", "http://x", "open", "y"]),
+		).toBe(true);
+	});
+
+	it("wait --state es predicado, no launch-scoped (mirror 0.34.0)", () => {
+		expect(hasLaunchScopedFlag(["wait", "--state", "visible"])).toBe(false);
+		// --state ANTES del comando sigue siendo launch-scoped (estado de launch).
+		expect(hasLaunchScopedFlag(["--state", "x", "open", "y"])).toBe(true);
+		// Con flags de valor globales delante, el comando se detecta igual.
+		expect(
+			hasLaunchScopedFlag(["--profile", "P", "wait", "--state", "hidden"]),
+		).toBe(true); // por --profile, no por --state
+	});
+
+	it("--auto-connect sólo cuando habilitado (last-wins)", () => {
+		expect(hasLaunchScopedFlag(["--auto-connect", "open", "x"])).toBe(true);
+		expect(
+			hasLaunchScopedFlag(["--auto-connect", "false", "open", "x"]),
+		).toBe(false);
+		expect(hasLaunchScopedFlag(["--auto-connect=false", "open", "x"])).toBe(
+			false,
+		);
+	});
+
+	it("--pin-tab es sticky (booleano global, NO launch-scoped)", () => {
+		expect(hasLaunchScopedFlag(["--pin-tab", "snapshot", "-i"])).toBe(false);
+		expect(hasLaunchScopedFlag(["--no-pin-tab", "snapshot", "-i"])).toBe(
+			false,
+		);
+		// Puede operar sobre sesión viva: no debe disparar política de fresh.
+		expect(hasLaunchScopedFlag(["--pin-tab", "false", "get", "url"])).toBe(
+			false,
+		);
+	});
 });

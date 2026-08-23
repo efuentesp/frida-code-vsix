@@ -40,12 +40,12 @@ describe("parseLooseSemver", () => {
 	});
 });
 
-describe("classifyDrift (contrato portado: 0.33.2)", () => {
+describe("classifyDrift (contrato portado: 0.34.0)", () => {
 	it("clasifica match/patch/minor/major correctamente", () => {
-		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.33.2")).toBe("match");
-		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.33.1")).toBe("patch");
-		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.34.0")).toBe("minor");
-		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.33.9")).toBe("patch");
+		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.34.0")).toBe("match");
+		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.34.1")).toBe("patch");
+		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.35.0")).toBe("minor");
+		expect(classifyDrift(PORTED_BINARY_CONTRACT, "0.33.2")).toBe("minor");
 		expect(classifyDrift(PORTED_BINARY_CONTRACT, "1.0.0")).toBe("major");
 	});
 
@@ -57,20 +57,20 @@ describe("classifyDrift (contrato portado: 0.33.2)", () => {
 describe("checkBinaryBaseline", () => {
 	it("drift patch → sin notice (ruido aceptado por diseño)", async () => {
 		const r = await checkBinaryBaseline({
-			runFn: fakeVersionRun("0.33.1") as never,
+			runFn: fakeVersionRun("0.34.1") as never,
 		});
 		expect(r.drift).toBe("patch");
-		expect(r.version).toBe("0.33.1");
+		expect(r.version).toBe("0.34.1");
 		expect(r.notice).toBeUndefined();
 	});
 
-	it("drift minor (binario 0.34.0 real) → notice visible con guía", async () => {
+	it("drift minor (p. ej. binario 0.35.0 futuro) → notice visible con guía", async () => {
 		const r = await checkBinaryBaseline({
-			runFn: fakeVersionRun("0.34.0") as never,
+			runFn: fakeVersionRun("0.35.0") as never,
 		});
 		expect(r.drift).toBe("minor");
-		expect(r.version).toBe("0.34.0");
-		expect(r.notice).toContain("0.33.2");
+		expect(r.version).toBe("0.35.0");
+		expect(r.notice).toContain("0.34.0");
 		expect(r.notice).toContain("upstream-drift");
 	});
 
