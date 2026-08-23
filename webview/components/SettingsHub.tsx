@@ -23,7 +23,7 @@ export type SettingsTab =
 
 const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "providers", label: "Proveedores", iconName: "plug" },
-	{ id: "models", label: "Modelos", iconName: "sliders" },
+	{ id: "models", label: "Modelos", iconName: "sparkle" },
 	{ id: "approval", label: "Auto-Aprobación", iconName: "shield" },
 	{ id: "resources", label: "Recursos", iconName: "library" },
 	{ id: "tools", label: "Herramientas", iconName: "tools" },
