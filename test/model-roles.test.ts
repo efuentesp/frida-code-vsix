@@ -231,7 +231,10 @@ describe("#121 — resolvedor de roles de modelo", () => {
 
 		it("ON (o ausente para compat) → routing normal", () => {
 			const base = {
-				default: { provider: "frida-enterprise", modelId: "claude-sonnet-4-5" } as const,
+				default: {
+					provider: "frida-enterprise",
+					modelId: "claude-sonnet-4-5",
+				} as const,
 				smol: { provider: "ollama", modelId: "llama3.2" } as const,
 			};
 			const on = resolveModelRoles(input({ ...base, enabled: true }, CATALOG));
@@ -265,7 +268,9 @@ describe("#121 — pickChildModel / pickStartupFallback (wiring puro)", () => {
 
 	it("pickChildModel: roles OFF → null (modelo de la sesión padre, clásico)", () => {
 		const res = resolveModelRoles({ config: cfgOn, authedCatalog: CATALOG });
-		expect(pickChildModel({ ...cfgOn, enabled: false }, res, getModel)).toBeNull();
+		expect(
+			pickChildModel({ ...cfgOn, enabled: false }, res, getModel),
+		).toBeNull();
 	});
 
 	it("pickChildModel: smol explícito + ON → modelo Ollama para las hijas", () => {
@@ -288,7 +293,9 @@ describe("#121 — pickChildModel / pickStartupFallback (wiring puro)", () => {
 			config: { ...cfgOn, fallback: null },
 			authedCatalog: CATALOG,
 		});
-		expect(pickStartupFallback({ ...cfgOn, fallback: null }, res2, getModel)).toBeNull();
+		expect(
+			pickStartupFallback({ ...cfgOn, fallback: null }, res2, getModel),
+		).toBeNull();
 	});
 
 	it("pickStartupFallback: ON + cadena → primer respaldo disponible (Ollama)", () => {

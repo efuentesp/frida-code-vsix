@@ -6,6 +6,7 @@ import { EnvironmentTab } from "./EnvironmentTab";
 import { IndexTab } from "./IndexTab";
 import { ProductivityTab } from "./ProductivityTab";
 import { ProveedoresTab } from "./ProveedoresTab";
+import { RolesSection } from "./ModelPanel";
 import { ResourcesContent } from "./ResourcesPanel";
 import { UsageDashboard } from "./UsageDashboard";
 
@@ -321,9 +322,24 @@ export function SettingsHub({
 						)}
 
 						{tab === "models" && (
-							<div className="cfg-stub">
-								La selección rápida de modelo está en el botón de modelo de la barra
-								superior. Próximamente: gestión completa de modelos aquí.
+							<div className="cfg-models-tab">
+								{state.models?.roles ? (
+									<RolesSection
+										roles={state.models.roles}
+										active={state.models.active}
+										providers={state.models.providers}
+										onSetRoles={(patch) =>
+											post({ type: "model_roles_set", ...patch })
+										}
+									/>
+								) : (
+									<div className="cfg-stub">Cargando roles de modelo…</div>
+								)}
+								<div className="cfg-stub">
+									La selección rápida de modelo (intercambio en vivo) está en el botón de
+									modelo de la barra superior; los roles de arriba aplican desde la
+									próxima sesión.
+								</div>
 							</div>
 						)}
 

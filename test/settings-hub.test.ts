@@ -40,6 +40,12 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 					authed: false,
 				},
 			],
+			roles: {
+				enabled: true,
+				smol: { provider: "frida-enterprise", modelId: "model-a" },
+				commit: null,
+				fallbackEnabled: true,
+			},
 		},
 		toolToggles: {
 			"frida-git-sync": true,
@@ -106,6 +112,28 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("Recursos");
 		expect(html).toContain("Uso");
 		expect(html).toContain("Index");
+	});
+
+	it("#121 — pestaña Modelos muestra la sección Roles (donde el usuario la espera)", () => {
+		const post = vi.fn();
+		const onClose = vi.fn();
+
+		const html = renderToStaticMarkup(
+			React.createElement(SettingsHub, {
+				state: baseState,
+				post,
+				onClose,
+				initialTab: "models",
+			}),
+		);
+
+		expect(html).toContain("ROLES — cada trabajo usa su modelo");
+		expect(html).toContain("Principal (default)");
+		expect(html).toContain("Rápido (smol)");
+		expect(html).toContain("Commits (commit)");
+		expect(html).toContain("Respaldo (fallback)");
+		// ya no es el stub "Próximamente"
+		expect(html).not.toContain("Próximamente: gestión completa de modelos");
 	});
 
 	it("renderiza la pestaña de herramientas con tarjetas de módulos, switches e iconos semánticos", () => {

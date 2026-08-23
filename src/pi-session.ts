@@ -928,9 +928,9 @@ export async function createFridaSession(
 	);
 	const authedCatalog: Record<string, string[]> = {};
 	for (const p of KNOWN_MODEL_PROVIDERS) {
-		const ids = (modelRuntime.getModels?.(p) ?? []).map(
-			(m: any) => String(m?.id ?? ""),
-		).filter(Boolean);
+		const ids = (modelRuntime.getModels?.(p) ?? [])
+			.map((m: any) => String(m?.id ?? ""))
+			.filter(Boolean);
 		if (ids.length > 0) authedCatalog[p] = ids;
 	}
 	const modelRoles = resolveModelRoles({

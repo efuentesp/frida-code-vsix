@@ -363,9 +363,7 @@ export function readModelRolesConfig(
 		const provider = String(
 			cfg.get<string>(`modelRoles.${role}.provider`, ""),
 		).trim();
-		const model = String(
-			cfg.get<string>(`modelRoles.${role}.model`, ""),
-		).trim();
+		const model = String(cfg.get<string>(`modelRoles.${role}.model`, "")).trim();
 		return provider && model ? { provider, modelId: model } : null;
 	};
 	const fallbackEnabled = cfg.get<boolean>("modelRoles.fallback.enabled", false);

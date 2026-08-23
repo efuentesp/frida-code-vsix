@@ -120,16 +120,16 @@ export function RolesSection({
 			{roles.enabled ? (
 				<>
 					<div className="mr-card mr-card-default">
-					<div className="mr-card-head">
-						<Codicon name="settings-gear" size={13} />
-						<span className="mr-card-title">Principal (default)</span>
+						<div className="mr-card-head">
+							<Codicon name="settings-gear" size={13} />
+							<span className="mr-card-title">Principal (default)</span>
+						</div>
+						<div className="mr-card-val">
+							{providerName(active?.provider)}
+							{active?.modelId ? ` · ${active.modelId}` : ""} — el modelo que eliges en
+							esta misma lista.
+						</div>
 					</div>
-					<div className="mr-card-val">
-						{providerName(active?.provider)}
-						{active?.modelId ? ` · ${active.modelId}` : ""} — el modelo que
-						eliges en esta misma lista.
-					</div>
-				</div>
 					<RoleCard
 						icon="zap"
 						title="Rápido (smol)"
@@ -137,7 +137,7 @@ export function RolesSection({
 						value={roles.smol}
 						providers={providers}
 						onChange={(smol) => onSetRoles({ smol })}
-				/>
+					/>
 					<RoleCard
 						icon="edit"
 						title="Commits (commit)"
@@ -145,28 +145,26 @@ export function RolesSection({
 						value={roles.commit}
 						providers={providers}
 						onChange={(commit) => onSetRoles({ commit })}
-				/>
+					/>
 					<div className="mr-fallback">
-					<div className="mr-fallback-head">
-						<span>Respaldo (fallback)</span>
-						<button
-							type="button"
-							className={`ccp-switch${roles.fallbackEnabled ? " ccp-switch-on" : ""}`}
-							role="switch"
-							aria-checked={roles.fallbackEnabled}
-							title="Si el modelo del rol falla (429/cuota), la sesión cae al siguiente proveedor autenticado"
-							onClick={() =>
-								onSetRoles({ fallbackEnabled: !roles.fallbackEnabled })
-							}
-						>
-							<span className="ccp-switch-knob" />
-						</button>
+						<div className="mr-fallback-head">
+							<span>Respaldo (fallback)</span>
+							<button
+								type="button"
+								className={`ccp-switch${roles.fallbackEnabled ? " ccp-switch-on" : ""}`}
+								role="switch"
+								aria-checked={roles.fallbackEnabled}
+								title="Si el modelo del rol falla (429/cuota), la sesión cae al siguiente proveedor autenticado"
+								onClick={() => onSetRoles({ fallbackEnabled: !roles.fallbackEnabled })}
+							>
+								<span className="ccp-switch-knob" />
+							</button>
+						</div>
+						<div className="mr-fallback-copy">
+							Si el modelo del rol falla (429/cuota), la sesión cae al siguiente
+							proveedor autenticado y se restaura al enfriarse.
+						</div>
 					</div>
-					<div className="mr-fallback-copy">
-					Si el modelo del rol falla (429/cuota), la sesión cae al siguiente
-					proveedor autenticado y se restaura al enfriarse.
-					</div>
-				</div>
 				</>
 			) : (
 				<div className="mr-off-note">

@@ -5901,7 +5901,8 @@ button.danger:hover {
 	line-height: 1.5;
 	color: var(--vscode-descriptionForeground);
 	padding: 6px 8px;
-	border-left: 2px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3));
+	border-left: 2px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3));
 }
 .mr-card {
 	display: flex;
@@ -5950,7 +5951,8 @@ button.danger:hover {
 	flex-direction: column;
 	gap: 2px;
 	padding-top: 6px;
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
 }
 .mr-fallback-head {
 	display: flex;
