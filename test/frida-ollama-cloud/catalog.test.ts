@@ -61,10 +61,12 @@ describe("#122 — catálogo Ollama Cloud (parser /api/show)", () => {
 	});
 
 	it("contextLengthFrom: primera clave *.context_length > 0", () => {
+		expect(contextLengthFrom({ "llama.attention.context_length": 4096 })).toBe(
+			4096,
+		);
 		expect(
-			contextLengthFrom({ "llama.attention.context_length": 4096 }),
-		).toBe(4096);
-		expect(contextLengthFrom({ "a.x": 0, "b.context_length": -1 })).toBeUndefined();
+			contextLengthFrom({ "a.x": 0, "b.context_length": -1 }),
+		).toBeUndefined();
 		expect(contextLengthFrom(undefined)).toBeUndefined();
 	});
 });

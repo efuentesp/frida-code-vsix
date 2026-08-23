@@ -7065,7 +7065,12 @@ kbd {
 .ctxr {
 	box-sizing: border-box;
 	width: 100%;
-	font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, sans-serif);
+	font-family: var(
+		--vscode-font-family,
+		-apple-system,
+		BlinkMacSystemFont,
+		sans-serif
+	);
 	background: var(
 		--vscode-editorWidget-background,
 		var(--vscode-sideBar-background, #1e1e1e)
@@ -7087,8 +7092,7 @@ kbd {
 }
 
 .ctxr-header {
-	border-bottom: 1px solid
-		var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
 	padding-bottom: 6px;
 }
 
@@ -7123,8 +7127,7 @@ kbd {
 
 /* Tree View Container & Rows estilo VS Code Test Explorer / Explorer */
 .ctx-tree-container {
-	border: 1px solid
-		var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
 	border-radius: 4px;
 	background: var(
 		--vscode-sideBar-background,

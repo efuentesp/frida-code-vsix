@@ -47,6 +47,20 @@ const askSchema = Type.Object({
 	}),
 });
 
+/**
+ * Transforma un comando `/ask [pregunta o tema]` en el prompt estructurado para el LLM.
+ * Devuelve null si el texto no coincide con `/ask`.
+ */
+export function expandAskPrompt(text: string): string | null {
+	const match = text.match(/^\/ask(?:\s+([\s\S]*))?$/);
+	if (!match) return null;
+	const topic = (match[1] ?? "").trim();
+	if (topic) {
+		return `El usuario solicita tomar una decisión o resolver lo siguiente: "${topic}". DEBES responder utilizando inmediatamente la herramienta \`ask_user_question\` con 2 a 4 opciones estructuradas (cada una con etiqueta concisa y descripción explicativa).`;
+	}
+	return "El usuario solicita tomar una decisión o aclarar el siguiente paso. Analiza el estado actual de la conversación, el plan o el código, e invoca inmediatamente la herramienta `ask_user_question` con 2 a 4 opciones estructuradas para que el usuario decida cómo proceder.";
+}
+
 /** Slice del ExtensionUIContext de Frida que expone askUserQuestion (no en SDK). */
 type AskUserQuestionUI = {
 	askUserQuestion: (

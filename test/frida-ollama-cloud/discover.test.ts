@@ -5,7 +5,10 @@ import {
 } from "../../src/providers/frida-ollama-cloud/discover";
 import { OLLAMA_CLOUD_BASE_URL } from "../../src/providers/frida-ollama-cloud/catalog";
 
-function res(body: unknown, ok = true): { ok: boolean; json(): Promise<unknown> } {
+function res(
+	body: unknown,
+	ok = true,
+): { ok: boolean; json(): Promise<unknown> } {
 	return { ok, json: async () => body };
 }
 
@@ -67,9 +70,7 @@ describe("#122 — discoverOllamaCloudModels (fetch inyectable)", () => {
 			calls.push(url);
 			return res({ data: [] });
 		};
-		expect(
-			await discoverOllamaCloudModels(OLLAMA_CLOUD_BASE_URL, f),
-		).toEqual([]);
+		expect(await discoverOllamaCloudModels(OLLAMA_CLOUD_BASE_URL, f)).toEqual([]);
 		expect(calls).toHaveLength(1);
 	});
 });

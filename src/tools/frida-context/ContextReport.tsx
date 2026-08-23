@@ -21,7 +21,8 @@ const COLORS = {
 	toolCalls: "var(--vscode-charts-orange, #d18616)",
 	toolResults: "var(--vscode-charts-yellow, #cca700)",
 	other: "var(--vscode-charts-red, #f14c4c)",
-	free: "var(--vscode-editor-inactiveSelectionBackground, rgba(127, 127, 127, 0.25))",
+	free:
+		"var(--vscode-editor-inactiveSelectionBackground, rgba(127, 127, 127, 0.25))",
 } as const;
 
 const TENUE = "var(--vscode-descriptionForeground)";
@@ -103,11 +104,31 @@ function ContextReport({
 	const pressure = s.pressurePercent ?? s.usagePercent ?? null;
 
 	const segments: Seg[] = [
-		{ key: "sp", label: "System prompt", tokens: cat.systemPrompt, color: COLORS.systemPrompt },
-		{ key: "ts", label: "Tool snippets", tokens: b.toolSnippets, color: COLORS.toolSnippets },
+		{
+			key: "sp",
+			label: "System prompt",
+			tokens: cat.systemPrompt,
+			color: COLORS.systemPrompt,
+		},
+		{
+			key: "ts",
+			label: "Tool snippets",
+			tokens: b.toolSnippets,
+			color: COLORS.toolSnippets,
+		},
 		{ key: "msg", label: "Mensajes", tokens: messages, color: COLORS.messages },
-		{ key: "tc", label: "Tool calls", tokens: cat.toolCalls, color: COLORS.toolCalls },
-		{ key: "tr", label: "Tool results", tokens: cat.toolResults, color: COLORS.toolResults },
+		{
+			key: "tc",
+			label: "Tool calls",
+			tokens: cat.toolCalls,
+			color: COLORS.toolCalls,
+		},
+		{
+			key: "tr",
+			label: "Tool results",
+			tokens: cat.toolResults,
+			color: COLORS.toolResults,
+		},
 		...(cat.other > 0
 			? [{ key: "ot", label: "Otros", tokens: cat.other, color: COLORS.other }]
 			: []),
@@ -135,8 +156,14 @@ function ContextReport({
 				cls="ctxr-header"
 			>
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ficon name="server" size={14} color="var(--vscode-textLink-foreground, #4daafc)" />
-					<ftext bold size={13}>Uso de Contexto</ftext>
+					<ficon
+						name="server"
+						size={14}
+						color="var(--vscode-textLink-foreground, #4daafc)"
+					/>
+					<ftext bold size={13}>
+						Uso de Contexto
+					</ftext>
 					<ftext color={TENUE} size={12}>
 						({s.modelName})
 					</ftext>
@@ -169,9 +196,14 @@ function ContextReport({
 						/>
 					))}
 				</fbox>
-				<fbox flexDirection="row" justifyContent="space-between" alignItems="center">
+				<fbox
+					flexDirection="row"
+					justifyContent="space-between"
+					alignItems="center"
+				>
 					<ftext size={11} color={TENUE}>
-						{fmt(s.usedTokens)} de {cw ? fmt(cw) : "?"} tokens ({s.usagePercent ?? 0}%)
+						{fmt(s.usedTokens)} de {cw ? fmt(cw) : "?"} tokens ({s.usagePercent ?? 0}
+						%)
 					</ftext>
 					<ftext size={11} color={TENUE}>
 						headroom: {s.headroomTokens == null ? "?" : fmt(s.headroomTokens)} ·{" "}
@@ -183,7 +215,11 @@ function ContextReport({
 
 			{analysis.approximationNote ? (
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ficon name="warning" size={13} color="var(--vscode-editorWarning-foreground, #cca700)" />
+					<ficon
+						name="warning"
+						size={13}
+						color="var(--vscode-editorWarning-foreground, #cca700)"
+					/>
 					<ftext color="var(--vscode-editorWarning-foreground, #cca700)" size={11}>
 						{analysis.approximationNote}
 					</ftext>
@@ -398,11 +434,7 @@ function ContextReport({
 					) : null}
 
 					{b.appendText > 0 ? (
-						<TreeRow
-							icon="note"
-							label="Append System Prompt"
-							tokens={b.appendText}
-						/>
+						<TreeRow icon="note" label="Append System Prompt" tokens={b.appendText} />
 					) : null}
 				</TreeSection>
 
@@ -429,7 +461,12 @@ function ContextReport({
 			</fbox>
 
 			{/* 4. Footer con acciones estilo Copilot */}
-			<fbox flexDirection="row" justifyContent="flex-end" gap={8} cls="ctxr-footer">
+			<fbox
+				flexDirection="row"
+				justifyContent="flex-end"
+				gap={8}
+				cls="ctxr-footer"
+			>
 				{actions.onCompact && s.compactionEnabled ? (
 					<fbutton
 						variant="secondary"
@@ -486,7 +523,11 @@ function TreeSection({
 					size={12}
 					color={TENUE}
 				/>
-				<ficon name={icon} size={13} color="var(--vscode-textLink-foreground, #4daafc)" />
+				<ficon
+					name={icon}
+					size={13}
+					color="var(--vscode-textLink-foreground, #4daafc)"
+				/>
 				<ftext bold size={12}>
 					{title}
 				</ftext>

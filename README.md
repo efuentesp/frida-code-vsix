@@ -109,6 +109,7 @@ El panel es un chat (webview React) que se comunica con el host por `postMessage
 
 | Comando | Acción |
 | --- | --- |
+| `/ask [tema]` | Formular preguntas o decisiones interactivas con opciones (`ask_user_question`) |
 | `/help [herramienta]` | Abre esta ayuda (o la doc de la herramienta indicada) en el preview de markdown |
 | `/new` | Nueva sesión |
 | `/clone` · `/fork` | Clonar / bifurcar la sesión actual |

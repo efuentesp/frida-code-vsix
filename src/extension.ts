@@ -100,6 +100,7 @@ import {
 	getCachedSystemPrompt,
 } from "./tools/frida-context/store";
 import { getTodoState } from "./tools/todo-web/store";
+import { expandAskPrompt } from "./tools/ask-user-question-web";
 import {
 	createFridaWorkflowHost,
 	handleWfSlash,
@@ -3409,6 +3410,12 @@ export async function activate(
 		description: string;
 		argumentHint?: string;
 	}[] = [
+		{
+			name: "ask",
+			description:
+				"Formular preguntas o decisiones interactivas con opciones (ask_user_question)",
+			argumentHint: "[pregunta o tema]",
+		},
 		{ name: "compact", description: "Compactar el contexto de la sesión" },
 		{ name: "reload", description: "Recargar extensiones, skills y prompts" },
 		{ name: "new", description: "Iniciar una sesión nueva" },
@@ -3500,6 +3507,9 @@ export async function activate(
 		const arg = (m[2] ?? "").trim();
 		if (!BUILTIN_SLASH.has(cmd)) return false; // /skill:... y prompts → al agente
 		switch (cmd) {
+			case "ask":
+				// Se delega a runPrompt para inyectar la directiva estructurada y enviarla al LLM
+				return false;
 			case "compact":
 				void compactContext();
 				break;
@@ -4786,11 +4796,15 @@ export async function activate(
 				});
 			}
 		}
+		// Slash command /ask: instrucción explícita para formular preguntas usando ask_user_question
+		const askPrompt = expandAskPrompt(expanded);
+
 		// toSend = lo que recibe el modelo; toPost = lo que ve el webview. Para
-		// skills (/skill: o $skill) ambos son el bloque; para @files/normal se
-		// preserva el comportamiento actual (post raw, send expandido con @files
+		// skills (/skill: o $skill) ambos son el bloque; para /ask es el prompt estructurado;
+		// para @files/normal se preserva el comportamiento actual (post raw, send expandido con @files
 		// ya sustituidos).
-		const toSend = multiSkill?.transformed ?? skillBlock ?? expanded;
+		const toSend =
+			askPrompt ?? multiSkill?.transformed ?? skillBlock ?? expanded;
 		const toPost = multiSkill?.transformed ?? skillBlock ?? trimmed;
 
 		// Normaliza imágenes adjuntas (paste de imagen) al formato del SDK.
