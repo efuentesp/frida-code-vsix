@@ -657,22 +657,18 @@ export function AutoIndexToggle({
 				</span>
 			</div>
 			<div className="ci-autoindex-purpose">
-				Mantiene el índice fresco en background al abrir el workspace y ante
-				cambios de archivos.
+				Mantiene el índice fresco en background al abrir el workspace y ante cambios
+				de archivos.
 			</div>
 			<div className="ci-autoindex-guide">
-				<div
-					className={`ci-autoindex-case is-on ${enabled ? "is-current" : ""}`}
-				>
+				<div className={`ci-autoindex-case is-on ${enabled ? "is-current" : ""}`}>
 					<strong>ON</strong> — si trabajas a diario aquí: búsquedas semánticas
 					siempre al día, sin acordarte de re-indexar.
-			</div>
-				<div
-					className={`ci-autoindex-case is-off ${enabled ? "" : "is-current"}`}
-				>
-					<strong>OFF</strong> — si indexas poco o el proveedor es lento/costoso:
-					tú controlas cada corrida con Re-indexar.
-			</div>
+				</div>
+				<div className={`ci-autoindex-case is-off ${enabled ? "" : "is-current"}`}>
+					<strong>OFF</strong> — si indexas poco o el proveedor es lento/costoso: tú
+					controlas cada corrida con Re-indexar.
+				</div>
 			</div>
 		</div>
 	);

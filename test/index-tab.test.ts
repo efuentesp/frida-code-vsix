@@ -544,7 +544,7 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			const html = renderToStaticMarkup(
 				React.createElement(AutoIndexToggle, {
 					enabled: false,
-				onToggle: () => {},
+					onToggle: () => {},
 				}),
 			);
 			expect(html).toContain("Indexación automática");

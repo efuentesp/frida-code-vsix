@@ -269,7 +269,9 @@ describe("readAutoIndexEnabled / setAutoIndexEnabled (#120)", () => {
 		);
 		expect(setAutoIndexEnabled(ws, true)).toBe(true);
 		expect(readAutoIndexEnabled(ws)).toBe(true);
-		const cfg = JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8"));
+		const cfg = JSON.parse(
+			fs.readFileSync(path.join(dir, "config.json"), "utf8"),
+		);
 		// merge defensivo: solo indexing.autoIndex cambia; el resto queda
 		expect(cfg.scope).toBe("project");
 		expect(cfg.embeddingProvider).toBe("ollama");

@@ -3223,7 +3223,8 @@ export async function activate(
 				if (!ok) {
 					post({
 						type: "info",
-						text: "No se pudo escribir .codebase-index/config.json (¿workspace read-only?) — la indexación automática no cambió.",
+						text:
+							"No se pudo escribir .codebase-index/config.json (¿workspace read-only?) — la indexación automática no cambió.",
 						level: "error",
 					});
 				}
