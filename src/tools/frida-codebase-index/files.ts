@@ -54,13 +54,23 @@ export function indexDir(cwd: string): string {
 	return path.join(cwd, ".codebase-index", "index");
 }
 
-/** Agrupa los chunks fallidos (JSONL de batches) por archivo. Puro. */
-export function aggregateFailed(lines: string[]): FailedFile[] {
+/**
+ * Agrupa los chunks fallidos (JSONL de batches) por archivo. Puro.
+ * #119 — recoveredIds: ids de chunks YA confirmados en la DB (recuperados por
+ * un reintento posterior): se excluyen para no contarlos como fallidos
+ * cuando un .failed-batches de una corrida previa sigue presente.
+ */
+export function aggregateFailed(
+	lines: string[],
+	recoveredIds?: Set<string>,
+): FailedFile[] {
 	const byPath = new Map<string, number>();
 	for (const line of lines) {
 		const t = line.trim();
 		if (!t) continue;
-		let batch: { chunks?: { metadata?: { filePath?: unknown } }[] };
+		let batch: {
+			chunks?: { id?: unknown; metadata?: { filePath?: unknown } }[];
+		};
 		try {
 			batch = JSON.parse(t);
 		} catch {
@@ -69,9 +79,10 @@ export function aggregateFailed(lines: string[]): FailedFile[] {
 		for (const chunk of batch?.chunks ?? []) {
 			const fp = chunk?.metadata?.filePath;
 			const p = typeof fp === "string" ? fp : undefined;
-			if (typeof p === "string" && p) {
-				byPath.set(p, (byPath.get(p) ?? 0) + 1);
-			}
+			if (typeof p !== "string" || !p) continue;
+			const id = typeof chunk?.id === "string" ? chunk.id : undefined;
+			if (recoveredIds && id && recoveredIds.has(id)) continue; // #119
+			byPath.set(p, (byPath.get(p) ?? 0) + 1);
 		}
 	}
 	return [...byPath.entries()]
@@ -79,8 +90,9 @@ export function aggregateFailed(lines: string[]): FailedFile[] {
 		.sort((a, b) => b.chunks - a.chunks || a.path.localeCompare(b.path));
 }
 
-/** Lee los .failed-batches* del índice y los agrega por archivo. */
-function readFailed(dir: string): FailedFile[] {
+/** Lee los .failed-batches* del índice y los agrega por archivo.
+ *  #119 — recoveredIds filtra chunks ya confirmados en la DB. */
+function readFailed(dir: string, recoveredIds?: Set<string>): FailedFile[] {
 	try {
 		const names = fs
 			.readdirSync(dir)
@@ -92,7 +104,7 @@ function readFailed(dir: string): FailedFile[] {
 				return [];
 			}
 		});
-		return aggregateFailed(lines);
+		return aggregateFailed(lines, recoveredIds);
 	} catch {
 		return [];
 	}
@@ -204,7 +216,26 @@ export async function readIndexedFiles(
 		})
 		.filter((f) => f.path.length > 0);
 
-	return { files, failed: readFailed(indexDir(cwd)), engine };
+	// #119 — ids de chunks YA confirmados: los .failed-batches de corridas
+	// previas pueden seguir presentes aunque sus chunks ya se recuperaron.
+	const idRows =
+		(await queryViaNodeSqlite(db, "SELECT chunk_id FROM chunks")) ??
+		(await queryViaCli(db, "SELECT chunk_id FROM chunks"));
+	const recoveredIds = idRows
+		? new Set(
+				idRows.map((r) => {
+					const row = r as Record<string, unknown> | string[];
+					const id = Array.isArray(row) ? row[0] : row.chunk_id;
+					return typeof id === "string" ? id : "";
+				}),
+			)
+		: undefined;
+
+	return {
+		files,
+		failed: readFailed(indexDir(cwd), recoveredIds),
+		engine,
+	};
 }
 
 /**

@@ -57,6 +57,62 @@ describe("codebase-index/files — lista de archivos indexados (#112)", () => {
 		expect(await readIndexedFiles(d)).toBeNull();
 	});
 
+	it("#119 — aggregateFailed: chunks ya recuperados (id en DB) se excluyen", () => {
+		const batch = (file: string, ids: string[]) =>
+			JSON.stringify({
+				chunks: ids.map((id) => ({
+					id,
+					metadata: { filePath: file },
+			})),
+		});
+		const lines = [
+			batch("modulo-01.md", ["c1", "c2"]), // c1 recuperado, c2 pendiente
+			batch("docs/otro.md", ["c3"]), // pendiente
+		];
+		const failed = aggregateFailed(lines, new Set(["c1"]));
+		expect(failed).toEqual([
+			{ path: "docs/otro.md", chunks: 1 },
+			{ path: "modulo-01.md", chunks: 1 }, // solo c2 (c1 recuperado)
+		]);
+		// Sin set (motor no disponible): comportamiento actual, sin filtro
+		expect(aggregateFailed(lines)).toHaveLength(2);
+		expect(aggregateFailed(lines)[0].chunks).toBe(2);
+	});
+
+	it("#119 — readIndexedFiles: fallidos deduplicados contra chunks confirmados", async () => {
+		try {
+			execFileSync("sqlite3", ["--version"]);
+		} catch {
+			return; // sin CLI
+		}
+		const d = tmpdir();
+		dirs.push(d);
+		const idx = path.join(d, ".codebase-index", "index");
+		fs.mkdirSync(idx, { recursive: true });
+		execFileSync("sqlite3", [
+			path.join(idx, "codebase.db"),
+			`CREATE TABLE chunks (chunk_id TEXT PRIMARY KEY, file_path TEXT NOT NULL, language TEXT NOT NULL);
+			 INSERT INTO chunks VALUES ('c1','modulo-01.md','markdown');`,
+		]);
+		// El batch fallido incluye c1 (ya confirmado en DB) y c2 (pendiente real)
+		fs.writeFileSync(
+			path.join(idx, ".failed-batches.abc.json.tmp"),
+			JSON.stringify({
+				chunks: [
+					{ id: "c1", metadata: { filePath: "modulo-01.md" } },
+					{ id: "c2", metadata: { filePath: "modulo-01.md" } },
+				],
+			}) + "\n",
+		);
+
+		const res = await readIndexedFiles(d);
+		expect(res?.files).toEqual([
+			{ path: "modulo-01.md", chunks: 1, language: "markdown" },
+		]);
+		// Solo c2 queda como fallido real — c1 ya está confirmado en la DB
+		expect(res?.failed).toEqual([{ path: "modulo-01.md", chunks: 1 }]);
+	});
+
 	it("readIndexedFiles: consulta la DB real y agrupa por archivo (skip si no hay sqlite3)", async () => {
 		try {
 			execFileSync("sqlite3", ["--version"]);
