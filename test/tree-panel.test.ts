@@ -207,3 +207,83 @@ describe("passesFilter — paridad applyFilter de Pi (#126)", () => {
 		).toBe(true);
 	});
 });
+
+// Regresión #126 ("escalera + | previos al filtrar"): la profundidad de cada
+// fila debe renormalizarse sobre los ancestros VISIBLES, no conservar la
+// profundidad estructural cuando el filtro oculta intermedios (wiki/etc.).
+// Verificamos que el paddingLeft de cada fila visible en "Conversación" es
+// exactamente 6 + (posición en la lista visible) × 2 — escalera lineal limpia,
+// sin saltos por nodos ocultos — y que no hay contenedores tree-children vacíos.
+describe("TreePanel · profundidad visual renormalizada al filtrar (#126)", () => {
+	it("cada fila visible incrementa su indent en 1 nivel (sin huecos de ocultos)", () => {
+		// Cadena real con intermedios ocultos: user → wiki → asst → wiki → user.
+		const chained: TreeData = {
+			leafId: "u2",
+			nodes: [
+				node({
+					id: "u1",
+					kind: "user",
+					text: "pregunta 1",
+					children: [
+						node({
+							id: "w1",
+							parentId: "u1",
+							kind: "customMessage",
+							text: "⟨wiki⟩",
+							display: false,
+							children: [
+								node({
+									id: "a1",
+									parentId: "w1",
+									kind: "assistant",
+									text: "respuesta 1",
+									hasText: true,
+									children: [
+										node({
+											id: "w2",
+											parentId: "a1",
+											kind: "customMessage",
+											text: "⟨wiki⟩",
+											display: false,
+											children: [
+												node({
+													id: "u2",
+													parentId: "w2",
+													kind: "user",
+													text: "pregunta 2",
+													children: [],
+												}),
+											],
+										}),
+									],
+								}),
+							],
+						}),
+					],
+				}),
+			],
+		};
+		const { html } = renderTree(chained);
+		// u1=depth0(6px), a1=depth1(8px), u2=depth2(10px) — los wiki ocultos NO
+		// suman niveles. Antes: a1 quedaba en depth2(10px) y u2 en depth4(14px).
+		// React serializa paddingLeft numérico sin espacio: "padding-left:6px".
+		// u1=6px → a1=8px → u2=10px: escalera lineal; los wiki ocultos NO suman.
+		expect(html).toContain('style="padding-left:6px"');
+		expect(html).toContain('style="padding-left:8px"');
+		expect(html).toContain('style="padding-left:10px"');
+		expect(html).not.toContain("padding-left:12px");
+		expect(html).not.toContain("padding-left:14px");
+	});
+});
+
+function renderTree(d: TreeData) {
+	const html = renderToStaticMarkup(
+		React.createElement(TreePanel, {
+			data: d,
+			onClose: vi.fn(),
+			onNavigate: vi.fn(),
+			onLabel: vi.fn(),
+		}),
+	);
+	return { html };
+}

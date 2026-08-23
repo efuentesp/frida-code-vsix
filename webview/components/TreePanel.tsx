@@ -362,8 +362,9 @@ export function TreePanel({
 				break;
 			case "ArrowRight":
 				if (selectedId) {
-					const n = byId.get(selectedId);
-					if (n && n.children.length > 0 && folded.has(selectedId)) {
+					// Plegable = hijos visibles (directos o emergentes), no estructurales.
+					const kids = visibleChildIds.get(selectedId) ?? [];
+					if (kids.length > 0 && folded.has(selectedId)) {
 						e.preventDefault();
 						toggleFold(selectedId);
 					}
@@ -371,8 +372,8 @@ export function TreePanel({
 				break;
 			case "ArrowLeft":
 				if (selectedId) {
-					const n = byId.get(selectedId);
-					if (n && n.children.length > 0 && !folded.has(selectedId)) {
+					const kids = visibleChildIds.get(selectedId) ?? [];
+					if (kids.length > 0 && !folded.has(selectedId)) {
 						e.preventDefault();
 						toggleFold(selectedId);
 					}
@@ -391,11 +392,91 @@ export function TreePanel({
 		}
 	};
 
+	// Profundidad VISUAL (#126): nº de ancestros visibles, no la profundidad
+	// estructural. Sin esto, ocultar entradas intermedias (wiki/bookkeeping)
+	// deja escalera + guías │ huérfanas: cada fila conserva su depth real y el
+	// filtro sólo elimina renglones sin reconstruir la cadena (bug reportado).
+	const visualDepth = useMemo(() => {
+		const parentOf = new Map<string, string | null>();
+		const walk = (list: TreeEntryNode[], parent: string | null) => {
+			for (const n of list) {
+				parentOf.set(n.id, parent);
+				walk(n.children, n.id);
+			}
+		};
+		walk(data.nodes, null);
+		const depth = new Map<string, number>();
+		// Recursión sobre IDs: parentOf guarda el ID del padre (string), no el nodo.
+		// Si el padre real está oculto, heredo su profundidad visual (sube hasta el
+		// ancestro visible más cercano); si es visible, +1.
+		const compute = (id: string): number => {
+			const cached = depth.get(id);
+			if (cached !== undefined) return cached;
+			const p = parentOf.get(id) ?? null;
+			const d = p ? visibleIds.has(p) ? compute(p) + 1 : compute(p) : 0;
+			depth.set(id, d);
+			return d;
+		};
+		const all = new Map<string, TreeEntryNode>();
+		const collect = (list: TreeEntryNode[]) => {
+			for (const n of list) {
+				all.set(n.id, n);
+				collect(n.children);
+			}
+		};
+		collect(data.nodes);
+		for (const n of all.values()) compute(n.id);
+		return depth;
+	}, [data, visibleIds]);
+
+	// Hijos VISIBLES directos de un nodo (para plegado y guías). Un hijo cuyo
+	// padre real está oculto "emerge" al nivel del ancestro visible más cercano:
+	// el contenedor .tree-children del ancestro lo incluye.
+	const visibleChildIds = useMemo(() => {
+		const m = new Map<string, string[]>();
+		const parentOf = new Map<string, string | null>();
+		const walk = (list: TreeEntryNode[], parent: string | null) => {
+			for (const n of list) {
+				parentOf.set(n.id, parent);
+				walk(n.children, n.id);
+			}
+		};
+		walk(data.nodes, null);
+		const byId = new Map<string, TreeEntryNode>();
+		const collect = (list: TreeEntryNode[]) => {
+			for (const n of list) {
+				byId.set(n.id, n);
+				collect(n.children);
+			}
+		};
+		collect(data.nodes);
+		// Ancestro visible más cercano de un nodo (excluyéndose a sí mismo).
+		const nearestVisibleAncestor = (id: string): string | null => {
+			let cur = parentOf.get(id) ?? null;
+			while (cur) {
+				if (visibleIds.has(cur)) return cur;
+				cur = parentOf.get(cur) ?? null;
+			}
+			return null;
+		};
+		for (const n of byId.values()) {
+			if (!visibleIds.has(n.id)) continue;
+			const owner = nearestVisibleAncestor(n.id);
+			if (!owner) continue; // raíz visual: la maneja renderLevel top
+			const arr = m.get(owner) ?? [];
+			arr.push(n.id);
+			m.set(owner, arr);
+		}
+		return m;
+	}, [data, visibleIds]);
+
 	const renderRow = (n: TreeEntryNode, depth: number) => {
 		if (!visibleIds.has(n.id)) return null;
 		const isLeaf = n.id === effectiveLeafId;
 		const sel = n.id === selectedId;
-		const foldable = n.children.some((c) => visibleIds.has(c.id));
+		// Plegable = tiene hijos visibles directos O emergentes (a través de
+		// ancestros ocultos por el filtro). Usa visibleChildIds, no children.
+		const foldable = (visibleChildIds.get(n.id) ?? []).length > 0;
 		const isOpen = !folded.has(n.id);
 		const icon = KIND_ICONS[n.kind] ?? "circle-outline";
 		return (
@@ -491,15 +572,26 @@ export function TreePanel({
 		);
 	};
 
-	const renderLevel = (list: TreeEntryNode[], depth: number): React.ReactNode =>
-		list.map((n) => (
-			<div key={n.id} className="tree-branch">
-				{renderRow(n, depth)}
-				{n.children.length > 0 && (
-					<div className="tree-children">{renderLevel(n.children, depth + 1)}</div>
-				)}
-			</div>
-		));
+	// Render renormalizado: cada fila usa su profundidad VISUAL y sólo se
+	// recorren los hijos visibles (directos o emergentes) de cada nodo. El
+	// contenedor .tree-children sólo existe cuando hay contenido visible →
+	// sin guías │ colgando de ancestros ocultos por el filtro.
+	const renderLevel = (list: TreeEntryNode[]): React.ReactNode =>
+		list.flatMap((n) => {
+			if (!visibleIds.has(n.id)) return [];
+			const kids = (visibleChildIds.get(n.id) ?? []).map(
+				(id) => byId.get(id)!,
+			);
+			const d = visualDepth.get(n.id) ?? 0;
+			return [
+				<div key={n.id} className="tree-branch">
+					{renderRow(n, d)}
+					{kids.length > 0 && (
+						<div className="tree-children">{renderLevel(kids)}</div>
+					)}
+				</div>,
+			];
+		});
 
 	const target = pending ? byId.get(pending) : undefined;
 	const abandoned = pending
@@ -564,7 +656,7 @@ export function TreePanel({
 							Nada que mostrar con este filtro. Prueba “Todo” o limpia la búsqueda.
 						</div>
 					) : (
-						renderLevel(data.nodes, 0)
+						renderLevel(data.nodes)
 					)}
 				</div>
 				<div className="tree-statusbar">
