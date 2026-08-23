@@ -54,6 +54,37 @@ function projLabel(cwd: string): string {
 	return parts[parts.length - 1] || t;
 }
 
+/** Modos de ordenación del historial: recencia (grupos de fecha, como siempre)
+ * o actividad/turnos (lista plana global — rankear trabajo total por bucket de
+ * fecha no tiene sentido). */
+type SortMode = "recent" | "active" | "turns";
+
+/** Tooltip del chip ⚡ — mismo vocabulario que el popover #107 del header
+ * (activo/turnos, pared con proporción, promedio, tokens y costo). */
+function timingTip(s: SessionItem): string {
+	const active = s.activeMs ?? 0;
+	const turns = s.turnCount ?? 0;
+	const avg = turns > 0 ? Math.round(active / turns) : 0;
+	const pct =
+		s.durationMs && s.durationMs > 0
+			? Math.round((active / s.durationMs) * 100)
+			: null;
+	const tokens = (s.inputTotal ?? 0) + (s.outputTotal ?? 0);
+	return [
+		`⚡ ${formatDuration(active)} · ${turns} turnos`,
+		pct !== null
+			? `Pared: ${formatDuration(s.durationMs!)} (${pct}% activo)`
+			: "",
+		turns > 0 ? `Promedio: ${formatDuration(avg)}/turno` : "",
+		tokens > 0
+			? `↑${fmtTokens(s.inputTotal ?? 0)} ↓${fmtTokens(s.outputTotal ?? 0)} tokens`
+			: "",
+		(s.cost ?? 0) > 0 ? `$${(s.cost ?? 0).toFixed(2)}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
 export function SessionsPanel({
 	sessions,
 	scope = "project",
@@ -74,6 +105,7 @@ export function SessionsPanel({
 	onNewSession?: () => void;
 }) {
 	const [search, setSearch] = useState("");
+	const [sort, setSort] = useState<SortMode>("recent");
 	const [editing, setEditing] = useState<string | null>(null);
 	const [confirming, setConfirming] = useState<string | null>(null);
 	const [draft, setDraft] = useState("");
@@ -93,8 +125,8 @@ export function SessionsPanel({
 		});
 	}, [rawItems, search]);
 
-	// Agrupación cronológica ordenada
-	const groups = useMemo(() => {
+	// Agrupación cronológica ordenada (sólo en modo recencia)
+	const dateGroups = useMemo(() => {
 		const order: Array<
 			"Hoy" | "Ayer" | "Últimos 7 días" | "Este mes" | "Anteriores"
 		> = ["Hoy", "Ayer", "Últimos 7 días", "Este mes", "Anteriores"];
@@ -109,6 +141,35 @@ export function SessionsPanel({
 			.map((g) => ({ group: g, items: map[g] }));
 	}, [filteredItems]);
 
+	// Secciones a renderizar: grupos de fecha (recencia) o lista plana global
+	// ordenada desc por tiempo activo / turnos.
+	const sections = useMemo(() => {
+		if (sort !== "recent") {
+			const items = [...filteredItems].sort((a, b) =>
+				sort === "active"
+					? (b.activeMs ?? 0) - (a.activeMs ?? 0)
+					: (b.turnCount ?? 0) - (a.turnCount ?? 0),
+			);
+			return [{ group: null, items }];
+		}
+		return dateGroups;
+	}, [filteredItems, sort, dateGroups]);
+
+	// Σ de tiempo activo y turnos de las sesiones filtradas (pie del panel).
+	const totals = useMemo(() => {
+		let active = 0;
+		let turns = 0;
+		let any = false;
+		for (const s of filteredItems) {
+			if (s.activeMs !== undefined) {
+				active += s.activeMs;
+				any = true;
+			}
+			turns += s.turnCount ?? 0;
+		}
+		return { active, turns, any };
+	}, [filteredItems]);
+
 	return (
 		<div className="sessions-overlay" onClick={onClose}>
 			<div className="sessions-panel" onClick={(e) => e.stopPropagation()}>
@@ -118,22 +179,47 @@ export function SessionsPanel({
 						<Codicon name="history" size={15} />
 						<span>Historial de Sesiones</span>
 					</div>
-					<div className="seg-toggle" role="tablist">
-						<button
-							className={"seg" + (scope === "project" ? " active" : "")}
-							onClick={() => onScopeChange("project")}
-							title="Solo sesiones de este proyecto"
-						>
-							Este proyecto
-						</button>
-						<button
-							className={"seg" + (scope === "all" ? " active" : "")}
-							onClick={() => onScopeChange("all")}
-							title="Sesiones de todos los proyectos"
-						>
-							Todas
-						</button>
-					</div>
+				<div className="seg-toggle" role="tablist">
+					<button
+						className={"seg" + (scope === "project" ? " active" : "")}
+						onClick={() => onScopeChange("project")}
+						title="Solo sesiones de este proyecto"
+					>
+						Este proyecto
+					</button>
+					<button
+						className={"seg" + (scope === "all" ? " active" : "")}
+						onClick={() => onScopeChange("all")}
+						title="Sesiones de todos los proyectos"
+					>
+						Todas
+					</button>
+				</div>
+				{/* #107 — orden por actividad: recencia (grupos de fecha) o ranking
+				    global por tiempo activo / turnos. */}
+				<div className="seg-toggle" role="tablist" title="Ordenar sesiones">
+					<button
+						className={"seg" + (sort === "recent" ? " active" : "")}
+						onClick={() => setSort("recent")}
+						title="Grupos cronológicos (por fecha de modificación)"
+					>
+						<Codicon name="calendar" size={12} />
+					</button>
+					<button
+						className={"seg" + (sort === "active" ? " active" : "")}
+						onClick={() => setSort("active")}
+						title="Más tiempo activo primero (lista plana)"
+					>
+						<Codicon name="zap" size={12} />
+					</button>
+					<button
+						className={"seg" + (sort === "turns" ? " active" : "")}
+						onClick={() => setSort("turns")}
+						title="Más turnos primero (lista plana)"
+					>
+						<Codicon name="repeat" size={12} />
+					</button>
+				</div>
 					<button
 						className="icon-btn sessions-close-btn"
 						onClick={onClose}
@@ -181,12 +267,14 @@ export function SessionsPanel({
 							</span>
 						</div>
 					) : (
-						groups.map(({ group, items }) => (
-							<div key={group} className="session-group">
-								<div className="session-group-header">
-									<span className="session-group-label">{group}</span>
-									<span className="session-group-count">{items.length}</span>
-								</div>
+						sections.map(({ group, items }, si) => (
+							<div key={group ?? `flat-${si}`} className="session-group">
+								{group !== null && (
+									<div className="session-group-header">
+										<span className="session-group-label">{group}</span>
+										<span className="session-group-count">{items.length}</span>
+									</div>
+								)}
 								{items.map((s) => {
 									const isCurrent = s.path === sessions.currentPath;
 									const title = s.name || s.firstMessage || "(sin mensajes)";
@@ -294,12 +382,29 @@ export function SessionsPanel({
 																<Codicon name="comment" size={11} />
 																<span>{s.messageCount} msgs</span>
 															</span>
-															{s.durationMs !== undefined && s.durationMs > 0 && (
-																<span className="session-meta-chip">
-																	<Codicon name="clock" size={11} />
-																	<span>{formatDuration(s.durationMs)}</span>
-																</span>
-															)}
+																{/* #107 — chip fusionado ⚡ tiempo activo · Nt (paridad con el
+																    header); fallback al reloj de pared si el JSONL no trajo
+																    turns (p. ej. sesiones pre-#107). Tooltip = vocabulario
+																    del popover del header. */}
+																	{(s.activeMs ?? 0) > 0 || (s.turnCount ?? 0) > 0 ? (
+																		<Tooltip label={timingTip(s)} side="top">
+																			<span className="session-meta-chip session-timing-chip">
+																				<Codicon name="zap" size={11} />
+																				<span>
+																					{formatDuration(s.activeMs ?? 0)} ·{" "}
+																					{s.turnCount ?? 0}t
+																				</span>
+																			</span>
+																		</Tooltip>
+																	) : (
+																		s.durationMs !== undefined &&
+																		s.durationMs > 0 && (
+																			<span className="session-meta-chip">
+																				<Codicon name="clock" size={11} />
+																				<span>{formatDuration(s.durationMs)}</span>
+																			</span>
+																		)
+																	)}
 															{totalTokens > 0 && (
 																<span className="session-meta-chip">
 																	<Codicon name="database" size={11} />
@@ -369,12 +474,21 @@ export function SessionsPanel({
 							<span>Nueva Sesión</span>
 						</button>
 					)}
-					<span className="sessions-footer-count">
-						{filteredItems.length === 1
-							? "1 sesión"
-							: `${filteredItems.length} sesiones`}
-						{search && ` (de ${rawItems.length})`}
+				<span className="sessions-footer-count">
+					{filteredItems.length === 1
+						? "1 sesión"
+						: `${filteredItems.length} sesiones`}
+					{search && ` (de ${rawItems.length})`}
+				</span>
+				{/* Σ de las filtradas — mismo vocabulario del chip (#107). */}
+				{totals.any && (
+					<span className="sessions-footer-total">
+						<Codicon name="zap" size={11} />
+						<span>
+							{formatDuration(totals.active)} · {totals.turns}t
+						</span>
 					</span>
+				)}
 					<button type="button" className="sec" onClick={onClose}>
 						Cerrar
 					</button>

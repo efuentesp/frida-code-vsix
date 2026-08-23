@@ -4293,6 +4293,11 @@ button.sec:hover {
 .session-proj-chip {
 	color: var(--vscode-textLink-foreground, #4daafc);
 }
+/* #107 — chip ⚡ activo · Nt del historial: mismo rol que el st-chip del
+   header; el tooltip (componente Tooltip) trae pared/promedio/tokens. */
+.session-timing-chip {
+	cursor: help;
+}
 .session-meta-date {
 	margin-left: auto;
 	font-size: 10.5px;
@@ -4388,6 +4393,15 @@ button.sec:hover {
 	padding: 4px 10px;
 }
 .sessions-footer-count {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+}
+/* Σ de tiempo activo/turnos de las sesiones filtradas (#107). */
+.sessions-footer-total {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
 	opacity: 0.85;

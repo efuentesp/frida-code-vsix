@@ -5281,6 +5281,11 @@ export async function activate(
 						durationMs,
 						inputTotal: stats?.inputTotal,
 						outputTotal: stats?.outputTotal,
+						// #107 — paridad con el chip del header: el mismo readSessionStats
+						// ya calcula tiempo activo y turnos; passthrough sin IO extra.
+						activeMs: stats?.activeMs,
+						turnCount: stats?.turnCount,
+						cost: stats?.cost || undefined,
 					};
 				})
 				.sort((a: any, b: any) => b.modified - a.modified);

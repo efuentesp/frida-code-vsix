@@ -23,6 +23,10 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 			durationMs: 1000 * 60 * 25,
 			inputTotal: 45000,
 			outputTotal: 8000,
+			// #107 — timing del header: activo (Σ turnos) + nº de turnos.
+			activeMs: 1000 * 60 * 19,
+			turnCount: 7,
+			cost: 0.42,
 		},
 		{
 			path: "/sessions/s2.jsonl",
@@ -34,6 +38,8 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 			durationMs: 1000 * 60 * 12,
 			inputTotal: 12000,
 			outputTotal: 2500,
+			activeMs: 1000 * 60 * 9,
+			turnCount: 3,
 		},
 		{
 			path: "/sessions/s3.jsonl",
@@ -45,6 +51,7 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 			durationMs: 1000 * 60 * 90,
 			inputTotal: 85000,
 			outputTotal: 14000,
+			// Sin activeMs/turnCount → debe caer al chip legacy de reloj (pared).
 		},
 	];
 
@@ -84,6 +91,37 @@ describe("SessionsPanel component (Propuesta 1: Copilot Chat History style)", ()
 		expect(html).toContain("Patrones /wf Lote 2");
 		expect(html).toContain("Nueva Sesión");
 		expect(html).toContain("3 sesiones");
+	});
+
+	it("muestra el chip fusionado ⚡ activo·turnos con Σ en el pie y fallback al reloj legacy", () => {
+		const html = renderToStaticMarkup(
+				React.createElement(SessionsPanel, {
+					sessions: {
+					items: sampleSessions,
+					currentPath: "/sessions/s1.jsonl",
+				},
+				scope: "project",
+				onScopeChange: vi.fn(),
+				onClose: vi.fn(),
+				onSwitch: vi.fn(),
+				onRename: vi.fn(),
+				onDelete: vi.fn(),
+			}),
+		);
+
+		// Sesiones con timing #107: chip fusionado «activo · Nt» (formatDuration
+		// de 19min = "19m", 9min = "9m").
+		expect(html).toContain("session-timing-chip");
+		expect(html).toContain("19m · 7t");
+		expect(html).toContain("9m · 3t");
+		// Sesión pre-#107 (sin stats de turns): chip legacy de reloj (1h 30m pared).
+		expect(html).toContain("1h 30m");
+		// Σ del pie: 19m + 9m = 28m · 7t + 3t = 10t.
+		expect(html).toContain("sessions-footer-total");
+		expect(html).toContain("28m · 10t");
+		// Controles de orden (recencia / actividad / turnos) presentes.
+		expect(html).toContain("Más tiempo activo primero");
+		expect(html).toContain("Más turnos primero");
 	});
 
 	it("renderiza etiqueta de proyecto cuando el scope es 'all'", () => {

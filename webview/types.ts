@@ -320,6 +320,13 @@ export interface SessionItem {
 	durationMs?: number;
 	inputTotal?: number;
 	outputTotal?: number;
+	// #107 — paridad con el chip de tiempo del header: tiempo ACTIVO (Σ turnos
+	// cerrados, sin gaps de lectura) y nº de turnos, del JSONL en disco
+	// (readSessionStats). El historial los muestra como chip fusionado ⚡·Nt.
+	activeMs?: number;
+	turnCount?: number;
+	/** Costo acumulado ($, 0 si no aplica) — sólo para el tooltip del chip. */
+	cost?: number;
 }
 
 // ── /tree (#126): árbol de la sesión activa ──
