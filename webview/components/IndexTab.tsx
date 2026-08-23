@@ -614,6 +614,70 @@ export function EmbeddingsChangeDialog({
 	);
 }
 
+/**
+ * #120 — Toggle de indexación automática con guía UX embebida: microcopy
+ * siempre visible (propósito + cuándo ON/OFF) e ⓘ con detalle técnico.
+ * Switch reutiliza el patrón casa .ccp-switch (CcPluginsPanel).
+ */
+export function AutoIndexToggle({
+	enabled,
+	onToggle,
+}: {
+	enabled: boolean;
+	onToggle: (next: boolean) => void;
+}) {
+	return (
+		<div className="ci-autoindex">
+			<div className="ci-autoindex-head">
+				<span className="ci-autoindex-label">Indexación automática</span>
+				<button
+					type="button"
+					className={`ccp-switch${enabled ? " ccp-switch-on" : ""}`}
+					role="switch"
+					aria-checked={enabled}
+					title={
+						enabled
+							? "Activa — click para desactivar"
+							: "Inactiva — click para activar"
+					}
+					onClick={() => onToggle(!enabled)}
+				>
+					<span className="ccp-switch-knob" />
+				</button>
+				<span
+					className="ci-autoindex-info"
+					title={[
+						"Indexa en background al abrir el workspace y tras cambios de archivos.",
+						"Las búsquedas semánticas esperan hasta 10s (autoIndexWaitMs) mientras el índice queda listo.",
+						"Las corridas manuales (Re-indexar / Reconstruir) tienen prioridad y no se interrumpen.",
+						"Se guarda por proyecto en .codebase-index/config.json (indexing.autoIndex).",
+					].join("\n")}
+				>
+					<Codicon name="info" size={13} />
+				</span>
+			</div>
+			<div className="ci-autoindex-purpose">
+				Mantiene el índice fresco en background al abrir el workspace y ante
+				cambios de archivos.
+			</div>
+			<div className="ci-autoindex-guide">
+				<div
+					className={`ci-autoindex-case is-on ${enabled ? "is-current" : ""}`}
+				>
+					<strong>ON</strong> — si trabajas a diario aquí: búsquedas semánticas
+					siempre al día, sin acordarte de re-indexar.
+			</div>
+				<div
+					className={`ci-autoindex-case is-off ${enabled ? "" : "is-current"}`}
+				>
+					<strong>OFF</strong> — si indexas poco o el proveedor es lento/costoso:
+					tú controlas cada corrida con Re-indexar.
+			</div>
+			</div>
+		</div>
+	);
+}
+
 export function IndexTab({
 	state,
 	post,
@@ -968,6 +1032,12 @@ export function IndexTab({
 					<div className="cfg-section">
 						<Codicon name="tools" size={13} /> ACCIONES Y MANTENIMIENTO DEL WORKSPACE
 					</div>
+					<AutoIndexToggle
+						enabled={!!ci?.autoIndex}
+						onToggle={(next) =>
+							post({ type: "codebase_index_autoindex", enabled: next })
+						}
+					/>
 					<div className="ci-actions-row">
 						<button
 							type="button"

@@ -278,3 +278,57 @@ export function readEnterpriseEmbeddingsCredential(
     return null;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * #120 — Toggle de indexación automática (indexing.autoIndex del config.json
+ * del upstream). Lectura + escritura con merge defensivo (solo la clave
+ * indexing.autoIndex se toca; scope/include/exclude/… quedan intactos).
+ *──────────────────────────────────────────────────────────────────────────*/
+
+/** ¿Está activa la indexación automática del workspace? (default false) */
+export function readAutoIndexEnabled(workspacePath: string): boolean {
+  const cfgPath = path.join(
+    workspacePath,
+    CODEBASE_INDEX_STORAGE_DIR,
+    "config.json",
+  );
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    const obj = parsed as Record<string, unknown> | null;
+    const idx = obj?.indexing as Record<string, unknown> | undefined;
+    return idx?.autoIndex === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Activa/desactiva autoIndex preservando el resto del config. */
+export function setAutoIndexEnabled(
+  workspacePath: string,
+  enabled: boolean,
+): boolean {
+  const cfgDir = path.join(workspacePath, CODEBASE_INDEX_STORAGE_DIR);
+  const cfgPath = path.join(cfgDir, "config.json");
+  let merged: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      merged = parsed as Record<string, unknown>;
+    }
+  } catch {
+    /* ausente o inválido → objeto nuevo */
+  }
+  const indexing =
+    merged.indexing && typeof merged.indexing === "object"
+      ? { ...(merged.indexing as Record<string, unknown>) }
+      : {};
+  indexing.autoIndex = enabled;
+  merged.indexing = indexing;
+  try {
+    fs.mkdirSync(cfgDir, { recursive: true });
+    fs.writeFileSync(cfgPath, JSON.stringify(merged, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}

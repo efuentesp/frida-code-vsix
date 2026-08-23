@@ -9883,6 +9883,68 @@ kbd {
 }
 
 /* #113 — botón Detener en la tarjeta de progreso y diálogo de confirmación */
+/* ── #120 — toggle de indexación automática con guía UX ── */
+.ci-autoindex {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+.ci-autoindex-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ci-autoindex-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+.ci-autoindex-info {
+	display: inline-flex;
+	align-items: center;
+	color: var(--vscode-descriptionForeground);
+	cursor: help;
+}
+.ci-autoindex-info:hover {
+	color: var(--vscode-textLink-foreground, #4daafc);
+}
+.ci-autoindex-purpose {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	line-height: 1.4;
+}
+.ci-autoindex-guide {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 2px;
+}
+.ci-autoindex-case {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.6;
+	line-height: 1.45;
+	padding-left: 4px;
+	border-left: 2px solid transparent;
+}
+.ci-autoindex-case strong {
+	color: var(--vscode-foreground);
+}
+.ci-autoindex-case.is-current {
+	opacity: 1;
+	border-left-color: var(--vscode-textLink-foreground, #4daafc);
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
+	border-radius: 0 3px 3px 0;
+	padding: 2px 6px;
+}
+.ci-autoindex-case.is-on.is-current strong {
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+
 .ci-stop-btn {
 	display: inline-flex;
 	align-items: center;

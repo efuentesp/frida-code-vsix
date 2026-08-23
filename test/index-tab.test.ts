@@ -3,6 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseAutoIndexProgress } from "../src/tools/frida-codebase-index/progress";
 import {
+	AutoIndexToggle,
 	IndexTab,
 	StopIndexDialog,
 	EmbeddingsEngine,
@@ -536,6 +537,38 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		);
 		expect(html).toContain("recargará la ventana");
 		expect(html).toContain("retomará desde donde quedó");
+	});
+
+	describe("AutoIndexToggle — guía UX de indexación automática (#120)", () => {
+		it("OFF por defecto: guía ON/OFF visible y switch refleja el estado", () => {
+			const html = renderToStaticMarkup(
+				React.createElement(AutoIndexToggle, {
+					enabled: false,
+				onToggle: () => {},
+				}),
+			);
+			expect(html).toContain("Indexación automática");
+			expect(html).toContain("Mantiene el índice fresco en background");
+			// Guía de cuándo usarlo — siempre visible, no solo tooltip
+			expect(html).toContain("ON</strong> — si trabajas a diario");
+			expect(html).toContain("OFF</strong> — si indexas poco");
+			expect(html).toContain('aria-checked="false"');
+			expect(html).toContain("is-off is-current");
+			// ⓘ con detalle técnico
+			expect(html).toContain("ci-autoindex-info");
+		});
+
+		it("ON: aria-checked true y caso ON resaltado como actual", () => {
+			const html = renderToStaticMarkup(
+				React.createElement(AutoIndexToggle, {
+					enabled: true,
+					onToggle: () => {},
+				}),
+			);
+			expect(html).toContain('aria-checked="true"');
+			expect(html).toContain("is-on is-current");
+			expect(html).not.toContain("is-off is-current");
+		});
 	});
 
 	it("#118 — línea de último archivo confirmado durante la indexación", () => {

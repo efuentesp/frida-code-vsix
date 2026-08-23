@@ -175,8 +175,10 @@ import {
 import type { IndexMeta } from "./tools/frida-codebase-index/files";
 import { pingEmbeddingsProvider } from "./tools/frida-codebase-index/ping";
 import {
+	readAutoIndexEnabled,
 	readEnterpriseEmbeddingsCredential,
 	syncCodebaseIndexConfig,
+	setAutoIndexEnabled,
 } from "./tools/frida-codebase-index/host-setup";
 import { checkEnvironment } from "./environment/doctor";
 import { createWebDemoElement } from "./demo/web-demo";
@@ -584,6 +586,9 @@ export async function activate(
 	let ciProgress: IndexProgress | null = null;
 	// #118 — último archivo confirmado durante la indexación (línea en vivo).
 	let ciLastFile: string | null = null;
+	// #120 — indexación automática del proyecto (indexing.autoIndex).
+	// (let: se recarga en webview_ready y se asigna en el toggle del tab.)
+	let ciAutoIndex = readAutoIndexEnabled(workspaceCwd());
 	// #111 — epoch ms del inicio de la acción: el reloj del tab deriva de aquí
 	// y sobrevive cambios de pestaña (remount del componente).
 	let ciBusySince: number | null = null;
@@ -613,6 +618,7 @@ export async function activate(
 				lastLine: ciLastLine,
 				progress: ciProgress,
 				lastFile: ciLastFile,
+				autoIndex: ciAutoIndex,
 				indexMeta: ciIndexMeta ?? undefined,
 				config: {
 					provider: cfg.provider,
@@ -3208,6 +3214,21 @@ export async function activate(
 					}
 				}
 				post({ type: "codebase_index_ping_result", provider, ...res });
+				break;
+			}
+			// #120 — toggle de indexación automática: escribe indexing.autoIndex
+			// del config.json del proyecto (merge defensivo) y publica el estado.
+			case "codebase_index_autoindex": {
+				const ok = setAutoIndexEnabled(workspaceCwd(), !!msg.enabled);
+				if (!ok) {
+					post({
+						type: "info",
+						text: "No se pudo escribir .codebase-index/config.json (¿workspace read-only?) — la indexación automática no cambió.",
+						level: "error",
+					});
+				}
+				ciAutoIndex = readAutoIndexEnabled(workspaceCwd());
+				postCodebaseIndexState();
 				break;
 			}
 			// #117 (Fase B) — selección de proveedor/modelo: persiste el setting

@@ -500,6 +500,8 @@ export interface CodebaseIndexUiState {
 	} | null;
 	/** Último archivo confirmado durante la indexación (#118). */
 	lastFile?: string | null;
+	/** #120 — indexación automática activa del proyecto (indexing.autoIndex). */
+	autoIndex?: boolean;
 	/** Configuración activa del motor de embeddings (#100; modelos #116). */
 	config?: {
 		provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";
@@ -1101,6 +1103,12 @@ export type OutMessage =
 	| {
 			type: "codebase_index_action";
 			action: "install" | "index" | "rebuild" | "status" | "files" | "stop";
+	  }
+	| {
+			/** #120 — toggle de indexación automática (indexing.autoIndex del
+			 *  config.json del proyecto). enabled=false apaga. */
+			type: "codebase_index_autoindex";
+			enabled: boolean;
 	  }
 	| {
 			/** #116 Fase A — Ping de conectividad del proveedor de embeddings. */

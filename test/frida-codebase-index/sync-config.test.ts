@@ -3,7 +3,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import {
+	readAutoIndexEnabled,
 	readEnterpriseEmbeddingsCredential,
+	setAutoIndexEnabled,
 	syncCodebaseIndexConfig,
 } from "../../src/tools/frida-codebase-index/host-setup";
 import { pingEmbeddingsProvider } from "../../src/tools/frida-codebase-index/ping";
@@ -247,5 +249,37 @@ describe("readEnterpriseEmbeddingsCredential (#116)", () => {
 		);
 		expect(readEnterpriseEmbeddingsCredential(d)?.expired).toBe(true);
 		expect(readEnterpriseEmbeddingsCredential(tmpWs())).toBeNull();
+	});
+});
+
+describe("readAutoIndexEnabled / setAutoIndexEnabled (#120)", () => {
+	it("default false sin config; set ON escribe y preserva claves existentes", () => {
+		const ws = tmpWs();
+		expect(readAutoIndexEnabled(ws)).toBe(false);
+		// config previo con claves del usuario
+		const dir = path.join(ws, ".codebase-index");
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, "config.json"),
+			JSON.stringify({
+				scope: "project",
+				embeddingProvider: "ollama",
+				indexing: { autoIndex: false, watchFiles: true },
+			}),
+		);
+		expect(setAutoIndexEnabled(ws, true)).toBe(true);
+		expect(readAutoIndexEnabled(ws)).toBe(true);
+		const cfg = JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8"));
+		// merge defensivo: solo indexing.autoIndex cambia; el resto queda
+		expect(cfg.scope).toBe("project");
+		expect(cfg.embeddingProvider).toBe("ollama");
+		expect(cfg.indexing).toEqual({ autoIndex: true, watchFiles: true });
+	});
+
+	it("set OFF regresa a false; sin .codebase-index lo crea", () => {
+		const ws = tmpWs();
+		expect(setAutoIndexEnabled(ws, true)).toBe(true);
+		expect(setAutoIndexEnabled(ws, false)).toBe(true);
+		expect(readAutoIndexEnabled(ws)).toBe(false);
 	});
 });
