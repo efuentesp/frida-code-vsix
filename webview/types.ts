@@ -498,6 +498,8 @@ export interface CodebaseIndexUiState {
 		chunksProcessed: number;
 		totalChunks: number;
 	} | null;
+	/** Último archivo confirmado durante la indexación (#118). */
+	lastFile?: string | null;
 	/** Configuración activa del motor de embeddings (#100; modelos #116). */
 	config?: {
 		provider: "auto" | "frida-enterprise" | "ollama" | "openai" | "custom";

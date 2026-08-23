@@ -170,6 +170,7 @@ import {
 import {
 	readIndexedFiles,
 	readIndexMeta,
+	readLastIndexedFile,
 } from "./tools/frida-codebase-index/files";
 import type { IndexMeta } from "./tools/frida-codebase-index/files";
 import { pingEmbeddingsProvider } from "./tools/frida-codebase-index/ping";
@@ -581,6 +582,8 @@ export async function activate(
 	// #109 — progreso en vivo de la indexación (sondeo de index_status cada 2s
 	// mientras index/rebuild corren en este mismo proceso → mismo coordinador).
 	let ciProgress: IndexProgress | null = null;
+	// #118 — último archivo confirmado durante la indexación (línea en vivo).
+	let ciLastFile: string | null = null;
 	// #111 — epoch ms del inicio de la acción: el reloj del tab deriva de aquí
 	// y sobrevive cambios de pestaña (remount del componente).
 	let ciBusySince: number | null = null;
@@ -609,6 +612,7 @@ export async function activate(
 				busySince: ciBusySince,
 				lastLine: ciLastLine,
 				progress: ciProgress,
+				lastFile: ciLastFile,
 				indexMeta: ciIndexMeta ?? undefined,
 				config: {
 					provider: cfg.provider,
@@ -3073,10 +3077,15 @@ export async function activate(
 										.execute("host-progress", {}, undefined, undefined, {
 											cwd: workspaceCwd(),
 										})
-										.then((res: any) => {
+										.then(async (res: any) => {
 											const txt = res?.content?.[0]?.text;
 											ciProgress =
 												typeof txt === "string" ? parseAutoIndexProgress(txt) : null;
+											// #118 — último archivo confirmado (read-only; solo durante
+											// embedding hay commits; en parsing queda el anterior/null)
+											ciLastFile = await readLastIndexedFile(workspaceCwd()).catch(
+												() => null,
+											);
 											postCodebaseIndexState();
 										})
 										.catch(() => {
@@ -3101,6 +3110,7 @@ export async function activate(
 							// #109 — el polling muere SIEMPRE con la acción (sin timers huérfanos)
 							if (poll) clearInterval(poll);
 							ciProgress = null;
+							ciLastFile = null;
 						}
 					}
 				} catch (e: any) {

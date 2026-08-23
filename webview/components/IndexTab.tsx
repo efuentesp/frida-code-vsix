@@ -930,6 +930,20 @@ export function IndexTab({
 											tamaño del repositorio.
 										</div>
 									)}
+							{/* #118 — último archivo confirmado: actividad visible.
+							 * (Este bloque ya vive en la rama busy !== "install" de #109.) */}
+							{ci?.lastFile && (
+										<div
+											className="ci-busy-file"
+											title={ci.lastFile}
+										>
+											<Codicon name="file" size={12} />
+											<span className="ci-busy-file-path">{ci.lastFile}</span>
+											<span className="ci-busy-file-hint">
+									↑ último archivo confirmado
+								</span>
+										</div>
+									)}
 								</>
 							);
 						})()}

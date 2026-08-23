@@ -10195,6 +10195,30 @@ kbd {
 	font-size: 11px;
 	color: var(--vscode-descriptionForeground);
 }
+/* #118 — línea de último archivo confirmado (actividad visible) */
+.ci-busy-file {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 10.5px;
+	min-width: 0;
+	color: var(--vscode-descriptionForeground);
+}
+.ci-busy-file-path {
+	font-family: var(--vscode-editor-font-family, monospace);
+	color: var(--vscode-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	direction: rtl;
+	text-align: left;
+	max-width: 340px;
+}
+.ci-busy-file-hint {
+	flex-shrink: 0;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.75;
+}
 @keyframes ci-busy-slide {
 	0% {
 		left: -30%;

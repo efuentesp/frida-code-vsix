@@ -206,3 +206,23 @@ export async function readIndexedFiles(
 
 	return { files, failed: readFailed(indexDir(cwd)), engine };
 }
+
+/**
+ * Último archivo confirmado en el índice (#118): el chunk con mayor rowid
+ * (orden de inserción → confirmación más reciente). Read-only, mismo
+ * mecanismo que readIndexMeta. null sin índice o sin chunks.
+ */
+export async function readLastIndexedFile(
+	cwd: string,
+): Promise<string | null> {
+	const db = path.join(indexDir(cwd), "codebase.db");
+	if (!fs.existsSync(db)) return null;
+	const SQL_LAST =
+		"SELECT file_path FROM chunks ORDER BY rowid DESC LIMIT 1";
+	let rows: unknown[] | null = await queryViaNodeSqlite(db, SQL_LAST);
+	if (!rows) rows = await queryViaCli(db, SQL_LAST);
+	if (!rows || rows.length === 0) return null;
+	const row = rows[0] as Record<string, unknown> | string[];
+	const p = Array.isArray(row) ? row[0] : row.file_path;
+	return typeof p === "string" && p.length > 0 ? p : null;
+}

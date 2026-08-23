@@ -7,6 +7,7 @@ import {
 	aggregateFailed,
 	readIndexedFiles,
 	readIndexMeta,
+	readLastIndexedFile,
 } from "../src/tools/frida-codebase-index/files";
 
 function tmpdir(): string {
@@ -138,5 +139,51 @@ describe("codebase-index/files — metadata de embeddings del índice (#114)", (
 		}
 		const d = mkIndex(`INSERT INTO metadata VALUES ('schema_version','7');`);
 		expect(await readIndexMeta(d)).toBeNull(); // DB sin claves embedding
+	});
+});
+
+describe("readLastIndexedFile — último archivo confirmado (#118)", () => {
+	const dirs: string[] = [];
+	afterAll(() => {
+		for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("devuelve el file_path del chunk más reciente por rowid", async () => {
+		try {
+			execFileSync("sqlite3", ["--version"]);
+		} catch {
+			return; // sin CLI
+		}
+		const d = tmpdir();
+		dirs.push(d);
+		const idx = path.join(d, ".codebase-index", "index");
+		fs.mkdirSync(idx, { recursive: true });
+		execFileSync("sqlite3", [
+			path.join(idx, "codebase.db"),
+			`CREATE TABLE chunks (chunk_id TEXT PRIMARY KEY, file_path TEXT NOT NULL);
+			 INSERT INTO chunks VALUES ('c1','src/a.ts');
+			 INSERT INTO chunks VALUES ('c2','src/b.ts');
+			 INSERT INTO chunks VALUES ('c3','src/c.ts');`,
+		]);
+		// rowid de INSERT c3 es el mayor → último confirmado
+		expect(await readLastIndexedFile(d)).toBe("src/c.ts");
+	});
+
+	it("null sin índice o sin chunks confirmados", async () => {
+		expect(await readLastIndexedFile(tmpdir())).toBeNull();
+		try {
+			execFileSync("sqlite3", ["--version"]);
+		} catch {
+			return;
+		}
+		const d = tmpdir();
+		dirs.push(d);
+		const idx = path.join(d, ".codebase-index", "index");
+		fs.mkdirSync(idx, { recursive: true });
+		execFileSync("sqlite3", [
+			path.join(idx, "codebase.db"),
+			"CREATE TABLE chunks (chunk_id TEXT PRIMARY KEY, file_path TEXT NOT NULL);",
+		]);
+		expect(await readLastIndexedFile(d)).toBeNull(); // tabla vacía
 	});
 });

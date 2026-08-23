@@ -522,9 +522,7 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			// abierto desde "Cambiar motor…" nunca renderizaba.
 			expect(shouldShowChangeDialog(true, null)).toBe(true); // ← el bug
 			expect(shouldShowChangeDialog(true, undefined)).toBe(false);
-			expect(
-				shouldShowChangeDialog(true, { provider: "ollama" }),
-			).toBe(true);
+			expect(shouldShowChangeDialog(true, { provider: "ollama" })).toBe(true);
 			expect(shouldShowChangeDialog(false, { provider: "ollama" })).toBe(false);
 		});
 	});
@@ -538,6 +536,51 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		);
 		expect(html).toContain("recargará la ventana");
 		expect(html).toContain("retomará desde donde quedó");
+	});
+
+	it("#118 — línea de último archivo confirmado durante la indexación", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+					...baseState,
+					codebaseIndex: {
+						installed: true,
+						busy: "index",
+						lastFile: "raw/Best Free Open Source Backend.md",
+						progress: {
+							phase: "embedding",
+							percentage: 45,
+							filesProcessed: 218,
+							totalFiles: 218,
+							chunksProcessed: 500,
+							totalChunks: 1100,
+						},
+						},
+					},
+					post,
+				}),
+		);
+		expect(html).toContain("raw/Best Free Open Source Backend.md");
+		expect(html).toContain("último archivo confirmado");
+	});
+
+	it("#118 — sin línea de archivo en install (no hay índice confirmándose)", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+					...baseState,
+					codebaseIndex: {
+						installed: false,
+						busy: "install",
+						lastFile: "x/y.ts",
+						},
+					},
+					post,
+				}),
+		);
+		expect(html).not.toContain("último archivo confirmado");
 	});
 
 	it("#109 — sin datos del coordinador: barra indeterminada y contadores en —", () => {
