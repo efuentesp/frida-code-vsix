@@ -25,7 +25,7 @@ export const PROJECT_RULE_PROMPT =
  */
 export function buildPromptGuidelines(): string[] {
 	return [
-		"Use agent_browser with one input mode: args, semanticAction, job, qa, sourceLookup/networkSourceLookup, or electron. stdin only for batch/eval/auth/wrapper batch; electron rejects stdin; never pass --json.",
+		"Use agent_browser with one input mode: args, semanticAction, job, qa, script, sourceLookup/networkSourceLookup, or electron. stdin only for batch/eval/auth/wrapper batch; electron rejects stdin; never pass --json.",
 		"For agent_browser, use open → snapshot -i → current @refs or semanticAction → re-snapshot after navigation/scroll/rerender. Batch same-snapshot forms; split before navigation/submits. Stop before order/post/purchase/submit.",
 		`Use agent_browser sessionMode=fresh for launch-scoped flags, including --allowed-domains; never put --session-mode in args. Use requested/configured profiles only; on profile failures run profiles/doctor. Profile content is model-visible.`,
 		"For agent_browser artifacts, use exact user paths and verify details.artifactVerification/details.artifacts before claiming success. Save details.promptGuard-required artifacts before close; record stop needs ffmpeg; close keeps files; waited:timeout is not proof.",
@@ -37,7 +37,7 @@ export function buildPromptGuidelines(): string[] {
 /** Descripción agent-facing del tool (réplica del referencia). */
 export const AGENT_BROWSER_DESCRIPTION =
 	"Browse websites, read live docs, click and fill pages, extract browser content, take screenshots, and automate real web workflows. " +
-	"Input choice: default `args` for open → snapshot -i → click/fill @refs; `semanticAction` for stable role/text/label targets; `job` or `qa` for multi-step checks; `electron` only for desktop apps; experimental `sourceLookup` / `networkSourceLookup` for candidates only.";
+	"Input choice: default `args` for open → snapshot -i → click/fill @refs; `semanticAction` for stable role/text/label targets; `job` or `qa` for multi-step checks; `script` for loops, conditional branches, and multi-page aggregation via sandboxed browser()/emit(); `electron` only for desktop apps; experimental `sourceLookup` / `networkSourceLookup` for candidates only.";
 
 /** Snippet corto para el catálogo de tools del agente. */
 export const AGENT_BROWSER_PROMPT_SNIPPET =

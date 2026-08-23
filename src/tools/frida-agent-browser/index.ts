@@ -39,6 +39,7 @@ import {
 	AGENT_BROWSER_DESCRIPTION,
 	AGENT_BROWSER_PROMPT_SNIPPET,
 	buildPromptGuidelines,
+	MISSING_BINARY_MESSAGE,
 	PROJECT_RULE_PROMPT,
 } from "./prompt";
 import {
@@ -58,6 +59,12 @@ import {
 	ManagedSession,
 } from "./session";
 import { isPlainTextInspection, isSessionlessCommand } from "./command-policy";
+import {
+	createScriptCloseArgs,
+	createScriptSessionName,
+	runAgentBrowserScript,
+	SCRIPT_NAMESPACE,
+} from "./script/mode";
 import { CLOSE_COMMANDS, isRefMutation, NAVIGATE_COMMANDS } from "./ref-guard";
 import { buildNextActions } from "./results/next-actions";
 import { commandOf } from "./results/presentation";
@@ -204,6 +211,118 @@ export function createFridaAgentBrowser(
 							}
 						},
 					});
+				}
+
+				// Fase 9: input-mode script → orquestador sandbox (upstream 0.4.0).
+				// No usa la sesión implícita: cada corrida tiene su sesión aislada
+				// `piab-script-<uuid>` (namespace vacío), cerrada en el cleanup.
+				if (resolved.mode === "script" && resolved.script) {
+					const scriptSession = createScriptSessionName();
+				const run = await runAgentBrowserScript({
+						code: resolved.script.code,
+						timeoutMs: (params as { timeoutMs?: number }).timeoutMs,
+						signal: signal ?? undefined,
+						dispatch: async (p, callSignal) => {
+							const callRun = await runFn({
+								args: [
+									"--namespace",
+									SCRIPT_NAMESPACE,
+									"--session",
+									scriptSession,
+									...p.args,
+									"--json",
+								],
+								stdin: p.stdin,
+								cwd: ctx.cwd,
+								timeoutMs: p.timeoutMs,
+								signal: callSignal,
+							});
+							if (isMissingBinary(callRun)) {
+								return {
+									ok: false,
+									text: MISSING_BINARY_MESSAGE,
+									summary: "missing-binary",
+									resultCategory: "failure" as const,
+									failureCategory: "missing-binary",
+									error: MISSING_BINARY_MESSAGE,
+								};
+							}
+							const parsed = parseAgentBrowserOutput({
+								stdout: callRun.stdout,
+								stderr: callRun.stderr,
+								exitCode: callRun.exitCode,
+								mode: "script",
+								args: p.args,
+								sessionName: scriptSession,
+								cwd: ctx.cwd,
+							});
+							const d = parsed.details as {
+								resultCategory?: string;
+								successCategory?: string;
+								failureCategory?: string;
+								result?: unknown;
+								error?: string;
+							};
+							return {
+								ok: !parsed.isError,
+								text:
+									parsed.content[0]?.type === "text"
+										? parsed.content[0].text
+										: "",
+								summary: parsed.isError ? "failed" : "ok",
+								resultCategory:
+									d.resultCategory === "failure" ? "failure" : "success",
+								successCategory: d.successCategory,
+								failureCategory: d.failureCategory,
+								data: d.result,
+								error: d.error,
+							};
+						},
+						cleanup: async () => {
+							try {
+								await runFn({
+									args: createScriptCloseArgs(scriptSession),
+									cwd: ctx.cwd,
+									timeoutMs: 10_000,
+								});
+							} catch {
+								/* best-effort */
+							}
+						},
+					});
+					const outputText =
+						run.data === undefined
+							? "(script completed with no output)"
+							: JSON.stringify(run.data, null, 2);
+					const summaryLine = `Script run: ${run.callCount} browser call(s), ${run.rejectedCallCount} rejected, ${run.emitCount} emit(s).`;
+					return {
+						content: [
+							{
+								type: "text",
+								text: run.ok
+									? `${outputText}\n\n${summaryLine}`
+									: `Script failed (${run.failureCategory}): ${run.error}\n\n${summaryLine}`,
+							},
+						],
+						details: {
+							mode: "script",
+							command: "script",
+							session: scriptSession,
+							resultCategory: run.ok ? "success" : "failure",
+							...(run.ok ? {} : { failureCategory: run.failureCategory }),
+							script: {
+								callCount: run.callCount,
+								emitCount: run.emitCount,
+								rejectedCallCount: run.rejectedCallCount,
+								timedOut: run.timedOut ?? undefined,
+								aborted: run.aborted ?? undefined,
+							},
+							steps: run.steps,
+							...(run.data !== undefined ? { data: run.data } : {}),
+							...(run.ok ? {} : { error: run.error }),
+						},
+						isError: !run.ok,
+					};
 				}
 
 				const ms = ensureSession(ctx);

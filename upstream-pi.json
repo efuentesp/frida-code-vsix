@@ -58,7 +58,7 @@
       "mode": "fork",
       "basedOn": "0.5.0",
       "repo": "https://github.com/fitchmultz/pi-agent-browser-native",
-      "fridaAdditions": "Sync contractual 0.34.0 (upstream 0.4.2/0.4.3): launch-scoped flags ampliados (--args/--user-agent/--headed/--idle-timeout/--allowed-domains/--restore-check-*), --pin-tab sticky no-launch-scoped, argv-grammar mirror (findCommandStartIndex/getBooleanFlagValue), categoría tab-gone + recovery actions, targetId CDP en tab list, PORTED_BINARY_CONTRACT=0.34.0. Diferido: modo script (0.4.0) y presentación compacta.",
+      "fridaAdditions": "Sync contractual 0.34.0 (upstream 0.4.2/0.4.3): launch-scoped flags ampliados, --pin-tab sticky, argv-grammar mirror, categoria tab-gone + recovery actions, targetId CDP en tab list, PORTED_BINARY_CONTRACT=0.34.0. Fase 2 porteada: modo script (upstream 0.4.0) con sandbox VM worker (sin codegen, globals vetados, caps 64KiB/25 calls/IPC bounded) y presentacion compacta de get/eval + mirror de nextActions en fallos. Diferido: leases persistentes/restart-recovery, spill rehydration, redaccion model-facing profunda.",
       "lastSync": "2026-08-23"
     },
     {

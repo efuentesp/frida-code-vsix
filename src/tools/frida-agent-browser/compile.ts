@@ -30,9 +30,11 @@ export interface CompiledInput {
 	/** stdin opcional (sólo batch/eval/auth). */
 	stdin?: string;
 	/** modo que se compiló (para details). */
-	mode: "args" | "semanticAction" | "job" | "qa" | "electron";
+	mode: "args" | "semanticAction" | "job" | "qa" | "electron" | "script";
 	/** plan electron (sólo mode="electron"). */
 	electron?: CompiledElectron;
+	/** código del sandbox (sólo mode="script"). */
+	script?: { code: string };
 }
 
 export interface CompileError {
@@ -718,13 +720,13 @@ export function compileQa(input: unknown): {
 export function resolveAgentBrowserInput(
 	params: Record_,
 ): CompiledInput | CompileError {
-	const modes = ["args", "semanticAction", "job", "qa", "electron"].filter(
+	const modes = ["args", "semanticAction", "job", "qa", "electron", "script"].filter(
 		(m) => params[m] !== undefined,
 	);
 	if (modes.length === 0) {
 		return {
 			error:
-				"Provide exactly one input mode: args, semanticAction, job, qa, or electron.",
+				"Provide exactly one input mode: args, semanticAction, job, qa, electron, or script.",
 		};
 	}
 	if (modes.length > 1) {
@@ -765,6 +767,18 @@ export function resolveAgentBrowserInput(
 		const r = compileElectron(params.electron);
 		if (r.error) return { error: r.error };
 		return { args: [], mode: "electron", electron: r.compiled };
+	}
+	if (params.script !== undefined) {
+		// El código se valida en script/mode.ts (límite 64 KiB); aquí sólo se
+		// tipa y se marca el modo — el orquestador del sandbox lo ejecuta.
+		if (typeof params.script !== "string" || params.script.trim() === "") {
+			return { error: "script must be a non-empty string." };
+		}
+		return {
+			args: [],
+			mode: "script",
+			script: { code: params.script as string },
+		};
 	}
 	return { error: "Unsupported input mode." };
 }

@@ -37,6 +37,9 @@ export interface RunOptions {
 	cwd: string;
 	timeoutMs?: number;
 	signal?: AbortSignal;
+	/** Entorno del hijo. Default: process.env. El modo script usa env propio
+	 *  (sesión aislada sin variables ambientales del host). */
+	env?: NodeJS.ProcessEnv;
 }
 
 /** Seam de inyección para tests: una función spawn-like. Loose a propósito
@@ -57,7 +60,7 @@ export async function runAgentBrowser(
 	return new Promise<RunResult>((resolve) => {
 		const child = doSpawn(AGENT_BROWSER_BINARY, opts.args, {
 			cwd: opts.cwd,
-			env: process.env,
+			env: opts.env ?? process.env,
 			stdio: ["pipe", "pipe", "pipe"],
 			windowsHide: true,
 		}) as {

@@ -126,6 +126,99 @@ export function getTabSummary(
 	return lines.join("\n");
 }
 
+/**
+ * Presentación compacta de extracciones escalares (mirror 0.4.0,
+ * formatExtractionText del referencia): `get url/title/text/count/…` y
+ * `eval` renderizan el escalar + Origin en vez del sobre JSON crudo.
+ * Campo `result` tiene prioridad; fallback al campo por subcomando.
+ */
+const GET_RESULT_FIELDS: Record<string, string> = {
+	attr: "value",
+	count: "count",
+	html: "html",
+	text: "text",
+	title: "title",
+	url: "url",
+	value: "value",
+};
+
+function scalarToString(result: unknown): string | undefined {
+	if (typeof result === "string")
+		return result.trim().length > 0 ? result : "(empty string)";
+	if (typeof result === "number" || typeof result === "boolean")
+		return String(result);
+	if (result === null || result === undefined) return "null";
+	if (typeof result === "object") return JSON.stringify(result);
+	return undefined;
+}
+
+/** Subcomando = primer token no-flag tras el comando (`get url …` → "url"). */
+function subcommandOf(args: string[]): string | undefined {
+	const start = findCommandStartIndex(args);
+	if (start === undefined) return undefined;
+	for (let i = start + 1; i < args.length; i++) {
+		if (!args[i].startsWith("-")) return args[i];
+	}
+	return undefined;
+}
+
+export function formatExtractionText(
+	command: string | undefined,
+	args: string[],
+	data: AgentBrowserData | null | undefined,
+): string | undefined {
+	if (
+		!data ||
+		(command !== "get" && command !== "eval")
+	) {
+		return undefined;
+	}
+	const fallbackField =
+		command === "get"
+			? (GET_RESULT_FIELDS[subcommandOf(args) ?? ""] ?? "")
+			: "";
+	const resultField = Object.hasOwn(data, "result")
+		? "result"
+		: fallbackField.length > 0 && Object.hasOwn(data, fallbackField)
+				? fallbackField
+				: undefined;
+	if (resultField === undefined) return undefined;
+	const scalar = scalarToString((data as Record<string, unknown>)[resultField]);
+	if (scalar === undefined) return undefined;
+	const origin = getOrigin(data);
+	return origin && origin !== scalar
+		? `${scalar}\n\nOrigin: ${origin}`
+		: scalar;
+}
+
+/**
+ * Mirror de nextActions al output model-visible en FALLOS (mirror 0.4.0,
+ * formatFailureNextActionsText del referencia): máx 6 acciones, stdin omitido
+ * (los payloads exactos viven en details.nextActions).
+ */
+export function formatFailureNextActionsText(
+	nextActions: { id: string; reason: string; params?: { stdin?: unknown } }[],
+): string | undefined {
+	if (nextActions.length === 0) return undefined;
+	const lines = nextActions.slice(0, 6).map((action) => {
+		const params =
+			action.params
+				? {
+						...action.params,
+						...(action.params.stdin === undefined
+							? {}
+							: { stdin: "[omitted; use details.nextActions]" }),
+				}
+				: undefined;
+		return `- ${action.id}${params ? ` ${JSON.stringify(params)}` : ""}: ${action.reason}`;
+	});
+	return [
+		"Next actions:",
+		...lines,
+		"Use the exact redacted payloads in details.nextActions when available.",
+	].join("\n");
+}
+
 /** Construye el BrowserToolResult a partir de un sobre JSON ya parseado. */
 export function presentAgentBrowserResult(
 	opts: PresentOptions,
@@ -208,6 +301,9 @@ export function presentAgentBrowserResult(
 			// Contrato 0.34.0: listados de tab con selector + label + CDP targetId
 			// (los tres sirven como refs de tab en comandos posteriores).
 			text = getTabSummary(data)!;
+		} else if (formatExtractionText(command, args, data)) {
+			// Presentación compacta 0.4.0: get/eval renderizan el escalar + Origin.
+			text = formatExtractionText(command, args, data)!;
 		} else {
 			text = extractReadableText(data) ?? JSON.stringify(envelope, null, 2);
 		}
@@ -218,13 +314,16 @@ export function presentAgentBrowserResult(
 		};
 	}
 
-	// Fallo: mensaje del binario (o stderr) + categoría.
+	// Fallo: mensaje del binario (o stderr) + categoría + nextActions espejadas
+	// al output model-visible (mirror 0.4.0) con payloads redactados.
 	const text =
 		envelope.error?.trim() ||
 		opts.stderr.trim() ||
 		`agent-browser command "${command ?? mode}" failed (exit ${opts.exitCode ?? "?"}).`;
+	const mirrored = formatFailureNextActionsText(nextActions);
+	const contentText = mirrored ? `${text}\n\n${mirrored}` : text;
 	return {
-		content: [{ type: "text", text }],
+		content: [{ type: "text", text: contentText }],
 		details: { ...baseDetails, error: envelope.error ?? undefined },
 		isError: true,
 	};

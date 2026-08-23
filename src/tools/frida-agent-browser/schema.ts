@@ -121,6 +121,13 @@ export const AGENT_BROWSER_PARAMS = Type.Object(
 		qa: qaParam,
 		job: jobParam,
 		electron: Type.Optional(ELECTRON_INPUT),
+		script: Type.Optional(
+			Type.String({
+				description:
+					"JavaScript source for the sandboxed script mode: async body with browser({ args, stdin?, timeoutMs? }) and emit(value). Max 25 browser calls; 64 KiB source/output caps; no host globals, no code generation from strings; browser calls cannot change session identity.",
+				minLength: 1,
+			}),
+		),
 		stdin: Type.Optional(
 			Type.String({
 				description:
@@ -151,6 +158,7 @@ export type AgentBrowserParams = {
 	semanticAction?: Record<string, unknown>;
 	qa?: Record<string, unknown>;
 	job?: Record<string, unknown>;
+	script?: string;
 	stdin?: string;
 	outputPath?: string;
 	timeoutMs?: number;

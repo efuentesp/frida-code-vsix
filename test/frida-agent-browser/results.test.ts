@@ -297,5 +297,63 @@ describe("presentAgentBrowserResult", () => {
 		]);
 		expect(d.nextActions?.[0]?.params.args).toEqual(["tab", "list"]);
 		expect(d.nextActions?.[1]?.params.args).toEqual(["tab", "new"]);
+		// Mirror 0.4.0: nextActions espejadas al texto model-visible.
+		expect(r.content[0].text).toContain("Next actions:");
+		expect(r.content[0].text).toContain(
+			"- list-tabs-after-tab-gone {\"args\":[\"tab\",\"list\"]}:",
+		);
+		expect(r.content[0].text).toContain(
+			"Use the exact redacted payloads in details.nextActions",
+		);
+	});
+	it("presentación compacta 0.4.0: get url → escalar (origin === scalar, sin repetir)", () => {
+		const r = present(
+			{
+				success: true,
+				data: { url: "https://docs.x/guide", origin: "https://docs.x/guide" },
+				error: null,
+			},
+			["get", "url"],
+		);
+		expect(r.isError).toBe(false);
+		expect(r.content[0].text).toBe("https://docs.x/guide");
+	});
+	it("presentación compacta: get count → escalar numérico", () => {
+		const r = present(
+			{ success: true, data: { count: 3 }, error: null },
+			["get", "count", "a"],
+		);
+		expect(r.content[0].text).toBe("3");
+	});
+	it("presentación compacta: campo `result` tiene prioridad", () => {
+		const r = present(
+			{
+				success: true,
+				data: { result: 42, count: 7 },
+				error: null,
+			},
+			["get", "count", "a"],
+		);
+		expect(r.content[0].text).toBe("42");
+	});
+	it("presentación compacta: eval con Origin distinto al escalar", () => {
+		const r = present(
+			{
+				success: true,
+				data: { result: "ok", origin: "https://x/page" },
+				error: null,
+			},
+			["eval", "--stdin"],
+		);
+		expect(r.content[0].text).toBe("ok\n\nOrigin: https://x/page");
+	});
+	it("fallo sin nextActions → sin bloque Next actions", () => {
+		const r = present(
+			{ success: false, data: null, error: "something broke" },
+			["get", "url"],
+			1,
+		);
+		expect(r.isError).toBe(true);
+		expect(r.content[0].text).not.toContain("Next actions:");
 	});
 });
