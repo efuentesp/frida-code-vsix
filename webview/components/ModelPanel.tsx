@@ -168,9 +168,9 @@ export function RolesSection({
 				</>
 			) : (
 				<div className="mr-off-note">
-					Todo lo resuelve el <strong>modelo Principal</strong> que elegiste abajo
-					(comportamiento clásico). Enciende los roles para enviar subagents y
-					commits a un modelo más barato.
+					Todo lo resuelve el <strong>modelo Principal</strong> activo (el que
+					eleccionaste en la barra superior — comportamiento clásico). Enciende los
+					roles para enviar subagents y commits a un modelo más barato.
 				</div>
 			)}
 		</div>

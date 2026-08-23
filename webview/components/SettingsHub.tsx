@@ -328,9 +328,7 @@ export function SettingsHub({
 										roles={state.models.roles}
 										active={state.models.active}
 										providers={state.models.providers}
-										onSetRoles={(patch) =>
-											post({ type: "model_roles_set", ...patch })
-										}
+										onSetRoles={(patch) => post({ type: "model_roles_set", ...patch })}
 									/>
 								) : (
 									<div className="cfg-stub">Cargando roles de modelo…</div>
