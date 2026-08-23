@@ -7,7 +7,7 @@ repository: frida-code
 topic: "Hoja de Ruta UI/UX Frida Code × GitHub Copilot — Rediseño visual gradual del Webview"
 tags: [ui-ux, copilot-chat, webview, codicons, tool-flat, transcript, input-stack, roadmap]
 status: ready
-phase_count: 6
+phase_count: 13
 phases:
   - { n: 1, title: "Fundaciones Visuales y Primitivas CSS (@vscode/codicons, shimmer, tokens)", files: [package.json, webview/main.tsx, webview/components/Codicon.tsx, webview/styles.css, test/codicon.test.ts], depends_on: [] }
   - { n: 2, title: "Fila de Tools Plana y Catálogo Tool por Tool (tool-phrases, .tool-flat, 20 tools)", files: [webview/tool-phrases.ts, webview/components/CollapsibleCard.tsx, webview/components/ToolCard.tsx, test/webview-tool-phrases.test.ts], depends_on: [1] }
@@ -15,7 +15,14 @@ phases:
   - { n: 4, title: "Footer — Input Stack, Composer y Border Beam (.working, botón circular ↑/■)", files: [webview/components/Composer.tsx, webview/components/ContextBar.tsx, webview/styles.css], depends_on: [1] }
   - { n: 5, title: "Footer — Paneles Dockeados en Píldora Única y Followups (Todo, Preguntas, Aprobación)", files: [webview/components/Followups.tsx, webview/followup-rules.ts, webview/components/QuestionsPanel.tsx, webview/components/ApprovalCard.tsx, webview/App.tsx, test/followup-rules.test.ts], depends_on: [4] }
   - { n: 6, title: "Header, Overlays y Botón Scroll-to-Bottom Flotante", files: [webview/components/WorkspaceBar.tsx, webview/components/SettingsHub.tsx, webview/components/SessionsPanel.tsx, webview/App.tsx, webview/styles.css], depends_on: [3, 5] }
-last_updated: 2026-08-19T17:15:00-0600
+  - { n: 7, title: "Roles de Modelo y Routing por Intención (default/smol/commit + fallback chains)", files: [src/settings.ts, package.json, src/providers/, webview/components/ModelPanel.tsx, webview/components/Composer.tsx], depends_on: [] }
+  - { n: 8, title: "Advisor en Vivo con WATCHDOG.md (revisor por turno, severidades, emission guard)", files: [src/advisor/, webview/components/Turn.tsx, webview/components/Composer.tsx, webview/types.ts], depends_on: [7] }
+  - { n: 9, title: "Búsqueda Web Nativa con Piso Keyless (web_search builtin, cadena de backends)", files: [src/tools/frida-web-search/, package.json], depends_on: [] }
+  - { n: 10, title: "Edición Hashline (anclas por hash de contenido, port del paquete MIT)", files: [src/tools/frida-hashline/, src/extension.ts], depends_on: [] }
+  - { n: 11, title: "Agent Hub — Supervisión de Subagentes (roster vivo, steer, revive, kill)", files: [webview/components/AgentHub.tsx, src/tools/frida-subagents/, webview/App.tsx], depends_on: [6] }
+  - { n: 12, title: "TTSR — Reglas de Stream (regex/AST → abort + inyecta + reintenta)", files: [src/ttsr/, src/extension.ts], depends_on: ["fix #85/#90/#96"] }
+  - { n: 13, title: "Extensiones Menores (memoria 2-fase, conflict://, dictado 🎤, magic keywords)", files: [src/tools/frida-hermes-memory/, src/worktree.ts, webview/components/Composer.tsx], depends_on: [7] }
+last_updated: 2026-08-22T20:00:00-0600
 last_updated_by: Edgar F. Fuentes Perea
 ---
 
@@ -238,6 +245,199 @@ Esta hoja de ruta establece la adopción gradual de la identidad visual y patron
 
 ---
 
+## 3-B. Fases 7–13: Capacidades del Harness (inspiradas en oh-my-pi)
+
+> Fuente: investigación competitiva 2026-08-22 contra fuentes primarias de
+> [`can1357/oh-my-pi`](https://github.com/can1357/oh-my-pi) (fork de pi-mono, MIT) — ver
+> [research/2026-08-22_oh-my-pi-vs-frida.md](../research/2026-08-22_oh-my-pi-vs-frida.md).
+> Tesis adoptada: **el harness —no el modelo— mueve las métricas** (edición confiable,
+> routing por intención, revisión en vivo, reglas oportunas). Frida ya ganó en host UX
+> (webview) y corporativo (Enterprise/AIDD/permission-system); estas fases atacan el delta.
+
+---
+
+### Fase 7: Roles de Modelo y Routing por Intención
+
+**Objetivo**: Pasar de "un modelo activo con cambio manual" a roles que enrutan trabajo
+por intención, con cadenas de resiliencia. Base habilitadora de las Fases 8, 13 y de la
+consolidación de memoria barata.
+
+#### Entregables
+
+1. **Roles iniciales** (`frida.modelRoles.*` en settings):
+   - `default` — el modelo principal actual.
+   - `smol` — subagents, extracciones de memoria, resúmenes (default: Ollama local, costo 0).
+   - `commit` — changelogs/commits (default: mismo que default).
+2. **Fallback chain por rol**: `Enterprise → Ollama` (429/quota → siguiente en la cadena;
+restauración al enfriarse). Prueba TDD del resolvedor con catálogo simulado.
+3. **UI**: selector de rol en `Composer.tsx` junto al selector de modelo; pestaña Roles en
+`ModelPanel.tsx` con asignación por rol (incluye estado "sin configurar → hereda default").
+4. **Atribución**: session-stats y usage reportan por rol.
+
+#### Criterios de Éxito
+
+- Un subagent lanzado con rol `smol` usa Ollama sin tocar cuota Enterprise.
+- Al fallar Enterprise (simulado en test), el turno cae a Ollama y se restaura después.
+- Suite verde, tsc ×2, build OK.
+
+---
+
+### Fase 8: Advisor en Vivo con WATCHDOG.md
+
+**Objetivo**: Un modelo revisor leyendo el **delta** de cada turno del agente principal,
+inyectando notas con severidad y guard anti-ruido. Port del patrón advisor/watchdog de OMP
+adaptado a la webview y a la cultura de issues de Frida.
+
+Dependencia: Fase 7 (el advisor corre en el rol `smol` de Ollama, costo 0).
+
+#### Entregables
+
+1. **Runtime advisor** (`src/advisor/`): sesión propia (contexto aislado, toolset
+   read/grep/glob), cursor de delta sobre el transcript principal, manejo de
+   compactación (re-prime).
+2. **Tool `advise`** con severidades: `nit` (aside no interruptivo) · `concern` (steer del
+turno en vivo) · `blocker` (interrumpe incluso tras respuesta terminal).
+3. **Emission guard** (port del diseño OMP): normalización NFKC, filtro de frases vacías
+("lgtm", "ok"), dedupe exacto FIFO, máx 1 nota por update.
+4. **`WATCHDOG.md`**: descubrimiento user-level + project-level (misma convención que
+AGENTS.md) con prioridades de revisión SOLO del advisor (es-MX, `Refs #N`, tokens
+`--vscode-*`, TDD).
+5. **UI webview**: tarjetas de nota embebidas en `Turn.tsx` (borde ámbar/rojo por
+severidad, estilo chat-notice), toggle advisor en Composer, `/advisor status` con costo/tokens.
+6. **Persistencia**: `__advisor.jsonl` por sesión (uso atribuido en usage dashboard).
+
+#### Criterios de Éxito
+
+- Con advisor activo, una violación de regla (p. ej. commit sin `Refs #N`) produce una nota
+`concern` visible en el turno sin duplicarse en updates siguientes.
+- El costo del advisor se reporta separado y el toggle lo apaga sin reinicio de ventana.
+
+---
+
+### Fase 9: Búsqueda Web Nativa con Piso Keyless
+
+**Objetivo**: `web_search` builtin con cadena de backends y piso sin API key (la sesión de
+research 2026-08-22 quedó coja sin keys; duckduckgo/startpage habrían funcionado).
+
+#### Entregables
+
+1. **Tool `web_search`** host-side: cadena `provider configurado → backends con key →
+backends keyless (duckduckgo/startpage)`; resultados rankeados con URL+snippet.
+2. **Extracción site-aware básica** en `web_fetch`: GitHub (ya vía API), npm, docs oficiales
+→ markdown con anchors.
+3. **Settings** por proveedor + estado en Entorno doctor ("web_search: 2/5 backends
+disponibles").
+4. **UI**: fila tool-flat en transcript (Fase 2) para web_search/web_fetch.
+
+#### Criterios de Éxito
+
+- Búsqueda funciona sin ninguna API key configurada (piso keyless).
+- La cadena degrada con mensaje claro cuando un backend falla.
+
+---
+
+### Fase 10: Edición Hashline
+
+**Objetivo**: Port del paquete MIT `@oh-my-pi/hashline` como variante del edit: anclas por
+hash de contenido (`[PATH#TAG]`), rechazo de ediciones rancias ANTES de escribir,
+anclas de bloque tree-sitter. Los números de OMP (Grok Code Fast 6.7%→68.3% éxito;
+Grok 4 Fast −61% tokens) lo hacen el mayor multiplicador calidad/token.
+
+#### Entregables
+
+1. **Port del core** (`src/tools/frida-hashline/`): parser/applier de la gramática
+   (`PUT N.=M:`, `CUT N*`, registros, `MV`), snapshot tags de 4 hex, recovery unívoco.
+2. **Integración con read/edit**: read/grep publican tags de snapshot; edit en modo hashline
+los exige; edición fuera de rango visto se rechaza con guía de re-lectura.
+3. **Selección de modo** (`resolveEditMode`): hashline default, `replace` de fallback por
+modelo — configurable por setting.
+4. **UI**: el preview de diff existente ya sirve; carta (proposed) + Accept para MV/REM.
+
+#### Criterios de Éxito
+
+- Editar un archivo modificado desde el último read se RECHAZA limpio (test con carrera
+simulada), nunca corrompe.
+- Benchmark local antes/después de tokens de edición en 3 tareas típicas.
+
+---
+
+### Fase 11: Agent Hub — Supervisión de Subagentes
+
+**Objetivo**: Tab de la webview para ver y controlar subagents en vivo: roster con estado,
+costo y actividad; transcript en tiempo real; steering; revive de parked; kill.
+
+Dependencia suave: Fase 6 (overlays armonizados).
+
+#### Entregables
+
+1. **Roster vivo** (`AgentHub.tsx`): status (running/idle/parked/aborted), modelo/rol,
+   costo, tokens, toolCalls, edad desde última actividad; vista árbol padre/hijo.
+2. **Inspector**: transcript en vivo del subagent (tail del JSONL), tool actual y args,
+   uso de contexto.
+3. **Controles**: input de steering (usa el prompt path normal → queda persistido), revive
+   de parked, kill con confirmación (sin abortar la sesión padre).
+4. **Descubrimiento al resumir**: JSONL de subagents de sesiones previas → filas parked.
+
+#### Criterios de Éxito
+
+- Steer en caliente a un subagent corriendo desde la UI, visible en su transcript.
+- Kill no aborta la sesión principal y el roster refleja el tombstone.
+
+---
+
+### Fase 12: TTSR — Reglas de Stream
+
+**Objetivo**: Reglas de proyecto que DUERMEN hasta que el modelo las viola: match
+regex/AST sobre el stream en vivo → abort del parcial → inyección
+`<system-interrupt>` → reintento desde el mismo punto. Cero context tax por turno.
+
+**Prerrequisito bloqueante**: reparar el clúster de abort (#85, #90, #96 — abortRun
+sobre undefined y run escapado). OMP demuestra que abort limpio es la base de TTSR.
+
+#### Entregables
+
+1. **Fix previo**: issues #85/#90/#96 (abort consistente en chat/workflow/detached).
+2. **TtsrManager**: reglas con `condition` (regex) y `astCondition` (ast-grep vía
+   pi-lens), scope (texto/thinking/toolargs), `repeatMode` once/after-gap.
+3. **Coordinator**: monitoreo de deltas → abort acotado al tool-call ofensor → descarte
+   del parcial (`contextMode: discard`) → inyección → `continue()`; guards de carrera
+   (retry token + generación).
+4. **Reglas builtin Frida**: es-MX, `Refs #N` (no `Closes #N`), tokens `--vscode-*` en UI,
+TDD sin marcar completo.
+5. **Persistencia**: `ttsr_injection` en la sesión (sobrevive resume/compactación).
+6. **UI**: tarjeta TTSR-notification (ámbar) en Turn.tsx; gestión de reglas en Settings.
+
+#### Criterios de Éxito
+
+- Un commit sin `Refs #N` en un repo con la regla activa se aborta mid-stream y se
+reintenta con el recordatorio inyectado.
+- Sin reglas violadas, el costo por turno es idéntico al baseline (0 tax).
+
+---
+
+### Fase 13: Extensiones Menores
+
+**Objetivo**: Capacidades de menor alcance que completan la adopción selectiva.
+
+#### Entregables
+
+1. **Memoria 2-fase sobre hermes-memory**: extracción por sesión (rol smol) →
+   consolidación cruzada (`MEMORY.md` + summary + lecciones) inyectada al arranque con
+   cap de tokens; descubrimiento en background con leases.
+2. **`conflict://N` en worktrees**: cada conflicto de merge como URL resoluble con
+   `@theirs/@ours/@base` (bulk `conflict://*`); integra con `src/worktree.ts` y la guía
+   de worktrees.
+3. **Dictado 🎤 (#95)**: port del crate MIT `pi-voice` (captura, Opus) para STT local en el
+   Composer — cierra el issue existente.
+4. **Magic keywords**: `ultrathink` (thinking máximo), `orchestrate` (subagent_gate),
+   `workflowz` (frida-extensible-workflows) — match solo en prosa, nunca en código/paths.
+
+#### Criterios de Éxito
+
+- Cada ítem con su test TDD y su issue propio vinculado; sin regresiones.
+
+---
+
 ## 4. Matriz de Compatibilidad y Verificación Visual
 
 | Elemento | Tema Oscuro (Dark+) | Tema Claro (Light+) | Alto Contraste | Reduced Motion |
@@ -258,3 +458,10 @@ Esta hoja de ruta establece la adopción gradual de la identidad visual y patron
 - [x] **Fase 4 (Footer — Input Stack, Composer y Border Beam)**: `.chat-input-stack` con borde unificado, border beam `.working` animado con conic-gradient, botón circular Submit/Abort (↑/■) y toolbars integradas (`98a8b65`).
 - [x] **Fase 5 (Footer — Paneles Dockeados y Followups)**: `Followups.tsx` con reglas contextuales inteligentes en `followup-rules.ts` y chips clicables (`d693f07`).
 - [x] **Fase 6 (Header, Overlays y Botón Scroll-to-Bottom)**: `WorkspaceBar` modernizado con Codicons y botón flotante `.jump-bottom` (`c01d332`).
+- [ ] **Fase 7 (Roles de Modelo y Routing)** — habilitadora: smol→Ollama, fallback Enterprise→Ollama.
+- [ ] **Fase 8 (Advisor en Vivo + WATCHDOG.md)** — depende de 7.
+- [ ] **Fase 9 (web_search Nativo Keyless)**.
+- [ ] **Fase 10 (Edición Hashline)**.
+- [ ] **Fase 11 (Agent Hub)** — depende de 6 (ya lista).
+- [ ] **Fase 12 (TTSR)** — bloqueada por el clúster de abort #85/#90/#96.
+- [ ] **Fase 13 (Menores: memoria 2-fase, conflict://, dictado #95, magic keywords)** — depende de 7.
