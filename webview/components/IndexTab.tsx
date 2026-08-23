@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Codicon } from "./Codicon";
-import type { OutMessage, State } from "../types";
+import type { CodebaseIndexUiState, OutMessage, State } from "../types";
 
 /** Formatea segundos como m:ss (el reloj de la barra de progreso). */
 function fmtElapsed(totalSec: number): string {
@@ -207,6 +207,357 @@ export function StopIndexDialog({
 	);
 }
 
+/** Proveedores seleccionables (#116/#117). */
+export type EmbProviderId =
+	| "auto"
+	| "frida-enterprise"
+	| "ollama"
+	| "openai"
+	| "custom";
+
+/** Estado de semáforo por proveedor (#117). */
+interface EmbCardState {
+	id: "frida-enterprise" | "ollama" | "openai" | "custom";
+	name: string;
+	icon: string;
+	/** ok=verde · warn=ámbar · error=rojo · neutral=gris (custom) */
+	level: "ok" | "warn" | "error" | "neutral";
+	label: string;
+}
+
+const EMB_MODELS: Record<string, string[]> = {
+	"frida-enterprise": ["azure-embeddings-default"],
+	ollama: ["nomic-embed-text", "mxbai-embed-large"],
+	openai: ["text-embedding-3-small", "text-embedding-3-large"],
+};
+
+const EMB_NAMES: Record<string, string> = {
+	"frida-enterprise": "Frida Enterprise",
+	ollama: "Ollama Local",
+	openai: "OpenAI API",
+	custom: "Endpoint Custom",
+};
+
+const EMB_CARD_IDS = [
+	"frida-enterprise",
+	"ollama",
+	"openai",
+	"custom",
+] as const;
+
+/** Tarjeta individual de proveedor (#117). Extraída para bajar complejidad. */
+function EmbProviderCard({
+	id,
+	st,
+	selected,
+	result,
+	modelOpts,
+	model,
+	locking,
+	enterpriseAuthed,
+	customBaseUrl,
+	copiedOllama,
+	onPing,
+	onSelect,
+	onLogin,
+	onCopyOllama,
+}: {
+	id: (typeof EMB_CARD_IDS)[number];
+	st: EmbCardState;
+	selected: boolean;
+	result?: { ok: boolean; latencyMs?: number; dimensions?: number; error?: string };
+	modelOpts?: string[];
+	model?: string;
+	locking: boolean;
+	enterpriseAuthed: boolean;
+	customBaseUrl?: string;
+	copiedOllama: boolean;
+	onPing: (provider: EmbCardState["id"], model?: string) => void;
+	onSelect: (provider: EmbProviderId, model?: string) => void;
+	onLogin: (provider: string) => void;
+	onCopyOllama: () => void;
+}) {
+	const badgeCls =
+		st.level === "ok" ? "is-ok" : st.level === "warn" ? "is-warn" : "is-error";
+	const stop = (fn: () => void) => (e: { stopPropagation(): void }) => {
+		e.stopPropagation();
+		fn();
+	};
+	return (
+		<div
+			className={`cfg-env-card ${selected ? "is-installed" : ""} ci-emb-card`}
+			onClick={() => !locking && onSelect(id)}
+		>
+			<div className="ci-emb-head">
+				<Codicon name={st.icon} size={15} />
+				<span className="ci-emb-name">{st.name}</span>
+				{st.level === "neutral" ? (
+					<span className="cfg-env-badge">{st.label}</span>
+				) : (
+					<span className={`cfg-env-badge ${badgeCls}`}>{st.label}</span>
+				)}
+				{selected && <span className="cfg-env-badge is-ok">Activo</span>}
+			</div>
+			<div className="ci-emb-desc">
+				{id === "frida-enterprise" && "Endpoint corporativo con la sesión OAuth de Frida."}
+				{id === "ollama" && "Privacidad total en tu máquina; sin costo por token."}
+				{id === "openai" && "API key gestionada en Frida (SecretStorage)."}
+				{id === "custom" && "vLLM, LiteLLM o servidores OpenAI-compatible."}
+			</div>
+			<div className="ci-emb-controls">
+				{modelOpts && modelOpts.length > 0 ? (
+					<select
+						className="bar-select"
+						value={model ?? modelOpts[0]}
+						disabled={locking}
+						onChange={(e) => {
+							e.stopPropagation();
+							onSelect(id, e.target.value);
+						}}
+					>
+						{modelOpts.map((m) => (
+							<option key={m} value={m}>
+								{m}
+							</option>
+						))}
+					</select>
+				) : id === "custom" ? (
+					<span className="ci-emb-hint">{customBaseUrl || "(settings)"}</span>
+				) : null}
+				{id === "frida-enterprise" && !enterpriseAuthed && (
+					<button
+						type="button"
+						className="model-diff-btn secondary"
+						onClick={stop(() => onLogin("frida-enterprise"))}
+					>
+						Iniciar sesión
+					</button>
+				)}
+				{id === "ollama" && (
+					<button
+						type="button"
+						className={`model-diff-btn secondary ${copiedOllama ? "copied" : ""}`}
+						onClick={stop(onCopyOllama)}
+					>
+						{copiedOllama ? "¡Copiado!" : "ollama pull…"}
+					</button>
+				)}
+				<button
+					type="button"
+					className="ci-emb-ping"
+					onClick={stop(() => onPing(id, model))}
+				>
+					<Codicon name="radio-tower" size={12} /> Probar conexión
+				</button>
+			</div>
+			{result && (
+				<div className={`ci-emb-result ${result.ok ? "is-ok" : "is-error"}`}>
+					{result.ok ? (
+						<>
+							<Codicon name="pass" size={12} /> {result.latencyMs}ms ·{" "}
+							{result.dimensions}d
+						</>
+					) : (
+						<>
+							<Codicon name="error" size={12} /> {result.error}
+						</>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+/** Sección MOTOR DE EMBEDDINGS (#117 Fase B): tarjetas interactivas con
+ *  semáforo, selector, ping y candado cuando el índice ya existe. */
+export function EmbeddingsEngine({
+	ci,
+	ping,
+	locking,
+	onPing,
+	onSelect,
+	onLogin,
+	onCopyOllama,
+	copiedOllama,
+	onOpenChangeDialog,
+}: {
+	ci: CodebaseIndexUiState;
+	ping?: { provider: string; ok: boolean; latencyMs?: number; dimensions?: number; error?: string } | undefined;
+	locking: boolean;
+	onPing: (provider: EmbCardState["id"], model?: string) => void;
+	onSelect: (provider: EmbProviderId, model?: string) => void;
+	onLogin: (provider: string) => void;
+	onCopyOllama: () => void;
+	copiedOllama: boolean;
+	onOpenChangeDialog: () => void;
+}) {
+	const cfg = ci.config;
+	const selected = cfg?.provider ?? "auto";
+
+	const cardState = (id: EmbCardState["id"]): EmbCardState => {
+		const meta = EMB_NAMES[id] ?? id;
+		if (id === "frida-enterprise") {
+			return {
+				id,
+				name: meta,
+				icon: "organization",
+				level: cfg?.enterpriseAuthed ? "ok" : "warn",
+				label: cfg?.enterpriseAuthed ? "Conectado" : "Requiere iniciar sesión",
+			};
+		}
+		if (id === "ollama") {
+			return { id, name: meta, icon: "device-desktop", level: "neutral", label: "100% Local" };
+		}
+		if (id === "openai") {
+			return {
+				id,
+				name: meta,
+				icon: "cloud",
+				level: cfg?.openaiAuthed ? "ok" : "error",
+				label: cfg?.openaiAuthed ? "API key lista" : "Sin API key",
+			};
+		}
+		return { id, name: meta, icon: "settings", level: "neutral", label: "Configurable" };
+	};
+
+	const currentModel = (id: EmbCardState["id"]): string | undefined =>
+		id === "frida-enterprise" ? cfg?.fridaEnterpriseModel : id === "ollama" ? cfg?.ollamaModel : id === "openai" ? cfg?.openaiModel : cfg?.customModel;
+
+	return (
+		<div className="ci-emb-wrap">
+			{locking && (
+				<div className="ci-emb-lock">
+					<Codicon name="lock" size={13} />
+					<span>
+						🔒 Bloqueado · Indexado con{" "}
+						<strong>
+							{(PROVIDER_LABELS[ci.indexMeta?.provider ?? ""] ??
+								ci.indexMeta?.provider)} ·{" "}
+							{ci.indexMeta?.model}
+						</strong>
+					</span>
+					<button
+						type="button"
+						className="model-diff-btn secondary ci-emb-change-btn"
+						onClick={onOpenChangeDialog}
+					>
+						Cambiar motor de embeddings…
+					</button>
+				</div>
+			)}
+
+			<div className="ci-emb-cards">
+				{EMB_CARD_IDS.map((id) => (
+					<EmbProviderCard
+						key={id}
+						id={id}
+						st={cardState(id)}
+						selected={selected === id}
+						result={ping?.provider === id ? ping : undefined}
+						modelOpts={EMB_MODELS[id]}
+						model={currentModel(id)}
+						locking={locking}
+						enterpriseAuthed={!!cfg?.enterpriseAuthed}
+						customBaseUrl={cfg?.customBaseUrl}
+						copiedOllama={copiedOllama}
+						onPing={onPing}
+						onSelect={onSelect}
+						onLogin={onLogin}
+						onCopyOllama={onCopyOllama}
+					/>
+				))}
+			</div>
+
+			<div className="ci-emb-auto">
+				<label className="ci-emb-auto-label">
+					<input
+						type="radio"
+						name="ci-emb-provider"
+						checked={selected === "auto"}
+						disabled={locking}
+						onChange={() => onSelect("auto")}
+					/>
+					Automático (Ollama → Copilot → …)
+				</label>
+				<span className="ci-engine-hint">El motor Auto elige el primer proveedor disponible al indexar.</span>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * #117 — Diálogo de cambio de motor con reindexación obligatoria.
+ * Contrato de StopIndexDialog/ModelConfirmDialog: Esc cancela, Enter confirma.
+ */
+export function EmbeddingsChangeDialog({
+	current,
+	target,
+	onConfirm,
+	onCancel,
+}: {
+	current?: { provider: string; model?: string };
+	target: { provider: string; model?: string };
+	onConfirm: () => void;
+	onCancel: () => void;
+}) {
+	return (
+		<div
+			className="model-diff-overlay"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Cambiar motor de embeddings"
+			onKeyDown={(e) => {
+				if (e.key === "Escape") {
+					e.preventDefault();
+					onCancel();
+				}
+				if (e.key === "Enter") {
+					e.preventDefault();
+					onConfirm();
+				}
+			}}
+		>
+			<div className="ci-stop-card">
+				<div className="ci-stop-title">
+					<Codicon name="debug-restart" size={16} /> Cambiar motor de embeddings
+				</div>
+				{/* Comparativa Actual → Nuevo (badge estilo model-diff) */}
+				<div className="model-diff-compare">
+					<div className="model-diff-col">
+						<span className="model-diff-col-badge">Actual</span>
+						<span className="ci-emb-cmp-model">
+							{current
+								? `${PROVIDER_LABELS[current.provider] ?? EMB_NAMES[current.provider] ?? current.provider}${current.model ? ` · ${current.model}` : ""}`
+								: "Auto"}
+						</span>
+					</div>
+					<Codicon name="arrow-right" size={14} />
+					<div className="model-diff-col">
+						<span className="model-diff-col-badge">Nuevo</span>
+						<span className="ci-emb-cmp-model">
+							{EMB_NAMES[target.provider] ?? target.provider}
+							{target.model ? ` · ${target.model}` : ""}
+						</span>
+					</div>
+				</div>
+				<div className="ci-stop-text">
+					Cambiar de modelo <strong>invalidará los vectores existentes</strong> en
+				<code> .codebase-index/</code>. Se requiere una reconstrucción total para
+					habilitar la búsqueda semántica.
+				</div>
+				<div className="model-diff-actions">
+					<button type="button" className="model-diff-btn secondary" onClick={onCancel}>
+						Cancelar
+				</button>
+				<button type="button" className="model-diff-btn primary" onClick={onConfirm}>
+						<Codicon name="debug-restart" size={13} /> Cambiar y Reconstruir Índice
+				</button>
+			</div>
+		</div>
+	</div>
+	);
+}
+
 export function IndexTab({
 	state,
 	post,
@@ -239,6 +590,19 @@ export function IndexTab({
 	const [filesQuery, setFilesQuery] = useState("");
 	// #113 — confirmación para detener la indexación (recarga de ventana)
 	const [stopOpen, setStopOpen] = useState(false);
+	// #117 — target del modal de cambio de motor: undefined=cerrado,
+	// null=abierto desde el botón (sin selección previa), objeto=elección.
+	const [changeTarget, setChangeTarget] = useState<
+		{
+			provider:
+				| "auto"
+				| "frida-enterprise"
+				| "ollama"
+				| "openai"
+				| "custom";
+			model?: string;
+		} | null | undefined
+	>(undefined);
 	useEffect(() => {
 		if (isInstalled && !idxFiles) {
 			post({ type: "codebase_index_action", action: "files" });
@@ -628,91 +992,52 @@ export function IndexTab({
 				</div>
 			)}
 
-			{/* Motor de embeddings */}
-			<div className="ci-section-group">
-				<div className="cfg-section">
-					<Codicon name="sparkle" size={13} /> MOTOR DE EMBEDDINGS (VECTORIZACIÓN)
-				</div>
-				<div className="ci-engine-card">
-					<div className="ci-engine-head">
-						<div className="ci-engine-provider-badge">
-							<Codicon name="server-process" size={14} />
-							<span>
-								Proveedor Activo: <strong>{providerMode.toUpperCase()}</strong>
-							</span>
-						</div>
-						<span className="ci-engine-hint">
-							Configurable en settings: `frida.codebaseIndex.embeddings.*`
-						</span>
+			{/* #117 (Fase B) — Motor de embeddings: tarjetas interactivas */}
+			{isInstalled && ci && (
+				<div className="ci-section-group">
+					<div className="cfg-section">
+						<Codicon name="sparkle" size={13} /> MOTOR DE EMBEDDINGS (VECTORIZACIÓN)
 					</div>
-
-					<div className="ci-engine-options">
-						{/* Opción Ollama */}
-						<div className="ci-option-row">
-							<div className="ci-option-icon">
-								<Codicon name="device-desktop" size={15} />
-							</div>
-							<div className="ci-option-content">
-								<div className="ci-option-header">
-									<span className="ci-option-name">1. Ollama Local (Recomendado)</span>
-									<span className="ci-option-tag is-free">100% Local & Gratis</span>
-								</div>
-								<div className="ci-option-desc">
-									Sin costo por token, sin latencia de red y con privacidad total en tu
-									máquina.
-								</div>
-								<div className="ci-cmd-snippet">
-									<code>ollama pull nomic-embed-text</code>
-									<button
-										type="button"
-										className={`ci-copy-btn ${copiedOllama ? "copied" : ""}`}
-										onClick={handleCopyOllama}
-										title="Copiar comando de descarga de modelo"
-									>
-										<Codicon name={copiedOllama ? "check" : "copy"} size={12} />
-										<span>{copiedOllama ? "¡Copiado!" : "Copiar"}</span>
-									</button>
-								</div>
-							</div>
-						</div>
-
-						{/* Opción OpenAI */}
-						<div className="ci-option-row">
-							<div className="ci-option-icon">
-								<Codicon name="cloud" size={15} />
-							</div>
-							<div className="ci-option-content">
-								<div className="ci-option-header">
-									<span className="ci-option-name">2. OpenAI Embeddings API</span>
-									<span className="ci-option-tag">Cloud</span>
-								</div>
-								<div className="ci-option-desc">
-									Usa el modelo <code>text-embedding-3-small</code> con la API key de
-									OpenAI ya configurada en Frida.
-								</div>
-							</div>
-						</div>
-
-						{/* Opción Custom */}
-						<div className="ci-option-row">
-							<div className="ci-option-icon">
-								<Codicon name="gear" size={15} />
-							</div>
-							<div className="ci-option-content">
-								<div className="ci-option-header">
-									<span className="ci-option-name">
-										3. Endpoint Custom (OpenAI-compatible)
-									</span>
-									<span className="ci-option-tag">Avanzado</span>
-								</div>
-								<div className="ci-option-desc">
-									Compatible con vLLM, LiteLLM o servidores locales en tu red privada.
-								</div>
-							</div>
-						</div>
-					</div>
+					<EmbeddingsEngine
+						ci={ci}
+						ping={state.codebaseIndexPing}
+						locking={!!ci.indexMeta}
+						onPing={(provider, model) =>
+							post({ type: "codebase_index_ping", provider, model })
+						}
+						onSelect={(provider, model) => {
+							if (ci.indexMeta) {
+								// Bloqueado: la selección pasa por el modal de reconstrucción
+								setChangeTarget({ provider, model });
+							} else {
+								post({ type: "codebase_index_select", provider, model });
+							}
+						}}
+						onLogin={(provider) => post({ type: "login_provider", provider })}
+						onCopyOllama={handleCopyOllama}
+						copiedOllama={copiedOllama}
+						onOpenChangeDialog={() => setChangeTarget(null)}
+					/>
 				</div>
-			</div>
+			)}
+
+			{/* #117 — modal de cambio de motor (reindexación obligatoria) */}
+			{ci?.indexMeta && changeTarget && (
+				<EmbeddingsChangeDialog
+					current={{ provider: ci.indexMeta.provider, model: ci.indexMeta.model }}
+					target={changeTarget ?? { provider: "ollama" }}
+					onConfirm={() => {
+						post({
+							type: "codebase_index_select",
+							provider: changeTarget?.provider ?? "ollama",
+							model: changeTarget?.model,
+							rebuild: true,
+						});
+						setChangeTarget(undefined);
+					}}
+					onCancel={() => setChangeTarget(undefined)}
+				/>
+			)}
 
 			{/* Matriz de Tools activas para el agente */}
 			<div className="ci-section-group">

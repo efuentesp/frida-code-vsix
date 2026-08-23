@@ -245,14 +245,14 @@ export function syncCodebaseIndexConfig(
 /** Credencial OAuth de Frida Enterprise leída de <agentDir>/auth.json
  *  (persistida por pi-ai tras el login; clave "frida-enterprise"). #116 */
 export interface EnterpriseEmbeddingsCredential {
-	/** COMPATIBLE_API_URL (sin /v1). */
-	baseUrl: string;
-	/** idToken (access) — Bearer del endpoint compatible. */
-	token: string;
-	/** Epoch ms de expiración del access token. */
-	expiresMs: number;
-	/** true si el access ya expiró (refresh solo lo hace pi-ai al usar el provider). */
-	expired: boolean;
+  /** COMPATIBLE_API_URL (sin /v1). */
+  baseUrl: string;
+  /** idToken (access) — Bearer del endpoint compatible. */
+  token: string;
+  /** Epoch ms de expiración del access token. */
+  expiresMs: number;
+  /** true si el access ya expiró (refresh solo lo hace pi-ai al usar el provider). */
+  expired: boolean;
 }
 
 export function readEnterpriseEmbeddingsCredential(
@@ -263,7 +263,8 @@ export function readEnterpriseEmbeddingsCredential(
       fs.readFileSync(path.join(agentDir, "auth.json"), "utf8"),
     );
     const cred = (parsed as Record<string, any>)?.["frida-enterprise"];
-    const url = typeof cred?.compatibleApiUrl === "string" ? cred.compatibleApiUrl : "";
+    const url =
+      typeof cred?.compatibleApiUrl === "string" ? cred.compatibleApiUrl : "";
     const token = typeof cred?.access === "string" ? cred.access : "";
     const expiresMs = Number(cred?.expires) || 0;
     if (!url || !token || !expiresMs) return null;

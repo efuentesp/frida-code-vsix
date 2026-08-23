@@ -358,13 +358,7 @@ export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 		"auto",
 	);
 	const provider: EmbeddingsProviderSetting = (
-		[
-			"auto",
-			"frida-enterprise",
-			"ollama",
-			"openai",
-			"custom",
-		] as const
+		["auto", "frida-enterprise", "ollama", "openai", "custom"] as const
 	).includes(rawProvider as EmbeddingsProviderSetting)
 		? (rawProvider as EmbeddingsProviderSetting)
 		: "auto";

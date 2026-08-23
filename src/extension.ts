@@ -588,6 +588,9 @@ export async function activate(
 	// Async (SQLite read-only): se cachea y se refresca al montar el webview
 	// y al terminar index/rebuild/status. undefined = aún no consultado.
 	let ciIndexMeta: IndexMeta | null | undefined;
+	// #117 (Fase B) — ¿hay API key de OpenAI en el SecretStorage? Caché
+	// async refrescada en webview_ready y tras guardar/borrar keys.
+	let ciOpenAiAuthed: boolean | undefined;
 	// Tab pendiente del comando frida.codebaseIndex: el post() inmediato se
 	// pierde en arranque frío (el listener del webview monta en webview_ready).
 	let pendingSettingsTab: string | undefined;
@@ -609,8 +612,20 @@ export async function activate(
 				indexMeta: ciIndexMeta ?? undefined,
 				config: {
 					provider: cfg.provider,
+					// Fase B (#117): señales de autenticación para los semáforos de
+					// las tarjetas de proveedor (enterprise lee auth.json; openai
+					// lee el SecretStorage de forma síncrona-cached — best-effort).
+					enterpriseAuthed: (() => {
+						const c = readEnterpriseEmbeddingsCredential(defaultAgentDir());
+						return !!c && !c.expired;
+					})(),
+					fridaEnterpriseModel: cfg.fridaEnterpriseModel,
+					ollamaModel: cfg.ollamaModel,
+					openaiModel: cfg.openaiModel,
+					openaiAuthed: ciOpenAiAuthed,
 					customBaseUrl: cfg.customBaseUrl || undefined,
 					customModel: cfg.customModel || undefined,
+					customDimensions: cfg.customDimensions || undefined,
 				},
 			},
 		});
@@ -2462,6 +2477,13 @@ export async function activate(
 				postCodebaseIndexState();
 				// #114 — metadata real del motor del índice (async, read-only)
 				void refreshCiIndexMeta();
+				// #117 — semáforo OpenAI de las tarjetas (async, best-effort)
+				void Promise.resolve(context.secrets.get("frida.openaiKey"))
+					.then((k) => {
+						ciOpenAiAuthed = !!k;
+						postCodebaseIndexState();
+					})
+					.catch(() => {});
 				// #20 — re-envía el último snapshot del goal si el webview montó
 				// después del evento (cacheado en postGoalState).
 				if (lastGoalState !== undefined) {
@@ -2978,7 +3000,7 @@ export async function activate(
 					| "rebuild"
 					| "status"
 					| "files"
-					| "stop";				// #112 — consulta read-only de archivos indexados: no es una acción
+					| "stop"; // #112 — consulta read-only de archivos indexados: no es una acción
 				// «busy» (no deshabilita botones ni arranca reloj).
 				if (action === "files") {
 					try {
@@ -3108,9 +3130,8 @@ export async function activate(
 							type: "codebase_index_ping_result",
 							provider,
 							ok: false,
-							error:
-								"Sin sesión de Frida Enterprise — inicia sesión primero",
-							});
+							error: "Sin sesión de Frida Enterprise — inicia sesión primero",
+						});
 						break;
 					}
 					if (cred.expired) {
@@ -3118,18 +3139,18 @@ export async function activate(
 							type: "codebase_index_ping_result",
 							provider,
 							ok: false,
-							error:
-								"Sesión de Frida Enterprise expirada — vuelve a iniciar sesión",
-							});
+							error: "Sesión de Frida Enterprise expirada — vuelve a iniciar sesión",
+						});
 						break;
 					}
 					baseUrl = `${cred.baseUrl}/v1`;
 					model = model || cfg.fridaEnterpriseModel;
 					apiKey = cred.token;
 				} else if (provider === "ollama") {
-					const host = (
-						process.env.OLLAMA_HOST || "http://localhost:11434"
-					).replace(/\/+$/, "");
+					const host = (process.env.OLLAMA_HOST || "http://localhost:11434").replace(
+						/\/+$/,
+						"",
+					);
 					baseUrl = host.endsWith("/v1") ? host : `${host}/v1`;
 					model = model || cfg.ollamaModel;
 				} else if (provider === "openai") {
@@ -3140,7 +3161,7 @@ export async function activate(
 							provider,
 							ok: false,
 							error: "Sin API key de OpenAI guardada en Frida (Configuración)",
-							});
+						});
 						break;
 					}
 					baseUrl = "https://api.openai.com/v1";
@@ -3155,7 +3176,7 @@ export async function activate(
 							ok: false,
 							error:
 								"Endpoint custom incompleto — configura baseUrl y modelo en settings",
-							});
+						});
 						break;
 					}
 					baseUrl = cfg.customBaseUrl;
@@ -3177,6 +3198,63 @@ export async function activate(
 					}
 				}
 				post({ type: "codebase_index_ping_result", provider, ...res });
+				break;
+			}
+			// #117 (Fase B) — selección de proveedor/modelo: persiste el setting
+			// de VS Code, materializa config.json vía sync (Fase A) y — con
+			// rebuild=true (modal) — dispara la reconstrucción total del índice.
+			case "codebase_index_select": {
+				const cfg = vscode.workspace.getConfiguration("frida");
+				const target = vscode.ConfigurationTarget.Global;
+				await cfg.update(
+					"codebaseIndex.embeddings.provider",
+					msg.provider,
+					target,
+				);
+				if (msg.model) {
+					const key =
+						msg.provider === "frida-enterprise"
+							? "codebaseIndex.embeddings.fridaEnterprise.model"
+							: msg.provider === "ollama"
+								? "codebaseIndex.embeddings.ollama.model"
+								: "codebaseIndex.embeddings.openai.model";
+					if (key) await cfg.update(key, msg.model, target);
+				}
+				// sync config.json del upstream con la nueva elección
+				const fresh = readCodebaseIndexConfig();
+				if (msg.provider !== "auto" && msg.provider !== "openai") {
+					let enterpriseDimensions = 0;
+						if (msg.provider === "frida-enterprise") {
+						// dimensions verificadas por el último ping exitoso guardadas
+						// en el config actual (si existen) — el ping las deduce.
+						const prev = await readIndexMeta(workspaceCwd());
+						enterpriseDimensions = prev?.dimensions ?? 0;
+					}
+					const cred =
+						msg.provider === "frida-enterprise"
+							? readEnterpriseEmbeddingsCredential(defaultAgentDir())
+							: undefined;
+					syncCodebaseIndexConfig(workspaceCwd(), {
+						provider: msg.provider,
+						enterpriseBaseUrl: cred?.baseUrl,
+						enterpriseToken: cred?.token,
+						enterpriseModel: fresh.fridaEnterpriseModel,
+						enterpriseDimensions,
+						ollamaModel: fresh.ollamaModel,
+						openaiModel: fresh.openaiModel,
+						customBaseUrl: fresh.customBaseUrl,
+						customModel: fresh.customModel,
+						customDimensions: fresh.customDimensions,
+					});
+				}
+				postCodebaseIndexState();
+				if (msg.rebuild) {
+					// Reutiliza el flujo existente de la acción rebuild
+					void handleWebviewMessage({
+						type: "codebase_index_action",
+						action: "rebuild",
+					});
+				}
 				break;
 			}
 			case "check_environment": {

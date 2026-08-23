@@ -498,11 +498,24 @@ export interface CodebaseIndexUiState {
 		chunksProcessed: number;
 		totalChunks: number;
 	} | null;
-	/** Configuración activa del motor de embeddings (#100). */
+	/** Configuración activa del motor de embeddings (#100; modelos #116). */
 	config?: {
-		provider: "auto" | "ollama" | "custom";
+		provider:
+			| "auto"
+			| "frida-enterprise"
+			| "ollama"
+			| "openai"
+			| "custom";
+		/** ¿Existe sesión OAuth de Frida Enterprise viva? (Fase B semáforo) */
+		enterpriseAuthed?: boolean;
+		fridaEnterpriseModel?: string;
+		ollamaModel?: string;
+		openaiModel?: string;
+		/** ¿Hay API key de OpenAI guardada en Frida? */
+		openaiAuthed?: boolean;
 		customBaseUrl?: string;
 		customModel?: string;
+		customDimensions?: number;
 	};
 }
 
@@ -950,13 +963,13 @@ export type InMessage =
 			latencyMs?: number;
 			dimensions?: number;
 			error?: string;
-		}
+	  }
 	| {
 			type: "codebase_index_files";
 			available: boolean;
 			files: { path: string; chunks: number; language: string }[];
 			failed: { path: string; chunks: number }[];
-		}
+	  }
 	| { type: "environment_status"; status: EnvironmentReport }
 	| { type: "environment_checking"; checking: boolean }
 	| { type: "error"; text: string };
@@ -1097,5 +1110,18 @@ export type OutMessage =
 			type: "codebase_index_ping";
 			provider: "frida-enterprise" | "ollama" | "openai" | "custom";
 			model?: string;
+	  }
+	| {
+			/** #117 Fase B — elegir proveedor/modelo: persiste settings + sync
+			 *  config.json. Con rebuild=true dispara reconstrucción (modal). */
+			type: "codebase_index_select";
+			provider:
+				| "auto"
+				| "frida-enterprise"
+				| "ollama"
+				| "openai"
+				| "custom";
+			model?: string;
+			rebuild?: boolean;
 	  }
 	| { type: "check_environment" };

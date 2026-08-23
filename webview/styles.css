@@ -9610,6 +9610,136 @@ kbd {
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 
+/* ── #117 Fase B: tarjetas interactivas de proveedores de embeddings ── */
+.ci-emb-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.ci-emb-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+	gap: 8px;
+}
+.ci-emb-card {
+	cursor: pointer;
+	padding: 10px 12px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	transition: border-color 0.1s ease;
+}
+.ci-emb-card:hover {
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+.ci-emb-card.is-installed {
+	border-color: var(--vscode-testing-iconPassed, #73c991);
+}
+.ci-emb-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.ci-emb-name {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+}
+.ci-emb-desc {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	margin-top: 4px;
+	line-height: 1.35;
+}
+.ci-emb-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+.ci-emb-controls .bar-select {
+	font-size: 11px;
+	padding: 2px 6px;
+	max-width: 170px;
+}
+.ci-emb-hint {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+.ci-emb-ping {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10.5px;
+	padding: 3px 8px;
+	border-radius: 4px;
+	background: transparent;
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+}
+.ci-emb-ping:hover {
+	/* compuesto: vence al button:hover global (regla de cascada) */
+	background: var(--vscode-list-hoverBackground);
+	color: var(--vscode-foreground);
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+.ci-emb-result {
+	margin-top: 6px;
+	font-size: 10.5px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.ci-emb-result.is-ok {
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.ci-emb-result.is-error {
+	color: var(--vscode-editorError-foreground, #f14c4c);
+}
+.ci-emb-lock {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	padding: 6px 10px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.08));
+}
+.ci-emb-lock strong {
+	color: var(--vscode-foreground);
+}
+.ci-emb-change-btn {
+	margin-left: auto;
+	padding: 2px 10px;
+	font-size: 10.5px;
+}
+.ci-emb-auto {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 11px;
+	color: var(--vscode-foreground);
+	flex-wrap: wrap;
+}
+.ci-emb-auto-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+.ci-emb-cmp-model {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 11px;
+	color: var(--vscode-foreground);
+}
+
 /* #112 — Archivos en el índice: tarjeta consultable con filtro y fallidos */
 .ci-files-card {
 	display: flex;

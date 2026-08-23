@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseAutoIndexProgress } from "../src/tools/frida-codebase-index/progress";
-import { IndexTab, StopIndexDialog } from "../webview/components/IndexTab";
-import type { State } from "../webview/types";
+import { IndexTab, StopIndexDialog, EmbeddingsEngine, EmbeddingsChangeDialog } from "../webview/components/IndexTab";
+import type { CodebaseIndexUiState, State } from "../webview/types";
 
 describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 	const baseState: State = {
@@ -75,7 +75,8 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		expect(html).toContain("Re-indexar");
 		expect(html).toContain("Reconstruir desde Cero");
 		expect(html).toContain("Ver Diagnóstico y Salud");
-		expect(html).toContain("ollama pull nomic-embed-text");
+		// #117 — el comando de descarga vive en el botón copiable de la tarjeta
+		expect(html).toContain("ollama pull…");
 		expect(html).toContain("is-active");
 	});
 
@@ -321,6 +322,117 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 			}),
 		);
 		expect(html).toContain("Auto (Ollama/OpenAI)");
+	});
+
+	describe("EmbeddingsEngine — tarjetas de proveedor (#117 Fase B)", () => {
+		const noop = () => {};
+		const mkCi = (over: Partial<CodebaseIndexUiState> = {}): CodebaseIndexUiState => ({
+			installed: true,
+			config: {
+				provider: "ollama",
+				enterpriseAuthed: false,
+				openaiAuthed: false,
+				fridaEnterpriseModel: "azure-embeddings-default",
+				ollamaModel: "nomic-embed-text",
+				openaiModel: "text-embedding-3-small",
+			},
+			...over,
+		});
+
+		it("semáforos: enterprise warn sin sesión, openai error sin key, activo en ollama", () => {
+			const html = renderToStaticMarkup(
+					React.createElement(EmbeddingsEngine, {
+						ci: mkCi(),
+						locking: false,
+						onPing: noop,
+						onSelect: noop,
+						onLogin: noop,
+						onCopyOllama: noop,
+						copiedOllama: false,
+						onOpenChangeDialog: noop,
+					}),
+			);
+			expect(html).toContain("Requiere iniciar sesión");
+			expect(html).toContain("is-warn"); // enterprise
+			expect(html).toContain("Sin API key");
+			expect(html).toContain("is-error"); // openai
+			expect(html).toContain("Iniciar sesión"); // botón login enterprise
+			expect(html).toContain("Activo"); // ollama seleccionado
+			expect(html).toContain("Probar conexión");
+		});
+
+		it("ping ok: resultado inline con latencia y dimensions", () => {
+			const html = renderToStaticMarkup(
+					React.createElement(EmbeddingsEngine, {
+						ci: mkCi(),
+						ping: {
+							provider: "ollama",
+							ok: true,
+							latencyMs: 85,
+							dimensions: 768,
+						},
+						locking: false,
+						onPing: noop,
+						onSelect: noop,
+						onLogin: noop,
+						onCopyOllama: noop,
+						copiedOllama: false,
+						onOpenChangeDialog: noop,
+					}),
+			);
+			expect(html).toContain("85ms");
+			expect(html).toContain("768d");
+			expect(html).toContain("is-ok");
+		});
+
+		it("candado: con indexMeta muestra bloqueo y selectores disabled", () => {
+			const html = renderToStaticMarkup(
+					React.createElement(EmbeddingsEngine, {
+						ci: mkCi({
+							indexMeta: {
+								provider: "github-copilot",
+								model: "text-embedding-3-small",
+								dimensions: 1536,
+							},
+						}),
+						locking: true,
+						onPing: noop,
+						onSelect: noop,
+						onLogin: noop,
+						onCopyOllama: noop,
+						copiedOllama: false,
+						onOpenChangeDialog: noop,
+					}),
+			);
+			expect(html).toContain("🔒 Bloqueado");
+			expect(html).toContain("GitHub Copilot · text-embedding-3-small");
+			expect(html).toContain("Cambiar motor de embeddings…");
+			expect(html).toContain('<select class="bar-select" disabled="">');
+		});
+	});
+
+	describe("EmbeddingsChangeDialog — modal de reconstrucción (#117 Fase B)", () => {
+		it("comparativa Actual→Nuevo + advertencia de invalidación + acciones", () => {
+			const html = renderToStaticMarkup(
+					React.createElement(EmbeddingsChangeDialog, {
+						current: {
+							provider: "github-copilot",
+							model: "text-embedding-3-small",
+						},
+						target: { provider: "ollama", model: "nomic-embed-text" },
+						onConfirm: () => {},
+						onCancel: () => {},
+					}),
+			);
+			expect(html).toContain("Actual");
+			expect(html).toContain("GitHub Copilot · text-embedding-3-small");
+			expect(html).toContain("Nuevo");
+			expect(html).toContain("Ollama Local · nomic-embed-text");
+			expect(html).toContain("invalidará los vectores existentes");
+			expect(html).toContain("reconstrucción total");
+			expect(html).toContain("Cambiar y Reconstruir Índice");
+			expect(html).toContain("Cancelar");
+		});
 	});
 
 	it("#113 — el diálogo de confirmación explica recarga e incrementalidad", () => {
