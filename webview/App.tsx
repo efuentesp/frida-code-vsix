@@ -107,7 +107,7 @@ export function App() {
 	useEffect(() => {
 		if (state.keyNeeded && !wizardVisible) setWizardVisible(true);
 	}, [state.keyNeeded, wizardVisible]);
-	const [hideThinking, setHideThinking] = useState(false);
+	const hideThinking = state.ui?.hideThinking === true;
 	const [retrySecs, setRetrySecs] = useState<number | null>(null);
 	const lastEscRef = useRef(0);
 	const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -469,17 +469,6 @@ export function App() {
 							disabled={state.busy || state.isCompacting || state.turns.length === 0}
 						>
 							<Codicon name="collapse-all" size={15} />
-						</button>
-					</Tooltip>
-					<Tooltip
-						label={hideThinking ? "Mostrar razonamiento" : "Ocultar razonamiento"}
-						side="bottom"
-					>
-						<button
-							className={"ico" + (hideThinking ? " off" : " active")}
-							onClick={() => setHideThinking((v) => !v)}
-						>
-							<Codicon name="sparkle" size={15} />
 						</button>
 					</Tooltip>
 				</span>

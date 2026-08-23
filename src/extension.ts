@@ -1213,6 +1213,7 @@ export async function activate(
 				}
 				postResources();
 				postModels();
+				postUiPrefs();
 				void postWorkspace();
 				postToolToggles();
 				postUsage(s.session);
@@ -1471,6 +1472,16 @@ export async function activate(
 				commit: rolesCfg.commit ?? null,
 				fallbackEnabled: rolesCfg.fallback != null,
 			},
+		});
+	}
+
+	/** #121 — publica preferencias de UI persistidas (Transcript). */
+	function postUiPrefs(): void {
+		post({
+			type: "ui_prefs",
+			hideThinking: vscode.workspace
+				.getConfiguration("frida")
+				.get<boolean>("ui.hideThinking", false),
 		});
 	}
 
@@ -3345,6 +3356,15 @@ export async function activate(
 					});
 					post({ type: "environment_checking", checking: false });
 				}
+				break;
+			}
+			// #121 — toggle Transcript (Configuración → Modelos): persiste y
+			// re-publica. El header ya no tiene el botón.
+			case "ui_hide_thinking_set": {
+				await vscode.workspace
+					.getConfiguration("frida")
+				.update("ui.hideThinking", !!msg.value, vscode.ConfigurationTarget.Global);
+				postUiPrefs();
 				break;
 			}
 			case "set_thinking":

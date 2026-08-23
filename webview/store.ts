@@ -538,6 +538,8 @@ export function reduce(state: State, msg: InMessage): State {
 			return { ...state, workspace: rest as WorkspaceInfo };
 		}
 
+		case "ui_prefs":
+			return { ...state, ui: { ...state.ui, hideThinking: msg.hideThinking } };
 		case "models":
 			return {
 				...state,

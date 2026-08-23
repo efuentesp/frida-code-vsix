@@ -454,6 +454,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "#121 (F7) — respaldo por turno: si el modelo del rol falla (429/cuota), el turno cae al siguiente proveedor autenticado y se restaura al enfriarse."
+				},
+				"frida.ui.hideThinking": {
+					"type": "boolean",
+					"default": false,
+					"description": "#121 — Ocultar el razonamiento (thinking) del modelo en el transcript: los turnos muestran solo la respuesta final. Se configura en Configuración → Modelos → Transcript."
 				}
 			}
 		}

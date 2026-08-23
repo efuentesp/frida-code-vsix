@@ -777,6 +777,11 @@ export interface State {
 		/** #121 (F7) — config de roles de modelo para el panel. */
 		roles?: ModelRolesUi;
 	};
+	/** #121 — preferencias de UI persistidas (Transcript). */
+	ui?: {
+		/** Ocultar el razonamiento del modelo en el transcript. */
+		hideThinking?: boolean;
+	};
 	/** #20 — snapshot del goal activo (chip 🎯 del footer); undefined = sin goal. */
 	goal?: GoalState;
 	forkPoints?: { entryId: string; text: string }[];
@@ -936,6 +941,11 @@ export type InMessage =
 			refreshErrors?: string[];
 			/** #121 (F7) — config de roles de modelo (lo que el usuario puso). */
 			roles?: ModelRolesUi;
+	  }
+	| {
+			/** #121 — preferencias de UI persistidas (Transcript). */
+			type: "ui_prefs";
+			hideThinking?: boolean;
 	  }
 	| { type: "open_models" }
 	| { type: "refresh_models" }
@@ -1148,5 +1158,11 @@ export type OutMessage =
 			smol?: { provider: string; modelId: string } | null;
 			commit?: { provider: string; modelId: string } | null;
 			fallbackEnabled?: boolean;
+	  }
+	| {
+			/** #121 — toggle de Transcript (Configuración → Modelos): ocultar el
+			 *  razonamiento del modelo en los turnos. Persistido por el host. */
+			type: "ui_hide_thinking_set";
+			value: boolean;
 	  }
 	| { type: "check_environment" };

@@ -132,6 +132,10 @@ describe("SettingsHub (Propuesta 1: Settings Editor Nativo de VS Code)", () => {
 		expect(html).toContain("Rápido (smol)");
 		expect(html).toContain("Commits (commit)");
 		expect(html).toContain("Respaldo (fallback)");
+		// #121 — toggle de Transcript (antes en el header, sin persistir)
+		expect(html).toContain("TRANSCRIPT");
+		expect(html).toContain("Mostrar razonamiento del modelo");
+		expect(html).toContain('aria-label="Mostrar razonamiento del modelo"');
 		// ya no es el stub "Próximamente"
 		expect(html).not.toContain("Próximamente: gestión completa de modelos");
 	});
