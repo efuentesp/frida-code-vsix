@@ -94,9 +94,7 @@ async function auth(): Promise<{
 			token = j.id_token;
 		}
 		const part = String(token).split(".")[1];
-		const claims = JSON.parse(
-			Buffer.from(part, "base64url").toString("utf8"),
-		);
+		const claims = JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
 		cachedToken = {
 			token,
 			identity: {
@@ -215,70 +213,163 @@ const TRIPLETS: ReadonlyArray<readonly [string, string, string]> = [
 ];
 
 describe.skipIf(!live)("E2E live: embeddings del gateway (RAG-ready)", () => {
-	it(
-		"T1 catálogo: los 4 modelos embeddings publicados, capability embeddings y SIN chat/responses",
-		async () => {
-			const { token, root } = await auth();
-			const catRes = await fetch(`${root}/v1/models`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-			expect(catRes.ok, "GET /v1/models").toBe(true);
-			const cat: any = await catRes.json();
-			const byId = new Map<string, string[]>(
-				(cat.data ?? []).map((m: any) => [
-					String(m.id),
-					Array.isArray(m.capabilities)
-						? m.capabilities.map((c: any) => String(c).toLowerCase())
-						: [],
-				]),
-			);
-			const embedIds = [...byId.entries()]
-				.filter(([, caps]) => caps.includes("embeddings"))
-				.map(([id]) => id);
-			// Contracto del catálogo: exactamente los 4 conocidos (nuevo modelo ⇒
-			// actualizar EMBEDDING_MODEL_IDS tras pasar esta matriz).
-			expect(embedIds.sort()).toEqual([...EMBEDDING_MODEL_IDS].sort());
-			for (const id of EMBEDDING_MODEL_IDS) {
-				const caps = byId.get(id) ?? [];
-				expect(caps, `${id} capabilities`).toContain("embeddings");
-				expect(
-					caps.some((c) => c === "chat" || c === "responses"),
-					`${id} no debe ser chat/responses (el selector los excluye)`,
-				).toBe(false);
-			}
-		},
-		120_000,
-	);
+	it("T1 catálogo: los 4 modelos embeddings publicados, capability embeddings y SIN chat/responses", async () => {
+		const { token, root } = await auth();
+		const catRes = await fetch(`${root}/v1/models`, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		expect(catRes.ok, "GET /v1/models").toBe(true);
+		const cat: any = await catRes.json();
+		const byId = new Map<string, string[]>(
+			(cat.data ?? []).map((m: any) => [
+				String(m.id),
+				Array.isArray(m.capabilities)
+					? m.capabilities.map((c: any) => String(c).toLowerCase())
+					: [],
+			]),
+		);
+		const embedIds = [...byId.entries()]
+			.filter(([, caps]) => caps.includes("embeddings"))
+			.map(([id]) => id);
+		// Contracto del catálogo: exactamente los 4 conocidos (nuevo modelo ⇒
+		// actualizar EMBEDDING_MODEL_IDS tras pasar esta matriz).
+		expect(embedIds.sort()).toEqual([...EMBEDDING_MODEL_IDS].sort());
+		for (const id of EMBEDDING_MODEL_IDS) {
+			const caps = byId.get(id) ?? [];
+			expect(caps, `${id} capabilities`).toContain("embeddings");
+			expect(
+				caps.some((c) => c === "chat" || c === "responses"),
+				`${id} no debe ser chat/responses (el selector los excluye)`,
+			).toBe(false);
+		}
+	}, 120_000);
 
-	it(
-		"T2 Errata-2 aplica a embeddings: sin user_id/email → 422 Field required",
-		async () => {
-			const model = EMBEDDING_MODEL_IDS[0];
-			const { status, json, text } = await postEmbeddings(
-				{ model, input: "hola mundo" },
-				{}, // SIN identidad — caso negativo del contrato
-			);
-			expect(status).toBe(422);
-			const detail = json?.detail ?? [];
-			const missing = detail
-				.filter((d: any) => d?.type === "missing")
-				.map((d: any) => d?.loc?.join("."));
-			expect(missing, `body 422 → ${text.slice(0, 160)}`).toEqual(
-				expect.arrayContaining(["body.user_id", "body.email"]),
-			);
-		},
-		120_000,
-	);
+	it("T2 Errata-2 aplica a embeddings: sin user_id/email → 422 Field required", async () => {
+		const model = EMBEDDING_MODEL_IDS[0];
+		const { status, json, text } = await postEmbeddings(
+			{ model, input: "hola mundo" },
+			{}, // SIN identidad — caso negativo del contrato
+		);
+		expect(status).toBe(422);
+		const detail = json?.detail ?? [];
+		const missing = detail
+			.filter((d: any) => d?.type === "missing")
+			.map((d: any) => d?.loc?.join("."));
+		expect(missing, `body 422 → ${text.slice(0, 160)}`).toEqual(
+			expect.arrayContaining(["body.user_id", "body.email"]),
+		);
+	}, 120_000);
 
-	it(
-		"T3 matriz: cada modelo → 200, vector válido, dims estables, batch y usage",
-		async () => {
-			for (const model of EMBEDDING_MODEL_IDS) {
-				const row: Row = {
+	it("T3 matriz: cada modelo → 200, vector válido, dims estables, batch y usage", async () => {
+		for (const model of EMBEDDING_MODEL_IDS) {
+			const row: Row = {
+				model,
+				status: 0,
+				dims: null,
+				batch: null,
+				deterministic: null,
+				semantics: null,
+				cosRelated: null,
+				cosUnrelated: null,
+				meanMargin: null,
+				minMargin: null,
+				wins: null,
+				promptTokens: null,
+				failed: null,
+			};
+			try {
+				const first = await postEmbeddings({
 					model,
-					status: 0,
-					dims: null,
-					batch: null,
+					input: "hola mundo",
+				});
+				row.status = first.status;
+				expect(first.status, `${model} HTTP`).toBe(200);
+				expect(first.json?.object, `${model} object`).toBe("list");
+				expect(first.json?.model, `${model} echo`).toBe(model);
+				const vec = first.json?.data?.[0]?.embedding;
+				expect(
+					Array.isArray(vec) && vec.length > 0,
+					`${model} data[0].embedding`,
+				).toBe(true);
+				row.dims = vec.length;
+				expect(
+					typeof first.json?.usage?.prompt_tokens === "number" &&
+						first.json.usage.prompt_tokens > 0,
+					`${model} usage.prompt_tokens`,
+				).toBe(true);
+				row.promptTokens = first.json.usage.prompt_tokens;
+
+				// Dims ESTABLES (segunda llamada, texto distinto).
+				const second = await embedOne(model, "otro texto diferente");
+				expect(second.length, `${model} dims estables`).toBe(row.dims);
+
+				// Determinismo (mismo texto ⇒ ¿mismo vector?): registro para
+				// el reporte, NO aserción (el backend puede cachear/batch).
+				const third = await embedOne(model, "hola mundo");
+				row.deterministic =
+					third.length === vec.length && third.every((v, i) => v === vec[i]);
+
+				// Batch OpenAI: array de inputs ⇒ N vectores con mismas dims.
+				const batch = await postEmbeddings({
+					model,
+					input: ["hola", "mundo vectorial"],
+				});
+				row.batch =
+					batch.status === 200 &&
+					batch.json?.data?.length === 2 &&
+					batch.json.data.every(
+						(d: any) =>
+							Array.isArray(d?.embedding) && d.embedding.length === row.dims,
+					);
+				expect(row.batch, `${model} batch de 2 inputs`).toBe(true);
+			} catch (err) {
+				row.failed = String(err).slice(0, 140);
+				throw err;
+			} finally {
+				rows.push(row);
+			}
+		}
+	}, 600_000);
+
+	it("T4 semántica RAG (benchmark 6 tripletas ES/EN): cos(query,rel) > cos(query,unrel) en TODAS", async () => {
+		for (const model of EMBEDDING_MODEL_IDS) {
+			// Una sola llamada batch con los 18 textos (6 tripletas × 3).
+			const flat = TRIPLETS.flatMap(([q, r, u]) => [q, r, u]);
+			const { status, json, text } = await postEmbeddings({
+				model,
+				input: flat,
+			});
+			expect(status, `${model} HTTP`).toBe(200);
+			const data = json?.data;
+			expect(
+				Array.isArray(data) && data.length === flat.length,
+				`${model} batch de ${flat.length} inputs`,
+			).toBe(true);
+			const vecs = data.map((d: any) => d.embedding as number[]);
+
+			const rels: number[] = [];
+			const unrels: number[] = [];
+			for (const [i] of TRIPLETS.entries()) {
+				const cosRel = cosine(vecs[i * 3], vecs[i * 3 + 1]);
+				const cosUnrel = cosine(vecs[i * 3], vecs[i * 3 + 2]);
+				rels.push(cosRel);
+				unrels.push(cosUnrel);
+				expect(
+					cosRel > cosUnrel,
+					`${model} triplete ${i + 1}/6: cos(relacionado)=${cosRel.toFixed(4)} debe superar a cos(no-relacionado)=${cosUnrel.toFixed(4)} — si falla, el embedding no sirve para RAG`,
+				).toBe(true);
+			}
+			const margins = rels.map((rel, i) => rel - unrels[i]);
+			const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+
+			// Actualiza la fila de T3 (ya registrada) con las stats del benchmark.
+			let row = rows.find((r) => r.model === model);
+			if (!row) {
+				row = {
+					model,
+					status,
+					dims: vecs[0]?.length ?? null,
+					batch: true,
 					deterministic: null,
 					semantics: null,
 					cosRelated: null,
@@ -289,126 +380,16 @@ describe.skipIf(!live)("E2E live: embeddings del gateway (RAG-ready)", () => {
 					promptTokens: null,
 					failed: null,
 				};
-				try {
-					const first = await postEmbeddings({
-						model,
-						input: "hola mundo",
-					});
-					row.status = first.status;
-					expect(first.status, `${model} HTTP`).toBe(200);
-					expect(first.json?.object, `${model} object`).toBe("list");
-					expect(first.json?.model, `${model} echo`).toBe(model);
-					const vec = first.json?.data?.[0]?.embedding;
-					expect(
-						Array.isArray(vec) && vec.length > 0,
-						`${model} data[0].embedding`,
-					).toBe(true);
-					row.dims = vec.length;
-					expect(
-						typeof first.json?.usage?.prompt_tokens === "number" &&
-							first.json.usage.prompt_tokens > 0,
-						`${model} usage.prompt_tokens`,
-					).toBe(true);
-					row.promptTokens = first.json.usage.prompt_tokens;
-
-					// Dims ESTABLES (segunda llamada, texto distinto).
-					const second = await embedOne(model, "otro texto diferente");
-					expect(second.length, `${model} dims estables`).toBe(row.dims);
-
-					// Determinismo (mismo texto ⇒ ¿mismo vector?): registro para
-					// el reporte, NO aserción (el backend puede cachear/batch).
-					const third = await embedOne(model, "hola mundo");
-					row.deterministic =
-						third.length === vec.length &&
-						third.every((v, i) => v === vec[i]);
-
-					// Batch OpenAI: array de inputs ⇒ N vectores con mismas dims.
-					const batch = await postEmbeddings({
-						model,
-						input: ["hola", "mundo vectorial"],
-					});
-					row.batch =
-						batch.status === 200 &&
-						batch.json?.data?.length === 2 &&
-						batch.json.data.every(
-							(d: any) => Array.isArray(d?.embedding) && d.embedding.length === row.dims,
-						);
-					expect(row.batch, `${model} batch de 2 inputs`).toBe(true);
-				} catch (err) {
-					row.failed = String(err).slice(0, 140);
-					throw err;
-				} finally {
-					rows.push(row);
-				}
+				rows.push(row);
 			}
-		},
-		600_000,
-	);
-
-	it(
-		"T4 semántica RAG (benchmark 6 tripletas ES/EN): cos(query,rel) > cos(query,unrel) en TODAS",
-		async () => {
-			for (const model of EMBEDDING_MODEL_IDS) {
-				// Una sola llamada batch con los 18 textos (6 tripletas × 3).
-				const flat = TRIPLETS.flatMap(([q, r, u]) => [q, r, u]);
-				const { status, json, text } = await postEmbeddings({
-					model,
-					input: flat,
-				});
-				expect(status, `${model} HTTP`).toBe(200);
-				const data = json?.data;
-				expect(
-					Array.isArray(data) && data.length === flat.length,
-					`${model} batch de ${flat.length} inputs`,
-				).toBe(true);
-				const vecs = data.map((d: any) => d.embedding as number[]);
-
-				const rels: number[] = [];
-				const unrels: number[] = [];
-				for (const [i] of TRIPLETS.entries()) {
-					const cosRel = cosine(vecs[i * 3], vecs[i * 3 + 1]);
-					const cosUnrel = cosine(vecs[i * 3], vecs[i * 3 + 2]);
-					rels.push(cosRel);
-					unrels.push(cosUnrel);
-					expect(
-						cosRel > cosUnrel,
-						`${model} triplete ${i + 1}/6: cos(relacionado)=${cosRel.toFixed(4)} debe superar a cos(no-relacionado)=${cosUnrel.toFixed(4)} — si falla, el embedding no sirve para RAG`,
-					).toBe(true);
-				}
-				const margins = rels.map((rel, i) => rel - unrels[i]);
-				const mean = (a: number[]) =>
-					a.reduce((x, y) => x + y, 0) / a.length;
-
-				// Actualiza la fila de T3 (ya registrada) con las stats del benchmark.
-				let row = rows.find((r) => r.model === model);
-				if (!row) {
-					row = {
-						model,
-						status,
-						dims: vecs[0]?.length ?? null,
-						batch: true,
-						deterministic: null,
-						semantics: null,
-						cosRelated: null,
-						cosUnrelated: null,
-						meanMargin: null,
-						minMargin: null,
-						wins: null,
-						promptTokens: null,
-						failed: null,
-					};
-					rows.push(row);
-				}
-				row.semantics = margins.every((m) => m > 0);
-				row.cosRelated = Number(mean(rels).toFixed(4));
-				row.cosUnrelated = Number(mean(unrels).toFixed(4));
-				row.meanMargin = Number(mean(margins).toFixed(4));
-				row.minMargin = Number(Math.min(...margins).toFixed(4));
-				row.wins = margins.filter((m) => m > 0).length;
-			}
-		},
-		600_000,
-	);
+			row.semantics = margins.every((m) => m > 0);
+			row.cosRelated = Number(mean(rels).toFixed(4));
+			row.cosUnrelated = Number(mean(unrels).toFixed(4));
+			row.meanMargin = Number(mean(margins).toFixed(4));
+			row.minMargin = Number(Math.min(...margins).toFixed(4));
+			row.wins = margins.filter((m) => m > 0).length;
+		}
+	}, 600_000);
 });
 
 afterAll(() => {

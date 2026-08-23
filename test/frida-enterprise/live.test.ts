@@ -38,7 +38,8 @@ async function readCredential(): Promise<Credential> {
 
 /** Renueva el idToken si quedan <3 min (mismo contrato que oauth.refreshToken). */
 async function ensureFreshToken(cred: Credential): Promise<string> {
-	if (!cred.access) throw new Error("sin credential frida-enterprise (¿/login?)");
+	if (!cred.access)
+		throw new Error("sin credential frida-enterprise (¿/login?)");
 	const remaining = (cred.expires ?? 0) - Date.now();
 	if (remaining > 3 * 60 * 1000) return cred.access;
 	if (!cred.refresh) throw new Error("idToken expirado y sin refreshToken");
@@ -70,10 +71,10 @@ function claimsOf(token: string) {
 	);
 }
 
-describe.skipIf(!live)("Frida Enterprise live matrix (todos los modelos × tools)", () => {
-	it(
-		"cada modelo chat: responde, llama tools, continua tras tool result y streamea",
-		async () => {
+describe.skipIf(!live)(
+	"Frida Enterprise live matrix (todos los modelos × tools)",
+	() => {
+		it("cada modelo chat: responde, llama tools, continua tras tool result y streamea", async () => {
 			const cred = await readCredential();
 			const root = (
 				cred.compatibleApiUrl ??
@@ -95,9 +96,7 @@ describe.skipIf(!live)("Frida Enterprise live matrix (todos los modelos × tools
 			expect(models.length).toBeGreaterThan(0);
 
 			// Subconjunto opcional para iterar rápido.
-			const only = (
-				process.env.FRIDA_ENTERPRISE_MODELS ?? ""
-			)
+			const only = (process.env.FRIDA_ENTERPRISE_MODELS ?? "")
 				.split(",")
 				.map((s) => s.trim())
 				.filter(Boolean);
@@ -259,17 +258,23 @@ describe.skipIf(!live)("Frida Enterprise live matrix (todos los modelos × tools
 
 					ok.push(id);
 				} catch (e: any) {
-					failures.push(`${id} (excepción): ${String(e?.message ?? e).slice(0, 140)}`);
+					failures.push(
+						`${id} (excepción): ${String(e?.message ?? e).slice(0, 140)}`,
+					);
 				}
 			}
 
 			// eslint-disable-next-line no-console
 			console.log(
 				`\n[live matrix] ${ok.length}/${targets.length} modelos pasaron el ciclo completo: ${ok.join(", ")}\n` +
-					(failures.length ? `[live matrix] fallos:\n  - ${failures.join("\n  - ")}` : ""),
+					(failures.length
+						? `[live matrix] fallos:\n  - ${failures.join("\n  - ")}`
+						: ""),
 			);
-			expect(failures, `modelos con fallos en el ciclo de tools:\n${failures.join("\n")}`).toEqual([]);
-		},
-		600_000,
-	);
-});
+			expect(
+				failures,
+				`modelos con fallos en el ciclo de tools:\n${failures.join("\n")}`,
+			).toEqual([]);
+		}, 600_000);
+	},
+);
