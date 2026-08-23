@@ -9469,6 +9469,18 @@ kbd {
 	margin-left: 6px;
 	color: var(--vscode-textLink-foreground, #4daafc);
 }
+/* #115 — motor pendiente de confirmar: estado honesto con advertencia */
+.ci-motor-pending {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.ci-motor-warn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 10px;
+	margin-left: 6px;
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
 .ci-banner-right {
 	display: flex;
 	align-items: center;

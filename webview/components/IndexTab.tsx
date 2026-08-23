@@ -686,6 +686,16 @@ export function IndexTab({
 		? (PROVIDER_LABELS[meta.provider] ?? meta.provider)
 		: null;
 	const metaLabel = meta ? `${metaProvider} · ${meta.model}` : null;
+	// #115 — salud del motor: sin metadata confirmada PERO con señales de
+	// falla (chunks fallidos acumulados o corrida activa que no confirma
+	// ninguno), la etiqueta del setting sería engañosa. Estado honesto.
+	const hasFailed = (idxFiles?.failed?.length ?? 0) > 0;
+	const stuckRun =
+		busy === "index" &&
+		!!ci?.progress &&
+		ci.progress.chunksProcessed === 0 &&
+		ci.progress.totalChunks > 0;
+	const motorPending = !meta && (hasFailed || stuckRun);
 
 	return (
 		<div className="cfg-resources ci-tab">
@@ -727,7 +737,23 @@ export function IndexTab({
 									</span>
 									<span className="ci-bullet">·</span>
 									<span>
-										Motor: <strong>{engineLabel(providerMode, metaLabel)}</strong>
+										Motor:{" "}
+										<strong
+											className={motorPending ? "ci-motor-pending" : undefined}
+										>
+											{motorPending
+												? "pendiente de confirmar"
+												: engineLabel(providerMode, metaLabel)}
+										</strong>
+										{motorPending && (
+											<span
+												className="ci-motor-warn"
+												title="Ningún embedding confirmado — el índice aún no tiene motor usable"
+											>
+												<Codicon name="warning" size={12} /> los embeddings están
+												fallando — revisa el proveedor (tab Entorno y Ping de tarjetas)
+											</span>
+										)}
 										{meta && meta.dimensions > 0 && (
 											<span className="ci-tag-dims" title="Dimensiones de los vectores">
 												{meta.dimensions}d

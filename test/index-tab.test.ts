@@ -316,12 +316,87 @@ describe("IndexTab (Opción 1: Semantic Search Engine & Health Matrix)", () => {
 		const html = renderToStaticMarkup(
 			React.createElement(IndexTab, {
 				state: {
+				...baseState,
+				codebaseIndex: {
+					installed: true,
+					version: "0.23.0",
+					config: { provider: "auto" },
+				},
+			},
+				post,
+			}),
+		);
+		expect(html).toContain("Auto (Ollama/OpenAI)");
+	});
+
+	it("#115 — sin metadata + chunks fallidos acumulados: pendiente de confirmar con advertencia", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
 					...baseState,
 					codebaseIndex: {
 						installed: true,
 						version: "0.23.0",
 						config: { provider: "auto" },
 					},
+					codebaseIndexFiles: {
+						available: true,
+						files: [],
+						failed: [
+							{ path: "docs/g.md", chunks: 48 },
+							{ path: "CLAUDE.md", chunks: 16 },
+						],
+					},
+				},
+				post,
+			}),
+		);
+		// Estado honesto — NO la etiqueta engañosa del setting
+		expect(html).toContain("pendiente de confirmar");
+		expect(html).toContain("los embeddings están fallando");
+		expect(html).not.toContain("Auto (Ollama/OpenAI)");
+	});
+
+	it("#115 — sin metadata + corrida activa sin confirmaciones (chunks 0/N): advertencia", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+					...baseState,
+					codebaseIndex: {
+						installed: true,
+						busy: "index",
+						busySince: Date.now() - 300_000,
+						progress: {
+							phase: "embedding",
+							percentage: 20,
+							filesProcessed: 218,
+							totalFiles: 218,
+							chunksProcessed: 0,
+							totalChunks: 64,
+						},
+						config: { provider: "auto" },
+					},
+				},
+				post,
+			}),
+		);
+		expect(html).toContain("pendiente de confirmar");
+		expect(html).not.toContain("Auto (Ollama/OpenAI)");
+	});
+
+	it("#115 — sin índice en absoluto (available false, sin fallidos): etiqueta del setting", () => {
+		const post = vi.fn();
+		const html = renderToStaticMarkup(
+			React.createElement(IndexTab, {
+				state: {
+					...baseState,
+					codebaseIndex: {
+						installed: true,
+						config: { provider: "auto" },
+					},
+					codebaseIndexFiles: { available: false, files: [], failed: [] },
 				},
 				post,
 			}),
