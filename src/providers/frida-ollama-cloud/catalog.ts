@@ -154,3 +154,32 @@ export function modelIdsFromList(list: OllamaModelsListResponse): string[] {
 		.filter(Boolean);
 	return [...new Set(ids)];
 }
+
+/** #122 — Config del provider pi para registerProvider("ollama-cloud", …).
+ * apiKey placeholder cuando el usuario no ha guardado key: los modelos
+ * cargan igual pero quedan no-autenticados en /model hasta dar la key
+ * (mismo contrato que documenta pi Custom Models para keyless). */
+export function buildOllamaCloudProviderConfig(
+	models: OllamaCloudModelDef[],
+	opts: { apiKey?: string } = {},
+) {
+	return {
+		baseUrl: OLLAMA_CLOUD_BASE_URL,
+		api: "openai-completions" as const,
+		apiKey: opts.apiKey || "ollama-cloud-placeholder",
+		compat: {
+			supportsDeveloperRole: false,
+			supportsReasoningEffort: false,
+		},
+		models: models.map((m) => ({
+			id: m.id,
+			name: m.name,
+			reasoning: m.reasoning,
+			input: m.input,
+			contextWindow: m.contextWindow,
+			maxTokens: m.maxTokens,
+			cost: m.cost,
+			...(m.thinkingLevelMap ? { thinkingLevelMap: m.thinkingLevelMap } : {}),
+		})),
+	};
+}

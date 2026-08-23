@@ -56,6 +56,13 @@ import {
 	type OllamaLocalModelDef,
 } from "./providers/frida-ollama-local/catalog";
 import { discoverOllamaLocalModels } from "./providers/frida-ollama-local/discover";
+import {
+	buildOllamaCloudProviderConfig,
+	OLLAMA_CLOUD_BASE_URL,
+	OLLAMA_CLOUD_PROVIDER,
+	type OllamaCloudModelDef,
+} from "./providers/frida-ollama-cloud/catalog";
+import { discoverOllamaCloudModels } from "./providers/frida-ollama-cloud/discover";
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
@@ -478,6 +485,33 @@ export async function createFridaSession(
 		modelRuntime.registerProvider(
 			OLLAMA_PROVIDER,
 			buildOllamaProviderConfig(ollamaHost, ollamaLocalModels) as any,
+		);
+	}
+	// #122 — Ollama Cloud (ollama.com/v1): registro con catálogo dinámico
+	// SOLO cuando hay credencial resuelta (OLLAMA_API_KEY env o key guardada
+	// vía SecretStorage) — mismo criterio que el plugin de referencia: el
+	// descubrimiento es keyless pero el refresh vivo no corre sin credencial.
+	// Sin key: provider con models: [] → visible "sin conexión" con botón Key
+	// (entrada API_KEY_PROVIDERS); nunca rompe el arranque.
+	{
+		const cloudKey =
+			process.env.OLLAMA_API_KEY?.trim() || keyHolders[OLLAMA_CLOUD_PROVIDER];
+		let cloudModels: OllamaCloudModelDef[] = [];
+		if (cloudKey) {
+			try {
+				cloudModels = await discoverOllamaCloudModels(
+					OLLAMA_CLOUD_BASE_URL,
+					(url, init) => fetch(url, init),
+				);
+			} catch {
+				/* red caída: catálogo vacío, visible sin auth */
+			}
+		}
+		modelRuntime.registerProvider(
+			OLLAMA_CLOUD_PROVIDER,
+			buildOllamaCloudProviderConfig(cloudModels, {
+				apiKey: process.env.OLLAMA_API_KEY ? "$OLLAMA_API_KEY" : undefined,
+			}) as any,
 		);
 	}
 	// Errata-9: el compact/branch-summary llama streamSimple/completeSimple sin

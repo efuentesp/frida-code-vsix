@@ -1449,14 +1449,14 @@ export async function activate(
 		if (!frida) return;
 		const mr = frida.modelRuntime;
 		// #123 — ollama local sin modelos de chat descargados no aparece en
-	// ninguna lista de selección del chat (ModelPanel/Proveedores/Roles):
-	// sin modelos no hay nada que elegir y el bloque es ruido. La guía
-	// (ollama pull) vive en el doctor de Entorno (#110).
-	const visibleProviders = filterVisibleChatProviders(
-		SUPPORTED_PROVIDERS,
-		(id) => (mr.getModels?.(id) ?? []).length > 0,
-	);
-	const providers = visibleProviders.map((id) => ({
+		// ninguna lista de selección del chat (ModelPanel/Proveedores/Roles):
+		// sin modelos no hay nada que elegir y el bloque es ruido. La guía
+		// (ollama pull) vive en el doctor de Entorno (#110).
+		const visibleProviders = filterVisibleChatProviders(
+			SUPPORTED_PROVIDERS,
+			(id) => (mr.getModels?.(id) ?? []).length > 0,
+		);
+		const providers = visibleProviders.map((id) => ({
 			id,
 			name: providerDisplayName(id),
 			// Errata-3 (#58): isUsingOAuth sólo reporta con credential guardada; el

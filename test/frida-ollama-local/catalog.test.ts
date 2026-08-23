@@ -131,9 +131,10 @@ describe("#123 — filterVisibleChatProviders (ocultar ollama sin modelos)", () 
 	const base = ["frida-enterprise", "ollama", "openai"];
 
 	it("ollama SIN modelos de chat se oculta de las listas", () => {
-		expect(
-			filterVisibleChatProviders(base, (id) => id !== "ollama"),
-		).toEqual(["frida-enterprise", "openai"]);
+		expect(filterVisibleChatProviders(base, (id) => id !== "ollama")).toEqual([
+			"frida-enterprise",
+			"openai",
+		]);
 	});
 
 	it("ollama CON modelos visible (tras ollama pull)", () => {

@@ -22,6 +22,10 @@ import {
 	MOONSHOT_PROVIDER,
 	MOONSHOT_PROVIDER_DISPLAY,
 } from "./moonshot-provider";
+import {
+	OLLAMA_CLOUD_PROVIDER,
+	OLLAMA_CLOUD_DISPLAY,
+} from "./frida-ollama-cloud/catalog";
 import { SOFTTEK_PROVIDER, SOFTTEK_PROVIDER_DISPLAY } from "./softtek-provider";
 import { ZAI_PROVIDER, ZAI_PROVIDER_DISPLAY } from "./z-ai-provider";
 
@@ -58,6 +62,14 @@ export const API_KEY_PROVIDERS: readonly ApiKeyProviderDef[] = [
 		id: OPENAI_PROVIDER,
 		displayName: OPENAI_PROVIDER_DISPLAY,
 		secretKey: "frida.openaiKey",
+		authMode: "bearer",
+	},
+	{
+		// #122 — Ollama Cloud (ollama.com): bearer con key de ollama.com.
+		// OLLAMA_API_KEY (env) también resuelve vía apiKey del provider config.
+		id: OLLAMA_CLOUD_PROVIDER,
+		displayName: OLLAMA_CLOUD_DISPLAY,
+		secretKey: "frida.ollamaCloudKey",
 		authMode: "bearer",
 	},
 ];
