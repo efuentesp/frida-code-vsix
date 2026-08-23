@@ -283,6 +283,9 @@ describe.skipIf(!live)("E2E live: embeddings del gateway (RAG-ready)", () => {
 					semantics: null,
 					cosRelated: null,
 					cosUnrelated: null,
+					meanMargin: null,
+					minMargin: null,
+					wins: null,
 					promptTokens: null,
 					failed: null,
 				};

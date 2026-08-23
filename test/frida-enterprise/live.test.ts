@@ -55,10 +55,13 @@ async function ensureFreshToken(cred: Credential): Promise<string> {
 	);
 	if (!res.ok) throw new Error(`refresh → HTTP ${res.status}`);
 	const json: any = await res.json();
-	cred.access = json.id_token;
+	// Local tipada: asignar `any` a cred.access resetea el narrowing del guard
+	// inicial, por lo que retornamos el token capturado, no la propiedad.
+	const token = String(json.id_token);
+	cred.access = token;
 	cred.refresh = json.refresh_token;
 	cred.expires = Date.now() + Number(json.expires_in ?? 3600) * 1000 - 120_000;
-	return cred.access;
+	return token;
 }
 
 function claimsOf(token: string) {
