@@ -89,27 +89,18 @@ export function compileSemanticAction(input: unknown): {
 } {
 	if (!isRecord(input)) return { error: "semanticAction must be an object." };
 
-	const {
-		action,
-		locator,
-		value,
-		values,
-		selector,
-		text,
-		role,
-		name,
-		session,
-	} = input as Record_ & {
-		action?: string;
-		locator?: string;
-		value?: string;
-		values?: string[];
-		selector?: string;
-		text?: string;
-		role?: string;
-		name?: string;
-		session?: string;
-	};
+	const { action, locator, value, values, selector, text, role, name, session } =
+		input as Record_ & {
+			action?: string;
+			locator?: string;
+			value?: string;
+			values?: string[];
+			selector?: string;
+			text?: string;
+			role?: string;
+			name?: string;
+			session?: string;
+		};
 
 	if (
 		typeof action !== "string" ||
@@ -163,8 +154,7 @@ export function compileSemanticAction(input: unknown): {
 	if (selector !== undefined) {
 		if (!nonEmptyString(selector)) {
 			return {
-				error:
-					"semanticAction.selector must be a non-empty string when provided.",
+				error: "semanticAction.selector must be a non-empty string when provided.",
 			};
 		}
 		if (
@@ -367,8 +357,7 @@ function compileType(step: Record_): {
 	const press = step.press;
 	if (press !== undefined && !nonEmptyString(press)) {
 		return {
-			error:
-				"job step type press must be a non-empty key string when provided.",
+			error: "job step type press must be a non-empty key string when provided.",
 		};
 	}
 	const typedText = text.value!;
@@ -471,8 +460,7 @@ function compileJobStep(step: Record_, index: number): StepCompileResult {
 			const ms = step.milliseconds;
 			if (typeof ms !== "number" || !Number.isInteger(ms) || ms <= 0) {
 				return {
-					error:
-						"job step wait requires a positive integer milliseconds value.",
+					error: "job step wait requires a positive integer milliseconds value.",
 				};
 			}
 			return { args: ["wait", String(ms)] };
@@ -642,11 +630,7 @@ export function compileQa(input: unknown): {
 	const screenshotPath = nonEmptyString(input.screenshotPath)
 		? input.screenshotPath
 		: undefined;
-	for (const field of [
-		"checkConsole",
-		"checkErrors",
-		"checkNetwork",
-	] as const) {
+	for (const field of ["checkConsole", "checkErrors", "checkNetwork"] as const) {
 		if (input[field] !== undefined && typeof input[field] !== "boolean") {
 			return { error: `qa.${field} must be a boolean when provided.` };
 		}
@@ -720,9 +704,14 @@ export function compileQa(input: unknown): {
 export function resolveAgentBrowserInput(
 	params: Record_,
 ): CompiledInput | CompileError {
-	const modes = ["args", "semanticAction", "job", "qa", "electron", "script"].filter(
-		(m) => params[m] !== undefined,
-	);
+	const modes = [
+		"args",
+		"semanticAction",
+		"job",
+		"qa",
+		"electron",
+		"script",
+	].filter((m) => params[m] !== undefined);
 	if (modes.length === 0) {
 		return {
 			error:

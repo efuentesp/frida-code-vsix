@@ -167,28 +167,21 @@ export function formatExtractionText(
 	args: string[],
 	data: AgentBrowserData | null | undefined,
 ): string | undefined {
-	if (
-		!data ||
-		(command !== "get" && command !== "eval")
-	) {
+	if (!data || (command !== "get" && command !== "eval")) {
 		return undefined;
 	}
 	const fallbackField =
-		command === "get"
-			? (GET_RESULT_FIELDS[subcommandOf(args) ?? ""] ?? "")
-			: "";
+		command === "get" ? (GET_RESULT_FIELDS[subcommandOf(args) ?? ""] ?? "") : "";
 	const resultField = Object.hasOwn(data, "result")
 		? "result"
 		: fallbackField.length > 0 && Object.hasOwn(data, fallbackField)
-				? fallbackField
-				: undefined;
+			? fallbackField
+			: undefined;
 	if (resultField === undefined) return undefined;
 	const scalar = scalarToString((data as Record<string, unknown>)[resultField]);
 	if (scalar === undefined) return undefined;
 	const origin = getOrigin(data);
-	return origin && origin !== scalar
-		? `${scalar}\n\nOrigin: ${origin}`
-		: scalar;
+	return origin && origin !== scalar ? `${scalar}\n\nOrigin: ${origin}` : scalar;
 }
 
 /**
@@ -201,15 +194,14 @@ export function formatFailureNextActionsText(
 ): string | undefined {
 	if (nextActions.length === 0) return undefined;
 	const lines = nextActions.slice(0, 6).map((action) => {
-		const params =
-			action.params
-				? {
-						...action.params,
-						...(action.params.stdin === undefined
-							? {}
-							: { stdin: "[omitted; use details.nextActions]" }),
+		const params = action.params
+			? {
+					...action.params,
+					...(action.params.stdin === undefined
+						? {}
+						: { stdin: "[omitted; use details.nextActions]" }),
 				}
-				: undefined;
+			: undefined;
 		return `- ${action.id}${params ? ` ${JSON.stringify(params)}` : ""}: ${action.reason}`;
 	});
 	return [

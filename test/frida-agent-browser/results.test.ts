@@ -300,7 +300,7 @@ describe("presentAgentBrowserResult", () => {
 		// Mirror 0.4.0: nextActions espejadas al texto model-visible.
 		expect(r.content[0].text).toContain("Next actions:");
 		expect(r.content[0].text).toContain(
-			"- list-tabs-after-tab-gone {\"args\":[\"tab\",\"list\"]}:",
+			'- list-tabs-after-tab-gone {"args":["tab","list"]}:',
 		);
 		expect(r.content[0].text).toContain(
 			"Use the exact redacted payloads in details.nextActions",
@@ -319,10 +319,11 @@ describe("presentAgentBrowserResult", () => {
 		expect(r.content[0].text).toBe("https://docs.x/guide");
 	});
 	it("presentación compacta: get count → escalar numérico", () => {
-		const r = present(
-			{ success: true, data: { count: 3 }, error: null },
-			["get", "count", "a"],
-		);
+		const r = present({ success: true, data: { count: 3 }, error: null }, [
+			"get",
+			"count",
+			"a",
+		]);
 		expect(r.content[0].text).toBe("3");
 	});
 	it("presentación compacta: campo `result` tiene prioridad", () => {

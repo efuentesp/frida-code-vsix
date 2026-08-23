@@ -218,7 +218,7 @@ export function createFridaAgentBrowser(
 				// `piab-script-<uuid>` (namespace vacío), cerrada en el cleanup.
 				if (resolved.mode === "script" && resolved.script) {
 					const scriptSession = createScriptSessionName();
-				const run = await runAgentBrowserScript({
+					const run = await runAgentBrowserScript({
 						code: resolved.script.code,
 						timeoutMs: (params as { timeoutMs?: number }).timeoutMs,
 						signal: signal ?? undefined,
@@ -265,13 +265,9 @@ export function createFridaAgentBrowser(
 							};
 							return {
 								ok: !parsed.isError,
-								text:
-									parsed.content[0]?.type === "text"
-										? parsed.content[0].text
-										: "",
+								text: parsed.content[0]?.type === "text" ? parsed.content[0].text : "",
 								summary: parsed.isError ? "failed" : "ok",
-								resultCategory:
-									d.resultCategory === "failure" ? "failure" : "success",
+								resultCategory: d.resultCategory === "failure" ? "failure" : "success",
 								successCategory: d.successCategory,
 								failureCategory: d.failureCategory,
 								data: d.result,

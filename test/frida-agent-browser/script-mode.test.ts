@@ -115,16 +115,16 @@ describe("script — session naming", () => {
 
 /** Fake del child sandbox: reacciona al start emitiendo líneas por stdout. */
 function fakeScriptSpawn(
-	onStart: (
-		send: (obj: unknown) => void,
-		code: string,
-	) => void,
+	onStart: (send: (obj: unknown) => void, code: string) => void,
 	onParentMessage?: (msg: unknown) => void,
 ): { spawnFn: ScriptSpawnFn; child: () => ScriptChildLike } {
 	let current: ScriptChildLike | undefined;
 	const spawnFn = ((_cmd: string, _args: string[], _opts: unknown) => {
 		const child = new EventEmitter() as EventEmitter & {
-			stdin: { write: (s: string, cb: (e?: Error | null) => void) => void; destroy: () => void };
+			stdin: {
+				write: (s: string, cb: (e?: Error | null) => void) => void;
+				destroy: () => void;
+			};
 			stdout: EventEmitter;
 			stderr: EventEmitter;
 			kill: (s?: string) => void;
@@ -140,10 +140,7 @@ function fakeScriptSpawn(
 					queueMicrotask(() =>
 						onStart(
 							(obj) =>
-								child.stdout.emit(
-									"data",
-									Buffer.from(`${JSON.stringify(obj)}\n`),
-								),
+								child.stdout.emit("data", Buffer.from(`${JSON.stringify(obj)}\n`)),
 							msg.code ?? "",
 						),
 					);
@@ -292,9 +289,14 @@ describe("script — runAgentBrowserScript (fake sandbox)", () => {
 			const child = new EventEmitter() as never as ScriptChildLike & EventEmitter;
 			(child as unknown as { stdout: EventEmitter }).stdout = new EventEmitter();
 			(child as unknown as { stderr: EventEmitter }).stderr = new EventEmitter();
-			(child as unknown as {
-				stdin: { write: (s: string, cb: (e?: Error | null) => void) => void; destroy: () => void };
-			}).stdin = {
+			(
+				child as unknown as {
+					stdin: {
+						write: (s: string, cb: (e?: Error | null) => void) => void;
+						destroy: () => void;
+					};
+				}
+			).stdin = {
 				write: (_s, cb) => {
 					queueMicrotask(() => cb?.(null));
 					return true;
@@ -338,7 +340,8 @@ describe("script — runAgentBrowserScript (fake sandbox)", () => {
 describe("script — sandbox real (worker VM)", () => {
 	it("browser() + emit() vía IPC real", async () => {
 		const r = await runAgentBrowserScript({
-			code: "const r = await browser({ args: ['get', 'url'] }); emit({ ok: r.ok, summary: r.summary });",
+			code:
+				"const r = await browser({ args: ['get', 'url'] }); emit({ ok: r.ok, summary: r.summary });",
 			dispatch: async () => OK_ENVELOPE,
 		});
 		expect(r.ok).toBe(true);
@@ -357,7 +360,8 @@ describe("script — sandbox real (worker VM)", () => {
 
 	it("code generation desde strings vetado (VM)", async () => {
 		const r = await runAgentBrowserScript({
-			code: "try { new Function('return 1'); emit('unexpected'); } catch (e) { emit(e && e.constructor && e.constructor.name); }",
+			code:
+				"try { new Function('return 1'); emit('unexpected'); } catch (e) { emit(e && e.constructor && e.constructor.name); }",
 			dispatch: async () => OK_ENVELOPE,
 		});
 		expect(r.ok).toBe(true);

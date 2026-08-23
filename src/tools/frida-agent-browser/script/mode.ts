@@ -130,12 +130,10 @@ function flagNameOf(token: string): string {
 /** Política de llamadas browser() dentro del script (mirror getScriptCallPolicyError). */
 export function validateScriptBrowserParams(
 	input: unknown,
-): { params: ScriptBrowserParams } | { error: string; policyBlocked?: boolean } {
-	if (
-		typeof input !== "object" ||
-		input === null ||
-		Array.isArray(input)
-	) {
+):
+	| { params: ScriptBrowserParams }
+	| { error: string; policyBlocked?: boolean } {
+	if (typeof input !== "object" || input === null || Array.isArray(input)) {
 		return { error: "script browser(params) requires an object." };
 	}
 	const record = input as Record<string, unknown>;
@@ -169,7 +167,8 @@ export function validateScriptBrowserParams(
 			timeoutMs <= 0)
 	) {
 		return {
-			error: "script browser(params).timeoutMs must be a positive integer when provided.",
+			error:
+				"script browser(params).timeoutMs must be a positive integer when provided.",
 		};
 	}
 	// Política: comando + flags.
@@ -182,7 +181,8 @@ export function validateScriptBrowserParams(
 	}
 	if (CLOSE_COMMANDS.has(command)) {
 		return {
-			error: "script browser calls cannot close, quit, or exit their isolated session.",
+			error:
+				"script browser calls cannot close, quit, or exit their isolated session.",
 			policyBlocked: true,
 		};
 	}
@@ -251,15 +251,16 @@ function isChildMessage(value: unknown): boolean {
 	if (typeof v.type !== "string") return false;
 	if (v.type === "ready") return true;
 	if (v.type === "call")
-		return (
-			typeof v.id === "number" && Number.isSafeInteger(v.id) && v.id > 0
-		);
+		return typeof v.id === "number" && Number.isSafeInteger(v.id) && v.id > 0;
 	return v.type === "emit" || v.type === "complete";
 }
 
 /** Shape mínimo del child que consume el orquestador (seam para tests). */
 export interface ScriptChildLike {
-	stdin: { write: (s: string, cb: (e?: Error | null) => void) => void; destroy: () => void };
+	stdin: {
+		write: (s: string, cb: (e?: Error | null) => void) => void;
+		destroy: () => void;
+	};
 	stdout: { on: (e: string, cb: (d: Buffer) => void) => void };
 	stderr: { on: (e: string, cb: (d: Buffer) => void) => void };
 	on: (e: string, cb: (...a: unknown[]) => void) => void;
@@ -435,16 +436,11 @@ export async function runAgentBrowserScript(
 		}
 		cumulativeBytes += bytes;
 		await new Promise<void>((resolve, reject) => {
-			child.stdin.write(line, (error) =>
-				error ? reject(error) : resolve(),
-			);
+			child.stdin.write(line, (error) => (error ? reject(error) : resolve()));
 		});
 	};
 
-	const finish = async (
-		result: ScriptRunResult,
-		waitForDrain = false,
-	) => {
+	const finish = async (result: ScriptRunResult, waitForDrain = false) => {
 		if (stopping) return;
 		stopping = true;
 		if (timeout) clearTimeout(timeout);
@@ -546,20 +542,20 @@ export async function runAgentBrowserScript(
 					return;
 				}
 				if (message.type === "emit") {
-				if (!Object.hasOwn(message, "value")) {
-					await finish(
-						failedRun({
-							callCount,
-							emitCount: emissions.length,
-							error:
-								"emit(value) requires a JSON-serializable value; undefined and functions are not supported.",
+					if (!Object.hasOwn(message, "value")) {
+						await finish(
+							failedRun({
+								callCount,
+								emitCount: emissions.length,
+								error:
+									"emit(value) requires a JSON-serializable value; undefined and functions are not supported.",
 								failureCategory: "validation-error",
 								rejectedCallCount,
 								steps,
 							}),
-					);
+						);
 						return;
-				}
+					}
 					emissions.push(message.value);
 					continue;
 				}
@@ -592,9 +588,7 @@ export async function runAgentBrowserScript(
 					let serialized: string | undefined;
 					try {
 						serialized =
-							finalData === undefined
-								? undefined
-								: JSON.stringify(finalData);
+							finalData === undefined ? undefined : JSON.stringify(finalData);
 					} catch {
 						await finish(
 							failedRun({
@@ -610,21 +604,20 @@ export async function runAgentBrowserScript(
 					}
 					if (
 						serialized !== undefined &&
-						Buffer.byteLength(serialized, "utf8") >
-							SCRIPT_FINAL_OUTPUT_MAX_BYTES
-				) {
-					await finish(
-						failedRun({
-							callCount,
+						Buffer.byteLength(serialized, "utf8") > SCRIPT_FINAL_OUTPUT_MAX_BYTES
+					) {
+						await finish(
+							failedRun({
+								callCount,
 								emitCount: emissions.length,
 								error: `Final script output exceeds ${SCRIPT_FINAL_OUTPUT_MAX_BYTES} bytes.`,
 								failureCategory: "validation-error",
 								rejectedCallCount,
 								steps,
 							}),
-					);
+						);
 						return;
-				}
+					}
 					await finish({
 						ok: true,
 						callCount,
@@ -641,18 +634,18 @@ export async function runAgentBrowserScript(
 					await finish(
 						failedRun({
 							callCount: callCount - 1,
-								emitCount: emissions.length,
-								error: `Script browser call limit exceeded (${SCRIPT_MAX_CALLS}).`,
-								failureCategory: "validation-error",
-								rejectedCallCount,
-								steps,
-							}),
+							emitCount: emissions.length,
+							error: `Script browser call limit exceeded (${SCRIPT_MAX_CALLS}).`,
+							failureCategory: "validation-error",
+							rejectedCallCount,
+							steps,
+						}),
 					);
-						return;
+					return;
 				}
 				const validated = validateScriptBrowserParams(message.params);
 				let envelope: ScriptEnvelope;
-				if (("params" in validated)) {
+				if ("params" in validated) {
 					activeCallController = new AbortController();
 					try {
 						envelope = await options.dispatch(
@@ -692,14 +685,14 @@ export async function runAgentBrowserScript(
 					await finish(
 						failedRun({
 							callCount,
-								emitCount: emissions.length,
-								error: "Unable to return a browser result to the script sandbox.",
-								failureCategory: "upstream-error",
-								rejectedCallCount,
-								steps,
-							}),
+							emitCount: emissions.length,
+							error: "Unable to return a browser result to the script sandbox.",
+							failureCategory: "upstream-error",
+							rejectedCallCount,
+							steps,
+						}),
 					);
-						return;
+					return;
 				}
 			}
 		} finally {
@@ -761,12 +754,7 @@ export async function runAgentBrowserScript(
 	});
 	child.once("exit", () => {
 		if (!stopping)
-			fail(
-				"Script sandbox exited before completion.",
-				"upstream-error",
-				{},
-				true,
-			);
+			fail("Script sandbox exited before completion.", "upstream-error", {}, true);
 	});
 
 	return await resultPromise;

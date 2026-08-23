@@ -15,7 +15,7 @@ import { LAUNCH_SCOPED_FLAG_LABEL } from "./constants";
  * el agente prefiera el tool nativo `agent_browser` sobre `agent-browser` por bash.
  */
 export const PROJECT_RULE_PROMPT =
-	"Project rule: when browser automation is needed, prefer the native `agent_browser` tool. Do not run direct `agent-browser` bash commands unless the user explicitly asks for a bash-oriented workflow or browser-integration debugging.";
+ "Project rule: when browser automation is needed, prefer the native `agent_browser` tool. Do not run direct `agent-browser` bash commands unless the user explicitly asks for a bash-oriented workflow or browser-integration debugging.";
 
 /**
  * Guidelines Tier-A (siempre activas) — van en `promptGuidelines` del tool.
@@ -24,24 +24,24 @@ export const PROJECT_RULE_PROMPT =
  * nextActions, extracción).
  */
 export function buildPromptGuidelines(): string[] {
-	return [
-		"Use agent_browser with one input mode: args, semanticAction, job, qa, script, sourceLookup/networkSourceLookup, or electron. stdin only for batch/eval/auth/wrapper batch; electron rejects stdin; never pass --json.",
-		"For agent_browser, use open → snapshot -i → current @refs or semanticAction → re-snapshot after navigation/scroll/rerender. Batch same-snapshot forms; split before navigation/submits. Stop before order/post/purchase/submit.",
-		`Use agent_browser sessionMode=fresh for launch-scoped flags, including --allowed-domains; never put --session-mode in args. Use requested/configured profiles only; on profile failures run profiles/doctor. Profile content is model-visible.`,
-		"For agent_browser artifacts, use exact user paths and verify details.artifactVerification/details.artifacts before claiming success. Save details.promptGuard-required artifacts before close; record stop needs ffmpeg; close keeps files; waited:timeout is not proof.",
-		"When agent_browser details.nextActions exists, use exact payloads over guessed selectors/prose. Dense snapshots: check Omitted high-value controls/highValueControlRefIds. Dashboards: verify scroll with screenshot/snapshot.",
-		"For agent_browser extraction: read <url> for docs/text; read for active-tab DOM; get title/url; get text/html/value/count <selector>; get attr <selector> <name>; eval --stdin for targeted state. Batch 3+ getters; heed visibility warnings.",
-	];
+ return [
+  "Use agent_browser with one input mode: args, semanticAction, job, qa, script, sourceLookup/networkSourceLookup, or electron. stdin only for batch/eval/auth/wrapper batch; electron rejects stdin; never pass --json.",
+  "For agent_browser, use open → snapshot -i → current @refs or semanticAction → re-snapshot after navigation/scroll/rerender. Batch same-snapshot forms; split before navigation/submits. Stop before order/post/purchase/submit.",
+  `Use agent_browser sessionMode=fresh for launch-scoped flags, including --allowed-domains; never put --session-mode in args. Use requested/configured profiles only; on profile failures run profiles/doctor. Profile content is model-visible.`,
+  "For agent_browser artifacts, use exact user paths and verify details.artifactVerification/details.artifacts before claiming success. Save details.promptGuard-required artifacts before close; record stop needs ffmpeg; close keeps files; waited:timeout is not proof.",
+  "When agent_browser details.nextActions exists, use exact payloads over guessed selectors/prose. Dense snapshots: check Omitted high-value controls/highValueControlRefIds. Dashboards: verify scroll with screenshot/snapshot.",
+  "For agent_browser extraction: read <url> for docs/text; read for active-tab DOM; get title/url; get text/html/value/count <selector>; get attr <selector> <name>; eval --stdin for targeted state. Batch 3+ getters; heed visibility warnings.",
+ ];
 }
 
 /** Descripción agent-facing del tool (réplica del referencia). */
 export const AGENT_BROWSER_DESCRIPTION =
-	"Browse websites, read live docs, click and fill pages, extract browser content, take screenshots, and automate real web workflows. " +
-	"Input choice: default `args` for open → snapshot -i → click/fill @refs; `semanticAction` for stable role/text/label targets; `job` or `qa` for multi-step checks; `script` for loops, conditional branches, and multi-page aggregation via sandboxed browser()/emit(); `electron` only for desktop apps; experimental `sourceLookup` / `networkSourceLookup` for candidates only.";
+ "Browse websites, read live docs, click and fill pages, extract browser content, take screenshots, and automate real web workflows. " +
+ "Input choice: default `args` for open → snapshot -i → click/fill @refs; `semanticAction` for stable role/text/label targets; `job` or `qa` for multi-step checks; `script` for loops, conditional branches, and multi-page aggregation via sandboxed browser()/emit(); `electron` only for desktop apps; experimental `sourceLookup` / `networkSourceLookup` for candidates only.";
 
 /** Snippet corto para el catálogo de tools del agente. */
 export const AGENT_BROWSER_PROMPT_SNIPPET =
-	"Browse websites, read live docs, click and fill pages, extract browser content, take screenshots, and automate real web workflows.";
+ "Browse websites, read live docs, click and fill pages, extract browser content, take screenshots, and automate real web workflows.";
 
 /**
  * Mensaje de error cuando el binario upstream `agent-browser` no está en PATH.
@@ -57,5 +57,5 @@ After installing, ensure the binary is on the PATH visible to the editor and rel
 
 /** Hint que se añade a las guidelines cuando hay flags launch-scoped. (Informativo.) */
 export function launchScopedFlagHint(): string {
-	return `Launch-scoped flags (${LAUNCH_SCOPED_FLAG_LABEL}) require a fresh session: retry with sessionMode=fresh or an explicit --session.`;
+ return `Launch-scoped flags (${LAUNCH_SCOPED_FLAG_LABEL}) require a fresh session: retry with sessionMode=fresh or an explicit --session.`;
 }
