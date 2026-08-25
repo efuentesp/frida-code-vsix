@@ -4049,6 +4049,20 @@ export async function activate(
 		},
 		{
 			match: [
+				"walkthrough",
+				"app-walkthrough",
+				"documentar",
+				"documentacion",
+				"documentación",
+				"funcional",
+				"pantallas",
+			],
+			file: "docs/tools/frida-app-walkthrough.md",
+			howTo: "docs/how-to-frida-app-walkthrough.md",
+			label: "frida-app-walkthrough",
+		},
+		{
+			match: [
 				"workflows",
 				"patrones",
 				"patterns",

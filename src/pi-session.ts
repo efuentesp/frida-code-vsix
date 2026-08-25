@@ -119,6 +119,7 @@ import { createFridaMcpAdapter } from "./tools/frida-mcp-adapter";
 import { createFridaGitSync } from "./tools/frida-git-sync";
 import { createFridaAidd } from "./tools/frida-aidd";
 import { createFridaTea } from "./tools/frida-tea";
+import { createFridaAppWalkthrough } from "./tools/frida-app-walkthrough";
 import { createFridaGoal } from "./tools/frida-goal";
 import type { GoalStateSnapshot } from "./tools/frida-goal/state";
 import { createFridaWorktree } from "./worktree";
@@ -679,6 +680,10 @@ export async function createFridaSession(
 				factory: createFridaTea(),
 			},
 			{
+				name: "frida-app-walkthrough",
+				factory: createFridaAppWalkthrough(),
+			},
+			{
 				name: "frida-permission-system",
 				factory: createPermissionSystem(
 					bridge,
@@ -1092,6 +1097,8 @@ export async function createFridaSession(
 				// Override que PRESERVA los modelos built-in (con thinkingFormat:"zai") +
 				// añade los descubiertos nuevos. Si /models no trajo nada nuevo, no
 				// tocamos el catálogo (el built-in queda intacto).
+				// SAFETY: modelRuntime.getModels devuelve descriptores de modelo (objetos JSON planos);
+				// buildZaiCatalogOverride solo los lee estructuralmente, no depende de su tipo nominal.
 				const builtin = (modelRuntime.getModels?.(ZAI_PROVIDER) ??
 					[]) as unknown as Array<Record<string, unknown>>;
 				const override = buildZaiCatalogOverride(builtin, ids, {
