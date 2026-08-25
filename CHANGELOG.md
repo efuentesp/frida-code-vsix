@@ -17,6 +17,26 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.32.0] - 2026-08-25
+### Añadido
+
+- **workflows** — M1 frida-understand-app — fases 2-7: patrón builtin, seam del moat y publicación
+- **workflows** — M1 frida-understand-app — Fase 1: prompts y resolver 3-capas
+- **workflows** — M8 skill pack frida-app-walkthrough — patrón builtin app-walkthrough
+
+### Corregido
+
+- **app-walkthrough** — contrato real del binario agent-browser (smoke VN §8)
+
+### Interno
+
+- **rpiv** — validación M1 understand-app (pass) — checkmarks de fases 2-7
+- **rpiv** — pipeline M1 understand-app — FRD, research, design, plan y validación
+- **how-to** — guía paso a paso de app-walkthrough — de cero a los entregables
+- **validation** — verificación M8 app-walkthrough (pass)
+- **roadmap** — integrar Pista M (modernización de apps) — M8 y M1 a P1
+- **app-walkthrough** — reformato pi-lens post-commit (d958d4f)
+
 ## [0.31.0] - 2026-08-23
 ### Añadido
 
