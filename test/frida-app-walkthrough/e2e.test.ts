@@ -132,10 +132,14 @@ case "$cmd" in
 				printf '{"success":true}\\n'
 				;;
 		get)
+				# Contrato del binario REAL (smoke 2026-08-24): data tipado
+				# {url|title, lifecycle} — el mock reproduce esa forma para que
+				# la suite regrese el bug del "[object Object]" si el script
+				# vuelve a hacer String(data) plano.
 				if [ "$1" = "url" ]; then
-						printf '{"success":true,"data":"%s"}\\n' "$(cur)"
+					printf '{"success":true,"data":{"url":"%s","lifecycle":{"reused":true}}}\\n' "$(cur)"
 				else
-						printf '{"success":true,"data":"%s"}\\n' "$(title_for "$(cur)")"
+					printf '{"success":true,"data":{"title":"%s","lifecycle":{"reused":true}}}\\n' "$(title_for "$(cur)")"
 				fi
 				;;
 		snapshot)

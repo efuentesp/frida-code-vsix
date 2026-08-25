@@ -275,6 +275,18 @@ async function abRun(cmd) {
 	return env
 }
 
+// Contrato del binario real (smoke 2026-08-24): get url/title devuelven data
+// TIPADO ({ url } / { title }, más lifecycle) — nunca string plano; si se
+// hace String(data) directo sale "[object Object]" y el canon de dedup
+// colapsa todas las pantallas en una. Normaliza ambos mundos (el data
+// string plano queda aceptado por compatibilidad con mocks legibles).
+function strData(env, key) {
+	const d = env && env.data
+	if (typeof d === "string") return d
+	if (d && typeof d === "object" && typeof d[key] === "string") return d[key]
+	return ""
+}
+
 // Slug ASCII [a-z0-9-] máx 24 para screenshots (lesson d397401: filenames
 // es-MX no-ASCII). Sin Intl en el sandbox — tabla manual de acentos.
 function slug(title) {
@@ -329,6 +341,11 @@ try {
 }
 inv.run.startedAt = (await run("date '+%Y-%m-%d %H:%M:%S %z'")).trim()
 inv.run.startedAtEpoch = parseInt((await run("date +%s")).trim(), 10)
+// Lesson del smoke real (2026-08-24): el daemon de agent-browser resuelve
+// rutas relativas contra SU PROPIO cwd, no el del caller — una ruta
+// relativa al screenshot falla con ENOENT aunque el directorio exista en
+// el cwd del sandbox. Todo path que se pase AL DAEMON va absoluto.
+const runDir = (await run("pwd")).trim()
 const deadline = maxMinutes > 0 ? inv.run.startedAtEpoch + maxMinutes * 60 : 0
 await invWrite()
 
@@ -348,21 +365,25 @@ while (!done) {
 	const snapR = await shell(ab("snapshot -i") + " > " + snapPath)
 	if (snapR.exitCode !== 0) throw new Error("app-walkthrough: snapshot falló en paso " + steps + " — " + String(snapR.stderr || "").slice(0, 300) + " (¿sigue viva la sesión '" + session + "'?)")
 	const snapText = await run("head -c 24000 " + snapPath)
-	// 1b. El prompt del intérprete recibe el data del envelope (cuerpo a11y +
-	// tabla de refs, como su prompt describe), no el sobre completo; fallback
-	// al crudo truncado si el parse falla.
+	// 1b. El prompt del intérprete recibe el CUERPO a11y (data.snapshot con
+	// [ref=eN]) + la tabla de refs del envelope — contrato real del binario
+	// (smoke 2026-08-24); fallback al crudo truncado si el parse falla.
 	let snapForPrompt = snapText
 	try {
 		const snapFull = await run("cat " + snapPath)
 		const sj = JSON.parse(snapFull)
-		if (sj && sj.data) snapForPrompt = JSON.stringify(sj.data).slice(0, 24000)
+		if (sj && sj.data && typeof sj.data.snapshot === "string") {
+			snapForPrompt = sj.data.snapshot + "\\n\\n## Refs\\n" + JSON.stringify(sj.data.refs)
+		} else if (sj && sj.data) {
+			snapForPrompt = JSON.stringify(sj.data).slice(0, 24000)
+		}
 	} catch (e2) { snapForPrompt = snapText }
 
 	// 2. Identidad de la pantalla + dedup por origin canónico.
 	const urlR = await abRun("get url")
 	const titleR = await abRun("get title")
-	const origin = String((urlR && urlR.data) || "")
-	const title = String((titleR && titleR.data) || "")
+	const origin = strData(urlR, "url")
+	const title = strData(titleR, "title")
 	const canon = canonOrigin(origin)
 	let screen = null
 	for (let si = 0; si < inv.screens.length; si++) {
@@ -384,7 +405,8 @@ while (!done) {
 	if (isNew) {
 		const id = "P" + String(inv.screens.length + 1).padStart(2, "0")
 		const shot = ART + "/screenshots/" + id + "-" + slug(title) + ".png"
-		const shotR = await tryRun(ab("screenshot " + shq(shot)))
+		// shot (relativo) queda en el inventario/README; al daemon va ABSOLUTO.
+		const shotR = await tryRun(ab("screenshot " + shq(runDir + "/" + shot)))
 		screen = { id: id, canon: canon, origin: origin, title: title, firstSeenStep: steps, snapshot: snapPath, screenshot: shotR.exitCode === 0 ? shot : "", purpose: "", userRoles: [], mainElements: [], validationEvidence: [] }
 		inv.screens.push(screen)
 		if (shotR.exitCode !== 0) log("app-walkthrough: screenshot falló para " + id + " — el juez lo reportará")
