@@ -85,11 +85,11 @@ function optionalString(
 }
 
 /**
-	* Validación eager (análogo validateTeaAutomateArgs, frida-tea/workflow.ts:104).
-	* maxScreens es requerido A PROPÓSITO (D4): la corrida es desatendida tras el
-	* launch (checkpoint booleano; ask_user_question solo en sesión principal),
-	* así que el presupuesto se pregunta ANTES y llega ya resuelto en args.
-	*/
+ * Validación eager (análogo validateTeaAutomateArgs, frida-tea/workflow.ts:104).
+ * maxScreens es requerido A PROPÓSITO (D4): la corrida es desatendida tras el
+ * launch (checkpoint booleano; ask_user_question solo en sesión principal),
+ * así que el presupuesto se pregunta ANTES y llega ya resuelto en args.
+ */
 export function validateAppWalkthroughArgs(args: unknown): AppWalkthroughArgs {
 	const record = asRecord(args);
 	if (typeof record.url !== "string" || !record.url.trim()) {
@@ -128,8 +128,7 @@ export function validateAppWalkthroughArgs(args: unknown): AppWalkthroughArgs {
 		maxScreens: record.maxScreens,
 		maxMinutes: record.maxMinutes ?? 0,
 		session: optionalString(record, "session") ?? DEFAULT_SESSION_NAME,
-		language:
-			optionalString(record, "language") ?? DEFAULT_ARTIFACT_LANGUAGE,
+		language: optionalString(record, "language") ?? DEFAULT_ARTIFACT_LANGUAGE,
 		review: parseReview(record, "app-walkthrough"),
 	};
 }
@@ -165,10 +164,10 @@ function stageConsts(stages: ResolvedWalkthroughStage[]): string {
 }
 
 /**
-	* Escritores del fanout de análisis: clave → archivo (relativo a
-	* docs/funcional/) + brief de contenido. Se interpola al sandbox como specs
-	* planas; el script las mapea a rutas con ART.
-	*/
+ * Escritores del fanout de análisis: clave → archivo (relativo a
+ * docs/funcional/) + brief de contenido. Se interpola al sandbox como specs
+ * planas; el script las mapea a rutas con ART.
+ */
 const ANALYZE_WRITERS: ReadonlyArray<{
 	key: string;
 	file: string;
@@ -177,30 +176,34 @@ const ANALYZE_WRITERS: ReadonlyArray<{
 	{
 		key: "catalogo",
 		file: "catalogo-pantallas.md",
-		brief: "Catálogo 1:1 de las pantallas del inventario (P01..Pnn): por cada pantalla — id, título, origen, propósito funcional, roles de usuario, elementos interactivos clave y link a su screenshot (relativo). Tabla índice al inicio. Nada que no esté en el inventario o en los snapshots.",
+		brief:
+			"Catálogo 1:1 de las pantallas del inventario (P01..Pnn): por cada pantalla — id, título, origen, propósito funcional, roles de usuario, elementos interactivos clave y link a su screenshot (relativo). Tabla índice al inicio. Nada que no esté en el inventario o en los snapshots.",
 	},
 	{
 		key: "journeys",
 		file: "journeys.md",
-		brief: "Flujos de usuario (J01..) reconstruidos desde el actionLog del inventario: cada journey es una secuencia screenId→acción→resultado que la corrida ejerció de verdad (cítala por paso). Si el actionLog es pobre, documenta los flujos evidentes del catálogo y dilo explícitamente.",
+		brief:
+			"Flujos de usuario (J01..) reconstruidos desde el actionLog del inventario: cada journey es una secuencia screenId→acción→resultado que la corrida ejerció de verdad (cítala por paso). Si el actionLog es pobre, documenta los flujos evidentes del catálogo y dilo explícitamente.",
 	},
 	{
 		key: "reglas",
 		file: "reglas-negocio.md",
-		brief: "Reglas de negocio y validaciones (R01..) con evidencia: cada regla referencia el snapshot post-error (docs/funcional/artifacts/steps/*-validation.json) o el snapshot de la pantalla que la sugiere. Sin evidencia en disco → 'sin evidencia suficiente', no inventes la regla.",
+		brief:
+			"Reglas de negocio y validaciones (R01..) con evidencia: cada regla referencia el snapshot post-error (docs/funcional/artifacts/steps/*-validation.json) o el snapshot de la pantalla que la sugiere. Sin evidencia en disco → 'sin evidencia suficiente', no inventes la regla.",
 	},
 	{
 		key: "roles",
 		file: "roles-permisos.md",
-		brief: "Roles y permisos (A01..): roles detectados por pantalla (userRoles del inventario), qué ve/hace cada quien, pantallas exclusivas de un rol. Si no hay evidencia de roles diferenciados, decláralo explícitamente ('sin evidencia suficiente') y documenta el acceso como usuario autenticado único.",
+		brief:
+			"Roles y permisos (A01..): roles detectados por pantalla (userRoles del inventario), qué ve/hace cada quien, pantallas exclusivas de un rol. Si no hay evidencia de roles diferenciados, decláralo explícitamente ('sin evidencia suficiente') y documenta el acceso como usuario autenticado único.",
 	},
 ];
 
 /**
-	* Tope absoluto de pasos del loop explore: guard anti-loop-infinito (un agente
-	* que insista en refs stale o pantallas ya agotadas no cuelga la corrida).
-	* 3 pasos por pantalla presupuestada, piso 30, tope 200 (modo "todo").
-	*/
+ * Tope absoluto de pasos del loop explore: guard anti-loop-infinito (un agente
+ * que insista en refs stale o pantallas ya agotadas no cuelga la corrida).
+ * 3 pasos por pantalla presupuestada, piso 30, tope 200 (modo "todo").
+ */
 function stepLimitFor(maxScreens: number): number {
 	if (maxScreens <= 0) return 200;
 	return Math.min(Math.max(30, maxScreens * 3), 200);

@@ -65,11 +65,11 @@ afterEach(() => {
 });
 
 /**
-	* Binario mock de agent-browser: app demo determinista de 5 pantallas con
-	* estado en disco (cada comando del sandbox es un proceso nuevo). Tour
-	* cableado: inicio → productos (form agrega ?q=) → producto/1 → productos →
-	* carrito → perfil (validación con error). El estado vive en <bin>/state.
-	*/
+ * Binario mock de agent-browser: app demo determinista de 5 pantallas con
+ * estado en disco (cada comando del sandbox es un proceso nuevo). Tour
+ * cableado: inicio → productos (form agrega ?q=) → producto/1 → productos →
+ * carrito → perfil (validación con error). El estado vive en <bin>/state.
+ */
 const BROWSER_MOCK = `#!/usr/bin/env bash
 # mock agent-browser (e2e frida-app-walkthrough) — envelopes como el real.
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -191,7 +191,7 @@ function writeFakeDate(): void {
 }
 
 /** Escribe un artefacto en el cwd de la corrida (contrato #83: los mocks
-	* escriben archivos reales como los agentes con file tools). */
+ * escriben archivos reales como los agentes con file tools). */
 function writeArtifact(base: string, rel: string, content = "# doc\n"): void {
 	const p = join(base, rel);
 	mkdirSync(join(p, ".."), { recursive: true });
@@ -208,10 +208,10 @@ interface SpawnOptions {
 }
 
 /**
-	* Spawner mock por anclas de runtime context (molde tea e2e). El intérprete
-	* decide por canon de pantalla (mismo criterio de dedup que el script); los
-	* escritores escriben archivos reales; el juez responde según opts.
-	*/
+ * Spawner mock por anclas de runtime context (molde tea e2e). El intérprete
+ * decide por canon de pantalla (mismo criterio de dedup que el script); los
+ * escritores escriben archivos reales; el juez responde según opts.
+ */
 const makeSpawn = (
 	opts: SpawnOptions = {},
 	seen: string[] = [],
@@ -231,26 +231,57 @@ const makeSpawn = (
 				nextAction,
 			});
 			if (canon === BASE + "/inicio") {
-				return interp({ kind: "click", ref: "@e1", description: "ir a productos" }, "Portada");
+				return interp(
+					{ kind: "click", ref: "@e1", description: "ir a productos" },
+					"Portada",
+				);
 			}
 			if (canon === BASE + "/productos") {
 				if (isNew) {
-					return interp({ kind: "form", ref: "@e5", fields: [{ selector: "@e4", value: "laptop" }], description: "buscar laptop" }, "Listado");
+					return interp(
+						{
+							kind: "form",
+							ref: "@e5",
+							fields: [{ selector: "@e4", value: "laptop" }],
+							description: "buscar laptop",
+						},
+						"Listado",
+					);
 				}
 				if (prompt.includes("P03")) {
-					return interp({ kind: "goto", url: BASE + "/carrito", description: "ir a carrito" }, "Listado");
+					return interp(
+						{ kind: "goto", url: BASE + "/carrito", description: "ir a carrito" },
+						"Listado",
+					);
 				}
-				return interp({ kind: "click", ref: "@e1", description: "abrir detalle" }, "Listado");
+				return interp(
+					{ kind: "click", ref: "@e1", description: "abrir detalle" },
+					"Listado",
+				);
 			}
 			if (canon === BASE + "/producto/1") {
-				return interp({ kind: "click", ref: "@e1", description: "volver al listado" }, "Detalle");
+				return interp(
+					{ kind: "click", ref: "@e1", description: "volver al listado" },
+					"Detalle",
+				);
 			}
 			if (canon === BASE + "/carrito") {
-				return interp({ kind: "goto", url: BASE + "/perfil", description: "ir a perfil" }, "Carrito");
+				return interp(
+					{ kind: "goto", url: BASE + "/perfil", description: "ir a perfil" },
+					"Carrito",
+				);
 			}
 			if (canon === BASE + "/perfil") {
 				return isNew
-					? interp({ kind: "validate", ref: "@e4", fields: [{ selector: "@e3", value: "" }], description: "submit invalido" }, "Perfil")
+					? interp(
+							{
+								kind: "validate",
+								ref: "@e4",
+								fields: [{ selector: "@e3", value: "" }],
+								description: "submit invalido",
+							},
+							"Perfil",
+						)
 					: interp({ kind: "done", description: "app cubierta" }, "Perfil");
 			}
 			return interp({ kind: "done", description: "(default)" }, "?");
@@ -265,12 +296,20 @@ const makeSpawn = (
 			if (opts.flakyDoc && file === opts.flakyDoc && !isRetry) {
 				return { doc: file, sections: ["falla"], summary: "primera pasada vacia" };
 			}
-			writeArtifact(artifactsCwd, file, "# " + file + "\n\nEscrito por el escritor mock.\n");
+			writeArtifact(
+				artifactsCwd,
+				file,
+				"# " + file + "\n\nEscrito por el escritor mock.\n",
+			);
 			return { doc: file, sections: ["resumen"], summary: file + " escrito" };
 		}
 		// Juez — ancla: bloque "## Entregables a auditar".
 		if (prompt.includes("## Entregables a auditar")) {
-			return { decision: opts.judgeDecision ?? "PASS", findings: [], summary: "auditoria mock" };
+			return {
+				decision: opts.judgeDecision ?? "PASS",
+				findings: [],
+				summary: "auditoria mock",
+			};
 		}
 		return "echo: " + prompt.slice(0, 40);
 	}) as unknown as SpawnAgentFn;
@@ -286,7 +325,12 @@ interface InventoryScreen {
 interface Inventory {
 	run: { url: string; maxScreens: number; maxMinutes: number };
 	screens: InventoryScreen[];
-	actionLog: Array<{ step: number; screenId: string; kind: string; outcome: string }>;
+	actionLog: Array<{
+		step: number;
+		screenId: string;
+		kind: string;
+		outcome: string;
+	}>;
 	stoppedBy: string;
 	stoppedByTime: boolean;
 }
@@ -349,11 +393,19 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 		}
 
 		const inv = readInv(cwd);
-		expect(inv.screens.map((s) => s.id)).toEqual(["P01", "P02", "P03", "P04", "P05"]);
+		expect(inv.screens.map((s) => s.id)).toEqual([
+			"P01",
+			"P02",
+			"P03",
+			"P04",
+			"P05",
+		]);
 		expect(inv.run.url).toBe(BASE + "/inicio");
 		// DEDUP por origin canonico: /productos se visita en los pasos 2, 3 y 5
 		// (con ?q= tras el form) y queda registrado UNA sola vez.
-		expect(inv.screens.filter((s) => s.canon === BASE + "/productos")).toHaveLength(1);
+		expect(
+			inv.screens.filter((s) => s.canon === BASE + "/productos"),
+		).toHaveLength(1);
 		expect(inv.actionLog.filter((a) => a.screenId === "P02")).toHaveLength(3);
 		// Los 5 kinds de nextAction ejercidos; todos con outcome ok.
 		expect([...new Set(inv.actionLog.map((a) => a.kind))].sort()).toEqual([
@@ -369,14 +421,18 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 
 		const stepsDir = readdirSync(join(cwd, DOC, "artifacts/steps"));
 		expect(stepsDir.filter((f) => f.endsWith("-snapshot.json"))).toHaveLength(8);
-		expect(stepsDir.filter((f) => f.endsWith("-validation.json"))).toHaveLength(1);
+		expect(stepsDir.filter((f) => f.endsWith("-validation.json"))).toHaveLength(
+			1,
+		);
 
 		// Screenshots reales por pantalla (mock honesto, lesson bffd6f1).
 		const shots = readdirSync(join(cwd, DOC, "screenshots"));
 		expect(shots).toHaveLength(5);
 		expect(shots).toContain("P01-inicio.png");
 		for (const shot of shots) {
-			expect(statSync(join(cwd, DOC, "screenshots", shot)).size).toBeGreaterThan(0);
+			expect(statSync(join(cwd, DOC, "screenshots", shot)).size).toBeGreaterThan(
+				0,
+			);
 		}
 
 		// README e index.html sintetizados desde el MISMO inventario (D9).
@@ -434,7 +490,12 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 
 	it("corta por wall-clock (maxMinutes=1) marcando stoppedByTime (D6)", async () => {
 		writeFakeDate(); // +30 s por llamada a epoch: vence en el paso 2
-		const args = { url: BASE + "/inicio", maxScreens: 0, maxMinutes: 1, review: "auto" };
+		const args = {
+			url: BASE + "/inicio",
+			maxScreens: 0,
+			maxMinutes: 1,
+			review: "auto",
+		};
 		const script = APP_WALKTHROUGH_PATTERN.resolve(args, { cwd });
 
 		const { result } = await runWorkflowInStore({
@@ -449,7 +510,12 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 			foreground: false,
 		});
 
-		const r = result as { screens: number; steps: number; stoppedBy: string; stoppedByTime: boolean };
+		const r = result as {
+			screens: number;
+			steps: number;
+			stoppedBy: string;
+			stoppedByTime: boolean;
+		};
 		expect(r.stoppedBy).toBe("time");
 		expect(r.stoppedByTime).toBe(true);
 		expect(r.screens).toBe(1);
@@ -479,7 +545,9 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 
 		await expect(promise).rejects.toThrow(/NO escribieron/);
 		// El reintento informado corrio UNA vez antes de fallar (lesson 619d9e7).
-		expect(seen.some((p) => p.includes("FALLA ANTERIOR") && p.includes("journeys.md"))).toBe(true);
+		expect(
+			seen.some((p) => p.includes("FALLA ANTERIOR") && p.includes("journeys.md")),
+		).toBe(true);
 		expect(existsSync(docPath(cwd, "journeys.md"))).toBe(false);
 	}, 30000);
 
@@ -548,7 +616,9 @@ describe("frida-app-walkthrough · e2e sobre el motor (#133)", () => {
 		const first = await runOnce();
 		const second = await runOnce();
 		expect(second.screens).toEqual(first.screens);
-		expect(second.actionLog.map((a) => a.kind)).toEqual(first.actionLog.map((a) => a.kind));
+		expect(second.actionLog.map((a) => a.kind)).toEqual(
+			first.actionLog.map((a) => a.kind),
+		);
 	}, 45000);
 });
 

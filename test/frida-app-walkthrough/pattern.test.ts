@@ -43,12 +43,10 @@ const VALID = { url: "https://app.ejemplo.com", maxScreens: 5 };
 describe("frida-app-walkthrough · validación eager de args (#133)", () => {
 	it("requiere url no vacía", () => {
 		expect(() => APP_WALKTHROUGH_PATTERN.resolve({}, { cwd })).toThrow(/url/);
-		expect(() =>
-			APP_WALKTHROUGH_PATTERN.resolve({ url: "  " }, { cwd }),
-		).toThrow(/url/);
-		expect(() => APP_WALKTHROUGH_PATTERN.resolve(null, { cwd })).toThrow(
+		expect(() => APP_WALKTHROUGH_PATTERN.resolve({ url: "  " }, { cwd })).toThrow(
 			/url/,
 		);
+		expect(() => APP_WALKTHROUGH_PATTERN.resolve(null, { cwd })).toThrow(/url/);
 	});
 
 	it("maxScreens faltante instruye preguntar pre-launch (D4)", () => {
@@ -85,10 +83,7 @@ describe("frida-app-walkthrough · validación eager de args (#133)", () => {
 
 	it("review inválido se rechaza", () => {
 		expect(() =>
-			APP_WALKTHROUGH_PATTERN.resolve(
-				{ ...VALID, review: "sometimes" },
-				{ cwd },
-			),
+			APP_WALKTHROUGH_PATTERN.resolve({ ...VALID, review: "sometimes" }, { cwd }),
 		).toThrow(/review/);
 	});
 });

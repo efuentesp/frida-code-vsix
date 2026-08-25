@@ -30,13 +30,12 @@ export function userOverridesPath(): string {
 
 export type ResolvedWalkthroughStage = ResolvedLayeredStage<WalkthroughStage>;
 
-const resolveWalkthroughStages =
-	createLayeredStageResolver<WalkthroughStage>({
-		stages: WALKTHROUGH_STAGES,
-		defaults: DEFAULT_STAGE_PROMPTS,
-		teamPath: TEAM_OVERRIDES_PATH,
-		userPath: userOverridesPath,
-	});
+const resolveWalkthroughStages = createLayeredStageResolver<WalkthroughStage>({
+	stages: WALKTHROUGH_STAGES,
+	defaults: DEFAULT_STAGE_PROMPTS,
+	teamPath: TEAM_OVERRIDES_PATH,
+	userPath: userOverridesPath,
+});
 
 /**
  * Resuelve los prompts efectivos de los 3 stages. JSON inválido en una capa

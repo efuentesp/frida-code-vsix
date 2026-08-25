@@ -68,18 +68,14 @@ describe("frida-app-walkthrough · resolver 3-capas (#133)", () => {
 		expect(judge.source).toBe("team");
 		expect(judge.prompt).toBe("JUEZ DE EQUIPO");
 		// Los demás stages siguen en defaults (3 stages - 1 override).
-		expect(
-			resolved.filter((r) => r.source === "defaults"),
-		).toHaveLength(2);
+		expect(resolved.filter((r) => r.source === "defaults")).toHaveLength(2);
 	});
 
 	it("usuario gana sobre equipo y defaults", () => {
 		writeTeamOverrides({ stages: { explore: "EQUIPO", judge: "EQUIPO" } });
 		writeUserOverrides({ stages: { explore: "USUARIO" } });
 		const resolved = resolveStagePrompts(projectRoot);
-		expect(resolved.find((r) => r.stage === "explore")!.prompt).toBe(
-			"USUARIO",
-		);
+		expect(resolved.find((r) => r.stage === "explore")!.prompt).toBe("USUARIO");
 		expect(resolved.find((r) => r.stage === "explore")!.source).toBe("user");
 		expect(resolved.find((r) => r.stage === "judge")!.prompt).toBe("EQUIPO");
 	});
@@ -96,11 +92,7 @@ describe("frida-app-walkthrough · resolver 3-capas (#133)", () => {
 		mkdirSync(join(projectRoot, ".frida", "app-walkthrough"), {
 			recursive: true,
 		});
-		writeFileSync(
-			join(projectRoot, TEAM_OVERRIDES_PATH),
-			"{ no json",
-			"utf-8",
-		);
+		writeFileSync(join(projectRoot, TEAM_OVERRIDES_PATH), "{ no json", "utf-8");
 		expect(() => resolveStagePrompts(projectRoot)).toThrow(/JSON inválido/);
 	});
 

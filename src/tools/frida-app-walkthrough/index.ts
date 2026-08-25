@@ -35,7 +35,8 @@ export const APP_WALKTHROUGH_PATTERN: BuiltinPattern = {
 	name: "app-walkthrough",
 	description:
 		"Documenta una app web usándola como usuario real: exploración secuencial sobre una sesión de navegador pre-autenticada (pin --session), interpretación pantalla por pantalla, fan-out de 4 escritores (catálogo, journeys, reglas, roles) y juez PASS/CONCERNS/FAIL. Entregables en docs/funcional/ (README, catálogo, journeys, reglas, roles + dashboard index.html autónomo).",
-	args: '{ url: string (requerida, la app), maxScreens: number (REQUERIDO, entero 0-200; 0 = "todo"), maxMinutes?: number (entero 1-240, backstop wall-clock), session?: string (default "app-walkthrough"), language?: string (default "es-MX"), review?: "manual"|"auto" }',
+	args:
+		'{ url: string (requerida, la app), maxScreens: number (REQUERIDO, entero 0-200; 0 = "todo"), maxMinutes?: number (entero 1-240, backstop wall-clock), session?: string (default "app-walkthrough"), language?: string (default "es-MX"), review?: "manual"|"auto" }',
 	meta: { requiredTools: ["shell"], executionHints: { autonomous: true } },
 	resolve(args: unknown, ctx?: { cwd: string }) {
 		const validated = validateAppWalkthroughArgs(args);

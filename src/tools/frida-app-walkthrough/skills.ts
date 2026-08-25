@@ -56,10 +56,9 @@ POLÍTICA DE ACCIONES (no negociable — aplica a cualquier acción sobre la app
  * antepone WALKTHROUGH_PREAMBLE e interpola el runtime context (paso,
  * inventario, rutas, idioma) antes de pasárselo a agent().
  */
-export const DEFAULT_STAGE_PROMPTS: Readonly<
-	Record<WalkthroughStage, string>
-> = {
-	explore: `# Exploración — Intérprete de pantalla
+export const DEFAULT_STAGE_PROMPTS: Readonly<Record<WalkthroughStage, string>> =
+ {
+  explore: `# Exploración — Intérprete de pantalla
 
 Interpretas UNA pantalla de la app a la vez. Recibes en runtime context: el
 snapshot semántico (cuerpo a11y con [ref=eN] y tabla de refs) de la pantalla
@@ -92,7 +91,7 @@ Tu trabajo:
 
 Responde SOLO el JSON de tu contrato de salida.`,
 
-	analyze: `# Análisis — Escritor de un documento funcional
+  analyze: `# Análisis — Escritor de un documento funcional
 
 Eres UNO de los escritores del fanout de análisis. Recibes en runtime
 context: la ruta exacta del documento que te toca escribir, su especificación
@@ -117,7 +116,7 @@ Reglas:
 - Tu respuesta es SOLO el JSON de tu contrato de salida (resumen del
   documento), nunca el contenido inline.`,
 
-	judge: `# Juez — Verificación de cobertura (detached)
+  judge: `# Juez — Verificación de cobertura (detached)
 
 Auditas, no resumes: eres el último chequeo antes de entregar la
 documentación funcional. Lee los artefactos REALES en disco antes de juzgar
@@ -143,4 +142,4 @@ Decisiones (estrictas):
 Cada finding: severity (CRITICAL/HIGH/MEDIUM/LOW), evidence (path o cita),
 fix accionable. Un CONCERNS honesto vale más que un PASS cortés.
 Responde SOLO el JSON de tu contrato de salida.`,
-};
+ };
