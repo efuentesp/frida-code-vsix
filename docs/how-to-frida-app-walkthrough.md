@@ -54,6 +54,115 @@ screenshots, el dashboard `index.html` (ábrelo en cualquier navegador) y la
 decisión del juez. Con `review: "manual"` (default) hay un checkpoint final
 para aprobar.
 
+## Guía paso a paso — de cero a los entregables
+
+La versión detallada del flujo típico, con los comandos exactos y qué esperar
+en cada paso. Tiempo total típico: 10–40 min según el tamaño de la app — la
+mayor parte es espera desatendida mientras el workflow explora.
+
+### Antes de empezar
+
+- Frida Code con la extensión cargada y el motor `frida-extensible-workflows`
+  activo (el pack no necesita settings propios).
+- La URL de la app y tus credenciales para iniciar sesión TÚ — el workflow
+  nunca introduce credenciales ni hace login por ti (política del pack).
+- Una idea del presupuesto: ¿cuántas pantallas únicas esperas? (app mediana:
+  20–50; `0` = "todo").
+
+### Paso 1 — Abre la sesión del navegador y autentícate
+
+Pídelo en el chat de Frida:
+
+```text
+Tú: abre https://app.ejemplo.com en la sesión "app-walkthrough"
+```
+
+El agente corre `agent_browser({ args: ["--session", "app-walkthrough",
+"open", "https://app.ejemplo.com"] })` y se abre una ventana de navegador
+real. Inicia sesión con tu usuario, espera a quedar DENTRO de la app (pasado
+el login) y vuelve al chat.
+
+✓ Check: la sesión queda viva con ese nombre exacto — el workflow la reusará
+con el pin `--session` en cada comando. Si prefieres otro nombre, sé
+consistente y pásalo en el Paso 4 (`session: "tu-nombre"`).
+
+### Paso 2 — Pide documentar la app
+
+```text
+Tú: documenta la app en https://app.ejemplo.com
+    (ya inicié sesión en la sesión "app-walkthrough")
+```
+
+### Paso 3 — Responde la pregunta de presupuesto
+
+El agente pregunta con `ask_user_question`: **¿Presupuesto de exploración?**
+Elige "30 pantallas", "todo" (= sin tope) o un número propio. El presupuesto
+se pregunta ANTES del launch porque tras el lanzamiento la corrida es
+desatendida (el único checkpoint es el final, y es booleano).
+
+### Paso 4 — Lanzamiento (desatendido desde aquí)
+
+El agente lanza:
+
+```text
+workflow({ name: "app-walkthrough",
+           args: { url: "https://app.ejemplo.com", maxScreens: 30 } })
+```
+
+Qué verás en el panel de workflows — 5 fases en orden:
+
+1. `bootstrap` — valida que la sesión siga viva (si falla, el error trae la
+   receta exacta: vuelve al Paso 1 y relanza) y abre la URL.
+2. `explore` — el loop pantalla por pantalla: snapshot → screenshot de
+   pantalla nueva → un agente interpreta y decide el siguiente click. El
+   progreso se ve paso a paso; corta sola al agotar presupuesto.
+3. `analyze` — 4 escritores en paralelo redactan desde la evidencia en disco
+   (no navegan).
+4. `synthesize` — `README.md` + dashboard `index.html` desde el inventario.
+5. `judge` — auditoría final contra los archivos reales.
+
+Durante la corrida NO interactúas con la ventana del navegador: el script
+navega por su cuenta. Puedes mirarla, pero no clickear (tu click cambia la
+pantalla bajo los pies del explorador).
+
+### Paso 5 — Checkpoint final (default: revisión manual)
+
+Con `review: "manual"` (default) la corrida se detiene al final con un
+resumen: N pantallas, decisión del juez y rutas de los entregables. Aprueba
+para terminar; recházalo si algo se ve mal (el workflow se detiene sin
+esperar).
+
+### Paso 6 — Lee los entregables
+
+1. `docs/funcional/README.md` — el índice: corrida, conteos, links a todo.
+2. `docs/funcional/index.html` — ábrelo en tu navegador: tarjetas por
+   pantalla con screenshot.
+3. Los 4 documentos: `catalogo-pantallas.md`, `journeys.md`,
+   `reglas-negocio.md`, `roles-permisos.md`.
+4. Evidencia cruda si necesitas auditar: `artifacts/steps/` (snapshots por
+   paso), `screenshots/` (por pantalla) y `artifacts/inventory.json`
+   (registro auditable de la corrida).
+
+### Paso 7 — Si el juez dice CONCERNS
+
+No es un defecto: significa "verificado en general, con debilidades
+específicas listadas y con evidencia". Lo típico es exploración detenida
+por presupuesto o tiempo — relanza con un `maxScreens` / `maxMinutes`
+mayor, o con otra sesión autenticada bajo otro rol para cubrir pantallas
+exclusivas de ese rol. `FAIL` sí indica que una claim no se sostiene (p. ej.
+conteos que no coinciden): revisa los findings del juez antes de confiar en
+los documentos.
+
+### Problemas frecuentes
+
+| Síntoma | Causa probable | Remedio |
+| --- | --- | --- |
+| `la sesión de navegador 'app-walkthrough' no está viva` | ventana cerrada, otro nombre de sesión, o Frida reiniciado | Repite el Paso 1 y relanza — nada se pierde |
+| `la exploración no registró ninguna pantalla` | la app no cargó (URL incorrecta, redirección a login) | Abre la URL tú mismo en la sesión, verifica que cargue y relanza |
+| Corte `budget` / `time` / `stepLimit` antes de lo esperado | presupuesto chico para el tamaño de la app | Relanza con `maxScreens` / `maxMinutes` mayores |
+| Pantallas de un rol ausentes del catálogo | la sesión autenticada no tiene ese rol | Pre-autentica con un usuario de ese rol y relanza |
+| Escritores fallan con `NO escribieron:` | glitch transitorio de los agentes escritores | Relanza — el gate reintenta una vez solo; si persiste, revisa espacio en disco y permisos de `docs/funcional/` |
+
 ## Recetas
 
 ### Documentar una app por primera vez
