@@ -14,16 +14,32 @@
 > [research](../.rpiv/artifacts/research/2026-08-22_oh-my-pi-vs-frida.md) y el
 > [roadmap UI/UX](../.rpiv/artifacts/plans/2026-08-19_ui-ux-copilot-roadmap.md)
 > con el detalle por fase). Las referencias F7–F13 apuntan a ese documento.
+>
+> **Actualizado 2026-08-24:** integración de la pista de **entendimiento,
+> mantenimiento y modernización de apps desconocidas** — items **M1–M9** —
+> derivada de la investigación de [docs/modernization-apps.md](modernization-apps.md)
+> (§9 técnico, §10 funcional). Los items M viven ahora en su propia sección
+> **Pista M**, ordenada por valor hacia el objetivo "app desconocida →
+> entendida (funcional + técnico) → mantenida → modernizada": **M8
+> (`app-walkthrough`) y M1 (`understand-app`) a P1** (mejor ratio valor/esfuerzo:
+> todo lo que consumen ya existe), **M9, M2 y M3 a P2**, **M6 a P3**; M7 es
+> micro-tarea y M4/M5 quedan condicionales — en gran parte porque **#25✅ ya
+> cubre** búsqueda semántica + call graph (wrapper de open-codebase-index) y
+> pi-lens ya da hotspots/rename.
+>
+> **Refresh P1 (mismo día):** verificación contra issues/código confirma que
+> **#21 ✅, #29 ✅ y F7 ✅ (#121) ya están completos** — este documento los
+> listaba como pendientes. **P1 queda reducido a M8 (#133) y M1 (#134)**.
 
 ## Resumen ejecutivo
 
 | Prioridad | Foco | Issues | Estado |
 | --- | --- | --- | --- |
 | **P0** | Correctness del core (auditoría/facturación + UX de la feature bandera) | #18, #7 | ✅ **Completo** — #18 cerrado (`eb30dbc`); #7 resuelto por el panel de workflows (progreso vivo + live view, v0.29.x) |
-| **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21, #29, **F7** | #25/codebase-index **completo en v0.30.0** (ciclo #100, #109–#120); F7 es el nuevo habilitador |
-| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | #35, #13→#14, #26, #16, **F8, F9, F10** | F8 depende de F7 |
-| **P3** | Ecosistema de skills/packs (dependen de #16 y/o #19) | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, **F12** | **F12 bloqueada por el clúster de abort** |
-| **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39, **#2↗, F11, F13b** | **#2 re-evaluado: ver P2↗** |
+| **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21 ✅, #29 ✅, F7 ✅ (#121), **M8 (#133), M1 (#134)** | Tríada del moat + F7 completos; **solo restan M8 y M1** (Pista M): entendimiento funcional+técnico de apps desconocidas, sin blockers |
+| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | #35, #13→#14, #26, #16, **F8, F9, F10**, **M9, M2, M3** | F8 depende de F7; M9 (puente funcional↔técnico) y M2 (mapa) dependen de M8; M3 suma calidad/auditoría (Sonar) |
+| **P3** | Ecosistema de skills/packs (dependen de #16 y/o #19) | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, **F12**, **M6** | **F12 bloqueada por el clúster de abort**; M6 libre (fase modernización) |
+| **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39, **#2↗, F11, F13b, M7, M4↘, M5** | **#2 re-evaluado: ver P2↗**; M4/M5 re-escalados por solape con #25✅ + pi-lens |
 | **Blocked** | Plataforma | #42 | requiere refactor del bus Remote React |
 
 **Principio rector:** los pilares de Frida (CONTEXT §1-2) son *UX tipo Claude
@@ -49,17 +65,59 @@ y la **UX de la feature bandera**.
 
 Ninguno por sí solo distingue a Frida; **la tríada sí**. Juntos forman la barrera
 de entrada más alta para un competidor y el núcleo del pilar de *contexto*.
-Los tres están **sin bloquear** (no dependen de los P0): arrancar ya.
+✅ **Los tres módulos y F7 ya están completos**; lo único pendiente de P1 son
+M8/M1 (Pista M, sin blockers): arrancar ya.
 
 | Issue | Qué | Rol en el moat | Desbloquea |
 | --- | --- | --- | --- |
 | **#25** `frida-codebase-index` | Búsqueda semántica + call graph | **Grounding** — fundamenta respuestas en el código *real* del proyecto | ✅ **Completo en v0.30.0** — ciclo #100, #109–#120: progreso vivo, gestión de motores de embeddings (4 proveedores, ping, candado), autoindex, honestidad de estados |
-| **#21** `frida-hermes-memory` | Porte nativo de `pi-hermes-memory` | **Memoria** — persistencia de contexto/decisiones entre sesiones | #28, #32 |
-| **#29** `frida-knowledge-base` | KB OKF (capa agente) + Foam (capa humana) | **Conocimiento** — base estructurada que aprende y donde el humano inyecta criterios | #30, #41 |
-| **F7** Roles de modelo y routing | `default`/`smol`/`commit` + fallback chains Enterprise→Ollama | **Habilitador transversal del moat** — memoria, subagents y extracciones al Ollama local (costo 0) liberan cuota Enterprise para lo difícil; resiliencia ante 429/quota | F8, F13; abarata #21, #26, #28, #32 |
+| **#21** `frida-hermes-memory` | Porte nativo de `pi-hermes-memory` | **Memoria** — persistencia de contexto/decisiones entre sesiones | ✅ **Completo — issue cerrado**; retarget de better-sqlite3 al Electron del extension host, auto-review OOB ([how-to-frida-learn](how-to-frida-learn.md)) — destraba #28, #32 |
+| **#29** `frida-knowledge-base` | KB OKF (capa agente) + Foam (capa humana) | **Conocimiento** — base estructurada que aprende y donde el humano inyecta criterios | ✅ **Completo — issue cerrado**; vault OKF v0.2 en `<proyecto>/.llm-wiki/` (`docs/tools/frida-knowledge-base.md`) — destraba #30, #41 |
+| **F7** Roles de modelo y routing (#121) | `default`/`smol`/`commit` + fallback chains Enterprise→Ollama | **Habilitador transversal del moat** — memoria, subagents y extracciones al Ollama local (costo 0); resiliencia ante 429/quota | ✅ **Completo (#121)** — resolvedor puro (`src/model-roles.ts`) + sección Roles en el tab Modelos — destraba F8, F13a |
 
-**Orden sugerido:** ~~#25 primero~~ (✅ hecho) → **F7** (habilitador barato, infra
-existente) → #21 (memoria se apoya en F7 para consolidar) → #29.
+**Orden sugerido:** ~~tríada + F7~~ (✅ todo hecho). **Solo restan M8 (#133) y
+M1 (#134)** — ver [Pista M](#pista-m--entendimiento-de-aplicaciones-funcional--técnico)
+abajo: todo lo que consumen ya está listo.
+
+---
+
+## Pista M — Entendimiento de aplicaciones (funcional + técnico)
+
+> Objetivo de la pista: que Frida tome una **app desconocida** y pueda
+> (1) **usarla como usuario** y documentar su funcionalidad, (2) entender su
+> código, (3) diagnosticar y mantener, y (4) modernizar. Origen:
+> [docs/modernization-apps.md](modernization-apps.md) (§9 técnico, §10
+> funcional). Cada item es una extensión/skill que agrega **una capacidad
+> incremental**; el orden de la tabla = valor aportado hacia ese objetivo.
+
+| Orden | Item | Capacidad que agrega | Valor para el objetivo | Depende de | Esfuerzo | Prioridad |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | **M8** workflow `app-walkthrough` (#133) | El agente **usa la app como usuario nuevo**: navega, prueba acciones/validaciones, y produce el catálogo funcional (pantallas, journeys, reglas de negocio observadas, roles) | **La capacidad que hoy no existe y abre la pista**: Frida entiende código, no funcionalidad. El snapshot semántico de D34 (a11y tree) ya es un inventario funcional de pantalla — solo falta orquestarlo y documentarlo | `frida-agent-browser` ✅ (D34), `frida-subagents` ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
+| 2 | **M1** workflow `understand-app` (#134) | Contraparte **técnica**: overview + hotspots + riesgos → `docs/entendimiento.md` + modelo LikeC4 semilla | Junto con M8 cubre el entendimiento completo (funcional × técnico); además valida M4/M5 vía el piloto | #25 ✅, pi-lens ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
+| 3 | **M9** `frida-traffic2api` (#135) | Del tráfico capturado durante la exploración (HAR/mitmproxy) → **spec OpenAPI** + matriz funcionalidad↔endpoint↔módulo (cruce M8×M1) | **Puente funcional↔técnico**: convierte dos documentos aislados en un mapa accionable para mantenimiento quirúrgico y para detectar endpoints huérfanos | M8 (genera el tráfico), o proxy manual con sesión real | M | **P2** |
+| 4 | **M2** panel "Mapa del proyecto" | Visualizar en producto el mapa técnico (`/lens-map` de pi-lens) **y** el funcional (grafo de journeys de M8); clic → abrir archivo | Comunicar y compartir el entendimiento (equipo, stakeholders, demo comercial) | M8 (mapa funcional), pi-lens ✅ (mapa técnico) | S–M | **P2** |
+| 5 | **M3** `frida-sonar` | Quality gate en el loop: issues por severidad/rama, verificación post-fix, panel de tendencia | Cierra el ciclo entender → diagnosticar → corregir → **verificar**; refuerza el pilar de auditoría | Libre (requiere SonarQube operativo en la empresa) | M | **P2** |
+| 6 | **M6** `frida-openrewrite` | Migraciones mecánicas deterministas: dry-run + diff en VS Code + verificación post-receta | Fase modernización: lo mecánico con recetas type-aware; el criterio queda con el agente (guiado por M1) | M1 (contexto de lo no-mecánico); opcional M3 (verificación) | M–L | **P3** |
+| 7 | **M7** embeddings vía router | Semántica de #25 con el modelo autorizado por la empresa | Micro-tarea de configuración sobre #25 ✅ | Router con endpoint de embeddings compatible OpenAI | XS | P4 |
+| — | **M4↘** porte parcial pi-shazam | (condicional) solo el gap en hotspots/lookup/rename | Solape casi total con pi-lens + #25✅; evaluar tras el piloto | Piloto (modernization-apps §8) | M | P4 — evaluar/cancelar |
+| — | **M5** `frida-codegraph` | (watchlist) grafo persistente para monolitos enormes | Solo si #25 no escala en las apps objetivo | Piloto (modernization-apps §8) | L | P4 — watchlist |
+
+**Detalle de M8 (`app-walkthrough`)** — fases de la [§10 funcional](modernization-apps.md):
+
+1. **Explorar:** el agente navega la app con `frida-agent-browser` (sesión
+   autenticada vía perfiles de D34), snapshot semántico por pantalla, acciones
+   y validaciones probadas, mensajes de error capturados.
+2. **Correlacionar:** tráfico de red durante la exploración → insumo de M9.
+3. **Documentar:** entregables en `docs/funcional/` — catálogo de pantallas,
+   journeys, reglas de negocio observadas, roles/permisos.
+
+Toda acción destructiva/irreversible pasa por el gate (`ApprovalBridge`);
+   el fanout de scouts (subagents) paraleliza la exploración.
+
+> **Watchlist de la pista** (fuentes opcionales para M8/M9, no items propios):
+> análisis de videos/tutoriales de la app (pi-web-access), process mining si
+> hay logs de eventos (pm4py), session replay self-hosted (hyperdx/highlight).
+> Ver [modernization-apps §10](modernization-apps.md).
 
 ---
 
@@ -127,6 +185,10 @@ Valor real pero **menor prioridad estratégica** que el moat (P1). Varios están
 | **F11** Agent Hub | Tab de supervisión de subagents: roster vivo (costo/tokens/actividad), transcript en vivo, steer/revive/kill | Observabilidad pura — buen valor, menor palanca que F7–F10 |
 | **F13b** Menores | `conflict://` en worktrees, dictado 🎤 (#95), magic keywords (`ultrathink`/`orchestrate`/`workflowz`) | Nicho/UX; la memoria 2-fase (F13a) quedó en P1 junto a #21 |
 
+Los items M (M1–M9) viven consolidados en la
+[Pista M](#pista-m--entendimiento-de-aplicaciones-funcional--técnico), con
+dependencias, valor y orden de implementación por item.
+
 > **#2 (Detener/abort) fue movido a P2** — el análisis de TTSR (F12) lo reveló
 > bloqueador estructural, no solo un bug UX de nicho.
 
@@ -135,14 +197,14 @@ Valor real pero **menor prioridad estratégica** que el moat (P1). Varios están
 ## Blocked por plataforma
 
 | Issue | Qué | Bloqueo |
-|---|---|---|
+| --- | --- | --- |
 | **#42** `frida-remote-control` | Control remoto de la sesión embebida (WebSocket sobre el bus Remote React) | Requiere refactor del **bus multiplexado WebBridge**; no es un issue de esta extensión, es de plataforma |
 
 ---
 
 ## Mapa de dependencias (cadenas de bloqueo)
 
-```
+```text
 P0:  #18 ✅ ─┐
        #7 ✅ ─┴─→ #19 ──→ #41 (TEA)
                          ↑
@@ -155,12 +217,22 @@ P0:  #18 ✅ ─┐
 #13 (worktree) → #14 (sesiones paralelas)
 F7 (roles) ─→ F8 (advisor), F13a (memoria 2-fase)
 #2↗ (abort: #85/#90/#96) ─→ F12 (TTSR)
+Pista M (entendimiento de apps):
+  M8 (app-walkthrough) ←─ agent-browser ✅ (D34) + subagents ✅ + workflow ✅
+  M1 (understand-app)  ←─ #25 ✅ + pi-lens ✅ ──valida→ M4, M5
+  M9 (traffic2api)     ←─ M8 ──cruza con→ M1 (matriz función↔endpoint↔módulo)
+  M2 (panel mapa)      ←─ M8 (mapa funcional) + pi-lens ✅ (mapa técnico)
+  M3 (sonar, libre) ─────────────────────────────refuerza→ M6 (verificación)
+  M6 · M7 — libres
 ```
 
 **Lectura:** los nodos de mayor palanca hoy son **F7** (habilitador del moat
 con costo mínimo), **#16** (cadenas de skills) y **#2↗** (abort — destraba F12
 y devuelve control confiable a workflows/subagents). #18✅ y #7✅ ya
 destrabaron la base de la pista de workflows; #25✅ completó el grounding.
+En la pista M, **M8 y M1 tienen el mejor ratio valor/esfuerzo** (todo lo que
+consumen ya existe) y **M8 agrega la única capacidad que hoy no existe**:
+entendimiento funcional de la app a nivel de usuario.
 
 ---
 
@@ -168,18 +240,24 @@ destrabaron la base de la pista de workflows; #25✅ completó el grounding.
 
 1. ~~**Sprint P0**~~ ✅ Completo (#18 cerrado, #7 resuelto por el panel de
    workflows).
-2. **Sprint P1 (moat)** — **F7** (roles/routing, barato e inmediato) → #21
-   (memoria, ahora con consolidación barata vía rol smol) → #29. En paralelo:
-   cerrar issues #79–#84 del panel si hay holgura.
+2. **Sprint P1 (moat)** — ✅ tríada (#25/#21/#29) y F7 (#121) completos. **Restan
+   M8 (#133) y M1 (#134)**: todo lo que consumen (D34, subagents, #25✅, pi-lens,
+   `frida-workflow`) ya está listo — correr junto con el **piloto medible**
+   ([modernization-apps §8 y §10](modernization-apps.md)) que valida M4/M5. En
+   paralelo: cerrar issues #79–#84 del panel si hay holgura.
 3. **En paralelo al P1** — **#2↗ clúster de abort** (#85/#90/#96): es dolor UX
    diario Y prerrequisito de F12; y **investigar #16** (plugins) sin
    comprometer implementación.
 4. **Sprint P2** — F8 (advisor, tras F7) + F9 (web_search keyless) + F10
-   (hashline); #35 (sandboxes) + cerrar #13→#14 + #26.
+   (hashline); #35 (sandboxes) + cerrar #13→#14 + #26; **M9
+   (`frida-traffic2api`, #135) y M2 (panel mapa) al cerrar M8; M3 (`frida-sonar`)**
+   si la empresa confirma SonarQube operativo.
 5. **Sprint P3** — Desbloquear la cadena #19 → #41 y #16 → #38 → #40; **F12**
-   (TTSR) una vez resuelto el abort.
-6. **P4 a demanda** — F11 (Agent Hub), F13b (menores), #17/#23/#24/#27/#31/#33/#36/#39
-   según holgura.
+   (TTSR) una vez resuelto el abort; **M6 (`frida-openrewrite`)** cuando el
+   piloto madure hacia la fase de modernización.
+6. **P4 a demanda** — F11 (Agent Hub), F13b (menores), **M7 (embeddings del
+   router)**, #17/#23/#24/#27/#31/#33/#36/#39 según holgura. **M4/M5 solo si
+   el piloto demuestra el gap.**
 
 ---
 
