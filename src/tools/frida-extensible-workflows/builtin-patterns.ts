@@ -357,6 +357,18 @@ export interface BuiltinPatternMeta {
 		/** Conversa con el usuario (checkpoints) por diseño. */
 		interactive?: boolean;
 	};
+	/**
+	 * Flags declarativas del moat (M1 #134, D3): qué herramientas extra ven
+	 * las sesiones hijas de este patrón. JSON-safe (viaja al catálogo como
+	 * meta); la resolución flag→factory vive en el motor, no en el pack.
+	 * Inerte para patrones que no lo declaran.
+	 */
+	moat?: {
+		/** pi-lens read-only (project_report, symbol_search, module_report, read_symbol). */
+		lens?: boolean;
+		/** frida-codebase-index (semantic_search, call_graph, index_codebase, …). */
+		codebaseIndex?: boolean;
+	};
 }
 
 /** Un patrón curado del catálogo, ejecutable por nombre desde el tool workflow. */
@@ -384,12 +396,16 @@ export const BUILTIN_PATTERNS: readonly BuiltinPattern[] = [
 		description:
 			"Analyze a topic from several independent perspectives in parallel, then synthesize one balanced recommendation.",
 		args:
-			'{ topic: string, perspectives?: string[] } — perspectives usa las 5 por defecto si faltan o hay menos de 2',
+			"{ topic: string, perspectives?: string[] } — perspectives usa las 5 por defecto si faltan o hay menos de 2",
 		resolve(args: unknown): string {
 			const record = asRecord(args);
 			requireNonEmptyString(record.topic, "topic", "multi-perspective");
 			if (record.perspectives !== undefined) {
-				requireStringArray(record.perspectives, "perspectives", "multi-perspective");
+				requireStringArray(
+					record.perspectives,
+					"perspectives",
+					"multi-perspective",
+				);
 			}
 			return generateMultiPerspectiveWorkflow();
 		},
@@ -412,7 +428,7 @@ export const BUILTIN_PATTERNS: readonly BuiltinPattern[] = [
 		description:
 			"Investigate a task, then cross-check each finding with skeptical reviewers; only findings that survive the refutation threshold make the final report.",
 		args:
-			'{ task: string, reviewers?: number (1-5, default 2), threshold?: number (0-1, default 0.5) }',
+			"{ task: string, reviewers?: number (1-5, default 2), threshold?: number (0-1, default 0.5) }",
 		resolve(args: unknown): string {
 			const record = asRecord(args);
 			requireNonEmptyString(record.task, "task", "adversarial-review");
@@ -440,7 +456,7 @@ export const BUILTIN_PATTERNS: readonly BuiltinPattern[] = [
 		description:
 			"Multi-angle parallel code review: 7 specialized finders (correctness, reuse, simplification, efficiency, altitude) + verify pass → ranked findings.",
 		args:
-			'{ diff: string, diffSource?: string } — el diff a revisar (trunca a 200k chars); diffSource etiqueta la procedencia',
+			"{ diff: string, diffSource?: string } — el diff a revisar (trunca a 200k chars); diffSource etiqueta la procedencia",
 		resolve(args: unknown): string {
 			const record = asRecord(args);
 			requireNonEmptyString(record.diff, "diff", "code-review");

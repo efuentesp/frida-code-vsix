@@ -6,7 +6,11 @@
 //         adaptado a Frida (frida-agent-execution.ts). Sin background/checkpoints/
 //         retry/resume aún (fases 3+).
 
-import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+	defineTool,
+	type ExtensionAPI,
+	type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -15,15 +19,13 @@ import { isAbsolute, resolve } from "node:path";
 import { encoded } from "./core/execution";
 import { workflowCatalogIndex, workflowCatalogDetail } from "./core/registry";
 import { validateBudget } from "./core/budget";
-import {
-	builtinPatternsCatalog,
-	findBuiltinPattern,
-} from "./builtin-patterns";
+import { builtinPatternsCatalog, findBuiltinPattern } from "./builtin-patterns";
 import { withStructuredOutput } from "./structured-output";
 import {
 	runWorkflowInStore,
 	retryWorkflow,
 	resumeWorkflow,
+	loadPatternMeta,
 	type CheckpointNotifier,
 } from "./frida-host";
 import {
@@ -35,7 +37,9 @@ import {
 import { formatOrphansList, purgeOrphans, scanOrphans } from "./gc";
 import { wfLog } from "./telemetry";
 import { RunStore } from "./core/persistence";
-import { fridaHome } from "./frida-paths";
+import { fridaDefaultAgentDir, fridaHome } from "./frida-paths";
+import { createWorkflowChildFactoriesWithMoat } from "./moat-factories";
+import type { MoatFlags } from "./moat-factories";
 import {
 	deliverFollowUp,
 	emitWorkflowEvent,
@@ -179,8 +183,7 @@ const WORKFLOW_TOOL_PARAMETERS = Type.Object({
 	),
 	foreground: Type.Optional(
 		Type.Boolean({
-			description:
-				"Wait for completion instead of the default background launch",
+			description: "Wait for completion instead of the default background launch",
 		}),
 	),
 	concurrency: Type.Optional(
@@ -254,7 +257,44 @@ function toolResult(text: string): {
 // Factory de la extensión (Pi extension factory pattern).
 // ---------------------------------------------------------------------------
 
-export function createFridaExtensibleWorkflows() {
+export interface CreateFridaExtensibleWorkflowsOptions {
+	/** M1 #134 (D5): ¿está activo frida-codebase-index?
+	 *  (frida.codebaseIndex.enabled, default true). Mismo patrón getter que
+	 *  las factories de pi-session; evaluado al construir las factories del
+	 *  moat para que un patrón opt-in no registre las 6 tools si el usuario
+	 *  lo apagó (el pack registra la degradación en el inventario). */
+	codebaseIndexEnabled?: () => boolean;
+}
+
+export function createFridaExtensibleWorkflows(
+	opts?: CreateFridaExtensibleWorkflowsOptions,
+) {
+	// M1 #134 (D6): agentDir donde el seam sondea las instalaciones del moat —
+	// la MISMA convención que usa el spawner internamente, así la sonda
+	// CAPABILITIES del pack (agentDir de pi-session) y las factories reales no
+	// divergen en el host (ambas ~ = ~/.frida).
+	const moatAgentDir = fridaDefaultAgentDir();
+	/**
+	 * Spawner con las factories del moat cuando el patrón opta (D3/D5). Sin
+	 * moat, createWorkflowChildFactoriesWithMoat devuelve la lista base —
+	 * idéntica al default del spawner (no-leakage a patrones hermanos).
+	 */
+	const buildSpawner = (
+		spawnerCtx: ExtensionContext,
+		moat: MoatFlags | undefined,
+	) =>
+		withStructuredOutput(
+			createFridaAgentSpawner(spawnerCtx, {
+				extensionFactories: createWorkflowChildFactoriesWithMoat({
+					cwd: spawnerCtx.cwd,
+					agentDir: moatAgentDir,
+					...(moat ? { moat } : {}),
+					...(opts?.codebaseIndexEnabled
+						? { codebaseIndexEnabled: opts.codebaseIndexEnabled }
+						: {}),
+				}),
+			}),
+		);
 	return (pi: ExtensionAPI): void => {
 		// --- Tool: workflow (Fase 2: foreground-only) ---
 		pi.registerTool(
@@ -290,15 +330,19 @@ export function createFridaExtensibleWorkflows() {
 						!hasExplicit && builtin
 							? builtin.resolve(args, { cwd: ctx.cwd })
 							: readLaunchScript(p);
+					// M1 #134 (D3): flags del moat del patrón lanzado. Sin patrón,
+					// sin meta o sin moat → undefined → factories base.
+					const moat = builtin?.meta?.moat;
 					const budget = validateBudget((p as { budget?: unknown }).budget);
 
 					const sessionId = ctx.sessionManager.getSessionId();
-				const spawnAgent = withStructuredOutput(createFridaAgentSpawner(ctx));
-				// Fase 6: permite que los agentes de un withWorktree corran en el path del worktree.
-				const createSpawnerForCwd = (worktreeCwd: string) =>
-					withStructuredOutput(
-						createFridaAgentSpawner({ ...ctx, cwd: worktreeCwd }),
-					);
+					// M1 #134: los spawns de esta run ven el moat del patrón (D3);
+					// con moat undefined la composición ES la base — idéntico al
+					// comportamiento previo.
+					const spawnAgent = buildSpawner(ctx, moat);
+					// Fase 6: permite que los agentes de un withWorktree corran en el path del worktree.
+					const createSpawnerForCwd = (worktreeCwd: string) =>
+						buildSpawner({ ...ctx, cwd: worktreeCwd }, moat);
 
 					// Fase 5: notificador de checkpoints (entrega follow-up pidiendo aprobación).
 					const onCheckpoint: CheckpointNotifier = (cp) => {
@@ -337,6 +381,15 @@ export function createFridaExtensibleWorkflows() {
 							createSpawnerForCwd,
 							...(budget ? { budget } : {}),
 							onCheckpoint,
+							// M1 #134 (D4): meta del patrón persistida en el snapshot
+							// (shallow copy) para que retry/resume reconstruyan el moat.
+							...(builtin?.meta
+								? {
+										// SAFETY: builtin.meta es JSON-safe por diseño (D3) — flags moat
+										// booleanas y strings; el cast sólo acomoda readonly arrays.
+										patternMeta: { ...builtin.meta } as unknown as JsonValue,
+									}
+								: {}),
 						});
 						return toolResult(
 							`Workflow ${name} completado (runId: ${runId}).\n\n${renderWorkflowResult(result)}`,
@@ -373,8 +426,16 @@ export function createFridaExtensibleWorkflows() {
 						createSpawnerForCwd,
 						...(budget ? { budget } : {}),
 						onCheckpoint,
-						onProgress: (event) =>
-							applyWorkflowProgress({ runId, progress: event }),
+						// M1 #134 (D4): meta del patrón persistida en el snapshot
+						// (shallow copy) para que retry/resume reconstruyan el moat.
+						...(builtin?.meta
+							? {
+									// SAFETY: builtin.meta es JSON-safe por diseño (D3) — flags moat
+									// booleanas y strings; el cast sólo acomoda readonly arrays.
+									patternMeta: { ...builtin.meta } as unknown as JsonValue,
+								}
+							: {}),
+						onProgress: (event) => applyWorkflowProgress({ runId, progress: event }),
 					})
 						.then(({ result }) => {
 							emitWorkflowEvent(pi, "workflow:run-completed", {
@@ -393,8 +454,7 @@ export function createFridaExtensibleWorkflows() {
 							);
 						})
 						.catch((error: unknown) => {
-							const message =
-								error instanceof Error ? error.message : String(error);
+							const message = error instanceof Error ? error.message : String(error);
 							const cancelled = /CANCEL/i.test(message);
 							const budgetExhausted = /BUDGET/i.test(message);
 							emitWorkflowEvent(pi, "workflow:run-failed", {
@@ -497,8 +557,7 @@ export function createFridaExtensibleWorkflows() {
 										description: pattern.description,
 										args: pattern.args,
 										...(pattern.meta ? { meta: pattern.meta } : {}),
-										launch:
-											`workflow({ name: "${pattern.name}", args: { ... } }) — sin script; se resuelve al patrón.`,
+										launch: `workflow({ name: "${pattern.name}", args: { ... } }) — sin script; se resuelve al patrón.`,
 									},
 									null,
 									2,
@@ -506,11 +565,7 @@ export function createFridaExtensibleWorkflows() {
 							);
 						}
 						return toolResult(
-							JSON.stringify(
-								workflowCatalogDetail(requested, catalogCtx),
-								null,
-								2,
-							),
+							JSON.stringify(workflowCatalogDetail(requested, catalogCtx), null, 2),
 						);
 					}
 					return toolResult(
@@ -548,11 +603,11 @@ export function createFridaExtensibleWorkflows() {
 							`Run ${runId} no está activa (no es background, ya terminó, o el ID es inválido).`,
 						);
 					}
-						run.controller.abort();
-						return toolResult(`Run ${runId} (${run.workflowName}) cancelada.`);
-					},
-				}),
-			);
+					run.controller.abort();
+					return toolResult(`Run ${runId} (${run.workflowName}) cancelada.`);
+				},
+			}),
+		);
 
 		// --- Tool: workflow_gc (#69): runs huérfanos de sesiones muertas ---
 		pi.registerTool(
@@ -560,7 +615,7 @@ export function createFridaExtensibleWorkflows() {
 				name: "workflow_gc",
 				label: "Workflow GC",
 				description:
-				"List or purge orphaned workflow runs left behind by dead sessions (stuck at a checkpoint or running with no live session to manage them — workflow_stop can no longer reach them). Default mode 'list' is a dry run. 'purge' removes orphans older than olderThanDays (default 2) and NEVER touches runs of live sessions nor the current session. Purging a stuck run returns its journal tail as final diagnostic evidence.",
+					"List or purge orphaned workflow runs left behind by dead sessions (stuck at a checkpoint or running with no live session to manage them — workflow_stop can no longer reach them). Default mode 'list' is a dry run. 'purge' removes orphans older than olderThanDays (default 2) and NEVER touches runs of live sessions nor the current session. Purging a stuck run returns its journal tail as final diagnostic evidence.",
 				parameters: Type.Object(
 					{
 						mode: Type.Optional(
@@ -612,9 +667,7 @@ export function createFridaExtensibleWorkflows() {
 						...(typeof p.olderThanDays === "number"
 							? { olderThanDays: p.olderThanDays }
 							: {}),
-						...(typeof p.stuckOnly === "boolean"
-							? { stuckOnly: p.stuckOnly }
-							: {}),
+						...(typeof p.stuckOnly === "boolean" ? { stuckOnly: p.stuckOnly } : {}),
 						...(Array.isArray(p.runIds)
 							? { runIds: p.runIds.filter((r): r is string => typeof r === "string") }
 							: {}),
@@ -634,13 +687,13 @@ export function createFridaExtensibleWorkflows() {
 						})
 						.join("\n");
 					return toolResult(
-							`Purgados ${purged.length} run(s) huérfano(s); ${skipped} omitido(s) por candados.\n${
-								detail || ""
-							}${
-								remaining.length
-									? `\n\nQuedan ${remaining.length} huérfano(s) más recientes que el margen:\n${formatOrphansList(remaining)}`
-									: ""
-							}`,
+						`Purgados ${purged.length} run(s) huérfano(s); ${skipped} omitido(s) por candados.\n${
+							detail || ""
+						}${
+							remaining.length
+								? `\n\nQuedan ${remaining.length} huérfano(s) más recientes que el margen:\n${formatOrphansList(remaining)}`
+								: ""
+						}`,
 					);
 				},
 			}),
@@ -729,11 +782,20 @@ export function createFridaExtensibleWorkflows() {
 					if (typeof runId !== "string" || !runId.trim())
 						throw new Error("workflow_retry: runId is required");
 					const sessionId = ctx.sessionManager.getSessionId();
+					// M1 #134 (D4): el moat de la corrida fuente viaja persistido en
+					// su snapshot — retry lo lee y reconstruye las factories de las
+					// hijas. Runs viejas sin el campo → sin moat (backwards-compatible).
+					const source = await new RunStore(
+						ctx.cwd,
+						sessionId,
+						runId,
+						fridaHome(),
+					).load();
 					const { runId: childRunId, result } = await retryWorkflow(runId, {
 						cwd: ctx.cwd,
 						sessionId,
-					spawnAgent: withStructuredOutput(createFridaAgentSpawner(ctx)),
-				});
+						spawnAgent: buildSpawner(ctx, loadPatternMeta(source.snapshot)?.moat),
+					});
 					return toolResult(
 						`Workflow retry: run hija ${childRunId} (source ${runId}) completada.\n\n${renderWorkflowResult(result)}`,
 					);
@@ -774,13 +836,20 @@ export function createFridaExtensibleWorkflows() {
 					upsertWorkflowRun({ runId, workflowName, state: "running" });
 					wfLog("resume", { runId, workflowName });
 					try {
+						// M1 #134 (D4): igual que retry — el moat se lee del snapshot
+						// persistido de la propia run (resume no crea snapshot nuevo).
+						const { snapshot } = await new RunStore(
+							ctx.cwd,
+							sessionId,
+							runId,
+							fridaHome(),
+						).load();
 						const { result } = await resumeWorkflow(runId, {
 							cwd: ctx.cwd,
 							sessionId,
-							spawnAgent: withStructuredOutput(createFridaAgentSpawner(ctx)),
+							spawnAgent: buildSpawner(ctx, loadPatternMeta(snapshot)?.moat),
 							...(budgetPatch === undefined ? {} : { budgetPatch }),
-							onProgress: (event) =>
-								applyWorkflowProgress({ runId, progress: event }),
+							onProgress: (event) => applyWorkflowProgress({ runId, progress: event }),
 						});
 						upsertWorkflowRun({ runId, workflowName, state: "completed" });
 						return toolResult(

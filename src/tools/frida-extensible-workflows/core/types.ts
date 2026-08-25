@@ -272,6 +272,17 @@ export interface WorkflowModelAlias {
 export interface WorkflowMetadata {
 	name: string;
 	description?: string;
+	/**
+	 * M1 #134 (D4): meta del patrón builtin que lanzó esta run (incluye las
+	 * flags `moat`), persistida en el snapshot para que retry/resume puedan
+	 * reconstruir las factories de las sesiones hijas. Campo opcional y
+	 * aditivo: runs lanzadas antes de este campo no lo tienen → se tratan
+	 * como sin moat (degradación backwards-compatible, sin migración).
+	 * Sólo lo escribe runWorkflowInStore (frida-host.ts); el whitelist de
+	 * validateWorkflowMetadata (authoring upstream, core/validation.ts:271)
+	 * NO cambia — patternMeta nunca viaja por esa vía.
+	 */
+	patternMeta?: JsonValue;
 }
 export interface HerdrExtensionSettings {
 	enableFullyInspectableMode?: boolean;
@@ -558,6 +569,7 @@ export interface WorkflowFunction {
 	run(
 		input: Readonly<Record<string, JsonValue>>,
 		context: Readonly<WorkflowFunctionContext>,
+		// pi-lens-ignore: ast-grep/no-unknown-returns
 	): unknown;
 }
 type TypedWorkflowFunction<
@@ -767,10 +779,7 @@ export interface WorkflowRoleDirectoryRegistration {
 export interface AgentAttemptActionUi {
 	notify(message: string, level?: "info" | "warning" | "error"): void;
 	confirm(title: string, message: string): Promise<boolean>;
-	select(
-		title: string,
-		options: readonly string[],
-	): Promise<string | undefined>;
+	select(title: string, options: readonly string[]): Promise<string | undefined>;
 	input(title: string, placeholder?: string): Promise<string | undefined>;
 	setWorkingMessage?(message?: string): void;
 }

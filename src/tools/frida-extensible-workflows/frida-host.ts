@@ -53,6 +53,7 @@ import { WorkflowError } from "./core/types";
 import { fridaHome } from "./frida-paths";
 import { registerCheckpoint, unregisterCheckpoint } from "./frida-delivery";
 import { unpackSpawnResult, type SpawnAgentFn } from "./frida-agent-execution";
+import type { MoatFlags } from "./moat-factories";
 
 export type CheckpointNotifier = (checkpoint: {
 	runId: string;
@@ -161,12 +162,10 @@ export function createJournaledBridge(
 			}
 			const replayed = await opts.store.replay(path);
 			if (replayed) return readShellResult(replayed.value);
-			const result = await executeShellCommand(
-				command,
-				options,
-				signal,
-				opts.cwd,
-			);
+			const result = await executeShellCommand(command, options, signal, opts.cwd);
+			// SAFETY: ShellResult es un plain object JSON-serializable (strings y
+			// enteros); el journal JsonValue lo acepta sin pérdida y readShellResult
+			// lo reconstruye idéntico en replay.
 			await opts.store.complete(path, result as unknown as JsonValue);
 			return result;
 		},
@@ -245,7 +244,7 @@ async function runWithStore(
 		spawnAgent: opts.spawnAgent,
 		cwd: store.cwd,
 		usage,
-		...(opts.foreground !== undefined ? { foreground: opts.foreground } : {}),
+		...(opts.foreground === undefined ? {} : { foreground: opts.foreground }),
 		...(opts.budget ? { budget: opts.budget } : {}),
 		...(opts.onCheckpoint ? { onCheckpoint: opts.onCheckpoint } : {}),
 		...(opts.replaySources ? { replaySources: opts.replaySources } : {}),
@@ -311,6 +310,11 @@ export interface RunWorkflowInStoreOptions {
 	/** Stores adicionales para replay (retry pasa [sourceStore]). */
 	replaySources?: readonly RunStore[];
 	createSpawnerForCwd?: (cwd: string) => SpawnAgentFn;
+	/** M1 #134 (D4): meta del patrón builtin que lanzó esta run (incluye las
+	 *  flags `moat` — shallow copy de builtin.meta hecha por launch). Se
+	 *  persiste en snapshot.metadata.patternMeta para que retry/resume
+	 *  reconstruyan las factories del moat de las hijas. Opcional. */
+	patternMeta?: JsonValue;
 }
 
 export interface RunWorkflowInStoreResult {
@@ -327,7 +331,13 @@ export async function runWorkflowInStore(
 	const metadata: WorkflowMetadata = {
 		name: opts.name,
 		...(opts.description ? { description: opts.description } : {}),
+		// M1 #134 (D4): el patternMeta viaja en el snapshot — retry/resume lo
+		// leen para reconstruir el moat (loadPatternMeta).
+		...(opts.patternMeta === undefined ? {} : { patternMeta: opts.patternMeta }),
 	};
+	// SAFETY: el snapshot literal cumple la shape de LaunchSnapshot (script/args/
+	// metadata JSON-safe; settings mínimo válido con concurrency 1); el cast
+	// sólo acomoda los arrays vacíos tipados del core sin poblarlos en launch.
 	const snapshot = {
 		script: opts.script,
 		args: opts.args,
@@ -355,7 +365,7 @@ export async function runWorkflowInStore(
 		args: opts.args,
 		spawnAgent: opts.spawnAgent,
 		...(opts.signal ? { signal: opts.signal } : {}),
-		...(opts.foreground !== undefined ? { foreground: opts.foreground } : {}),
+		...(opts.foreground === undefined ? {} : { foreground: opts.foreground }),
 		...(opts.budget ? { budget: opts.budget } : {}),
 		...(opts.onCheckpoint ? { onCheckpoint: opts.onCheckpoint } : {}),
 		...(opts.replaySources ? { replaySources: opts.replaySources } : {}),
@@ -365,6 +375,29 @@ export async function runWorkflowInStore(
 		...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
 	});
 	return { runId, result };
+}
+
+/**
+ * M1 #134 (D4): extrae el `moat` del patternMeta persistido en el snapshot
+ * (lo que launch escribió desde builtin.meta). Runs lanzadas sin el campo o
+ * con forma inesperada → undefined / flags filtradas: el caller compone la
+ * lista BASE de factories — degradación backwards-compatible, nunca throw.
+ */
+export function loadPatternMeta(
+	snapshot: Readonly<LaunchSnapshot>,
+): Readonly<{ moat?: MoatFlags }> | undefined {
+	const meta = snapshot.metadata?.patternMeta;
+	if (!meta || typeof meta !== "object" || Array.isArray(meta)) return undefined;
+	const raw = (meta as { moat?: unknown }).moat;
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { moat: {} };
+	const lens = (raw as { lens?: unknown }).lens;
+	const codebaseIndex = (raw as { codebaseIndex?: unknown }).codebaseIndex;
+	return {
+		moat: {
+			...(typeof lens === "boolean" ? { lens } : {}),
+			...(typeof codebaseIndex === "boolean" ? { codebaseIndex } : {}),
+		},
+	};
 }
 
 export interface RecoveryOptions {
@@ -411,6 +444,11 @@ export async function retryWorkflow(
 		...(source.run.budget ? { budget: source.run.budget } : {}),
 		...(opts.onCheckpoint ? { onCheckpoint: opts.onCheckpoint } : {}),
 		...(opts.onProgress ? { onProgress: opts.onProgress } : {}),
+		// M1 #134 (D4): la run HIJA hereda el patternMeta del source — un
+		// retry-de-retry reconstruye el mismo moat (cadena conservada).
+		...(source.snapshot.metadata.patternMeta === undefined
+			? {}
+			: { patternMeta: source.snapshot.metadata.patternMeta }),
 	});
 }
 
@@ -447,6 +485,8 @@ export async function resumeWorkflow(
 		...(budget ? { budget } : {}),
 	} as PersistedRun;
 	// runWithStore NO recrea el store → el journal existente se preserva (replay).
+	// M1 #134 (D4): el snapshot tampoco se reescribe — el patternMeta persistido
+	// por launch sigue disponible para futuros retry/resume de esta misma run.
 	const { result } = await runWithStore(store, run, {
 		script: loaded.snapshot.script,
 		args: loaded.snapshot.args,

@@ -4062,6 +4062,16 @@ export async function activate(
 			label: "frida-app-walkthrough",
 		},
 		{
+			// M1 #134 — understand-app (skill pack del patrón builtin).
+			// Alias deliberadamente SIN la palabra reservada del moat: ya la
+			// consume la entrada frida-learn (más abajo) y HELP_TOOLS.find es
+			// first-match.
+			match: ["understand", "understand-app", "entender", "entendimiento"],
+			file: "docs/tools/frida-understand-app.md",
+			howTo: "docs/how-to-frida-understand-app.md",
+			label: "frida-understand-app",
+		},
+		{
 			match: [
 				"workflows",
 				"patrones",

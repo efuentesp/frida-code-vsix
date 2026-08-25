@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { listProjectExtensionFiles } from "./extension-paths";
 import {
 	createAgentSession,
@@ -120,6 +119,8 @@ import { createFridaGitSync } from "./tools/frida-git-sync";
 import { createFridaAidd } from "./tools/frida-aidd";
 import { createFridaTea } from "./tools/frida-tea";
 import { createFridaAppWalkthrough } from "./tools/frida-app-walkthrough";
+import { createFridaUnderstandApp } from "./tools/frida-understand-app";
+import { createFridaLensFactory } from "./tools/frida-extensible-workflows/moat-factories";
 import { createFridaGoal } from "./tools/frida-goal";
 import type { GoalStateSnapshot } from "./tools/frida-goal/state";
 import { createFridaWorktree } from "./worktree";
@@ -562,30 +563,15 @@ export async function createFridaSession(
 	// Fase 4 — patrones aprobados por sesión (en memoria, se resetea por sesión).
 	const sessionApprovals = new SessionApprovals();
 
-	// Fase 2: cargar frida-lens (pi-lens) desde ~/.frida vía import() nativo (no
-	// jiti, para evitar el bug de import.meta.url bajo jiti en módulos ESM).
-	// Si no está instalado, se omite silenciosamente.
-	let fridaLensFactory: ((pi: any) => void) | undefined;
-	const fridaLensEntry = path.join(
-		opts.agentDir,
-		"npm",
-		"node_modules",
-		"pi-lens",
-		"dist",
-		"index.js",
-	);
-	if (fs.existsSync(fridaLensEntry)) {
-		try {
-			// #57: import() dinámico EXIGE URL en ESM — un path crudo de Windows
-			// ("C:\\Users\\…") lanza ERR_UNSUPPORTED_ESM_URL_SCHEME y el catch lo
-			// tragaría. pathToFileURL normaliza ambas plataformas (patrón de
-			// frida-codebase-index/shim.ts).
-			const mod = await import(pathToFileURL(fridaLensEntry).href);
-			fridaLensFactory = (mod as any).default ?? (mod as any);
-		} catch (e: any) {
-			console.warn("[frida-lens] No se pudo cargar:", e?.message ?? e);
-		}
-	}
+	// Fase 2 — frida-lens (pi-lens): desde M1 #134 (D2) la factory DIFERIDA
+	// vive en el motor (frida-extensible-workflows/moat-factories.ts) y esta
+	// es su única fuente: misma sonda (existsSync de la entry bajo
+	// <agentDir>/npm/node_modules/pi-lens) y misma semántica de carga
+	// (#57: import() por URL de archivo, no path crudo; error → warn sin
+	// tumbar la sesión). Única
+	// diferencia conductual: el import() corre DENTRO del loader.reload()
+	// (`await factory(api)`) en vez de aquí — semánticamente equivalente.
+	const fridaLens = createFridaLensFactory(opts.agentDir);
 
 	// Fase de extensibilidad web: si la extensión nativa rpiv-ask-user-question está
 	// declarada en settings.json packages (la cargaría el resourceLoader vía jiti),
@@ -630,9 +616,9 @@ export async function createFridaSession(
 		additionalExtensionPaths: listProjectExtensionFiles(projExtDir),
 		additionalSkillPaths: fs.existsSync(projSkillDir) ? [projSkillDir] : [],
 		extensionFactories: [
-			...(fridaLensFactory
-				? [{ name: "frida-lens", factory: fridaLensFactory }]
-				: []),
+			// D2 (M1 #134): entry DIFERIDA del motor — misma forma {name, factory}
+			// que el bloque inline que reemplaza.
+			...(fridaLens ? [fridaLens] : []),
 			{
 				name: "softtek-provider",
 				factory: createSofttekProviderHooks({
@@ -682,6 +668,17 @@ export async function createFridaSession(
 			{
 				name: "frida-app-walkthrough",
 				factory: createFridaAppWalkthrough(),
+			},
+			{
+				name: "frida-understand-app",
+				// M1 (#134): skill pack del patrón `understand-app`. Sin toggle
+				// propio (los skill packs no se conmutan); recibe agentDir y el
+				// getter de codebase-index para que la const CAPABILITIES del
+				// script sea exacta respecto de instalación y toggle (D5/D6).
+				factory: createFridaUnderstandApp({
+					agentDir: opts.agentDir,
+					codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
+				}),
 			},
 			{
 				name: "frida-permission-system",
@@ -919,9 +916,15 @@ export async function createFridaSession(
 			{
 				name: "frida-extensible-workflows",
 				// Gate #53 (frida.extensibleWorkflows.enabled, default true).
+				// M1 #134 (D5): el getter del toggle de codebase-index fluye al
+				// motor para el seam del moat — las hijas de un patrón opt-in no
+				// registran codebase-index si el usuario lo apagó (mismo getter
+				// que la factory de la sesión principal de arriba).
 				factory: (pi: any) =>
 					(opts.extensibleWorkflowsEnabled?.() ?? true)
-						? createFridaExtensibleWorkflows()(pi)
+						? createFridaExtensibleWorkflows({
+								codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
+							})(pi)
 						: undefined,
 			},
 			// frida-mcp-adapter (ADR-0023): integración MCP (Model Context Protocol).
