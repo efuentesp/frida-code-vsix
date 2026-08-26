@@ -16,16 +16,23 @@
 > con el detalle por fase). Las referencias F7–F13 apuntan a ese documento.
 >
 > **Actualizado 2026-08-24:** integración de la pista de **entendimiento,
-> mantenimiento y modernización de apps desconocidas** — items **M1–M9** —
+> mantenimiento y modernización de apps desconocidas** — items **M1–M10** —
 > derivada de la investigación de [docs/modernization-apps.md](modernization-apps.md)
 > (§9 técnico, §10 funcional). Los items M viven ahora en su propia sección
 > **Pista M**, ordenada por valor hacia el objetivo "app desconocida →
 > entendida (funcional + técnico) → mantenida → modernizada": **M8
 > (`app-walkthrough`) y M1 (`understand-app`) a P1** (mejor ratio valor/esfuerzo:
-> todo lo que consumen ya existe), **M9, M2 y M3 a P2**, **M6 a P3**; M7 es
+> todo lo que consumen ya existe), **M9, M2, M3 y M10 a P2**, **M6 a P3**; M7 es
 > micro-tarea y M4/M5 quedan condicionales — en gran parte porque **#25✅ ya
 > cubre** búsqueda semántica + call graph (wrapper de open-codebase-index) y
 > pi-lens ya da hotspots/rename.
+>
+> **Refresh P2 (2026-08-26):** alta de **M10 (#139) workflow `size-app`** —
+> contraparte **cuantitativa** de M1 (#134, ya en producción): LOC,
+> complejidad por función, duplicación, acoplamiento, churn/hotspots y
+> **COCOMO±rango** desde `scc`+pi-lens → `docs/dimensionamiento/`. Insumo
+> directo del dimensionamiento de esfuerzo de mantenimiento/modernización
+> (investigación de métricas 2026-08-26: SonarQube, COCOMO/Boehm, scc/lizard).
 >
 > **Refresh P1 (mismo día):** verificación contra issues/código confirma que
 > **#21 ✅, #29 ✅ y F7 ✅ (#121) ya están completos** — este documento los
@@ -37,7 +44,7 @@
 | --- | --- | --- | --- |
 | **P0** | Correctness del core (auditoría/facturación + UX de la feature bandera) | #18, #7 | ✅ **Completo** — #18 cerrado (`eb30dbc`); #7 resuelto por el panel de workflows (progreso vivo + live view, v0.29.x) |
 | **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21 ✅, #29 ✅, F7 ✅ (#121), **M8 (#133), M1 (#134)** | Tríada del moat + F7 completos; **solo restan M8 y M1** (Pista M): entendimiento funcional+técnico de apps desconocidas, sin blockers |
-| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | #35, #13→#14, #26, #16, **F8, F9, F10**, **M9, M2, M3** | F8 depende de F7; M9 (puente funcional↔técnico) y M2 (mapa) dependen de M8; M3 suma calidad/auditoría (Sonar) |
+| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | #35, #13→#14, #26, #16, **F8, F9, F10**, **M9, M2, M3, M10 (#139)** | F8 depende de F7; M9 (puente funcional↔técnico) y M2 (mapa) dependen de M8; M3 suma calidad/auditoría (Sonar); **M10 dimensiona el esfuerzo** (cuantitativo, hermano de M1✅) |
 | **P3** | Ecosistema de skills/packs (dependen de #16 y/o #19) | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, **F12**, **M6** | **F12 bloqueada por el clúster de abort**; M6 libre (fase modernización) |
 | **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39, **#2↗, F11, F13b, M7, M4↘, M5** | **#2 re-evaluado: ver P2↗**; M4/M5 re-escalados por solape con #25✅ + pi-lens |
 | **Blocked** | Plataforma | #42 | requiere refactor del bus Remote React |
@@ -95,10 +102,11 @@ abajo: todo lo que consumen ya está listo.
 | 1 | **M8** workflow `app-walkthrough` (#133) | El agente **usa la app como usuario nuevo**: navega, prueba acciones/validaciones, y produce el catálogo funcional (pantallas, journeys, reglas de negocio observadas, roles) | **La capacidad que hoy no existe y abre la pista**: Frida entiende código, no funcionalidad. El snapshot semántico de D34 (a11y tree) ya es un inventario funcional de pantalla — solo falta orquestarlo y documentarlo | `frida-agent-browser` ✅ (D34), `frida-subagents` ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
 | 2 | **M1** workflow `understand-app` (#134) | Contraparte **técnica**: overview + hotspots + riesgos → `docs/entendimiento.md` + modelo LikeC4 semilla | Junto con M8 cubre el entendimiento completo (funcional × técnico); además valida M4/M5 vía el piloto | #25 ✅, pi-lens ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
 | 3 | **M9** `frida-traffic2api` (#135) | Del tráfico capturado durante la exploración (HAR/mitmproxy) → **spec OpenAPI** + matriz funcionalidad↔endpoint↔módulo (cruce M8×M1) | **Puente funcional↔técnico**: convierte dos documentos aislados en un mapa accionable para mantenimiento quirúrgico y para detectar endpoints huérfanos | M8 (genera el tráfico), o proxy manual con sesión real | M | **P2** |
-| 4 | **M2** panel "Mapa del proyecto" | Visualizar en producto el mapa técnico (`/lens-map` de pi-lens) **y** el funcional (grafo de journeys de M8); clic → abrir archivo | Comunicar y compartir el entendimiento (equipo, stakeholders, demo comercial) | M8 (mapa funcional), pi-lens ✅ (mapa técnico) | S–M | **P2** |
-| 5 | **M3** `frida-sonar` | Quality gate en el loop: issues por severidad/rama, verificación post-fix, panel de tendencia | Cierra el ciclo entender → diagnosticar → corregir → **verificar**; refuerza el pilar de auditoría | Libre (requiere SonarQube operativo en la empresa) | M | **P2** |
-| 6 | **M6** `frida-openrewrite` | Migraciones mecánicas deterministas: dry-run + diff en VS Code + verificación post-receta | Fase modernización: lo mecánico con recetas type-aware; el criterio queda con el agente (guiado por M1) | M1 (contexto de lo no-mecánico); opcional M3 (verificación) | M–L | **P3** |
-| 7 | **M7** embeddings vía router | Semántica de #25 con el modelo autorizado por la empresa | Micro-tarea de configuración sobre #25 ✅ | Router con endpoint de embeddings compatible OpenAI | XS | P4 |
+| 4 | **M10** workflow `size-app` (#139) | **Dimensionamiento cuantitativo**: NCLOC/ULOC+DRYness, CCN p50/p90/p99 por función, duplicación, acoplamiento, churn/hotspots, bus factor → **COCOMO±rango + olas de migración** en `docs/dimensionamiento/` | El insumo del **negocio**: "app tomada → cuánto cuesta mantenerla/modernizarla". Hermano cuantitativo de M1✅; `scc` cubre ~80% en un binario polyglota (270+ lenguajes) | Motor ✅, pi-lens ✅, `scc` ⚠️ (bundling por decidir) | S–M | **P2** |
+| 5 | **M2** panel "Mapa del proyecto" | Visualizar en producto el mapa técnico (`/lens-map` de pi-lens) **y** el funcional (grafo de journeys de M8); clic → abrir archivo | Comunicar y compartir el entendimiento (equipo, stakeholders, demo comercial) | M8 (mapa funcional), pi-lens ✅ (mapa técnico) | S–M | **P2** |
+| 6 | **M3** `frida-sonar` | Quality gate en el loop: issues por severidad/rama, verificación post-fix, panel de tendencia | Cierra el ciclo entender → diagnosticar → corregir → **verificar**; refuerza el pilar de auditoría | Libre (requiere SonarQube operativo en la empresa) | M | **P2** |
+| 7 | **M6** `frida-openrewrite` | Migraciones mecánicas deterministas: dry-run + diff en VS Code + verificación post-receta | Fase modernización: lo mecánico con recetas type-aware; el criterio queda con el agente (guiado por M1) | M1 (contexto de lo no-mecánico); opcional M3 (verificación) | M–L | **P3** |
+| 8 | **M7** embeddings vía router | Semántica de #25 con el modelo autorizado por la empresa | Micro-tarea de configuración sobre #25 ✅ | Router con endpoint de embeddings compatible OpenAI | XS | P4 |
 | — | **M4↘** porte parcial pi-shazam | (condicional) solo el gap en hotspots/lookup/rename | Solape casi total con pi-lens + #25✅; evaluar tras el piloto | Piloto (modernization-apps §8) | M | P4 — evaluar/cancelar |
 | — | **M5** `frida-codegraph` | (watchlist) grafo persistente para monolitos enormes | Solo si #25 no escala en las apps objetivo | Piloto (modernization-apps §8) | L | P4 — watchlist |
 

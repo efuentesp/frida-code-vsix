@@ -463,6 +463,7 @@ esfuerzo y riesgo.
 | M8 | Workflow `app-walkthrough` | Skills sobre `frida-agent-browser` (D34) | S–M | **P1** | A | El agente usa la app como usuario y documenta la funcionalidad (ver §10) |
 | M1 | Workflow `understand-app` | Skills + DSL sobre `frida-workflow` | S–M | **P1** (moat) | 0–2 | Alto: orquesta todo lo demás con cero infra nueva |
 | M9 | `frida-traffic2api` | HAR/mitmproxy → OpenAPI + matriz función↔endpoint↔módulo | M | **P2** | B | Puente funcional↔técnico (ver §10) |
+| M10 | Workflow `size-app` | Skills sobre `frida-extensible-workflows` + `scc` | S–M | **P2** | 0–1 | Dimensionamiento cuantitativo: LOC/complejidad/duplicación/churn → COCOMO±rango (#139) |
 | M2 | Panel "Mapa del proyecto" | `frida-webview` + `/lens-map` | S | P4 | 0 | Alto para comunicar la estructura al equipo |
 | M3 | `frida-sonar` | Extensión nueva (base de diseño: pi-sonar) | M | **P2** | 1, 3 | Alto si la empresa ya opera SonarQube |
 | M4 | Porte parcial de pi-shazam | Porte evaluado contra upstream | M | P4 — **evaluar/cancelar** | 0, 3 | Bajo tras detectar solape (pi-lens + #25) |
