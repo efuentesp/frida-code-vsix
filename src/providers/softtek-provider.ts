@@ -324,6 +324,26 @@ export async function diagnoseOpaque500(
  */
 export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 	return (pi: ExtensionAPI) => {
+		// #137 — apareo payload↔proveedor: before_provider_request NO trae
+		// proveedor (BeforeProviderRequestEvent = { type, payload }), así que el
+		// payload se stagea en pendingPayload y se promueve a lastPayload en
+		// before_provider_headers, que sí filtra por SOFTTEK_PROVIDER. Así un
+		// payload de zai/ollama/github-copilot jamás llega al dump ni al re-probe
+		// del gateway (misatribución + fuga de payload, ver issue #137).
+		let lastPayload: unknown = null;
+		let pendingPayload: unknown = null;
+		const dumpLastRequest = () => {
+			if (!deps.requestDumpPath) return;
+			try {
+				writeFileSync(
+					deps.requestDumpPath,
+					JSON.stringify(lastPayload ?? null, null, 2),
+				);
+			} catch {
+				/* noop */
+			}
+		};
+
 		// CRÍTICO (ADR-0005): inyectar la key SOLO en requests a NUESTRO provider.
 		pi.on("before_provider_headers", (event: any, ctx: any) => {
 			if (ctx.model?.provider !== SOFTTEK_PROVIDER) return;
@@ -332,24 +352,14 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 				event.headers["X-Api-Key"] = key;
 				event.headers["authorization"] = null; // el gateway no usa Bearer
 			}
+			lastPayload = pendingPayload; // #137: promoción al confirmar proveedor
+			dumpLastRequest();
 		});
 
-		// Guarda el último payload enviado al provider (para dumpearlo ante un error
-		// del gateway y diagnosticar qué campo lo rechaza — el 500 de DevEngine no
-		// incluye body). Ver ADR-0009.
-		let lastPayload: unknown = null;
+		// Stagea el payload del request; el dump real va en el hook de headers
+		// (ver #137 arriba). Devolver el payload sin cambios es parte del contrato.
 		pi.on("before_provider_request", (event: any) => {
-			lastPayload = event?.payload;
-			if (deps.requestDumpPath) {
-				try {
-					writeFileSync(
-						deps.requestDumpPath,
-						JSON.stringify(event?.payload ?? null, null, 2),
-					);
-				} catch {
-					/* noop */
-				}
-			}
+			pendingPayload = event?.payload;
 			return event?.payload;
 		});
 		// 401/403 → re-onboarding de la key (D6). 4xx/5xx → dumpea el request.
@@ -371,6 +381,11 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 				const msg = event?.message;
 				if (!msg || msg.role !== "assistant" || msg.stopReason !== "error")
 					return;
+				// #137 — SOLO diagnósticos de NUESTRO provider: un 5xx de zai/ollama/
+				// github-copilot no debe re-enviar su payload al gateway DevEngine
+				// (el error quedaba misatribuido a DevEngine y la conversación del
+				// usuario viajaba a un gateway que no eligió para ese chat).
+				if (msg.provider !== SOFTTEK_PROVIDER) return;
 				const errText = String(msg.errorMessage ?? msg.error ?? "");
 				const m = /\b(5\d\d)\b/.exec(errText);
 				if (!m || diagnosing || !lastPayload) return;

@@ -145,14 +145,21 @@ describe("createSofttekProviderHooks + message_end (wiring del mitigador)", () =
 			) as unknown as typeof fetch,
 		});
 		factory(pi as any);
-		// sembrar lastPayload con el hook de request
+		// sembrar lastPayload: request + headers SOFTTEK (el apareo payload↔proveedor
+		// vive en before_provider_headers, que sí recibe ctx.model.provider)
 		pi.emit("before_provider_request", {
 			payload: { model: "gpt-5.4-mini", stream: true, messages: [], tools: [] },
 		});
+		pi.emit(
+			"before_provider_headers",
+			{ headers: {} },
+			{ model: { provider: "softtek-devengine", modelId: "gpt-5.4-mini" } },
+		);
 		// error 500 del stream (lo que hoy ve el usuario como opaco)
 		pi.emit("message_end", {
 			message: {
 				role: "assistant",
+				provider: "softtek-devengine",
 				stopReason: "error",
 				errorMessage: "500 Internal Server Error",
 			},
@@ -179,7 +186,75 @@ describe("createSofttekProviderHooks + message_end (wiring del mitigador)", () =
 			message: { role: "user", stopReason: "error", errorMessage: "500" },
 		});
 		pi.emit("message_end", {
-			message: { role: "assistant", stopReason: "error", errorMessage: "400 Bad Request" },
+			message: {
+				role: "assistant",
+				provider: "softtek-devengine",
+				stopReason: "error",
+				errorMessage: "400 Bad Request",
+			},
+		});
+		await new Promise((r) => setTimeout(r, 150));
+		expect(seen).toHaveLength(0);
+		expect(fetchFn).not.toHaveBeenCalled();
+	});
+
+	// #137 — misatribución: un 5xx de ORO proveedor no debe tocarnos
+	it("#137: error 500 de zai (u otro proveedor) NO dispara probe ni diagnóstico", async () => {
+		const pi = makePi();
+		const seen: GatewayDiagnosis[] = [];
+		const fetchFn = fakeFetch(500, JSON.stringify({ error: { message: "Error interno" } }));
+		const factory = createSofttekProviderHooks({
+			getKey: () => "test-key",
+			onUnauthorized: () => {},
+			onGatewayDiagnosis: (d) => seen.push(d),
+			fetchImpl: fetchFn as unknown as typeof fetch,
+		});
+		factory(pi as any);
+		// request de zai (glm-5.3) — el caso real del bug: falla con 500
+		pi.emit("before_provider_request", {
+			payload: { model: "glm-5.3", stream: true, messages: [], tools: [] },
+		});
+		pi.emit(
+			"before_provider_headers",
+			{ headers: {} },
+			{ model: { provider: "zai", modelId: "glm-5.3" } },
+		);
+		pi.emit("message_end", {
+			message: {
+				role: "assistant",
+				provider: "zai",
+				stopReason: "error",
+				errorMessage:
+					'500: {"code":"1234","message":"Network error, error id: 202608262201439fd51da0391645d4"}',
+			},
+		});
+		await new Promise((r) => setTimeout(r, 150));
+		expect(seen).toHaveLength(0);
+		expect(fetchFn).not.toHaveBeenCalled(); // nada de re-enviar el payload a DevEngine
+	});
+
+	it("#137: request de otro proveedor NO captura lastPayload (un 500 real de softtek posterior no hereda payload ajeno)", async () => {
+		const pi = makePi();
+		const seen: GatewayDiagnosis[] = [];
+		const fetchFn = fakeFetch(500, "{}");
+		const factory = createSofttekProviderHooks({
+			getKey: () => "test-key",
+			onUnauthorized: () => {},
+			onGatewayDiagnosis: (d) => seen.push(d),
+			fetchImpl: fetchFn as unknown as typeof fetch,
+		});
+		factory(pi as any);
+		// sólo request de zai, sin apareo de headers de softtek → lastPayload debe seguir vacío
+		pi.emit("before_provider_request", {
+			payload: { model: "glm-5.3", stream: true, messages: [], tools: [] },
+		});
+		pi.emit("message_end", {
+			message: {
+				role: "assistant",
+				provider: "softtek-devengine",
+				stopReason: "error",
+				errorMessage: "500 Internal Server Error",
+			},
 		});
 		await new Promise((r) => setTimeout(r, 150));
 		expect(seen).toHaveLength(0);
