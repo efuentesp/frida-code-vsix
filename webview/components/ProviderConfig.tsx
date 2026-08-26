@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Codicon } from "./Codicon";
 import type { ProviderOption } from "../types";
 import type { ProviderMeta } from "../providers-registry";
+import { highlightText } from "../highlight";
 
 // UI de configuración de UN proveedor (Propuesta 1: VS Code Accounts & Model Hub Card):
 //  - apikey: input de key con botón de revelar/ocultar + "Guardar" + link "Obtener key".
@@ -15,6 +16,7 @@ export function ProviderConfig({
 	meta,
 	deviceCode,
 	activeModelId,
+	highlightQuery = "",
 	onSetKey,
 	onLogin,
 	onLogout,
@@ -23,6 +25,8 @@ export function ProviderConfig({
 	meta: ProviderMeta;
 	deviceCode?: { userCode: string; verificationUri: string };
 	activeModelId?: string;
+	/** Consulta para resaltar coincidencias (filtro del tab o búsqueda global). */
+	highlightQuery?: string;
 	onSetKey: (id: string, key: string) => void;
 	onLogin: (id: string) => void;
 	onLogout: (id: string) => void;
@@ -71,7 +75,7 @@ export function ProviderConfig({
 				</span>
 				<div className="pc-titles">
 					<div className="pc-name-row">
-						<span className="pc-name">{meta.name}</span>
+						<span className="pc-name">{highlightText(meta.name, highlightQuery)}</span>
 						{provider.authed ? (
 							<span className="pc-badge ok">
 								<Codicon name="pass-filled" size={12} /> Conectado (
@@ -108,7 +112,9 @@ export function ProviderConfig({
 									className={`pc-model-chip${isCurrentActive ? " active" : ""}`}
 									title={isCurrentActive ? "Modelo activo en el chat" : m.name}
 								>
-									<span className="pc-model-chip-name">{m.name}</span>
+									<span className="pc-model-chip-name">
+									{highlightText(m.name, highlightQuery)}
+								</span>
 									{isCurrentActive && (
 										<span className="pc-model-active-tag">En uso</span>
 									)}

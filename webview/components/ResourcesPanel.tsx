@@ -2,24 +2,40 @@ import { useState, type ReactNode } from "react";
 import type { OutMessage, ResourceSummary } from "../types";
 import { Tooltip } from "./Tooltip";
 import { Codicon } from "./Codicon";
+import { FilterBar } from "./FilterBar";
+import { highlightText, matchesAny } from "../highlight";
 
 // Sección colapsable con Codicons nativos de VS Code.
 function Section({
 	title,
 	count,
+	label,
 	iconName,
 	children,
 }: {
 	title: string;
 	count: number;
+	/** Etiqueta opcional del contador (p.ej. "3/14" al filtrar). */
+	label?: string;
 	iconName: string;
 	children: ReactNode;
 }) {
 	const [open, setOpen] = useState(true);
 	if (count === 0) return null;
 	return (
-		<div className={"res-section" + (open ? "" : " collapsed")}>
-			<div className="res-section-head" onClick={() => setOpen(!open)}>
+		<div className={`res-section${open ? "" : " collapsed"}`}>
+			<div
+				className="res-section-head"
+				role="button"
+				tabIndex={0}
+				onClick={() => setOpen(!open)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						setOpen(!open);
+					}
+				}}
+			>
 				<Codicon
 					name={open ? "chevron-down" : "chevron-right"}
 					size={12}
@@ -27,7 +43,7 @@ function Section({
 				/>
 				<Codicon name={iconName} size={14} className="res-section-icon" />
 				<span className="res-section-title">{title}</span>
-				<span className="res-section-count">{count}</span>
+				<span className="res-section-count">{label ?? count}</span>
 			</div>
 			{open && <div className="res-section-body">{children}</div>}
 		</div>
@@ -83,8 +99,19 @@ function LocationsSection() {
 	);
 
 	return (
-		<div className={"res-section locations" + (open ? "" : " collapsed")}>
-			<div className="res-section-head" onClick={() => setOpen(!open)}>
+		<div className={`res-section locations${open ? "" : " collapsed"}`}>
+			<div
+				className="res-section-head"
+				role="button"
+				tabIndex={0}
+				onClick={() => setOpen(!open)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						setOpen(!open);
+					}
+				}}
+			>
 				<Codicon
 					name={open ? "chevron-down" : "chevron-right"}
 					size={12}
@@ -209,19 +236,62 @@ export function ResourcesContent({
 	res,
 	post,
 	onInsertText,
+	initialQuery = "",
 }: {
 	res: ResourceSummary;
 	post?: (m: OutMessage) => void;
 	onInsertText?: (text: string) => void;
+	/** Consulta inicial del filtro (útil para pruebas y deep-links). */
+	initialQuery?: string;
 }) {
 	const [skillFilter, setSkillFilter] = useState("all");
 	const [cmdFilter, setCmdFilter] = useState("all");
 	const [copiedPath, setCopiedPath] = useState<string | null>(null);
+	const [query, setQuery] = useState(initialQuery);
+	const q = query.trim();
 
-	const skills = res.skills.filter(
+	// Filtro de texto: filtra cada colección por sus campos visibles.
+	const extensions = q
+		? res.extensions.filter((e) =>
+				matchesAny(q, extName(e.path), e.path, ...(e.tools ?? []), ...(e.commands ?? [])),
+			)
+		: res.extensions;
+	const skillsByText = q
+		? res.skills.filter((s) =>
+				matchesAny(q, s.name, s.description, s.path, s.source),
+			)
+		: res.skills;
+	const commandsByText = q
+		? res.commands.filter((c) =>
+				matchesAny(q, c.name, c.description, c.extension, c.argumentHint),
+			)
+		: res.commands;
+	const prompts = q
+		? res.prompts.filter((p) => matchesAny(q, p.name, p.description))
+		: res.prompts;
+	const themes = q ? res.themes.filter((t) => matchesAny(q, t.name)) : res.themes;
+	const contextFiles = q
+		? res.contextFiles.filter((f) => matchesAny(q, f.path))
+		: res.contextFiles;
+	const errors = q
+		? res.errors.filter((e) => matchesAny(q, e.path, e.error))
+		: res.errors;
+
+	const totalMatches =
+		extensions.length +
+		skillsByText.length +
+		commandsByText.length +
+		prompts.length +
+		themes.length +
+		contextFiles.length +
+	errors.length;
+	// Contador de sección: "n/total" mientras se filtra (tabular-nums via CSS).
+	const cnt = (n: number, total: number) => (q ? `${n}/${total}` : undefined);
+
+	const skills = skillsByText.filter(
 		(s) => skillFilter === "all" || s.source === skillFilter,
 	);
-	const commands = res.commands.filter(
+	const commands = commandsByText.filter(
 		(c) => cmdFilter === "all" || c.source === cmdFilter,
 	);
 
@@ -253,14 +323,39 @@ export function ResourcesContent({
 
 	return (
 		<div className="resources-content">
+			<FilterBar
+				value={query}
+				onChange={setQuery}
+				placeholder="Filtrar recursos (skills, comandos, prompts…)"
+				label="Filtrar recursos"
+			/>
+			{q && totalMatches === 0 ? (
+				<div className="cfg-search-empty">
+					<Codicon name="search" size={24} className="cfg-empty-icon" />
+					<div className="cfg-empty-title">
+						No hay recursos que coincidan con &quot;{q}&quot;
+					</div>
+					<div className="cfg-empty-desc">
+						Verifica la ortografía o busca por otro término.
+					</div>
+					<button
+						type="button"
+						className="cfg-empty-btn"
+						onClick={() => setQuery("")}
+					>
+						Limpiar filtro
+					</button>
+				</div>
+			) : (
 			<div className="sessions-list">
 				{/* 1. Extensiones */}
 				<Section
 					title="Extensiones"
-					count={res.extensions.length}
+					count={extensions.length}
+					label={cnt(extensions.length, res.extensions.length)}
 					iconName="extensions"
 				>
-					{res.extensions.map((e, i) => {
+					{extensions.map((e, i) => {
 						const pills = [
 							...(e.tools ?? []).map((t) => ({ k: "tool", v: t })),
 							...(e.commands ?? []).map((c) => ({ k: "cmd", v: c })),
@@ -274,7 +369,7 @@ export function ResourcesContent({
 										) : (
 											<span className="tag">ext</span>
 										)}
-										<span className="ext-name">{extName(e.path)}</span>
+										<span className="ext-name">{highlightText(extName(e.path), q)}</span>
 									</div>
 								</Tooltip>
 								{pills.length > 0 && (
@@ -282,7 +377,7 @@ export function ResourcesContent({
 										{pills.map((p, j) => (
 											<span key={j} className="tag tool">
 												<span className="tag-k">{p.k}</span>
-												{p.v}
+												{highlightText(p.v, q)}
 											</span>
 										))}
 									</div>
@@ -293,9 +388,14 @@ export function ResourcesContent({
 				</Section>
 
 				{/* 2. Skills */}
-				<Section title="Skills" count={res.skills.length} iconName="sparkle">
+				<Section
+					title="Skills"
+					count={skillsByText.length}
+					label={cnt(skillsByText.length, res.skills.length)}
+					iconName="sparkle"
+				>
 					<SourceFilter
-						items={res.skills}
+						items={skillsByText}
 						active={skillFilter}
 						setActive={setSkillFilter}
 					/>
@@ -304,7 +404,7 @@ export function ResourcesContent({
 							<div className="res-item-head-row">
 								<div className="res-item-name">
 									<SourceBadge source={s.source} />
-									<code className="res-code-name">{s.name}</code>
+									<code className="res-code-name">{highlightText(s.name, q)}</code>
 								</div>
 								<button
 									type="button"
@@ -316,10 +416,12 @@ export function ResourcesContent({
 									<span>Usar</span>
 								</button>
 							</div>
-							{s.description && <div className="res-item-meta">{s.description}</div>}
+							{s.description && (
+								<div className="res-item-meta">{highlightText(s.description, q)}</div>
+							)}
 							{s.path && (
 								<div className="res-item-meta muted">
-									<code>{shortPath(s.path)}</code>
+									<code>{highlightText(shortPath(s.path), q)}</code>
 								</div>
 							)}
 						</div>
@@ -327,9 +429,14 @@ export function ResourcesContent({
 				</Section>
 
 				{/* 3. Comandos */}
-				<Section title="Comandos" count={res.commands.length} iconName="terminal">
+				<Section
+					title="Comandos"
+					count={commandsByText.length}
+					label={cnt(commandsByText.length, res.commands.length)}
+					iconName="terminal"
+				>
 					<SourceFilter
-						items={res.commands}
+						items={commandsByText}
 						active={cmdFilter}
 						setActive={setCmdFilter}
 					/>
@@ -338,7 +445,7 @@ export function ResourcesContent({
 							<div className="res-item-head-row">
 								<div className="res-item-name">
 									<SourceBadge source={c.source} />
-									<code className="res-code-name">/{c.name}</code>
+									<code className="res-code-name">/{highlightText(c.name, q)}</code>
 									{c.argumentHint && <span className="cmd-arg">{c.argumentHint}</span>}
 									{c.source === "extension" && c.extension && (
 										<span className="tag">{c.extension}</span>
@@ -354,18 +461,25 @@ export function ResourcesContent({
 									<span>Insertar</span>
 								</button>
 							</div>
-							{c.description && <div className="res-item-meta">{c.description}</div>}
+							{c.description && (
+								<div className="res-item-meta">{highlightText(c.description, q)}</div>
+							)}
 						</div>
 					))}
 				</Section>
 
 				{/* 4. Prompts */}
-				<Section title="Prompts" count={res.prompts.length} iconName="book">
-					{res.prompts.map((p, i) => (
+				<Section
+					title="Prompts"
+					count={prompts.length}
+					label={cnt(prompts.length, res.prompts.length)}
+					iconName="book"
+				>
+					{prompts.map((p, i) => (
 						<div key={i} className="res-item">
 							<div className="res-item-head-row">
 								<div className="res-item-name">
-									<code className="res-code-name">/{p.name}</code>
+									<code className="res-code-name">/{highlightText(p.name, q)}</code>
 								</div>
 								<button
 									type="button"
@@ -377,18 +491,25 @@ export function ResourcesContent({
 									<span>Insertar</span>
 								</button>
 							</div>
-							{p.description && <div className="res-item-meta">{p.description}</div>}
+							{p.description && (
+								<div className="res-item-meta">{highlightText(p.description, q)}</div>
+							)}
 						</div>
 					))}
 				</Section>
 
 				{/* 5. Themes */}
-				<Section title="Themes" count={res.themes.length} iconName="paintcan">
-					{res.themes.map((t, i) => (
+				<Section
+					title="Themes"
+					count={themes.length}
+					label={cnt(themes.length, res.themes.length)}
+					iconName="paintcan"
+				>
+					{themes.map((t, i) => (
 						<div key={i} className="res-item">
 							<div className="res-item-name">
 								<Codicon name="color-mode" size={13} />
-								<span>{t.name}</span>
+								<span>{highlightText(t.name, q)}</span>
 							</div>
 						</div>
 					))}
@@ -397,15 +518,16 @@ export function ResourcesContent({
 				{/* 6. Contexto */}
 				<Section
 					title="Contexto (AGENTS.md / CLAUDE.md)"
-					count={res.contextFiles.length}
+					count={contextFiles.length}
+					label={cnt(contextFiles.length, res.contextFiles.length)}
 					iconName="file-code"
 				>
-					{res.contextFiles.map((f, i) => (
+					{contextFiles.map((f, i) => (
 						<div key={i} className="res-item">
 							<div className="res-item-head-row">
 								<div className="res-item-name">
 									<Codicon name="file-text" size={13} />
-									<code>{shortPath(f.path)}</code>
+									<code>{highlightText(shortPath(f.path), q)}</code>
 								</div>
 								<button
 									type="button"
@@ -425,21 +547,27 @@ export function ResourcesContent({
 				</Section>
 
 				{/* 7. Errores */}
-				<Section title="Errores" count={res.errors.length} iconName="error">
-					{res.errors.map((e, i) => (
+				<Section
+					title="Errores"
+					count={errors.length}
+					label={cnt(errors.length, res.errors.length)}
+					iconName="error"
+				>
+					{errors.map((e, i) => (
 						<div key={i} className="res-item err">
 							<div className="res-item-name">
 								<Codicon name="warning" size={13} />
-								<code>{shortPath(e.path)}</code>
+									<code>{highlightText(shortPath(e.path), q)}</code>
 							</div>
-							<div className="res-item-meta">{e.error}</div>
+							<div className="res-item-meta">{highlightText(e.error, q)}</div>
 						</div>
 					))}
 				</Section>
 
-				{/* 8. Dónde se cargan */}
-				<LocationsSection />
+				{/* 8. Dónde se cargan — guía estática, oculta mientras se filtra */}
+				{!q && <LocationsSection />}
 			</div>
+		)}
 		</div>
 	);
 }

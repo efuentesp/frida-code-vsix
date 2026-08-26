@@ -123,4 +123,58 @@ describe("ResourcesContent (Propuesta 1: VS Code Resource Explorer & Action Hub)
 		expect(html).toContain(".pi/skills/");
 		expect(html).toContain("~/.frida/extensions/");
 	});
+
+	// Pruebas del filtro local (variante "filtro + resaltado")
+	describe("Filtro y resaltado", () => {
+		it("filtra por texto, resalta coincidencias y oculta secciones sin matches", () => {
+			const html = renderToStaticMarkup(
+				React.createElement(ResourcesContent, {
+					res: mockResources,
+					initialQuery: "commit",
+				}),
+			);
+
+			// Barra de filtro presente (embudo, idioma VS Code)
+			expect(html).toContain("cfg-filter-bar");
+			expect(html).toContain("Filtrar recursos");
+			// Contadores n/total mientras se filtra
+			expect(html).toContain("1/1"); // Extensiones (tools incluye git_commit)
+			expect(html).toContain("1/2"); // Skills
+			// Resaltado de coincidencias (el mark envuelve sólo la subcadena)
+			expect(html).toContain('<mark class="hl">commit</mark>');
+			expect(html).toContain("git_<mark class=\"hl\">commit</mark>");
+			// Secciones sin coincidencias se ocultan
+			expect(html).not.toContain(">Comandos<");
+			expect(html).not.toContain(">Prompts<");
+			expect(html).not.toContain(">Themes<");
+			expect(html).not.toContain(">Contexto");
+			// La guía estática se oculta durante el filtrado
+			expect(html).not.toContain("Dónde se cargan");
+		});
+
+		it("muestra estado vacío con acción de limpiar cuando nada coincide", () => {
+			const html = renderToStaticMarkup(
+				React.createElement(ResourcesContent, {
+					res: mockResources,
+					initialQuery: "zzz-sin-coincidencias",
+				}),
+			);
+
+			expect(html).toContain("cfg-search-empty");
+			expect(html).toContain("No hay recursos que coincidan");
+			expect(html).toContain("Limpiar filtro");
+			expect(html).not.toContain(">Skills<");
+		});
+
+		it("sin consulta conserva todas las secciones y sin resaltado", () => {
+			const html = renderToStaticMarkup(
+				React.createElement(ResourcesContent, { res: mockResources }),
+			);
+
+			expect(html).toContain(">Comandos<");
+			expect(html).toContain(">Prompts<");
+			expect(html).toContain("Dónde se cargan");
+			expect(html).not.toContain("<mark");
+		});
+	});
 });

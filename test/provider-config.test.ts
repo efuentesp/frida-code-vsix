@@ -171,4 +171,72 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 		expect(html).toContain("Frida Enterprise");
 		expect(html).toContain("OpenAI");
 	});
+
+	// Pruebas del filtro local (variante "filtro + resaltado")
+	describe("Filtro y resaltado", () => {
+		it("filtra tarjetas por modelo y resalta la coincidencia en los chips", () => {
+			const onSetKey = vi.fn();
+			const onLogin = vi.fn();
+			const onLogout = vi.fn();
+			const html = renderToStaticMarkup(
+				React.createElement(ProveedoresTab, {
+					providers: [mockEnterprise, mockAnthropic, mockOpenAI],
+					initialQuery: "ceres",
+						onSetKey,
+						onLogin,
+						onLogout,
+					}),
+			);
+
+			// Barra de filtro presente (embudo)
+			expect(html).toContain("cfg-filter-bar");
+			expect(html).toContain("Filtrar proveedores");
+			// Sólo el proveedor con el modelo "ceres-spark" sobrevive
+			expect(html).toContain("Frida Enterprise");
+			expect(html).not.toContain("Anthropic");
+			expect(html).not.toContain("OpenAI");
+			// Contador n/total y resaltado del chip del modelo
+			expect(html).toContain("Configurados (1/2)");
+			expect(html).toContain('<mark class="hl">Ceres</mark>');
+		});
+
+		it("muestra estado vacío cuando ningún proveedor coincide", () => {
+			const onSetKey = vi.fn();
+			const onLogin = vi.fn();
+			const onLogout = vi.fn();
+			const html = renderToStaticMarkup(
+				React.createElement(ProveedoresTab, {
+					providers: [mockEnterprise, mockOpenAI],
+					initialQuery: "zzz-no-existe",
+						onSetKey,
+						onLogin,
+						onLogout,
+					}),
+			);
+
+			expect(html).toContain("cfg-search-empty");
+			expect(html).toContain("No hay proveedores que coincidan");
+			expect(html).toContain("Limpiar filtro");
+			expect(html).not.toContain("Frida Enterprise");
+		});
+
+		it("showFilter=false oculta la barra y resalta la consulta externa (búsqueda global)", () => {
+			const onSetKey = vi.fn();
+			const onLogin = vi.fn();
+			const onLogout = vi.fn();
+			const html = renderToStaticMarkup(
+				React.createElement(ProveedoresTab, {
+					providers: [mockEnterprise],
+					showFilter: false,
+					highlightQuery: "frida",
+						onSetKey,
+						onLogin,
+						onLogout,
+					}),
+			);
+
+			expect(html).not.toContain("cfg-filter-bar");
+			expect(html).toContain('<mark class="hl">Frida</mark>');
+		});
+	});
 });

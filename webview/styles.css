@@ -6852,6 +6852,69 @@ kbd {
 	color: var(--vscode-foreground);
 }
 
+/* Filtro por tab (embudo) — mismo lenguaje visual que .cfg-search-bar pero
+ * compacto y con icono `filter`, el idioma de VS Code para "filtrar esta
+ * lista en el sitio", distinguible de la lupa de búsqueda global del hub. */
+.cfg-filter-bar {
+	position: relative;
+	display: flex;
+	align-items: center;
+	margin: 0 0 8px;
+}
+.cfg-filter-icon {
+	position: absolute;
+	left: 8px;
+	color: var(--vscode-input-placeholderForeground, rgba(128, 128, 128, 0.7));
+	pointer-events: none;
+}
+.cfg-filter-input {
+	width: 100%;
+	height: 26px;
+	padding: 3px 26px;
+	font-size: 12px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+	outline: none;
+	transition: border-color 0.12s ease;
+}
+.cfg-filter-input:focus {
+	border-color: var(--vscode-focusBorder);
+}
+.cfg-filter-input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
+}
+.cfg-filter-clear {
+	position: absolute;
+	right: 6px;
+	background: none;
+	border: none;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	padding: 2px;
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.cfg-filter-clear:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+
+/* Resaltado de coincidencias del filtro (variante "filtro + resaltado"):
+ * findMatchHighlightBackground del tema activo, texto heredado. */
+mark.hl {
+	background: var(
+		--vscode-editor-findMatchHighlightBackground,
+		rgba(234, 192, 5, 0.25)
+	);
+	color: inherit;
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
 .cfg-body {
 	flex: 1;
 	overflow-y: auto;
