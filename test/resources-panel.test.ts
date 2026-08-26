@@ -142,7 +142,7 @@ describe("ResourcesContent (Propuesta 1: VS Code Resource Explorer & Action Hub)
 			expect(html).toContain("1/2"); // Skills
 			// Resaltado de coincidencias (el mark envuelve sólo la subcadena)
 			expect(html).toContain('<mark class="hl">commit</mark>');
-			expect(html).toContain("git_<mark class=\"hl\">commit</mark>");
+			expect(html).toContain('git_<mark class="hl">commit</mark>');
 			// Secciones sin coincidencias se ocultan
 			expect(html).not.toContain(">Comandos<");
 			expect(html).not.toContain(">Prompts<");

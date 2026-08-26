@@ -110,7 +110,7 @@ export function ProveedoresTab({
 							<h4 className="pv-heading">
 								<Codicon name="pass-filled" size={13} /> Configurados (
 								{cnt(configured.length, allConfigured.length)})
-						</h4>
+							</h4>
 							<div className="pv-list">{configured.map(card)}</div>
 						</section>
 					)}
@@ -120,7 +120,7 @@ export function ProveedoresTab({
 							<h4 className="pv-heading">
 								<Codicon name="plug" size={13} /> Disponibles (
 								{cnt(available.length, allAvailable.length)})
-						</h4>
+							</h4>
 							{available.length === 0 ? (
 								<div className="pv-empty">
 									Todos los proveedores están configurados. 🎉

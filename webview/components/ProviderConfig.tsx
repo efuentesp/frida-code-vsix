@@ -75,7 +75,9 @@ export function ProviderConfig({
 				</span>
 				<div className="pc-titles">
 					<div className="pc-name-row">
-						<span className="pc-name">{highlightText(meta.name, highlightQuery)}</span>
+						<span className="pc-name">
+							{highlightText(meta.name, highlightQuery)}
+						</span>
 						{provider.authed ? (
 							<span className="pc-badge ok">
 								<Codicon name="pass-filled" size={12} /> Conectado (
@@ -113,8 +115,8 @@ export function ProviderConfig({
 									title={isCurrentActive ? "Modelo activo en el chat" : m.name}
 								>
 									<span className="pc-model-chip-name">
-									{highlightText(m.name, highlightQuery)}
-								</span>
+										{highlightText(m.name, highlightQuery)}
+									</span>
 									{isCurrentActive && (
 										<span className="pc-model-active-tag">En uso</span>
 									)}

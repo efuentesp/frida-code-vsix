@@ -253,7 +253,13 @@ export function ResourcesContent({
 	// Filtro de texto: filtra cada colección por sus campos visibles.
 	const extensions = q
 		? res.extensions.filter((e) =>
-				matchesAny(q, extName(e.path), e.path, ...(e.tools ?? []), ...(e.commands ?? [])),
+				matchesAny(
+					q,
+					extName(e.path),
+					e.path,
+					...(e.tools ?? []),
+					...(e.commands ?? []),
+				),
 			)
 		: res.extensions;
 	const skillsByText = q
@@ -269,7 +275,9 @@ export function ResourcesContent({
 	const prompts = q
 		? res.prompts.filter((p) => matchesAny(q, p.name, p.description))
 		: res.prompts;
-	const themes = q ? res.themes.filter((t) => matchesAny(q, t.name)) : res.themes;
+	const themes = q
+		? res.themes.filter((t) => matchesAny(q, t.name))
+		: res.themes;
 	const contextFiles = q
 		? res.contextFiles.filter((f) => matchesAny(q, f.path))
 		: res.contextFiles;
@@ -284,7 +292,7 @@ export function ResourcesContent({
 		prompts.length +
 		themes.length +
 		contextFiles.length +
-	errors.length;
+		errors.length;
 	// Contador de sección: "n/total" mientras se filtra (tabular-nums via CSS).
 	const cnt = (n: number, total: number) => (q ? `${n}/${total}` : undefined);
 
@@ -347,227 +355,227 @@ export function ResourcesContent({
 					</button>
 				</div>
 			) : (
-			<div className="sessions-list">
-				{/* 1. Extensiones */}
-				<Section
-					title="Extensiones"
-					count={extensions.length}
-					label={cnt(extensions.length, res.extensions.length)}
-					iconName="extensions"
-				>
-					{extensions.map((e, i) => {
-						const pills = [
-							...(e.tools ?? []).map((t) => ({ k: "tool", v: t })),
-							...(e.commands ?? []).map((c) => ({ k: "cmd", v: c })),
-						];
-						return (
+				<div className="sessions-list">
+					{/* 1. Extensiones */}
+					<Section
+						title="Extensiones"
+						count={extensions.length}
+						label={cnt(extensions.length, res.extensions.length)}
+						iconName="extensions"
+					>
+						{extensions.map((e, i) => {
+							const pills = [
+								...(e.tools ?? []).map((t) => ({ k: "tool", v: t })),
+								...(e.commands ?? []).map((c) => ({ k: "cmd", v: c })),
+							];
+							return (
+								<div key={i} className="res-item">
+									<Tooltip label={shortPath(e.path)} side="top">
+										<div className="res-item-name">
+											{e.inline ? (
+												<span className="tag inline">inline</span>
+											) : (
+												<span className="tag">ext</span>
+											)}
+											<span className="ext-name">{highlightText(extName(e.path), q)}</span>
+										</div>
+									</Tooltip>
+									{pills.length > 0 && (
+										<div className="res-item-pills">
+											{pills.map((p, j) => (
+												<span key={j} className="tag tool">
+													<span className="tag-k">{p.k}</span>
+													{highlightText(p.v, q)}
+												</span>
+											))}
+										</div>
+									)}
+								</div>
+							);
+						})}
+					</Section>
+
+					{/* 2. Skills */}
+					<Section
+						title="Skills"
+						count={skillsByText.length}
+						label={cnt(skillsByText.length, res.skills.length)}
+						iconName="sparkle"
+					>
+						<SourceFilter
+							items={skillsByText}
+							active={skillFilter}
+							setActive={setSkillFilter}
+						/>
+						{skills.map((s, i) => (
 							<div key={i} className="res-item">
-								<Tooltip label={shortPath(e.path)} side="top">
+								<div className="res-item-head-row">
 									<div className="res-item-name">
-										{e.inline ? (
-											<span className="tag inline">inline</span>
-										) : (
-											<span className="tag">ext</span>
-										)}
-										<span className="ext-name">{highlightText(extName(e.path), q)}</span>
+										<SourceBadge source={s.source} />
+										<code className="res-code-name">{highlightText(s.name, q)}</code>
 									</div>
-								</Tooltip>
-								{pills.length > 0 && (
-									<div className="res-item-pills">
-										{pills.map((p, j) => (
-											<span key={j} className="tag tool">
-												<span className="tag-k">{p.k}</span>
-												{highlightText(p.v, q)}
-											</span>
-										))}
+									<button
+										type="button"
+										className="res-use-btn"
+										onClick={() => handleUseSkill(s.name)}
+										title={`Insertar /skill:${s.name} en el chat`}
+									>
+										<Codicon name="play" size={11} />
+										<span>Usar</span>
+									</button>
+								</div>
+								{s.description && (
+									<div className="res-item-meta">{highlightText(s.description, q)}</div>
+								)}
+								{s.path && (
+									<div className="res-item-meta muted">
+										<code>{highlightText(shortPath(s.path), q)}</code>
 									</div>
 								)}
 							</div>
-						);
-					})}
-				</Section>
+						))}
+					</Section>
 
-				{/* 2. Skills */}
-				<Section
-					title="Skills"
-					count={skillsByText.length}
-					label={cnt(skillsByText.length, res.skills.length)}
-					iconName="sparkle"
-				>
-					<SourceFilter
-						items={skillsByText}
-						active={skillFilter}
-						setActive={setSkillFilter}
-					/>
-					{skills.map((s, i) => (
-						<div key={i} className="res-item">
-							<div className="res-item-head-row">
+					{/* 3. Comandos */}
+					<Section
+						title="Comandos"
+						count={commandsByText.length}
+						label={cnt(commandsByText.length, res.commands.length)}
+						iconName="terminal"
+					>
+						<SourceFilter
+							items={commandsByText}
+							active={cmdFilter}
+							setActive={setCmdFilter}
+						/>
+						{commands.map((c, i) => (
+							<div key={i} className="res-item">
+								<div className="res-item-head-row">
+									<div className="res-item-name">
+										<SourceBadge source={c.source} />
+										<code className="res-code-name">/{highlightText(c.name, q)}</code>
+										{c.argumentHint && <span className="cmd-arg">{c.argumentHint}</span>}
+										{c.source === "extension" && c.extension && (
+											<span className="tag">{c.extension}</span>
+										)}
+									</div>
+									<button
+										type="button"
+										className="res-use-btn"
+										onClick={() => handleInsertCommand(c.name)}
+										title={`Insertar /${c.name} en el chat`}
+									>
+										<Codicon name="add" size={11} />
+										<span>Insertar</span>
+									</button>
+								</div>
+								{c.description && (
+									<div className="res-item-meta">{highlightText(c.description, q)}</div>
+								)}
+							</div>
+						))}
+					</Section>
+
+					{/* 4. Prompts */}
+					<Section
+						title="Prompts"
+						count={prompts.length}
+						label={cnt(prompts.length, res.prompts.length)}
+						iconName="book"
+					>
+						{prompts.map((p, i) => (
+							<div key={i} className="res-item">
+								<div className="res-item-head-row">
+									<div className="res-item-name">
+										<code className="res-code-name">/{highlightText(p.name, q)}</code>
+									</div>
+									<button
+										type="button"
+										className="res-use-btn"
+										onClick={() => handleInsertCommand(p.name)}
+										title={`Insertar /${p.name} en el chat`}
+									>
+										<Codicon name="add" size={11} />
+										<span>Insertar</span>
+									</button>
+								</div>
+								{p.description && (
+									<div className="res-item-meta">{highlightText(p.description, q)}</div>
+								)}
+							</div>
+						))}
+					</Section>
+
+					{/* 5. Themes */}
+					<Section
+						title="Themes"
+						count={themes.length}
+						label={cnt(themes.length, res.themes.length)}
+						iconName="paintcan"
+					>
+						{themes.map((t, i) => (
+							<div key={i} className="res-item">
 								<div className="res-item-name">
-									<SourceBadge source={s.source} />
-									<code className="res-code-name">{highlightText(s.name, q)}</code>
+									<Codicon name="color-mode" size={13} />
+									<span>{highlightText(t.name, q)}</span>
 								</div>
-								<button
-									type="button"
-									className="res-use-btn"
-									onClick={() => handleUseSkill(s.name)}
-									title={`Insertar /skill:${s.name} en el chat`}
-								>
-									<Codicon name="play" size={11} />
-									<span>Usar</span>
-								</button>
 							</div>
-							{s.description && (
-								<div className="res-item-meta">{highlightText(s.description, q)}</div>
-							)}
-							{s.path && (
-								<div className="res-item-meta muted">
-									<code>{highlightText(shortPath(s.path), q)}</code>
-								</div>
-							)}
-						</div>
-					))}
-				</Section>
+						))}
+					</Section>
 
-				{/* 3. Comandos */}
-				<Section
-					title="Comandos"
-					count={commandsByText.length}
-					label={cnt(commandsByText.length, res.commands.length)}
-					iconName="terminal"
-				>
-					<SourceFilter
-						items={commandsByText}
-						active={cmdFilter}
-						setActive={setCmdFilter}
-					/>
-					{commands.map((c, i) => (
-						<div key={i} className="res-item">
-							<div className="res-item-head-row">
+					{/* 6. Contexto */}
+					<Section
+						title="Contexto (AGENTS.md / CLAUDE.md)"
+						count={contextFiles.length}
+						label={cnt(contextFiles.length, res.contextFiles.length)}
+						iconName="file-code"
+					>
+						{contextFiles.map((f, i) => (
+							<div key={i} className="res-item">
+								<div className="res-item-head-row">
+									<div className="res-item-name">
+										<Codicon name="file-text" size={13} />
+										<code>{highlightText(shortPath(f.path), q)}</code>
+									</div>
+									<button
+										type="button"
+										className="res-use-btn"
+										onClick={() => handleCopyPath(f.path)}
+										title={f.path}
+									>
+										<Codicon
+											name={copiedPath === f.path ? "check" : "go-to-file"}
+											size={11}
+										/>
+										<span>{copiedPath === f.path ? "Copiado" : "Abrir"}</span>
+									</button>
+								</div>
+							</div>
+						))}
+					</Section>
+
+					{/* 7. Errores */}
+					<Section
+						title="Errores"
+						count={errors.length}
+						label={cnt(errors.length, res.errors.length)}
+						iconName="error"
+					>
+						{errors.map((e, i) => (
+							<div key={i} className="res-item err">
 								<div className="res-item-name">
-									<SourceBadge source={c.source} />
-									<code className="res-code-name">/{highlightText(c.name, q)}</code>
-									{c.argumentHint && <span className="cmd-arg">{c.argumentHint}</span>}
-									{c.source === "extension" && c.extension && (
-										<span className="tag">{c.extension}</span>
-									)}
-								</div>
-								<button
-									type="button"
-									className="res-use-btn"
-									onClick={() => handleInsertCommand(c.name)}
-									title={`Insertar /${c.name} en el chat`}
-								>
-									<Codicon name="add" size={11} />
-									<span>Insertar</span>
-								</button>
-							</div>
-							{c.description && (
-								<div className="res-item-meta">{highlightText(c.description, q)}</div>
-							)}
-						</div>
-					))}
-				</Section>
-
-				{/* 4. Prompts */}
-				<Section
-					title="Prompts"
-					count={prompts.length}
-					label={cnt(prompts.length, res.prompts.length)}
-					iconName="book"
-				>
-					{prompts.map((p, i) => (
-						<div key={i} className="res-item">
-							<div className="res-item-head-row">
-								<div className="res-item-name">
-									<code className="res-code-name">/{highlightText(p.name, q)}</code>
-								</div>
-								<button
-									type="button"
-									className="res-use-btn"
-									onClick={() => handleInsertCommand(p.name)}
-									title={`Insertar /${p.name} en el chat`}
-								>
-									<Codicon name="add" size={11} />
-									<span>Insertar</span>
-								</button>
-							</div>
-							{p.description && (
-								<div className="res-item-meta">{highlightText(p.description, q)}</div>
-							)}
-						</div>
-					))}
-				</Section>
-
-				{/* 5. Themes */}
-				<Section
-					title="Themes"
-					count={themes.length}
-					label={cnt(themes.length, res.themes.length)}
-					iconName="paintcan"
-				>
-					{themes.map((t, i) => (
-						<div key={i} className="res-item">
-							<div className="res-item-name">
-								<Codicon name="color-mode" size={13} />
-								<span>{highlightText(t.name, q)}</span>
-							</div>
-						</div>
-					))}
-				</Section>
-
-				{/* 6. Contexto */}
-				<Section
-					title="Contexto (AGENTS.md / CLAUDE.md)"
-					count={contextFiles.length}
-					label={cnt(contextFiles.length, res.contextFiles.length)}
-					iconName="file-code"
-				>
-					{contextFiles.map((f, i) => (
-						<div key={i} className="res-item">
-							<div className="res-item-head-row">
-								<div className="res-item-name">
-									<Codicon name="file-text" size={13} />
-									<code>{highlightText(shortPath(f.path), q)}</code>
-								</div>
-								<button
-									type="button"
-									className="res-use-btn"
-									onClick={() => handleCopyPath(f.path)}
-									title={f.path}
-								>
-									<Codicon
-										name={copiedPath === f.path ? "check" : "go-to-file"}
-										size={11}
-									/>
-									<span>{copiedPath === f.path ? "Copiado" : "Abrir"}</span>
-								</button>
-							</div>
-						</div>
-					))}
-				</Section>
-
-				{/* 7. Errores */}
-				<Section
-					title="Errores"
-					count={errors.length}
-					label={cnt(errors.length, res.errors.length)}
-					iconName="error"
-				>
-					{errors.map((e, i) => (
-						<div key={i} className="res-item err">
-							<div className="res-item-name">
-								<Codicon name="warning" size={13} />
+									<Codicon name="warning" size={13} />
 									<code>{highlightText(shortPath(e.path), q)}</code>
+								</div>
+								<div className="res-item-meta">{highlightText(e.error, q)}</div>
 							</div>
-							<div className="res-item-meta">{highlightText(e.error, q)}</div>
-						</div>
-					))}
-				</Section>
+						))}
+					</Section>
 
-				{/* 8. Dónde se cargan — guía estática, oculta mientras se filtra */}
-				{!q && <LocationsSection />}
-			</div>
-		)}
+					{/* 8. Dónde se cargan — guía estática, oculta mientras se filtra */}
+					{!q && <LocationsSection />}
+				</div>
+			)}
 		</div>
 	);
 }

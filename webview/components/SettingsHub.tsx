@@ -199,23 +199,23 @@ export function SettingsHub({
 							</div>
 						) : (
 							<>
-										{matchedProviders.length > 0 && (
-											<div className="cfg-search-group">
-												<div className="cfg-section">
-													Proveedores ({matchedProviders.length})
-												</div>
-												<ProveedoresTab
-													providers={matchedProviders}
-													deviceCode={state.oauthDeviceCode}
-													activeModel={state.models?.active}
-													showFilter={false}
-													highlightQuery={q}
-													onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
-													onLogin={(id) => post({ type: "login_provider", provider: id })}
-													onLogout={(id) => post({ type: "logout_provider", provider: id })}
-												/>
-											</div>
-										)}
+								{matchedProviders.length > 0 && (
+									<div className="cfg-search-group">
+										<div className="cfg-section">
+											Proveedores ({matchedProviders.length})
+										</div>
+										<ProveedoresTab
+											providers={matchedProviders}
+											deviceCode={state.oauthDeviceCode}
+											activeModel={state.models?.active}
+											showFilter={false}
+											highlightQuery={q}
+											onSetKey={(id, key) => post({ type: "set_key", provider: id, key })}
+											onLogin={(id) => post({ type: "login_provider", provider: id })}
+											onLogout={(id) => post({ type: "logout_provider", provider: id })}
+										/>
+									</div>
+								)}
 
 								{matchedModules.length > 0 && (
 									<div className="cfg-search-group">

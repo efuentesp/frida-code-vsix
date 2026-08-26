@@ -182,10 +182,10 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 				React.createElement(ProveedoresTab, {
 					providers: [mockEnterprise, mockAnthropic, mockOpenAI],
 					initialQuery: "ceres",
-						onSetKey,
-						onLogin,
-						onLogout,
-					}),
+					onSetKey,
+					onLogin,
+					onLogout,
+				}),
 			);
 
 			// Barra de filtro presente (embudo)
@@ -208,10 +208,10 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 				React.createElement(ProveedoresTab, {
 					providers: [mockEnterprise, mockOpenAI],
 					initialQuery: "zzz-no-existe",
-						onSetKey,
-						onLogin,
-						onLogout,
-					}),
+					onSetKey,
+					onLogin,
+					onLogout,
+				}),
 			);
 
 			expect(html).toContain("cfg-search-empty");
@@ -229,10 +229,10 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 					providers: [mockEnterprise],
 					showFilter: false,
 					highlightQuery: "frida",
-						onSetKey,
-						onLogin,
-						onLogout,
-					}),
+					onSetKey,
+					onLogin,
+					onLogout,
+				}),
 			);
 
 			expect(html).not.toContain("cfg-filter-bar");
