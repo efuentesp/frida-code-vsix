@@ -47,7 +47,10 @@ describe("classifyGatewayError", () => {
 	});
 
 	it("400 con otro mensaje → invalid-request (no tool)", () => {
-		const r = classifyGatewayError(400, JSON.stringify({ error: { message: "Falta el header X" } }));
+		const r = classifyGatewayError(
+			400,
+			JSON.stringify({ error: { message: "Falta el header X" } }),
+		);
 		expect(r.kind).toBe("invalid-request");
 	});
 
@@ -62,9 +65,14 @@ describe("classifyGatewayError", () => {
 // ─── diagnoseOpaque500 (re-probe con stream:false) ───────────────────────────
 
 function fakeFetch(status: number, body: string) {
-	return vi.fn().mockResolvedValue(
-		new Response(body, { status, headers: { "Content-Type": "application/json" } }),
-	);
+	return vi
+		.fn()
+		.mockResolvedValue(
+			new Response(body, {
+				status,
+				headers: { "Content-Type": "application/json" },
+			}),
+		);
 }
 
 describe("diagnoseOpaque500", () => {
@@ -72,8 +80,15 @@ describe("diagnoseOpaque500", () => {
 		model: "gpt-5.4-mini",
 		stream: true,
 		stream_options: { include_usage: true },
-		messages: [{ role: "user", content: "Envía el mensaje al sub-agente agent-123." }],
-		tools: [{ type: "function", function: { name: "steer_subagent", description: "d", parameters: {} } }],
+		messages: [
+			{ role: "user", content: "Envía el mensaje al sub-agente agent-123." },
+		],
+		tools: [
+			{
+				type: "function",
+				function: { name: "steer_subagent", description: "d", parameters: {} },
+			},
+		],
 	};
 
 	it("re-probe con stream:false captura el 400 real y lo clasifica (H-3→H-2)", async () => {
@@ -94,7 +109,9 @@ describe("diagnoseOpaque500", () => {
 		const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
 		expect(String(url)).toMatch(/\/chat\/completions$/);
 		expect(JSON.parse(String(init.body)).stream).toBe(false);
-		expect((init.headers as Record<string, string>)["X-Api-Key"]).toBe("test-key");
+		expect((init.headers as Record<string, string>)["X-Api-Key"]).toBe(
+			"test-key",
+		);
 		// diagnóstico completo
 		expect(diag.probeStatus).toBe(400);
 		expect(diag.kind).toBe("inactive-tool-validation");
@@ -140,7 +157,10 @@ describe("createSofttekProviderHooks + message_end (wiring del mitigador)", () =
 			fetchImpl: fakeFetch(
 				400,
 				JSON.stringify({
-					error: { message: "No existe una tool activa con nombre 'read' para el proyecto 22" },
+					error: {
+						message:
+							"No existe una tool activa con nombre 'read' para el proyecto 22",
+					},
 				}),
 			) as unknown as typeof fetch,
 		});
@@ -181,7 +201,9 @@ describe("createSofttekProviderHooks + message_end (wiring del mitigador)", () =
 		});
 		factory(pi as any);
 		pi.emit("before_provider_request", { payload: { model: "m", stream: true } });
-		pi.emit("message_end", { message: { role: "assistant", stopReason: "stop" } });
+		pi.emit("message_end", {
+			message: { role: "assistant", stopReason: "stop" },
+		});
 		pi.emit("message_end", {
 			message: { role: "user", stopReason: "error", errorMessage: "500" },
 		});
@@ -202,7 +224,10 @@ describe("createSofttekProviderHooks + message_end (wiring del mitigador)", () =
 	it("#137: error 500 de zai (u otro proveedor) NO dispara probe ni diagnóstico", async () => {
 		const pi = makePi();
 		const seen: GatewayDiagnosis[] = [];
-		const fetchFn = fakeFetch(500, JSON.stringify({ error: { message: "Error interno" } }));
+		const fetchFn = fakeFetch(
+			500,
+			JSON.stringify({ error: { message: "Error interno" } }),
+		);
 		const factory = createSofttekProviderHooks({
 			getKey: () => "test-key",
 			onUnauthorized: () => {},

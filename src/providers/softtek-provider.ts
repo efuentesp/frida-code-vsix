@@ -55,9 +55,7 @@ export function lookupCanonicalModelMeta(
 	modelId: string,
 ): CanonicalModelMeta | undefined {
 	for (const providerId of CANONICAL_LOOKUP_PROVIDERS) {
-		const m = mr
-			?.getModels?.(providerId)
-			?.find?.((mm: any) => mm.id === modelId);
+		const m = mr?.getModels?.(providerId)?.find?.((mm: any) => mm.id === modelId);
 		if (m) {
 			return {
 				contextWindow: m.contextWindow,
@@ -366,8 +364,7 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 		pi.on("after_provider_response", (event: any, ctx: any) => {
 			if (ctx.model?.provider !== SOFTTEK_PROVIDER) return;
 			if (event.status === 401 || event.status === 403) deps.onUnauthorized();
-			if (event.status >= 400)
-				deps.onProviderError?.(lastPayload, event.status);
+			if (event.status >= 400) deps.onProviderError?.(lastPayload, event.status);
 		});
 		// H-2/H-3 (HALLAZGOS-GATEWAY): el SDK lanza ANTES de onResponse en 4xx/5xx,
 		// así que el 500 opaco NUNCA llega a after_provider_response. El error
@@ -379,8 +376,7 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 		pi.on("message_end", (event: any) => {
 			try {
 				const msg = event?.message;
-				if (!msg || msg.role !== "assistant" || msg.stopReason !== "error")
-					return;
+				if (!msg || msg.role !== "assistant" || msg.stopReason !== "error") return;
 				// #137 — SOLO diagnósticos de NUESTRO provider: un 5xx de zai/ollama/
 				// github-copilot no debe re-enviar su payload al gateway DevEngine
 				// (el error quedaba misatribuido a DevEngine y la conversación del
@@ -393,27 +389,27 @@ export function createSofttekProviderHooks(deps: SofttekProviderDeps) {
 				if (!key) return;
 				diagnosing = true; // un probe a la vez (fire-and-forget)
 				diagnoseOpaque500(lastPayload, {
-						key,
-						fetchImpl: deps.fetchImpl,
-						requestStatus: Number(m[1]),
-					})
-						.then((diagnosis) => {
-							if (deps.diagnosticDumpPath) {
-								try {
-									writeFileSync(
-										deps.diagnosticDumpPath,
-										JSON.stringify(diagnosis, null, 2),
-									);
-								} catch {
-									/* noop */
-								}
+					key,
+					fetchImpl: deps.fetchImpl,
+					requestStatus: Number(m[1]),
+				})
+					.then((diagnosis) => {
+						if (deps.diagnosticDumpPath) {
+							try {
+								writeFileSync(
+									deps.diagnosticDumpPath,
+									JSON.stringify(diagnosis, null, 2),
+								);
+							} catch {
+								/* noop */
 							}
-							deps.onGatewayDiagnosis?.(diagnosis);
-						})
-						.catch(() => {})
-						.finally(() => {
-							diagnosing = false;
-						});
+						}
+						deps.onGatewayDiagnosis?.(diagnosis);
+					})
+					.catch(() => {})
+					.finally(() => {
+						diagnosing = false;
+					});
 			} catch {
 				/* Errata-6: getters hostiles — nunca romper el flujo */
 			}
