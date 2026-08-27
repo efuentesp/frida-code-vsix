@@ -864,7 +864,10 @@ if (mode !== "walk") {
    if (isNew) {
     const id = "P" + String(inv.screens.length + 1).padStart(2, "0")
     const shot = ART + "/screenshots/" + id + "-" + slug(title) + ".png"
-    const shotR = await tryRun(ab("screenshot " + shq(runDir + "/" + shot)))
+    // Contrato del binario (COMMAND_REFERENCE): screenshot --full captura
+    // la página COMPLETA — sin el flag sale sólo el viewport y la evidencia
+    // queda recortada (defecto reportado en el piloto real de #135).
+    const shotR = await tryRun(ab("screenshot --full " + shq(runDir + "/" + shot)))
     screen = { id: id, canon: canon, origin: origin, title: title, firstSeenStep: steps, firstSeenEpoch: await epochNow(), snapshot: snapPath, screenshot: shotR.exitCode === 0 ? shot : "", purpose: "", userRoles: [], mainElements: [], validationEvidence: [] }
     inv.screens.push(screen)
     if (shotR.exitCode !== 0) log("traffic2api: screenshot falló para " + id + " — el juez lo reportará")

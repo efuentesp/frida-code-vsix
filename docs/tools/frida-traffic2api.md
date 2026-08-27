@@ -93,7 +93,7 @@ docs/api/
     ├── deadzone-candidates.txt # rutas candidatas (greps multi-framework + semilla M1)
     ├── raw.har               # HAR crudo preservado (capturado o copia del externo)
     ├── steps/                # sólo modo walk: snapshots por paso + *-validation.json
-    └── screenshots/          # sólo modo walk: una por pantalla (evidencia de la matriz)
+    └── screenshots/          # sólo modo walk: una por pantalla, página completa (evidencia de la matriz)
 ```
 
 `inventory.json` es grep-verificable ex-post y la fuente de verdad de

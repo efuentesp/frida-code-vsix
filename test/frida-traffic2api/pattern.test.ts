@@ -237,6 +237,13 @@ describe("frida-traffic2api · forma del script generado (#135)", () => {
   expect(script.match(/network har stop/g)?.length).toBeGreaterThanOrEqual(2);
  });
 
+ it("screenshots de página completa con el contrato del binario: screenshot --full", () => {
+  const script = TRAFFIC2API_PATTERN.resolve(VALID_WALK, { cwd });
+  // Sin --full el binario captura solo el viewport (piloto real #135).
+  expect(script).toContain('ab("screenshot --full "');
+  expect(script).not.toMatch(/ab\("screenshot " \+ shq/);
+ });
+
  it("el modo se interpola como CONST estructural: walk vs externo (D2/D10)", () => {
   const walkScript = TRAFFIC2API_PATTERN.resolve(VALID_WALK, { cwd });
   const extScript = TRAFFIC2API_PATTERN.resolve(VALID_EXTERNAL, { cwd });

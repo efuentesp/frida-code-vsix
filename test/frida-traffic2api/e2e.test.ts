@@ -257,7 +257,11 @@ case "$cmd" in
     printf '{"success":true}\\n'
     ;;
   screenshot)
-    printf 'png-mock-e2e' > "$1"
+    # Contrato real (COMMAND_REFERENCE): screenshot --full captura la
+    # página completa — el flag precede al path posicional.
+    out="$1"
+    if [ "$out" = "--full" ] || [ "$out" = "-f" ]; then out="$2"; fi
+    printf 'png-mock-e2e' > "$out"
     printf '{"success":true}\\n'
     ;;
   *)
