@@ -22,7 +22,8 @@ escritores redactan los documentos desde la evidencia en disco y un juez audita
 la cobertura (`PASS / CONCERNS / FAIL`).
 
 **No es**: QA automatizado (eso es [frida-tea](frida-tea.md)), ingeniería
-inversa de APIs por tráfico (M9 — `frida-traffic2api`), ni re-corrida con diff
+inversa de APIs por tráfico (eso es M9 —
+[frida-traffic2api](frida-traffic2api.md)), ni re-corrida con diff
 contra una documentación previa (`app-rewalk`, patrón futuro de la Pista M).
 
 ## El workflow — 5 fases

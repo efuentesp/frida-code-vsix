@@ -30,8 +30,9 @@ redocumentar tras un rediseño mayor, preparar material para no técnicos
 migración o testing.
 
 **No**: apps desktop o móviles (la sesión es de navegador), captura de
-tráfico/contratos de API (eso será M9), diff contra documentación previa
-(`app-rewalk` futuro), o si necesitas pruebas automatizadas — eso es
+tráfico/contratos de API (eso es
+[traffic2api](how-to-frida-traffic2api.md) — M9), diff contra documentación
+previa (`app-rewalk` futuro), o si necesitas pruebas automatizadas — eso es
 [TEA](how-to-frida-tea.md).
 
 ## Flujo típico

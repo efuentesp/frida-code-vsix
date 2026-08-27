@@ -4072,6 +4072,24 @@ export async function activate(
 			label: "frida-understand-app",
 		},
 		{
+			// M9 #135 — traffic2api (skill pack del patrón builtin). Alias sin
+			// colisiones: "api"/"openapi"/"har" no aparecen en ninguna entrada
+			// previa (ni match exacto ni label.includes — HELP_TOOLS.find es
+			// first-match).
+			match: [
+				"traffic2api",
+				"traffic",
+				"trafico",
+				"tráfico",
+				"api",
+				"openapi",
+				"har",
+			],
+			file: "docs/tools/frida-traffic2api.md",
+			howTo: "docs/how-to-frida-traffic2api.md",
+			label: "frida-traffic2api",
+		},
+		{
 			match: [
 				"workflows",
 				"patrones",

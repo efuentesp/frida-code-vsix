@@ -120,6 +120,7 @@ import { createFridaAidd } from "./tools/frida-aidd";
 import { createFridaTea } from "./tools/frida-tea";
 import { createFridaAppWalkthrough } from "./tools/frida-app-walkthrough";
 import { createFridaUnderstandApp } from "./tools/frida-understand-app";
+import { createFridaTraffic2Api } from "./tools/frida-traffic2api";
 import { createFridaLensFactory } from "./tools/frida-extensible-workflows/moat-factories";
 import { createFridaGoal } from "./tools/frida-goal";
 import type { GoalStateSnapshot } from "./tools/frida-goal/state";
@@ -676,6 +677,19 @@ export async function createFridaSession(
 				// getter de codebase-index para que la const CAPABILITIES del
 				// script sea exacta respecto de instalación y toggle (D5/D6).
 				factory: createFridaUnderstandApp({
+					agentDir: opts.agentDir,
+					codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
+				}),
+			},
+			{
+				name: "frida-traffic2api",
+				// M9 (#135): skill pack del patrón `traffic2api` — primer pack
+				// que combina moat declarativo (meta.moat, M1) y sesión
+				// pinneada (args.session, M8). Sin toggle propio (los skill
+				// packs no se conmutan); recibe agentDir y el getter de
+				// codebase-index para que la const CAPABILITIES del script sea
+				// exacta (misma forma que understand-app, D3).
+				factory: createFridaTraffic2Api({
 					agentDir: opts.agentDir,
 					codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
 				}),

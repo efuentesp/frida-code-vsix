@@ -25,8 +25,10 @@ escritores → juez) escribiendo evidencia en disco; la síntesis final (README 
 veredicto M4/M5 + inventario) es determinista desde una sola fuente de verdad.
 
 **No es**: documentación funcional de una app usándola (eso es M8 —
-`app-walkthrough`), cruce funcional↔técnico (M9, issue #135), panel «Mapa del
-proyecto» (M2), matriz funcionalidad↔endpoint↔módulo (M9) ni integración
+`app-walkthrough`), cruce funcional↔técnico con matriz
+funcionalidad↔endpoint↔módulo (eso es M9 —
+[frida-traffic2api](frida-traffic2api.md)), panel «Mapa del
+proyecto» (M2) ni integración
 SonarQube (M3). Tampoco refina ni visualiza el modelo LikeC4 (tooling externo —
 Frida solo genera el `.c4` semilla).
 

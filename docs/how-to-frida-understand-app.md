@@ -33,7 +33,9 @@ evidencia citable, sembrar un modelo LikeC4 para arquitectura.
 
 **No**: documentar una app web **usándola** (eso es
 [app-walkthrough](how-to-frida-app-walkthrough.md) — M8), capturar
-tráfico/API (M9), métricas de calidad/SonarQube (M3), o el panel «Mapa del
+tráfico/API y derivar la spec (eso es
+[traffic2api](how-to-frida-traffic2api.md) — M9), métricas de
+quality/SonarQube (M3), o el panel «Mapa del
 proyecto» (M2). El modelo LikeC4 queda en semilla — el refino es con tooling
 externo.
 
