@@ -17,6 +17,30 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.33.0] - 2026-08-28
+### Añadido
+
+- **workflows** — M10 frida-size-app — Fase 8: checkScc en el doctor y publicación
+- **workflows** — M10 frida-size-app — fases 1-7: patrón builtin, binario scc pineado, COCOMO y e2e
+- **workflows** — M9 frida-traffic2api — fases 2-6: patrón builtin, moat, publicación y e2e
+- **workflows** — M9 frida-traffic2api — Fase 1: prompts y resolver 3-capas
+- **webview** — filtro con resaltado en tabs Recursos y Proveedores
+
+### Corregido
+
+- **traffic2api** — screenshots de página completa en el walk (screenshot --full)
+- **providers** — diagnóstico de DevEngine sólo para 5xx de softtek-devengine
+
+### Interno
+
+- **rpiv** — validación M10 size-app (pass) — fases 1-8 verificadas
+- **rpiv** — pipeline M10 size-app — FRD, research, design, plan y validación
+- **rpiv** — validación M9 traffic2api (pass) — fases 1-6 verificadas
+- **rpiv** — pipeline M9 traffic2api — FRD, research, design, plan y validación
+- **roadmap** — alta de M10 size-app en Pista M — P2 (Refs #139)
+- **providers** — reformato pi-lens post-commit (Refs #137)
+- **webview** — reformateo post-commit del filtro de Recursos/Proveedores
+
 ## [0.32.0] - 2026-08-25
 ### Añadido
 
