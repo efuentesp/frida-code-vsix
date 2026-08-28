@@ -121,6 +121,8 @@ import { createFridaTea } from "./tools/frida-tea";
 import { createFridaAppWalkthrough } from "./tools/frida-app-walkthrough";
 import { createFridaUnderstandApp } from "./tools/frida-understand-app";
 import { createFridaTraffic2Api } from "./tools/frida-traffic2api";
+import { createFridaSizeApp } from "./tools/frida-size-app";
+import { SIZE_APP_FACTORY_NAME } from "./tools/frida-size-app/constants";
 import { createFridaLensFactory } from "./tools/frida-extensible-workflows/moat-factories";
 import { createFridaGoal } from "./tools/frida-goal";
 import type { GoalStateSnapshot } from "./tools/frida-goal/state";
@@ -690,6 +692,20 @@ export async function createFridaSession(
 				// codebase-index para que la const CAPABILITIES del script sea
 				// exacta (misma forma que understand-app, D3).
 				factory: createFridaTraffic2Api({
+					agentDir: opts.agentDir,
+					codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
+				}),
+			},
+			{
+				name: SIZE_APP_FACTORY_NAME,
+				// M10 (#139): skill pack del patrón `size-app` — primera
+				// dependencia binaria NO-npm del repo: scc v4.0.0 pineado al
+				// agentDir (sha256 verificado), descarga fire-and-forget al
+				// registrar la factory (D2, molde hermes). Sin toggle propio
+				// (los skill packs no se conmutan); agentDir + getter de
+				// codebase-index para que la const CAPABILITIES del script sea
+				// exacta (misma forma que understand-app/traffic2api).
+				factory: createFridaSizeApp({
 					agentDir: opts.agentDir,
 					codebaseIndexEnabled: () => opts.codebaseIndexEnabled?.() ?? true,
 				}),
