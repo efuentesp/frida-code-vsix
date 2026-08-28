@@ -3442,7 +3442,11 @@ export async function activate(
 			case "check_environment": {
 				post({ type: "environment_checking", checking: true });
 				try {
-					const report = await checkEnvironment();
+					// #139 (M10): agentDir real para checkScc (sonda síncrona del
+					// pack — misma que CAPABILITIES.scc del patrón).
+					const report = await checkEnvironment({
+						agentDir: defaultAgentDir(),
+					});
 					post({ type: "environment_status", status: report });
 				} catch (err: any) {
 					post({
@@ -4088,6 +4092,23 @@ export async function activate(
 			file: "docs/tools/frida-traffic2api.md",
 			howTo: "docs/how-to-frida-traffic2api.md",
 			label: "frida-traffic2api",
+		},
+		{
+			// M10 #139 — size-app (skill pack del patrón builtin). Alias sin
+			// colisiones: "size"/"tamaño"/"dimensionamiento"/"cocomo" no
+			// aparecen en ninguna entrada previa (ni match exacto ni
+			// label.includes — HELP_TOOLS.find es first-match).
+			match: [
+				"size-app",
+				"size",
+				"tamaño",
+				"tamano",
+				"dimensionamiento",
+				"cocomo",
+			],
+			file: "docs/tools/frida-size-app.md",
+			howTo: "docs/how-to-frida-size-app.md",
+			label: "frida-size-app",
 		},
 		{
 			match: [

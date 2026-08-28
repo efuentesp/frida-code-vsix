@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
 	checkAgentBrowser,
 	checkBash,
@@ -8,8 +11,15 @@ import {
 	checkGit,
 	checkNodeNpm,
 	checkOllama,
+	checkScc,
 	type ExecFn,
 } from "../src/environment/doctor";
+import {
+	SCC_PIN,
+	currentSccAsset,
+	sccBinPath,
+	sccMarkerPath,
+} from "../src/tools/frida-size-app/constants";
 
 describe("environment/doctor · detección de dependencias", () => {
 	it("checkGit detecta versión correctamente", async () => {
@@ -175,18 +185,29 @@ describe("environment/doctor · detección de dependencias", () => {
 			return { stdout: "", stderr: "not found", code: 127 };
 		};
 
-		const report = await checkEnvironment({
-			exec: mockExec,
-			platform: "win32",
-			arch: "x64",
-		});
+		const agentDir = mkdtempSync(join(tmpdir(), "doctor-win-"));
+		try {
+			const report = await checkEnvironment({
+				exec: mockExec,
+				platform: "win32",
+				arch: "x64",
+				agentDir,
+			});
 
-		expect(report.platform).toBe("win32");
-		expect(report.platformLabel).toBe("Windows");
-		expect(report.arch).toBe("x64");
-		expect(report.totalCount).toBe(7);
-		expect(report.readyCount).toBe(4);
-		expect(report.coreReady).toBe(true);
+			expect(report.platform).toBe("win32");
+			expect(report.platformLabel).toBe("Windows");
+			expect(report.arch).toBe("x64");
+			expect(report.totalCount).toBe(8);
+			expect(report.readyCount).toBe(4);
+			expect(report.coreReady).toBe(true);
+			// #139: scc es el 8º check — ausente en el agentDir inyectado
+			// (tmpdir vacío: sin él la sonda vería el ~/.frida real del
+			// runner y el conteo sería no determinista).
+			const scc = report.dependencies.find((d) => d.id === "scc");
+			expect(scc?.installed).toBe(false);
+		} finally {
+			rmSync(agentDir, { recursive: true, force: true });
+		}
 	});
 
 	it("#110 — checkOllama: instalado con daemon activo", async () => {
@@ -294,19 +315,88 @@ describe("environment/doctor · detección de dependencias", () => {
 		expect(res.notes).not.toContain("falta");
 	});
 
-	it("#110 — checkEnvironment incluye ollama (7 deps)", async () => {
+	it("#110/#139 — checkEnvironment incluye ollama y scc (8 deps)", async () => {
 		const mockExec: ExecFn = async (cmd) => {
 			if (cmd === "git")
 				return { stdout: "git version 2.44.0", stderr: "", code: 0 };
 			if (cmd === "bash") return { stdout: "version 5.2.0", stderr: "", code: 0 };
 			return { stdout: "", stderr: "not found", code: 127 };
 		};
-		const report = await checkEnvironment({
-			exec: mockExec,
-			platform: "darwin",
-			arch: "arm64",
-		});
-		expect(report.totalCount).toBe(7);
-		expect(report.dependencies.some((d) => d.id === "ollama")).toBe(true);
+		const agentDir = mkdtempSync(join(tmpdir(), "doctor-darwin-"));
+		try {
+			const report = await checkEnvironment({
+				exec: mockExec,
+				platform: "darwin",
+				arch: "arm64",
+				agentDir,
+			});
+			expect(report.totalCount).toBe(8);
+			expect(report.readyCount).toBe(2);
+			expect(report.dependencies.some((d) => d.id === "ollama")).toBe(true);
+			expect(report.dependencies.some((d) => d.id === "scc")).toBe(true);
+		} finally {
+			rmSync(agentDir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("#139 — checkScc (8º check, binario pineado al agentDir)", () => {
+	let agentDir: string;
+
+	beforeEach(() => {
+		agentDir = mkdtempSync(join(tmpdir(), "doctor-scc-"));
+	});
+
+	afterEach(() => {
+		rmSync(agentDir, { recursive: true, force: true });
+	});
+
+	/** Fixture espejo del e2e del pack (pattern.test fixtureSccAtPin):
+	 * marker al pin + binario presente. currentSccAsset() sin args usa la
+	 * plataforma REAL del runner → determinista en cualquier host. */
+	function fixtureSccAtPin(dir: string): void {
+		mkdirSync(dirname(sccBinPath(dir)), { recursive: true });
+		writeFileSync(sccBinPath(dir), "#!/bin/sh\necho scc\n");
+		writeFileSync(
+			sccMarkerPath(dir),
+			JSON.stringify({
+				pin: SCC_PIN,
+				asset: currentSccAsset(),
+				sha256: "0".repeat(64),
+			}),
+		);
+	}
+
+	it("instalado al pin (marker + binario) → installed con versión y ruta", async () => {
+		fixtureSccAtPin(agentDir);
+		const res = await checkScc(agentDir);
+		expect(res.installed).toBe(true);
+		expect(res.version).toBe(`v${SCC_PIN}`);
+		expect(res.category).toBe("extension");
+		expect(res.path).toContain(join(agentDir, "bin"));
+		expect(res.notes).toContain("verificado");
+	});
+
+	it("ausente → no instalado con guía de reintento (no error)", async () => {
+		const res = await checkScc(agentDir);
+		expect(res.installed).toBe(false);
+		expect(res.version).toBeUndefined();
+		expect(res.notes).toContain("Descarga automática");
+		expect(res.notes).toContain("degrada");
+	});
+
+	it("pin viejo (3.4.0) no cuenta: el gate es el pin exacto", async () => {
+		mkdirSync(dirname(sccBinPath(agentDir)), { recursive: true });
+		writeFileSync(sccBinPath(agentDir), "#!/bin/sh\necho scc\n");
+		writeFileSync(
+			sccMarkerPath(agentDir),
+			JSON.stringify({
+				pin: "3.4.0",
+				asset: currentSccAsset(),
+				sha256: "0".repeat(64),
+			}),
+		);
+		const res = await checkScc(agentDir);
+		expect(res.installed).toBe(false);
 	});
 });

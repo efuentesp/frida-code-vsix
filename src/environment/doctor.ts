@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { SCC_PIN, sccBinPath } from "../tools/frida-size-app/constants";
+import {
+	isSccInstalledAtPin,
+	readSccMarker,
+} from "../tools/frida-size-app/installer";
 import type {
 	DependencyStatus,
 	EnvironmentReport,
@@ -499,16 +504,78 @@ export async function checkOllama(exec: ExecFn): Promise<DependencyStatus> {
 	};
 }
 
+// ─── scc (#139, M10): 8º check — binario pineado al agentDir ─────────────
+
+export async function checkScc(
+	agentDir: string,
+	platform: NodeJS.Platform = process.platform,
+	arch: string = process.arch,
+): Promise<DependencyStatus> {
+	// Sonda síncrona del pack (misma que CAPABILITIES.scc del patrón):
+	// marker al pin + binario presente — doctor y workflow nunca discrepan.
+	// Sin exec deliberado: scc no se invoca (el marker ES la versión — scc no
+	// tiene package.json) y el check queda barato e idempotente.
+	const installed = isSccInstalledAtPin(agentDir, platform, arch);
+	const marker = readSccMarker(agentDir);
+	const version = installed && marker ? `v${marker.pin}` : undefined;
+	let notes: string | undefined;
+	if (installed) {
+		notes = `Pin ${SCC_PIN} verificado (${marker?.asset})`;
+	} else {
+		notes =
+			"Descarga automática al iniciar la sesión (fire-and-forget, ~7 MB con sha256). Reintenta en unos minutos o revisa red/proxy; size-app degrada (no aborta) mientras tanto.";
+	}
+
+	return {
+		id: "scc",
+		name: "scc (Sloc Cloc and Code)",
+		category: "extension",
+		installed,
+		version,
+		path: installed ? sccBinPath(agentDir, platform) : undefined,
+		notes,
+		description:
+			"Conteo políglota de LOC/complejidad/churn (270+ lenguajes) — binario pineado al agentDir con sha256 verificado.",
+		usedBy:
+			"Patrón size-app (frida-size-app, M10): KLOC, COCOMO, SQALE proxy, hotspots",
+		installGuides: {
+			win32: {
+				command: "# Automático: frida-size-app lo descarga al iniciar la sesión",
+				guide:
+					"Sin acción manual: descarga firmada (sha256) fire-and-forget al arrancar. Tras reiniciar verifica <agentDir>/bin/scc.exe.",
+				url: "https://github.com/boyter/scc/releases/tag/v4.0.0",
+			},
+			darwin: {
+				command: "# Automático: frida-size-app lo descarga al iniciar la sesión",
+				guide:
+					"Sin acción manual: descarga firmada (sha256) fire-and-forget al arrancar. Tras reiniciar verifica <agentDir>/bin/scc (chmod +x automático).",
+				url: "https://github.com/boyter/scc/releases/tag/v4.0.0",
+			},
+			linux: {
+				command: "# Automático: frida-size-app lo descarga al iniciar la sesión",
+				guide:
+					"Sin acción manual: descarga firmada (sha256) fire-and-forget al arrancar. Tras reiniciar verifica <agentDir>/bin/scc (chmod +x automático).",
+				url: "https://github.com/boyter/scc/releases/tag/v4.0.0",
+			},
+		},
+	};
+}
+
 export async function checkEnvironment(deps?: {
 	exec?: ExecFn;
 	platform?: NodeJS.Platform;
 	arch?: string;
+	agentDir?: string;
 }): Promise<EnvironmentReport> {
 	const exec = deps?.exec ?? defaultExec;
 	const platform = deps?.platform ?? process.platform;
 	const arch = deps?.arch ?? os.arch();
+	// Default espejo de defaultAgentDir() (pi-session.ts, ADR-0010) — la
+	// sesión real inyecta defaultAgentDir() desde extension.ts (call site
+	// productivo único).
+	const agentDir = deps?.agentDir ?? path.join(os.homedir(), ".frida");
 
-	const [git, bash, nodeNpm, gh, agentBrowser, docker, ollama] =
+	const [git, bash, nodeNpm, gh, agentBrowser, docker, ollama, scc] =
 		await Promise.all([
 			checkGit(exec),
 			checkBash(exec, platform),
@@ -517,9 +584,19 @@ export async function checkEnvironment(deps?: {
 			checkAgentBrowser(exec),
 			checkDocker(exec),
 			checkOllama(exec),
+			checkScc(agentDir, platform, arch),
 		]);
 
-	const dependencies = [git, bash, nodeNpm, gh, agentBrowser, docker, ollama];
+	const dependencies = [
+		git,
+		bash,
+		nodeNpm,
+		gh,
+		agentBrowser,
+		docker,
+		ollama,
+		scc,
+	];
 	const readyCount = dependencies.filter((d) => d.installed).length;
 	const coreReady = git.installed && bash.installed;
 
