@@ -43,11 +43,14 @@ previa (`app-rewalk` futuro), o si necesitas pruebas automatizadas — eso es
    → el agente corre agent_browser({ args: ["--session", "app-walkthrough",
        "open", "https://app.ejemplo.com"] })
    → TÚ inicias sesión en esa ventana (es tu navegador real)
-2. Presupuesto — el agente te pregunta (ask_user_question):
-   "¿Cuántas pantallas?" → "30" / "todo" / número propio
+2. Lanza el comando slash (vía guiada):
+   Tú: /walkthrough https://app.ejemplo.com
+   → QuickPick "¿Cuántas pantallas únicas documentar?" → "10 pantallas
+      (recomendado)" · "5 pantallas" · "25 pantallas" · "Todo (sin tope)"
+      (= maxScreens 0)
 3. Lanzamiento — desatendido desde aquí:
    workflow({ name: "app-walkthrough",
-              args: { url: "https://app.ejemplo.com", maxScreens: 30 } })
+              args: { url: "https://app.ejemplo.com", maxScreens: 10 } })
 ```
 
 Al terminar tienes `docs/funcional/` con `README.md` (índice), 4 documentos,
@@ -68,7 +71,8 @@ mayor parte es espera desatendida mientras el workflow explora.
 - La URL de la app y tus credenciales para iniciar sesión TÚ — el workflow
   nunca introduce credenciales ni hace login por ti (política del pack).
 - Una idea del presupuesto: ¿cuántas pantallas únicas esperas? (app mediana:
-  20–50; `0` = "todo").
+  20–50; el comando `/walkthrough` ofrece "10 pantallas (recomendado)" ·
+  "5 pantallas" · "25 pantallas" · "Todo (sin tope)" = `0`).
 
 ### Paso 1 — Abre la sesión del navegador y autentícate
 
@@ -90,16 +94,19 @@ consistente y pásalo en el Paso 4 (`session: "tu-nombre"`).
 ### Paso 2 — Pide documentar la app
 
 ```text
-Tú: documenta la app en https://app.ejemplo.com
-    (ya inicié sesión en la sesión "app-walkthrough")
+Tú: /walkthrough https://app.ejemplo.com
+    (o en lenguaje natural: "documenta la app en https://app.ejemplo.com —
+    ya inicié sesión en la sesión 'app-walkthrough'")
 ```
 
-### Paso 3 — Responde la pregunta de presupuesto
+### Paso 3 — Responde el QuickPick de presupuesto
 
-El agente pregunta con `ask_user_question`: **¿Presupuesto de exploración?**
-Elige "30 pantallas", "todo" (= sin tope) o un número propio. El presupuesto
-se pregunta ANTES del launch porque tras el lanzamiento la corrida es
-desatendida (el único checkpoint es el final, y es booleano).
+`/walkthrough` abre: **¿Cuántas pantallas únicas documentar?** Elige
+"10 pantallas (recomendado)", "5 pantallas", "25 pantallas" o
+"Todo (sin tope)" (= `maxScreens: 0`). El presupuesto se pregunta ANTES
+del launch porque tras el lanzamiento la corrida es desatendida (el único
+checkpoint es el final, y es booleano). Si lo pediste en lenguaje natural,
+el agente pregunta lo mismo con `ask_user_question`.
 
 ### Paso 4 — Lanzamiento (desatendido desde aquí)
 
@@ -107,7 +114,7 @@ El agente lanza:
 
 ```text
 workflow({ name: "app-walkthrough",
-           args: { url: "https://app.ejemplo.com", maxScreens: 30 } })
+           args: { url: "https://app.ejemplo.com", maxScreens: 10 } })
 ```
 
 Qué verás en el panel de workflows — 5 fases en orden:
@@ -169,10 +176,10 @@ los documentos.
 ### Documentar una app por primera vez
 
 ```text
-Tú: "documenta la app en https://app.ejemplo.com — ya inicié sesión en la sesión 'app-walkthrough'"
+Tú: /walkthrough https://app.ejemplo.com
 ```
 
-El agente confirma el presupuesto (`maxScreens`), lanza el workflow y al final
+El comando pregunta el presupuesto (QuickPick), lanza el workflow y al final
 resume: N pantallas en M pasos, decisión del juez y rutas de los entregables.
 Si algo no quedó documentado (corte por presupuesto), el juez lo lista como
 `CONCERNS` — relanza con un `maxScreens` mayor para ampliar.
@@ -192,7 +199,7 @@ falla la corrida).
 
 ```text
 workflow({ name: "app-walkthrough", args: {
-  url: "https://app.ejemplo.com", maxScreens: 30, language: "en-US" } })
+  url: "https://app.ejemplo.com", maxScreens: 10, language: "en-US" } })
 ```
 
 Los entregables salen en el idioma indicado (default `es-MX`).
@@ -201,7 +208,7 @@ Los entregables salen en el idioma indicado (default `es-MX`).
 
 ```text
 workflow({ name: "app-walkthrough", args: {
-  url: "https://app.ejemplo.com", maxScreens: 30, review: "auto" } })
+  url: "https://app.ejemplo.com", maxScreens: 10, review: "auto" } })
 ```
 
 Sin checkpoint final — la decisión del juez queda en el retorno del workflow.
@@ -213,7 +220,7 @@ Sin checkpoint final — la decisión del juez queda en el retorno del workflow.
 agent_browser({ args: ["--session", "demo-cliente", "open", "https://app.ejemplo.com"] })
 # y el mismo nombre en args:
 workflow({ name: "app-walkthrough", args: {
-  url: "https://app.ejemplo.com", maxScreens: 30, session: "demo-cliente" } })
+  url: "https://app.ejemplo.com", maxScreens: 10, session: "demo-cliente" } })
 ```
 
 Si la sesión no está viva al arrancar, el workflow falla en el bootstrap con

@@ -100,7 +100,7 @@ export function validateUnderstandAppArgs(args: unknown): UnderstandAppArgs {
 	const record = asRecord(args);
 	if (record.maxHotspots === undefined) {
 		throw new Error(
-			'Patrón "understand-app": falta args.maxHotspots (entero 0-100; 0 = "todo"). Pregunta el presupuesto al usuario con ask_user_question en la sesión principal ANTES de lanzar (opciones: "10 hotspots", "todo" (= 0), o un número propio) y relanza el workflow con el valor resuelto — tras el launch la corrida es desatendida y no puede preguntar.',
+			'Patrón "understand-app": falta args.maxHotspots (entero 0-100; 0 = "todo"). Resuélvelo ANTES de lanzar — tras el launch la corrida es desatendida y no puede preguntar: pregunta el presupuesto al usuario con ask_user_question en la sesión principal (opciones: "8 hotspots (recomendado)" · "15 hotspots" · "Todo (sin tope)" (= 0), o un número propio) y relanza el workflow con el valor resuelto — o sugiere al usuario el comando /understand, que pregunta lo mismo con QuickPick.',
 		);
 	}
 	if (

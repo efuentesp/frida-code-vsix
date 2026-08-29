@@ -99,7 +99,7 @@ export function validateAppWalkthroughArgs(args: unknown): AppWalkthroughArgs {
 	}
 	if (record.maxScreens === undefined) {
 		throw new Error(
-			'Patrón "app-walkthrough": falta args.maxScreens (entero 0-200; 0 = "todo"). Pregunta el presupuesto al usuario con ask_user_question en la sesión principal ANTES de lanzar (opciones: "30 pantallas", "todo" (= 0), o un número propio) y relanza el workflow con el valor resuelto — tras el launch la corrida es desatendida y no puede preguntar.',
+			'Patrón "app-walkthrough": falta args.maxScreens (entero 0-200; 0 = "todo"). Resuélvelo ANTES de lanzar — tras el launch la corrida es desatendida y no puede preguntar: pregunta el presupuesto al usuario con ask_user_question en la sesión principal (opciones: "10 pantallas (recomendado)" · "5 pantallas" · "25 pantallas" · "Todo (sin tope)" (= 0), o un número propio) y relanza el workflow con el valor resuelto — o sugiere al usuario el comando /walkthrough, que pregunta lo mismo con QuickPick.',
 		);
 	}
 	if (

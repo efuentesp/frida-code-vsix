@@ -11,9 +11,9 @@ Guía de uso — la referencia técnica vive en
 
 ## El modelo en 30 segundos
 
-1. **Presupuesto antes del launch**: el agente pregunta el salario mensual
-   (y tipo COCOMO + tope de tiempo) con `ask_user_question` — tras el
-   lanzamiento la corrida es desatendida.
+1. **Presupuesto antes del launch**: el comando `/size` pregunta el modo
+   COCOMO y el salario mensual con QuickPicks — tras el lanzamiento la
+   corrida es desatendida.
 2. **Medición determinista**: el binario `scc` v4.0.0 (descargado y firmado
    automáticamente al agentDir) corre por ruta absoluta; un helper node
    agrega todo a `docs/dimensionamiento/artifacts/metrics.json`.
@@ -38,16 +38,17 @@ sobre código existente).
 ## Flujo típico
 
 ```text
-1. Pídelo en el chat:
-   Tú: "dimensiona esta app para una propuesta de mantenimiento"
-2. El agente pregunta (ask_user_question):
-   "¿Salario mensual por persona?" → "MXN $35,000" / "USD $6,000" / propio
-   "¿Tipo COCOMO?" → semi-detached (recomendado) / organic / embedded
-   "¿Tope de tiempo?" → 60 min / sin tope
-3. Lanzamiento — desatendido desde aquí:
+1. Lanza el comando slash (vía guiada):
+   Tú: /size
+   → "¿Modo Basic COCOMO 81?" → "semi-detached (recomendado)" · "organic" ·
+      "embedded"
+   → "¿Salario MENSUAL por persona?" → "MXN $35,000" (wage 35000,
+      currency "MXN") · "USD $6,000" (wage 6000, currency "USD") ·
+      "monto propio" (InputBox numérico)
+2. Lanzamiento — desatendido desde aquí:
    workflow({ name: "size-app",
-              args: { wage: 35000, currency: "MXN", cocomoType: "semi-detached",
-                      maxMinutes: 60 } })
+              args: { wage: 35000, currency: "MXN",
+                      cocomoType: "semi-detached" } })
 ```
 
 Al terminar tienes `docs/dimensionamiento/` con `dimensionamiento.md` (el
@@ -70,22 +71,27 @@ informe), `README.md` (índice), `analisis/` (3 anexos interpretativos) y
 - `scc` se descarga SOLO (~7 MB firmados) al iniciar la sesión — la
   primera corrida tras instalar Frida ya lo encuentra; si aún no, la
   corrida degrada (no aborta) y puedes reintentar en minutos.
-- Una idea del salario mensual por persona para la pregunta de presupuesto.
+- Una idea del salario mensual por persona para el QuickPick de `/size`.
 
 ### Paso 1 — Pide el dimensionamiento
 
 ```text
-Tú: dimensiona esta app para una propuesta de mantenimiento
+Tú: /size
+    (o en lenguaje natural: "dimensiona esta app para una propuesta de
+     mantenimiento")
 ```
 
-### Paso 2 — Responde las preguntas de presupuesto
+### Paso 2 — Responde los QuickPicks de presupuesto
 
-El agente pregunta con `ask_user_question` (BEFORE del launch — después la
-corrida es desatendida): **salario mensual** (opciones MXN $35,000 /
-USD $6,000 / monto propio; decimales válidos), **tipo COCOMO**
-(semi-detached recomendado para mixed; organic para codebases pequeñas y
-conocidas; embedded para críticas con restricciones duras) y **tope de
-tiempo** (60 min típico; sin tope = corrida completa).
+`/size` abre primero **¿Modo Basic COCOMO 81?** ("semi-detached
+(recomendado)" para mixed; "organic" para codebases pequeñas y conocidas;
+"embedded" para críticas con restricciones duras) y luego
+**¿Salario MENSUAL por persona?** ("MXN $35,000" / "USD $6,000" /
+"monto propio" — InputBox numérico con punto decimal; "monto propio" sin
+moneda deja el default `currency: "USD"`). Todo ANTES del launch — después
+la corrida es desatendida. Si lo pediste en lenguaje natural, el agente
+pregunta lo mismo con `ask_user_question` y puede añadir el tope de tiempo
+(`maxMinutes`, default: sin tope).
 
 ### Paso 3 — Lanzamiento (desatendido desde aquí)
 
@@ -140,7 +146,7 @@ informe.
 | Degradación "scc no instalado al pin" | descarga fire-and-forget en curso o fallida | Espera unos minutos y relanza; verifica red/proxy; el doctor (checkScc) muestra el estado |
 | Familias churn "no disponible" | cwd sin historial git | Corre sobre un clone con commits; lo demás del informe no se afecta |
 | "CCN por función" no disponible | `lizard` ausente del PATH (opcional) | `pip install lizard` y relanza |
-| `args.wage` falta (error eager) | el launch se hizo sin presupuesto | Responde la pregunta del agente (MXN/USD/propio) y relanza — el error instruye cómo |
+| `args.wage` falta (error eager) | el launch se hizo sin presupuesto | Relanza con `/size` (QuickPicks de modo y salario) o responde la pregunta del agente (MXN/USD/propio) — el error instruye cómo |
 | Corte `stoppedBy: "time"` | `maxMinutes` chico para el tamaño | Relanza con tope mayor; los entregables de la corrida cortada siguen siendo útiles |
 | Doctor muestra scc no instalado | primera sesión aún descargando | "Verificar entorno" de nuevo tras reiniciar; la guía del check explica la descarga automática |
 

@@ -42,13 +42,16 @@ externo.
 ## Flujo típico
 
 ```text
-1. Pide entender el proyecto en el chat de Frida:
-   Tú: "no conozco este proyecto — necesito entender dónde se autentica,
-        quién llama a pagos y qué rompe si cambio la interfaz de pagos"
-2. Presupuesto — el agente te pregunta (ask_user_question):
-   "¿Cuántas áreas de riesgo?" → "10 hotspots" / "todo" (= 0) / número propio
+1. Pide entender el proyecto con el comando slash (o lenguaje natural):
+   Tú: /understand
+      (equivalente natural: "no conozco este proyecto — necesito entender
+       dónde se autentica, quién llama a pagos y qué rompe si cambio la
+       interfaz de pagos")
+2. Presupuesto — /understand abre el QuickPick:
+   "¿Cuántas áreas de riesgo (hotspots) explorar?" → "8 hotspots
+   (recomendado)" · "15 hotspots" · "Todo (sin tope)" (= maxHotspots 0)
 3. Lanzamiento — desatendido desde aquí:
-   workflow({ name: "understand-app", args: { maxHotspots: 10, maxMinutes: 90 } })
+   workflow({ name: "understand-app", args: { maxHotspots: 8 } })
 ```
 
 Al terminar tienes `docs/entendimiento/` con `README.md` (índice),
@@ -75,29 +78,34 @@ desatendida mientras el workflow investiga.
   pin («modo guía») → las 6 tools del índice responden con la guía de
   instalación; la corrida sigue degradada (pi-lens + shell/read/grep).
 - Una idea del presupuesto: ¿cuántas áreas de riesgo esperas? (app mediana:
-  5–15; `0` = "todo").
+  5–15; el comando `/understand` ofrece "8 hotspots (recomendado)" ·
+  "15 hotspots" · "Todo (sin tope)" = `0`).
 
 ### Paso 1 — Pide entender el proyecto
 
 ```text
-Tú: "entiende este proyecto: dónde se autentican los usuarios, quién llama
-     al servicio de pagos y qué código está muerto"
+Tú: /understand
+    (o en lenguaje natural: "entiende este proyecto: dónde se autentican
+     los usuarios, quién llama al servicio de pagos y qué código está muerto")
 ```
 
 El agente principal sabe que el presupuesto se pregunta ANTES del launch
 (`maxHotspots` es requerido a propósito: tras el lanzamiento la corrida es
 desatendida).
 
-### Paso 2 — Responde la pregunta de presupuesto
+### Paso 2 — Responde el QuickPick de presupuesto
 
-El agente pregunta con `ask_user_question`: **¿Presupuesto de hotspots?**
-Elige "10 hotspots", "todo" (= sin tope) o un número propio. Si el repo es
-grande, añade `maxMinutes` como backstop wall-clock.
+`/understand` abre: **¿Cuántas áreas de riesgo (hotspots) explorar?**
+Elige "8 hotspots (recomendado)", "15 hotspots" o "Todo (sin tope)"
+(= `maxHotspots: 0`). El presupuesto se pregunta ANTES del launch porque
+tras el lanzamiento la corrida es desatendida. Si lo pediste en lenguaje
+natural, el agente pregunta lo mismo con `ask_user_question`; y si el repo
+es grande, pide además un tope de tiempo (`maxMinutes`, default: sin tope).
 
 ### Paso 3 — Lanzamiento (desatendido desde aquí)
 
 ```text
-workflow({ name: "understand-app", args: { maxHotspots: 10, maxMinutes: 90 } })
+workflow({ name: "understand-app", args: { maxHotspots: 8 } })
 ```
 
 Qué verás en el panel de workflows — 6 fases en orden:
@@ -162,12 +170,12 @@ confiar en los documentos.
 ### Entender un proyecto por primera vez
 
 ```text
-Tú: "no conozco este proyecto — dame el entendimiento técnico completo"
+Tú: /understand
 ```
 
-El agente confirma el presupuesto (`maxHotspots`), lanza el workflow y al
-final resume: N componentes, M hotspots, estado de las 7 preguntas y decisión
-del juez.
+El comando pregunta el presupuesto (QuickPick), lanza el workflow y al
+final resume: N componentes, M hotspots, estado de las 7 preguntas y
+decisión del juez.
 
 ### Con tope de tiempo
 
@@ -182,7 +190,7 @@ falla la corrida).
 ### En otro idioma
 
 ```text
-workflow({ name: "understand-app", args: { maxHotspots: 10, language: "en-US" } })
+workflow({ name: "understand-app", args: { maxHotspots: 8, language: "en-US" } })
 ```
 
 Los entregables salen en el idioma indicado (default `es-MX`).
@@ -190,7 +198,7 @@ Los entregables salen en el idioma indicado (default `es-MX`).
 ### Corrida desatendida
 
 ```text
-workflow({ name: "understand-app", args: { maxHotspots: 10, review: "auto" } })
+workflow({ name: "understand-app", args: { maxHotspots: 8, review: "auto" } })
 ```
 
 Sin checkpoint final — la decisión del juez queda en el retorno del workflow.
