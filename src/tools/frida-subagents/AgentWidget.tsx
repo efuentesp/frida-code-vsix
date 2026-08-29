@@ -2,35 +2,54 @@
 //
 // Patrón de frida-pipeline/banner.tsx + todo-web/todo-web.tsx:
 // useSyncExternalStore sobre agentWidgetStore. Auto-hide cuando no hay
-// agentes. Muestra spinners animados, tipo, descripción y estado.
+// agentes. Muestra Codicons vectoriales, chips de rol y métricas tabulares.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { agentWidgetStore, type AgentDisplay } from "./store";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+interface AgentStatusMeta {
+	icon: string;
+	color: string;
+	spin?: boolean;
+}
 
-const STATUS_ICON: Record<AgentDisplay["status"], string> = {
-	running: "●",
-	queued: "○",
-	completed: "✓",
-	error: "✗",
-	stopped: "■",
-	steered: "✓",
-	aborted: "✗",
+const STATUS_MAP: Record<AgentDisplay["status"], AgentStatusMeta> = {
+	running: {
+		icon: "sync",
+		color: "var(--vscode-list-warningForeground, #cca700)",
+		spin: true,
+	},
+	queued: {
+		icon: "clock",
+		color: "var(--vscode-descriptionForeground, #8b949e)",
+	},
+	completed: {
+		icon: "check",
+		color: "var(--vscode-testing-iconPassed, #3fb950)",
+	},
+	error: {
+		icon: "error",
+		color: "var(--vscode-errorForeground, #f85149)",
+	},
+	stopped: {
+		icon: "debug-stop",
+		color: "var(--vscode-descriptionForeground, #8b949e)",
+	},
+	steered: {
+		icon: "sparkle",
+		color: "var(--vscode-textLink-foreground, #4daafc)",
+	},
+	aborted: {
+		icon: "error",
+		color: "var(--vscode-errorForeground, #f85149)",
+	},
 };
 
-const STATUS_COLOR: Partial<Record<AgentDisplay["status"], string>> = {
-	running: "var(--vscode-list-warningForeground, #cca700)",
-	completed: "var(--vscode-gitDecoration-addedResourceForeground, #3fb950)",
-	error: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
-	stopped: "var(--vscode-descriptionForeground)",
-	aborted: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
-};
-
-function formatElapsed(startedAt: number): string {
-	const seconds = Math.floor((Date.now() - startedAt) / 1000);
+function formatElapsed(startedAt: number, completedAt?: number): string {
+	const totalMs = completedAt ? completedAt - startedAt : Date.now() - startedAt;
+	const seconds = Math.floor(totalMs / 1000);
 	if (seconds < 60) return `${seconds}s`;
 	const minutes = Math.floor(seconds / 60);
 	const remSeconds = seconds % 60;
@@ -44,31 +63,15 @@ function formatTokens(count: number): string {
 	return `${count}`;
 }
 
-function AgentRow({
-	agent,
-	frame,
-}: {
-	agent: AgentDisplay;
-	frame: number;
-}): ReactElement {
-	// running → spinner de braille animado (frame rota cada ~100ms desde el panel);
-	// el resto usa su glyph de estado.
+function AgentRow({ agent }: { agent: AgentDisplay }): ReactElement {
+	const status = STATUS_MAP[agent.status] ?? STATUS_MAP.queued;
 	const isRunning = agent.status === "running";
-	const icon = isRunning
-		? SPINNER_FRAMES[frame % SPINNER_FRAMES.length]
-		: STATUS_ICON[agent.status];
-	const color = STATUS_COLOR[agent.status];
-	const elapsed = agent.completedAt
-		? `${Math.floor((agent.completedAt - agent.startedAt) / 1000)}s`
-		: formatElapsed(agent.startedAt);
+	const elapsed = formatElapsed(agent.startedAt, agent.completedAt);
 
-	// Stats en vivo desde el activity-tracker de la sesión hija (D1+D2):
-	// ↻turns≤max · N tools · N.Nk tok · elapsed. Sólo se muestran cuando el
-	// tracker ya reportó progreso; mientras tanto queda solo el elapsed.
 	const stats: string[] = [];
 	if (agent.turnCount != null && agent.turnCount > 0) {
 		stats.push(
-			`↻${agent.turnCount}${agent.maxTurns != null ? `≤${agent.maxTurns}` : ""}`,
+			`turn ${agent.turnCount}${agent.maxTurns == null ? "" : `/${agent.maxTurns}`}`,
 		);
 	}
 	if (agent.toolUses && agent.toolUses > 0) {
@@ -80,22 +83,51 @@ function AgentRow({
 	stats.push(elapsed);
 
 	return (
-		<fbox flexDirection="column">
-			<fbox flexDirection="row" gap={4} alignItems="center">
-				<ftext color={color}>{icon}</ftext>
-				<ftext bold>{agent.type}</ftext>
-				<ftext color="var(--vscode-descriptionForeground)">
+		<fbox flexDirection="column" gap={2} cls="agent-dense-row">
+			<fbox flexDirection="row" gap={6} alignItems="center">
+				<ficon
+					name={status.icon}
+					size={12}
+					color={status.color}
+					cls={status.spin ? "spinner" : undefined}
+				/>
+				<fbox cls="agent-role-chip" padding={2}>
+					<ftext size={11} bold>
+						{agent.type}
+					</ftext>
+				</fbox>
+				<ftext bold size={12}>
 					{agent.description}
 				</ftext>
-				<ftext color="var(--vscode-descriptionForeground)">
+				<ftext
+					color="var(--vscode-descriptionForeground)"
+					size={11}
+					cls="tabular-metrics"
+				>
 					· {stats.join(" · ")}
 				</ftext>
 			</fbox>
 			{isRunning && agent.activity ? (
-				<ftext color="var(--vscode-descriptionForeground)">
-					{"  ⎿  "}
-					{agent.activity}
-				</ftext>
+				<fbox
+					flexDirection="row"
+					alignItems="center"
+					gap={6}
+					paddingLeft={14}
+					cls="agent-subactivity-guide"
+				>
+					<ficon
+						name="arrow-right"
+						size={10}
+						color="var(--vscode-descriptionForeground)"
+					/>
+					<ftext
+						color="var(--vscode-descriptionForeground)"
+						size={11}
+						cls="code-target"
+					>
+						{agent.activity}
+					</ftext>
+				</fbox>
 			) : null}
 		</fbox>
 	);
@@ -106,16 +138,13 @@ function AgentWidgetPanel(): ReactElement | null {
 		agentWidgetStore.subscribe,
 		agentWidgetStore.getSnapshot,
 	);
-	// Reloj en vivo mientras haya agentes corriendo: rota el frame del spinner de
-	// braille y hace que el cronómetro (elapsed) avance en tiempo real. Sin esto el
-	// widget se ve "congelado" (icono fijo + elapsed estático) y el usuario no
-	// percibe que los subagentes siguen trabajando.
-	const [frame, setFrame] = useState(0);
+	// Reloj en vivo mientras haya agentes corriendo para actualizar el elapsed
+	const [, setTick] = useState(0);
 	const [collapsed, setCollapsed] = useState(false);
 	const hasRunning = agents.some((a) => a.status === "running");
 	useEffect(() => {
 		if (!hasRunning) return;
-		const id = setInterval(() => setFrame((n) => n + 1), 100);
+		const id = setInterval(() => setTick((t) => t + 1), 1000);
 		return () => clearInterval(id);
 	}, [hasRunning]);
 
@@ -125,9 +154,7 @@ function AgentWidgetPanel(): ReactElement | null {
 	const queued = agents.filter((a) => a.status === "queued");
 	const done = agents.filter(
 		(a) =>
-			a.status === "completed" ||
-			a.status === "error" ||
-			a.status === "stopped",
+			a.status === "completed" || a.status === "error" || a.status === "stopped",
 	);
 
 	return (
@@ -135,31 +162,36 @@ function AgentWidgetPanel(): ReactElement | null {
 			collapsed={collapsed}
 			onToggle={() => setCollapsed((c) => !c)}
 			padding={6}
+			cls="agent-widget-container"
 			header={
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext>●</ftext>
-					<ftext bold>Agents</ftext>
-					<ftext color="var(--vscode-descriptionForeground)">
-						({running.length} running
-						{queued.length > 0 ? `, ${queued.length} queued` : ""})
+					<ficon name="copilot" size={13} />
+					<ftext bold size={12}>
+						AGENTES ACTIVOS
+					</ftext>
+					<ftext size={11} color="var(--vscode-descriptionForeground)">
+						({running.length} en ejecución
+						{queued.length > 0 ? `, ${queued.length} en cola` : ""})
 					</ftext>
 				</fbox>
 			}
 		>
-			{running.map((a) => (
-				<AgentRow key={a.id} agent={a} frame={frame} />
-			))}
-			{queued.map((a) => (
-				<AgentRow key={a.id} agent={a} frame={frame} />
-			))}
-			{done.map((a) => (
-				<AgentRow key={a.id} agent={a} frame={frame} />
-			))}
-			{queued.length > 0 && (
-				<ftext color="var(--vscode-descriptionForeground)">
-					{queued.length} en cola
-				</ftext>
-			)}
+			<fbox flexDirection="column" gap={4}>
+				{running.map((a) => (
+					<AgentRow key={a.id} agent={a} />
+				))}
+				{queued.map((a) => (
+					<AgentRow key={a.id} agent={a} />
+				))}
+				{done.map((a) => (
+					<AgentRow key={a.id} agent={a} />
+				))}
+				{queued.length > 0 && (
+					<ftext color="var(--vscode-descriptionForeground)" size={11}>
+						{queued.length} en cola
+					</ftext>
+				)}
+			</fbox>
 		</CollapsiblePanel>
 	);
 }

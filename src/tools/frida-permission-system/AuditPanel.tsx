@@ -16,18 +16,18 @@ import type { GateEntry } from "./audit-log";
 
 type Filter = "all" | "allow" | "block";
 
-/** Glyph + color por decisión (verde allow / rojo block, como los badges git). */
+/** Icono + color por decisión (verde allow / rojo block, como los badges git). */
 const DECISION_STYLE: Record<
 	GateEntry["decision"],
-	{ glyph: string; color: string }
+	{ icon: string; color: string }
 > = {
 	allow: {
-		glyph: "✓",
-		color: "var(--vscode-gitDecoration-addedResourceForeground)",
+		icon: "check",
+		color: "var(--vscode-gitDecoration-addedResourceForeground, #3fb950)",
 	},
 	block: {
-		glyph: "✗",
-		color: "var(--vscode-gitDecoration-deletedResourceForeground)",
+		icon: "error",
+		color: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
 	},
 };
 
@@ -88,8 +88,30 @@ function AuditPanel({
 
 			{/* Stats + filtros */}
 			<fbox flexDirection="row" gap={8} alignItems="center">
-				<ftext color={DECISION_STYLE.allow.color}>✓ {allowCount}</ftext>
-				<ftext color={DECISION_STYLE.block.color}>✗ {blockCount}</ftext>
+				<fbox
+					cls="ui-chip success"
+					flexDirection="row"
+					gap={4}
+					alignItems="center"
+					padding={2}
+				>
+					<ficon name="check" size={11} color={DECISION_STYLE.allow.color} />
+					<ftext bold size={11} color={DECISION_STYLE.allow.color}>
+						{allowCount} permitidas
+					</ftext>
+				</fbox>
+				<fbox
+					cls="ui-chip danger"
+					flexDirection="row"
+					gap={4}
+					alignItems="center"
+					padding={2}
+				>
+					<ficon name="error" size={11} color={DECISION_STYLE.block.color} />
+					<ftext bold size={11} color={DECISION_STYLE.block.color}>
+						{blockCount} bloqueadas
+					</ftext>
+				</fbox>
 				<fbox flex={1} />
 				<fbutton
 					variant={filter === "all" ? "primary" : "secondary"}
@@ -130,7 +152,7 @@ function AuditPanel({
 								gap={8}
 								alignItems="center"
 							>
-								<ftext color={style.color}>{style.glyph}</ftext>
+								<ficon name={style.icon} size={12} color={style.color} />
 								<ftext bold wrap={false}>
 									{e.tool}
 								</ftext>
@@ -138,23 +160,33 @@ function AuditPanel({
 									{SOURCE_LABEL[e.source] ?? e.source}
 								</ftext>
 								{detail ? (
-									<ftext
-										color="var(--vscode-descriptionForeground)"
-										wrap={false}
-									>
+									<ftext color="var(--vscode-descriptionForeground)" wrap={false}>
 										{truncate(detail, 48)}
 									</ftext>
 								) : null}
 								{e.flags && e.flags.length > 0 ? (
-									<ftext
-										color="var(--vscode-editorWarning-foreground)"
-										wrap={false}
-									>
-										⚠ {e.flags.join(", ")}
-									</ftext>
+									<fbox flexDirection="row" gap={4} alignItems="center">
+										<ficon
+											name="warning"
+											size={11}
+											color="var(--vscode-editorWarning-foreground)"
+										/>
+										<ftext
+											color="var(--vscode-editorWarning-foreground)"
+											wrap={false}
+											size={11}
+										>
+											{e.flags.join(", ")}
+										</ftext>
+									</fbox>
 								) : null}
 								<fbox flex={1} />
-								<ftext color="var(--vscode-descriptionForeground)" wrap={false}>
+								<ftext
+									color="var(--vscode-descriptionForeground)"
+									wrap={false}
+									size={11}
+									cls="tabular-nums"
+								>
 									{fmtTime(e.ts)}
 								</ftext>
 							</fbox>

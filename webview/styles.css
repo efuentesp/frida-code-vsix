@@ -1579,6 +1579,9 @@ body {
 	opacity: 0.95;
 	white-space: pre-wrap;
 	word-break: break-word;
+	display: flex;
+	align-items: center;
+	gap: 6px;
 }
 .tool-result.md {
 	padding: 0;
@@ -10706,6 +10709,103 @@ mark.hl {
 }
 .wf-agent-card:hover {
 	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+
+/* ── Web-Friendly Tree & Chip Foundations ────────────────────────────── */
+.ui-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	font-size: 10px;
+	line-height: 12px;
+}
+.ui-chip.subtle {
+	background: rgba(128, 128, 128, 0.15);
+	color: var(--vscode-descriptionForeground);
+}
+.ui-chip.role {
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+}
+.ui-chip.info {
+	background: rgba(88, 166, 255, 0.18);
+	color: var(--vscode-charts-blue, #58a6ff);
+}
+.ui-chip.success {
+	background: rgba(63, 185, 80, 0.18);
+	color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.ui-chip.danger {
+	background: rgba(248, 81, 73, 0.18);
+	color: var(--vscode-errorForeground, #f85149);
+}
+.ui-chip.warning {
+	background: rgba(210, 153, 34, 0.18);
+	color: var(--vscode-list-warningForeground, #cca700);
+}
+
+.agent-widget-container {
+	border-top: 1px solid var(--vscode-panel-border);
+}
+.agent-dense-row {
+	padding: 3px 6px;
+	border-radius: 3px;
+	transition: background 0.1s ease;
+}
+.agent-dense-row:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.agent-role-chip {
+	background: var(--vscode-badge-background);
+	color: var(--vscode-badge-foreground);
+	border-radius: 3px;
+	padding: 0 4px;
+	line-height: 14px;
+}
+.agent-subactivity-guide {
+	border-inline-start: 1px solid
+		var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.25));
+	margin-top: 1px;
+	margin-left: 5px;
+}
+.tabular-metrics {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
+.code-target {
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.wf-stepper-container {
+	width: 100%;
+}
+.wf-step-pill {
+	border-radius: 3px;
+	border: 1px solid var(--vscode-panel-border);
+	transition: all 0.15s ease;
+}
+.wf-step-pill.active {
+	border-color: var(--vscode-charts-blue, #58a6ff);
+	box-shadow: 0 0 4px rgba(88, 166, 255, 0.2);
+}
+.wf-step-pill.done {
+	border-color: var(--vscode-testing-iconPassed, #3fb950);
+}
+.wf-timeline-box {
+	border-top: 1px solid var(--vscode-panel-border);
+	padding-top: 4px;
+}
+.wf-tree-section {
+	margin-top: 2px;
+}
+.wf-tree-children {
+	margin-left: 5px;
+	padding-left: 12px;
+	border-inline-start: 1px solid
+		var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.25));
 }
 
 /* ── Fundaciones Visuales y Primitivas Copilot (Fase 1) ───────────────── */

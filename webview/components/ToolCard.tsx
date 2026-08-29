@@ -331,7 +331,10 @@ function renderSubagentLive(d: SubagentProgressDetails) {
 			{stats.length > 0 ? (
 				<div className="sl-stats">{stats.join(" · ")}</div>
 			) : null}
-			<div className="sl-activity">⎿ {d.activity}</div>
+			<div className="sl-activity">
+				<Codicon name="arrow-right" size={10} />
+				<span>{d.activity}</span>
+			</div>
 		</div>
 	);
 }

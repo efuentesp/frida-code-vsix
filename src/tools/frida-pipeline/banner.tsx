@@ -41,11 +41,11 @@ export const bannerStore = {
 		// sobre los `index.ts` de las hermanas.
 		const next = computePipelineStatus();
 		// Si el conteo de hermanas cambió, emitimos para re-renderizar.
-		if (next.siblings.presentCount !== cachedStatus.siblings.presentCount) {
+		if (next.siblings.presentCount === cachedStatus.siblings.presentCount) {
 			cachedStatus = next;
-			emit();
 		} else {
 			cachedStatus = next;
+			emit();
 		}
 		return cachedStatus;
 	},
@@ -60,10 +60,10 @@ export const bannerStore = {
 // Componente
 // ---------------------------------------------------------------------------
 
-const STATE_GLYPH: Record<PipelineStatus["level"], string> = {
-	ready: "✅",
-	degraded: "⚠️",
-	empty: "🚧",
+const STATE_ICON: Record<PipelineStatus["level"], string> = {
+	ready: "pass-filled",
+	degraded: "warning",
+	empty: "circle",
 };
 
 const STATE_COLOR: Record<PipelineStatus["level"], string> = {
@@ -77,7 +77,7 @@ function BannerPanel(): ReactElement {
 		bannerStore.subscribe,
 		bannerStore.getSnapshot,
 	);
-	const allGlyph = status.siblings.allPresent ? "✅" : "⚠️";
+	const allPresent = status.siblings.allPresent;
 	const counts = status.counts;
 	const [collapsed, setCollapsed] = useState(false);
 
@@ -88,44 +88,66 @@ function BannerPanel(): ReactElement {
 			padding={6}
 			header={
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext>●</ftext>
-					<ftext bold>frida-pipeline</ftext>
-					<ftext color={STATE_COLOR[status.level]}>
-						v{status.siblings.fridaVersion} · {STATE_GLYPH[status.level]}
+					<ficon
+						name="layers"
+						size={13}
+						color="var(--vscode-textLink-foreground, #4daafc)"
+					/>
+					<ftext bold size={12}>
+						frida-pipeline
+					</ftext>
+					<ficon
+						name={STATE_ICON[status.level]}
+						size={11}
+						color={STATE_COLOR[status.level]}
+					/>
+					<ftext color={STATE_COLOR[status.level]} size={11}>
+						v{status.siblings.fridaVersion}
 					</ftext>
 				</fbox>
 			}
 		>
 			{/* Hermanas */}
-			<fbox flexDirection="row" gap={4} alignItems="center">
-				<ftext>
-					{allGlyph} Hermanas: {status.siblings.presentCount}/
-					{status.siblings.expectedCount}
+			<fbox flexDirection="row" gap={6} alignItems="center">
+				<ficon
+					name={allPresent ? "check" : "warning"}
+					size={11}
+					color={
+						allPresent
+							? "var(--vscode-testing-iconPassed)"
+							: "var(--vscode-list-warningForeground)"
+					}
+				/>
+				<ftext size={11}>
+					Hermanas: {status.siblings.presentCount}/{status.siblings.expectedCount}
 				</ftext>
 			</fbox>
 
 			{/* Conteos */}
 			<fbox flexDirection="row" gap={12} alignItems="center">
-				<ftext>
+				<ftext size={11} color="var(--vscode-descriptionForeground)">
 					Skills: {counts.skills.present}/{counts.skills.expected}
 				</ftext>
-				<ftext>
+				<ftext size={11} color="var(--vscode-descriptionForeground)">
 					Agentes: {counts.agents.present}/{counts.agents.expected}
 				</ftext>
-				<ftext>
+				<ftext size={11} color="var(--vscode-descriptionForeground)">
 					Workflows: {counts.workflows.present}/{counts.workflows.expected}
 				</ftext>
 			</fbox>
 
 			{/* Lista de hermanas (sólo si falta alguna, para no saturar el footer) */}
 			{!status.siblings.allPresent && (
-				<fbox flexDirection="column" padding={2}>
+				<fbox flexDirection="column" padding={2} gap={2}>
 					{status.siblings.siblings
 						.filter((s) => !s.present)
 						.map((s) => (
-							<ftext key={s.id} color={STATE_COLOR.degraded}>
-								❌ {s.id}
-							</ftext>
+							<fbox key={s.id} flexDirection="row" gap={4} alignItems="center">
+								<ficon name="error" size={11} color={STATE_COLOR.degraded} />
+								<ftext color={STATE_COLOR.degraded} size={11}>
+									{s.id}
+								</ftext>
+							</fbox>
 						))}
 				</fbox>
 			)}

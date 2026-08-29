@@ -148,7 +148,7 @@ function ContextReport({
 			padding={12}
 			cls={"ctxr" + (hot ? " is-dimming" : "")}
 		>
-			{/* 1. Header estilo Copilot Chat */}
+			{/* 1. Header estilo Claude Code / Copilot Chat */}
 			<fbox
 				flexDirection="row"
 				justifyContent="space-between"
@@ -162,20 +162,45 @@ function ContextReport({
 						color="var(--vscode-textLink-foreground, #4daafc)"
 					/>
 					<ftext bold size={13}>
-						Uso de Contexto
+						USO DE CONTEXTO
 					</ftext>
-					<ftext color={TENUE} size={12}>
+					<ftext color={TENUE} size={11}>
 						({s.modelName})
 					</ftext>
 				</fbox>
 				<fbox flexDirection="row" gap={6} alignItems="center">
-					<ftext
-						bold
+					<ficon
+						name={
+							pressure == null
+								? "circle"
+								: pressure >= 90
+									? "error"
+									: pressure >= 70
+										? "warning"
+										: "pass-filled"
+						}
 						size={12}
 						color={pressureColor(pressure)}
-						cls={pressure != null && pressure >= 70 ? "ctxr-pulse" : undefined}
+					/>
+					<ftext
+						bold
+						size={11}
+						color={pressureColor(pressure)}
+						cls={
+							pressure != null && pressure >= 70
+								? "ctxr-pulse tabular-nums"
+								: "tabular-nums"
+						}
 					>
-						● {pressure == null ? "?" : `${pressure}%`} presión
+						Estado{" "}
+						{pressure == null
+							? "Desconocido"
+							: pressure >= 90
+								? "Crítico"
+								: pressure >= 70
+									? "Atención"
+									: "Saludable"}{" "}
+						({pressure == null ? "?" : `${pressure}%`} presión)
 					</ftext>
 				</fbox>
 			</fbox>
@@ -460,23 +485,26 @@ function ContextReport({
 				) : null}
 			</fbox>
 
-			{/* 4. Footer con acciones estilo Copilot */}
+			{/* 4. Footer con acciones estilo Claude Code */}
 			<fbox
 				flexDirection="row"
-				justifyContent="flex-end"
-				gap={8}
+				justifyContent="space-between"
+				alignItems="center"
 				cls="ctxr-footer"
+				padding={4}
 			>
-				{actions.onCompact && s.compactionEnabled ? (
-					<fbutton
-						variant="secondary"
-						onClick={actions.onCompact}
-						title="Compactar historial de la sesión para liberar espacio de contexto"
-					>
-						<ficon name="collapse-all" size={12} />
-						Compactar
-					</fbutton>
-				) : null}
+				<fbox flexDirection="row" gap={6}>
+					{actions.onCompact && s.compactionEnabled ? (
+						<fbutton
+							variant="primary"
+							onClick={actions.onCompact}
+							title="Compactar historial de la sesión para liberar espacio de contexto"
+						>
+							<ficon name="sparkle" size={12} />
+							Compactar Ahora
+						</fbutton>
+					) : null}
+				</fbox>
 				<fbutton variant="secondary" onClick={actions.onClose}>
 					Cerrar
 				</fbutton>

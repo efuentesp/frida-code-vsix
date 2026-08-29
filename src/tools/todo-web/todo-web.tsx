@@ -62,19 +62,34 @@ function TodoWebPanel({
 	const showIds =
 		tasks.length > 1 || tasks.some((t) => t.blockedBy && t.blockedBy.length > 0);
 
-	// Badge del header cuando está colapsado (sin ternarias anidadas).
+	// Badge del header cuando está colapsado (sin ternarias anidadas ni glyphos).
 	let collapsedBadge: ReactElement | null = null;
 	if (collapsed && activeTask) {
 		collapsedBadge = (
-			<ftext color="var(--vscode-list-warningForeground, #cca700)">
-				◐ {activeTask.activeForm || activeTask.subject}
-			</ftext>
+			<fbox flexDirection="row" gap={4} alignItems="center">
+				<ficon
+					name="loader-circle"
+					size={11}
+					color="var(--vscode-list-warningForeground, #cca700)"
+					cls="spin"
+				/>
+				<ftext color="var(--vscode-list-warningForeground, #cca700)" size={11}>
+					{activeTask.activeForm || activeTask.subject}
+				</ftext>
+			</fbox>
 		);
 	} else if (collapsed && allDone) {
 		collapsedBadge = (
-			<ftext color="var(--vscode-testing-iconPassed, #73c991)">
-				✓ Todas completadas
-			</ftext>
+			<fbox flexDirection="row" gap={4} alignItems="center">
+				<ficon
+					name="check"
+					size={11}
+					color="var(--vscode-testing-iconPassed, #73c991)"
+				/>
+				<ftext color="var(--vscode-testing-iconPassed, #73c991)" size={11}>
+					Todas completadas
+				</ftext>
+			</fbox>
 		);
 	}
 
@@ -134,7 +149,6 @@ function TodoWebPanel({
 function TaskRow({
 	task,
 	showIds,
-	isLast,
 }: {
 	task: Task;
 	showIds: boolean;
@@ -143,7 +157,6 @@ function TaskRow({
 	const active = task.status === "in_progress";
 	const done = task.status === "completed";
 	const statusColor = STATUS_COLOR[task.status];
-	const branchGuide = isLast ? "└─" : "├─";
 
 	return (
 		<fbox
@@ -151,14 +164,9 @@ function TaskRow({
 			gap={1}
 			cls={`todo-tree-row${active ? " is-active" : ""}`}
 			tone={active ? "active" : "default"}
+			paddingLeft={6}
 		>
 			<fbox flexDirection="row" gap={6} alignItems="center">
-				<ftext
-					color="var(--vscode-tree-indentGuidesStroke, var(--vscode-descriptionForeground))"
-					cls="todo-tree-branch"
-				>
-					{branchGuide}
-				</ftext>
 				{done ? (
 					<ficon
 						name="circle-check"
@@ -187,12 +195,14 @@ function TaskRow({
 				)}
 
 				{showIds ? (
-					<ftext color="var(--vscode-descriptionForeground)" size={11}>
-						#{task.id}
-					</ftext>
+					<fbox cls="ui-chip subtle">
+						<ftext color="var(--vscode-descriptionForeground)" size={10}>
+							#{task.id}
+						</ftext>
+					</fbox>
 				) : null}
 
-				<ftext bold={active} color={statusColor} strike={done}>
+				<ftext bold={active} color={statusColor} strike={done} size={12}>
 					{task.subject}
 				</ftext>
 
@@ -203,13 +213,20 @@ function TaskRow({
 				) : null}
 
 				{task.blockedBy && task.blockedBy.length > 0 ? (
-					<ftext
-						color="var(--vscode-descriptionForeground)"
-						size={10}
-						cls="todo-deps"
-					>
-						(⛓ {task.blockedBy.map((id) => `#${id}`).join(",")})
-					</ftext>
+					<fbox cls="ui-chip subtle" flexDirection="row" gap={3} alignItems="center">
+						<ficon
+							name="link"
+							size={10}
+							color="var(--vscode-descriptionForeground)"
+						/>
+						<ftext
+							color="var(--vscode-descriptionForeground)"
+							size={10}
+							cls="todo-deps"
+						>
+							{task.blockedBy.map((id) => `#${id}`).join(", ")}
+						</ftext>
+					</fbox>
 				) : null}
 			</fbox>
 		</fbox>

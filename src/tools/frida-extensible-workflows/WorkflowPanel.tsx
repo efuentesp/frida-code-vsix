@@ -492,10 +492,10 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 			{/* Contadores agregados de agentes (iconos lucide, no glifos) */}
 			{hasCounts ? <CountsRow counts={counts} /> : null}
 
-			{/* Propuesta 1: Pipeline Graph (DAG) conectado horizontalmente */}
+			{/* Propuesta 1: Stepper horizontal unificado de fases */}
 			{run.phases.length > 1 ? (
 				<fbox
-					cls="wf-graph"
+					cls="wf-stepper-container"
 					flexDirection="row"
 					gap={4}
 					alignItems="center"
@@ -505,15 +505,19 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 						const isCurrent = node.state === "current";
 						const isDone = node.state === "done";
 						const color = isCurrent
-							? "#58a6ff"
+							? "var(--vscode-charts-blue, #58a6ff)"
 							: isDone
 								? STATE_COLOR.completed
-								: "#8b949e";
-						const bg = isCurrent ? "#58a6ff22" : isDone ? "#3fb9501a" : "transparent";
+								: "var(--vscode-descriptionForeground, #8b949e)";
+						const bg = isCurrent
+							? "rgba(88, 166, 255, 0.15)"
+							: isDone
+								? "rgba(63, 185, 80, 0.1)"
+								: "transparent";
 						return (
 							<fbox key={node.name} flexDirection="row" gap={4} alignItems="center">
 								<fbox
-									cls={`wf-node ${node.state}`}
+									cls={`wf-step-pill ${node.state}`}
 									flexDirection="row"
 									gap={4}
 									alignItems="center"
@@ -522,7 +526,7 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 									bordered
 								>
 									<ficon
-										name={isDone ? "check" : isCurrent ? "loader-circle" : "circle"}
+										name={isDone ? "check" : isCurrent ? "sync" : "circle"}
 										size={10}
 										color={color}
 										cls={isCurrent ? "spinner" : undefined}
@@ -537,7 +541,11 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 									) : null}
 								</fbox>
 								{node.isLast ? null : (
-									<ficon name="arrow-right" size={10} color="#8b949e" />
+									<ficon
+										name="arrow-right"
+										size={10}
+										color="var(--vscode-descriptionForeground, #8b949e)"
+									/>
 								)}
 							</fbox>
 						);
@@ -545,54 +553,57 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 				</fbox>
 			) : null}
 
-			{/* #79: timeline vertical — una fila por fase vista; la activa expandida
-			    con sus agentes anidados (label humano + duración). */}
+			{/* Timeline vertical estructurado con guías CSS nativas (En curso vs Restante) */}
 			{timeline.length > 0 ? (
-				<fbox flexDirection="column" gap={2}>
+				<fbox flexDirection="column" gap={4} cls="wf-timeline-box">
 					{timeline.map((row) => {
-						const color =
-							row.state === "current"
-								? "#58a6ff"
-								: row.state === "done"
-									? STATE_COLOR.completed
-									: "#8b949e";
+						const isCurrent = row.state === "current";
+						const isDone = row.state === "done";
+						const color = isCurrent
+							? "var(--vscode-charts-blue, #58a6ff)"
+							: isDone
+								? STATE_COLOR.completed
+								: "var(--vscode-descriptionForeground, #8b949e)";
 						return (
-							<fbox key={row.name} flexDirection="column" gap={1}>
-								<fbox flexDirection="row" gap={4} alignItems="center">
+							<fbox
+								key={row.name}
+								flexDirection="column"
+								gap={2}
+								cls="wf-tree-section"
+							>
+								<fbox flexDirection="row" gap={6} alignItems="center">
 									<ficon
-										name={
-											row.state === "current"
-												? "circle-dot"
-												: row.state === "done"
-													? "circle-check"
-													: "circle"
-										}
+										name={isCurrent ? "circle-dot" : isDone ? "circle-check" : "circle"}
 										size={11}
 										color={color}
 									/>
-									<ftext size={11} bold={row.state === "current"} color={color}>
-										{row.name}
+									<ftext size={11} bold={isCurrent} color={color}>
+										{isCurrent ? `FASE ACTUAL: ${row.name}` : row.name}
 									</ftext>
-									{row.state === "current" && counts.running > 0 ? (
-										<fbox flexDirection="row" gap={2} alignItems="center">
-											<ficon name="loader-circle" size={10} cls="spinner" />
-											<ftext size={11}>{counts.running}</ftext>
+									{isCurrent && counts.running > 0 ? (
+										<fbox cls="ui-chip info">
+											<ftext size={10}>{counts.running} en paralelo</ftext>
 										</fbox>
 									) : null}
-									<ftext size={11} color="#8b949e">
+									<ftext
+										size={11}
+										color="var(--vscode-descriptionForeground, #8b949e)"
+										cls="tabular-nums"
+									>
 										{formatDuration(row.durationMs)}
 									</ftext>
 								</fbox>
-								{row.state === "current"
-									? row.agents.map((a) => (
+								{isCurrent && row.agents.length > 0 ? (
+									<fbox flexDirection="column" gap={2} cls="wf-tree-children">
+										{row.agents.map((a) => (
 											<fbox
 												key={a.agentId}
 												cls="wf-agent-card"
 												flexDirection="row"
 												gap={6}
 												alignItems="center"
-												paddingLeft={14}
-												padding={4}
+												paddingLeft={12}
+												padding={3}
 												bordered
 											>
 												<ficon
@@ -605,21 +616,32 @@ function RunView({ run }: { run: WorkflowRunView }): ReactElement {
 													{a.label}
 												</ftext>
 												{a.role ? (
-													<ftext size={10} color="#8b949e">
-														[{a.role}]
-													</ftext>
+													<fbox cls="ui-chip role">
+														<ftext size={10} bold>
+															{a.role}
+														</ftext>
+													</fbox>
 												) : null}
 												{a.tokens !== undefined && a.tokens > 0 ? (
-													<ftext size={10} color="#8b949e">
+													<ftext
+														size={10}
+														color="var(--vscode-descriptionForeground, #8b949e)"
+														cls="tabular-nums"
+													>
 														∑ {formatTokens(a.tokens)}
 													</ftext>
 												) : null}
-												<ftext size={10} color="#8b949e">
+												<ftext
+													size={10}
+													color="var(--vscode-descriptionForeground, #8b949e)"
+													cls="tabular-nums"
+												>
 													⏱ {formatDuration(a.durationMs)}
 												</ftext>
 											</fbox>
-										))
-									: null}
+										))}
+									</fbox>
+								) : null}
 							</fbox>
 						);
 					})}

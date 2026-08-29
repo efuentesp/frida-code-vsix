@@ -1,29 +1,46 @@
 // frida-git-sync — widget de estado de sincronización (fridaWeb React).
 //
 // Patrón de frida-subagents/AgentWidget.tsx: useSyncExternalStore sobre
-// syncWidgetStore. Auto-hide cuando está idle. Muestra spinner, fase/mensaje,
-// elapsed y un botón Cancel (cuando la operación es cancelable).
+// syncWidgetStore. Auto-hide cuando está idle. Muestra Codicons vectoriales,
+// fase/mensaje, elapsed y un botón Cancel.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import { syncWidgetStore, type SyncWidgetStatus } from "./store";
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+interface SyncStatusMeta {
+	icon: string;
+	color: string;
+	spin?: boolean;
+}
 
-const STATUS_ICON: Partial<Record<SyncWidgetStatus, string>> = {
-	running: "●",
-	stopping: "●",
-	cancelled: "✗",
-	done: "✓",
-	error: "✗",
-};
-
-const STATUS_COLOR: Partial<Record<SyncWidgetStatus, string>> = {
-	running: "var(--vscode-list-warningForeground, #cca700)",
-	stopping: "var(--vscode-list-warningForeground, #cca700)",
-	cancelled: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
-	done: "var(--vscode-gitDecoration-addedResourceForeground, #3fb950)",
-	error: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
+const STATUS_MAP: Record<SyncWidgetStatus, SyncStatusMeta> = {
+	idle: {
+		icon: "circle",
+		color: "var(--vscode-descriptionForeground)",
+	},
+	running: {
+		icon: "sync",
+		color: "var(--vscode-list-warningForeground, #cca700)",
+		spin: true,
+	},
+	stopping: {
+		icon: "sync",
+		color: "var(--vscode-list-warningForeground, #cca700)",
+		spin: true,
+	},
+	cancelled: {
+		icon: "circle-slash",
+		color: "var(--vscode-gitDecoration-deletedResourceForeground, #f85149)",
+	},
+	done: {
+		icon: "check",
+		color: "var(--vscode-testing-iconPassed, #3fb950)",
+	},
+	error: {
+		icon: "error",
+		color: "var(--vscode-errorForeground, #f85149)",
+	},
 };
 
 function formatElapsed(elapsedMs: number): string {
@@ -39,22 +56,18 @@ function GitSyncPanel(): ReactElement | null {
 		syncWidgetStore.getSnapshot,
 	);
 
-	// Reloj en vivo mientras corre: rota el frame del spinner de braille.
-	const [frame, setFrame] = useState(0);
+	// Ticker para el elapsed
+	const [, setTick] = useState(0);
 	const isActive = s.status === "running" || s.status === "stopping";
 	useEffect(() => {
 		if (!isActive) return;
-		const id = setInterval(() => setFrame((n) => n + 1), 100);
+		const id = setInterval(() => setTick((n) => n + 1), 1000);
 		return () => clearInterval(id);
 	}, [isActive]);
 
 	if (s.status === "idle") return null;
 
-	const icon =
-		s.status === "running"
-			? SPINNER_FRAMES[frame % SPINNER_FRAMES.length]
-			: (STATUS_ICON[s.status] ?? "●");
-	const color = STATUS_COLOR[s.status];
+	const meta = STATUS_MAP[s.status] ?? STATUS_MAP.idle;
 	const label =
 		s.status === "done"
 			? "Synchronized"
@@ -67,12 +80,29 @@ function GitSyncPanel(): ReactElement | null {
 						: s.message;
 
 	return (
-		<fbox flexDirection="row" gap={6} alignItems="center" padding={6}>
-			<ftext color={color}>{icon}</ftext>
-			<ftext bold>frida-git-sync</ftext>
-			<ftext>{label}</ftext>
+		<fbox
+			flexDirection="row"
+			gap={6}
+			alignItems="center"
+			padding={6}
+			cls="git-sync-widget"
+		>
+			<ficon
+				name={meta.icon}
+				size={12}
+				color={meta.color}
+				cls={meta.spin ? "spinner" : undefined}
+			/>
+			<ftext bold size={12}>
+				frida-git-sync
+			</ftext>
+			<ftext size={12}>{label}</ftext>
 			{(s.status === "running" || s.status === "stopping") && (
-				<ftext color="var(--vscode-descriptionForeground)">
+				<ftext
+					color="var(--vscode-descriptionForeground)"
+					size={11}
+					cls="tabular-nums"
+				>
 					· {formatElapsed(s.elapsedMs)}
 				</ftext>
 			)}
