@@ -625,11 +625,72 @@ export type PmFunctionalState =
 	| { status: "empty"; reason: "missing" | "corrupt"; hint: string }
 	| { status: "error"; hint: string }
 	| { status: "ready"; data: PmFunctionalData; loadedAt: number };
+
+// ══ Fase 3: espejo técnico (productor src/project-map/lens-project-report.ts;
+//    contrato congelado pi-lens 3.8.72 — idéntico campo a campo) ══
+export interface PmTrust {
+	graphBuiltAt: string;
+	filesCovered: number;
+	filesTotal: number;
+	coverage: number;
+	stale: boolean;
+	lowCoverage: boolean;
+	notes: string[];
+}
+export interface PmHub {
+	file: string;
+	fanIn: number;
+	blastRadius: number;
+	role?: string;
+}
+export interface PmEntryPoint {
+	file: string;
+	fanIn: number;
+	fanOut: number;
+}
+export interface PmSubsystems {
+	directories: string[];
+	edges: { from: string; to: string; count: number }[];
+	cycles: { dirs: string[]; edgeCount: number }[];
+	violations: {
+		from: string;
+		to: string;
+		count: number;
+		dominantCount: number;
+	}[];
+}
+export interface PmRiskHotspot {
+	file: string;
+	fanIn: number;
+	maxComplexity: number;
+	score: number;
+}
+export interface PmTechnicalData {
+	trust: PmTrust;
+	hubs: PmHub[];
+	entryPoints: PmEntryPoint[];
+	subsystems: PmSubsystems;
+	riskHotspots: PmRiskHotspot[];
+	deadWeight: { files: { file: string }[]; disclaimer: string };
+}
+export type PmTechnicalState =
+	| { status: "loading" }
+	| { status: "building"; hint: string; attempts: number }
+	| {
+			status: "empty";
+			reason: "not-installed" | "disabled" | "exhausted" | "error";
+			hint: string;
+	  }
+	| { status: "ready"; data: PmTechnicalData; loadedAt: number; limit: number };
+
 /** Estado del tab Mapa publicado por el host (la vista activa NO vive aquí:
  *  es estado local del componente, análogo period/scope de ProductivityTab). */
 export interface ProjectMapUiState {
 	functional?: PmFunctionalState;
-	busy?: "functional" | null;
+	// ══ Fase 3: vista Técnica (pi-lens) ══
+	technical?: PmTechnicalState;
+	// (la unión busy se amplía de "functional" | null a:)
+	busy?: "functional" | "technical" | null;
 	/** Epoch ms del inicio de la acción (#111): sobrevive re-montes. */
 	busySince?: number | null;
 	/** Cache de screenshots on-demand (data-URI por screenId). Lo llena el

@@ -13,6 +13,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { deriveJourneys, type PmJourney, type PmAction } from "./journeys";
+// ══ Fase 3: fusión — estado técnico del tab (tipos del seam pi-lens; sin
+//    ciclo: lens-project-report NO importa de functional-inventory) ══
+import type { PmTechnicalState } from "./lens-project-report";
 
 /** Pantalla M8 normalizada para la UI (paths relativos al cwd de la corrida). */
 export interface PmScreen {
@@ -53,7 +56,9 @@ export type PmFunctionalState =
 /** Estado completo del tab (espejo UI en webview/types.ts — builds separados). */
 export interface ProjectMapHostState {
 	functional?: PmFunctionalState;
-	busy?: "functional" | null;
+	// ══ Fase 3: vista Técnica (pi-lens) ══
+	technical?: PmTechnicalState;
+	busy?: "functional" | "technical" | null;
 	/** Epoch ms del inicio de la acción (#111): sobrevive re-montes del tab. */
 	busySince?: number | null;
 }

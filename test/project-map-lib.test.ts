@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
 	loadFunctionalMap,
@@ -14,6 +14,12 @@ import {
 	safeResolveWithin,
 } from "../src/project-map/functional-inventory";
 import { deriveJourneys, type PmAction } from "../src/project-map/journeys";
+import {
+	isSizeSkipHint,
+	lensEnginePath,
+	loadTechnicalMap,
+	TECH_POLL_DELAYS_MS,
+} from "../src/project-map/lens-project-report";
 
 // Timeline canónico del ejemplo de design (corte por goto):
 //   J01: abre en paso 1 · traversed P01→P02 (form, paso 2) · traversed
@@ -322,5 +328,178 @@ describe("readScreenshotDataUri · data-URI on-demand", () => {
 			Buffer.alloc(4 * 1024 * 1024 + 1),
 		);
 		expect(readScreenshotDataUri(cwd, "shots/big.png")).toBe("");
+	});
+});
+
+// ══ Fase 3: seam pi-lens — mock honesto del contrato (layout espejo del
+//    real: package.json type:module porque el dist es ESM; hints verbatim del
+//    contrato 3.8.72; lecciones 30ef616/9d6d8bb: congelar el contrato upstream)
+// ══
+
+const READY_REPORT = {
+	available: true,
+	trust: {
+		graphBuiltAt: "2026-08-29T00:00:00.000Z",
+		filesCovered: 90,
+		filesTotal: 100,
+		coverage: 0.9,
+		stale: false,
+		lowCoverage: false,
+		notes: [],
+	},
+	hubs: [
+		{ file: "src/extension.ts", fanIn: 38, blastRadius: 12, role: "activate" },
+	],
+	entryPoints: [{ file: "webview/main.tsx", fanIn: 0, fanOut: 22 }],
+	subsystems: {
+		directories: ["src", "test", "webview"],
+		edges: [
+			{ from: "webview", to: "src", count: 12 },
+			{ from: "test", to: "src", count: 8 },
+			{ from: "src", to: "test", count: 3 },
+		],
+		cycles: [{ dirs: ["src", "test"], edgeCount: 11 }],
+		violations: [{ from: "src", to: "test", count: 3, dominantCount: 8 }],
+	},
+	riskHotspots: [
+		{ file: "src/extension.ts", fanIn: 38, maxComplexity: 30, score: 1140 },
+	],
+	deadWeight: {
+		files: [{ file: "docs/x.md" }],
+		disclaimer: "Low confidence: verifica antes de borrar.",
+	},
+};
+
+/** agentDir temporal con un lens-engine.js FAKE pero honesto (ESM espejo). */
+function makeAgentDir(moduleBody?: string): string {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-pm-lens-"));
+	tmpDirs.push(dir);
+	const pkgRoot = path.join(dir, "npm/node_modules/pi-lens");
+	fs.mkdirSync(path.join(pkgRoot, "dist/clients"), { recursive: true });
+	// Layout espejo del real: el dist de pi-lens es ESM ("type":"module").
+	fs.writeFileSync(
+		path.join(pkgRoot, "package.json"),
+		JSON.stringify({ name: "pi-lens", type: "module", version: "0.0.0-test" }),
+	);
+	fs.writeFileSync(
+		path.join(pkgRoot, "dist/clients/lens-engine.js"),
+		moduleBody ??
+			`export async function projectReport(cwd, options) {
+ globalThis.__pmLensCall = { cwd, options };
+ return ${JSON.stringify(READY_REPORT)};
+}
+`,
+	);
+	return dir;
+}
+
+describe("lens-project-report · seam pi-lens (mock honesto del contrato)", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+		delete (globalThis as any).__pmLensCall;
+	});
+
+	it("isSizeSkipHint: lenient por prefijo — size-skip sí, cache fría no", () => {
+		expect(
+			isSizeSkipHint(
+				"review graph disabled: project has 12000 files, cap is 5000 — raise maxProjectFiles in .pi-lens.json or set PI_LENS_REVIEW_GRAPH_MAX_FILES",
+			),
+		).toBe(true);
+		expect(isSizeSkipHint("Review graph disabled (otra redacción)")).toBe(true);
+		expect(
+			isSizeSkipHint(
+				"No review graph cached for this workspace yet — a build was kicked off in the background; retry this call shortly.",
+			),
+		).toBe(false);
+		expect(isSizeSkipHint("")).toBe(false);
+	});
+
+	it("TECH_POLL_DELAYS_MS congelado: 10 intentos, rampa 2s→5s→10s", () => {
+		expect(TECH_POLL_DELAYS_MS).toHaveLength(10);
+		for (let i = 1; i < TECH_POLL_DELAYS_MS.length; i++) {
+			expect(TECH_POLL_DELAYS_MS[i]).toBeGreaterThanOrEqual(
+				TECH_POLL_DELAYS_MS[i - 1],
+			);
+		}
+		expect(TECH_POLL_DELAYS_MS[0]).toBe(2000);
+		expect(TECH_POLL_DELAYS_MS[9]).toBe(10000);
+	});
+
+	it("lensEnginePath: layout espejo del piLensEntryPath del moat", () => {
+		expect(lensEnginePath(path.join("X", "agent"))).toBe(
+			path.join(
+				"X",
+				"agent",
+				"npm",
+				"node_modules",
+				"pi-lens",
+				"dist",
+				"clients",
+				"lens-engine.js",
+			),
+		);
+	});
+
+	it("sin instalación → empty/not-installed (sonda sin throw)", async () => {
+		const r = await loadTechnicalMap(makeCwd(), makeCwd(), 10);
+		expect(r.status).toBe("empty");
+		if (r.status === "empty") expect(r.reason).toBe("not-installed");
+	});
+
+	it("hint de cache fría → building (re-poll del host)", async () => {
+		const agentDir = makeAgentDir(
+			`export async function projectReport() {
+ return { available: false, hint: "No review graph cached for this workspace yet — a build was kicked off in the background; retry this call shortly." };
+}
+`,
+		);
+		const r = await loadTechnicalMap(makeCwd(), agentDir, 10);
+		expect(r.status).toBe("building");
+	});
+
+	it("hint de size-skip → empty/disabled (paro, no re-poll)", async () => {
+		const agentDir = makeAgentDir(
+			`export async function projectReport() {
+ return { available: false, hint: "review graph disabled: project has 12000 files, cap is 5000 — raise maxProjectFiles in .pi-lens.json" };
+}
+`,
+		);
+		const r = await loadTechnicalMap(makeCwd(), agentDir, 10);
+		expect(r.status).toBe("empty");
+		if (r.status === "empty") expect(r.reason).toBe("disabled");
+	});
+
+	it("available:true → ready normalizado + options.limit viaja al seam", async () => {
+		const cwd = makeCwd();
+		const r = await loadTechnicalMap(cwd, makeAgentDir(), 25);
+		expect(r.status).toBe("ready");
+		if (r.status === "ready") {
+			expect(r.limit).toBe(25);
+			expect(r.data.hubs[0]?.file).toBe("src/extension.ts");
+			expect(r.data.subsystems.directories).toEqual(["src", "test", "webview"]);
+			expect(r.data.riskHotspots[0]?.score).toBe(1140);
+			expect(Math.round(r.data.trust.coverage * 100)).toBe(90);
+		}
+		expect((globalThis as any).__pmLensCall?.options?.limit).toBe(25);
+	});
+
+	it("rechazo del import/llamada → empty/error + warn ruidoso (f3112ec)", async () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			const agentDir = makeAgentDir(
+				`export async function projectReport() { throw new Error("boom-lens"); }
+`,
+			);
+			const r = await loadTechnicalMap(makeCwd(), agentDir, 10);
+			expect(r.status).toBe("empty");
+			if (r.status === "empty") {
+				expect(r.reason).toBe("error");
+				expect(r.hint).toContain("boom-lens");
+			}
+			expect(warn).toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 });

@@ -8,7 +8,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ProjectMapTab } from "../webview/components/ProjectMapTab";
 import { FunctionalView } from "../webview/components/project-map/FunctionalView";
-import type { PmFunctionalData, State } from "../webview/types";
+import { TechnicalView } from "../webview/components/project-map/TechnicalView";
+import type {
+	PmFunctionalData,
+	PmTechnicalState,
+	State,
+} from "../webview/types";
 
 const baseState: State = {
 	keyNeeded: false,
@@ -190,5 +195,111 @@ describe("FunctionalView · grafo SVG por columnas (slice 2)", () => {
 		expect(html).toContain("pm-fail-row");
 		expect(html).toContain("#3");
 		expect(html).toContain("sin progresión");
+	});
+});
+
+// ══ Fase 3: vista Técnica (TechnicalView directo — open/busy inyectados;
+//    renderToStaticMarkup no corre efectos NI handlers, molde renderFn) ══
+
+const techReady: PmTechnicalState = {
+	status: "ready",
+	limit: 10,
+	loadedAt: 1,
+	data: {
+		trust: {
+			graphBuiltAt: "2026-08-29T00:00:00.000Z",
+			filesCovered: 90,
+			filesTotal: 100,
+			coverage: 0.9,
+			stale: false,
+			lowCoverage: false,
+			notes: [],
+		},
+		hubs: [
+			{ file: "src/extension.ts", fanIn: 38, blastRadius: 12, role: "activate" },
+		],
+		entryPoints: [{ file: "webview/main.tsx", fanIn: 0, fanOut: 22 }],
+		subsystems: {
+			directories: ["src", "test", "webview"],
+			edges: [
+				{ from: "webview", to: "src", count: 12 },
+				{ from: "test", to: "src", count: 8 },
+			],
+			cycles: [{ dirs: ["src", "test"], edgeCount: 11 }],
+			violations: [{ from: "src", to: "test", count: 3, dominantCount: 8 }],
+		},
+		riskHotspots: [
+			{ file: "src/extension.ts", fanIn: 38, maxComplexity: 30, score: 1140 },
+		],
+		deadWeight: {
+			files: [{ file: "docs/x.md" }],
+			disclaimer: "Low confidence: verifica antes de borrar.",
+		},
+	},
+};
+
+function renderTech(tech: PmTechnicalState | undefined): string {
+	return renderToStaticMarkup(
+		React.createElement(TechnicalView, {
+			tech,
+			busy: false,
+			post: vi.fn(),
+		}),
+	);
+}
+
+describe("ProjectMapTab · conmutador de vistas (slice 3)", () => {
+	it("render inicial: segmentos Funcional (activo) y Técnica presentes", () => {
+		const html = render(baseState);
+		expect(html).toContain("Funcional");
+		expect(html).toContain("Técnica");
+	});
+});
+
+describe("TechnicalView · estados (slice 3)", () => {
+	it("sin estado → cargando", () => {
+		expect(renderTech(undefined)).toContain("Cargando mapa técnico");
+	});
+
+	it("building → intentos visibles + hint verbatim (re-poll del host)", () => {
+		const html = renderTech({
+			status: "building",
+			hint: "No review graph cached — retry this call shortly.",
+			attempts: 3,
+		});
+		expect(html).toContain("Construyendo mapa técnico");
+		expect(html).toContain("(3/10)");
+		expect(html).toContain("retry this call shortly");
+	});
+
+	it("disabled (size-skip) → hint verbatim + botón Reintentar, sin re-poll", () => {
+		const html = renderTech({
+			status: "empty",
+			reason: "disabled",
+			hint: "review graph disabled: project has 12000 files, cap is 5000",
+		});
+		expect(html).toContain("review graph disabled");
+		expect(html).toContain("Reintentar");
+	});
+
+	it("not-installed → hint accionable SIN botón Reintentar", () => {
+		const html = renderTech({
+			status: "empty",
+			reason: "not-installed",
+			hint: "pi-lens no está instalado en ~/.frida/npm",
+		});
+		expect(html).not.toContain("Reintentar");
+	});
+
+	it("ready → grafo de subsystems + listas + overlay + deadWeight", () => {
+		const html = renderTech(techReady);
+		expect(html).toContain("pm-graph");
+		expect(html).toContain("12 import(s)");
+		expect(html).toContain("src/extension.ts");
+		expect(html).toContain("fanIn 38");
+		expect(html).toContain("score 1140");
+		expect(html).toContain("cobertura 90%");
+		expect(html).toContain("sin importadores conocidos");
+		expect(html).toContain("pm-node-box is-danger"); // dir "src" hospeda hotspot
 	});
 });

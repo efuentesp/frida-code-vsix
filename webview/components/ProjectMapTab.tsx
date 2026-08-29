@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import type { OutMessage, State } from "../types";
 import { Codicon } from "./Codicon";
 import { FunctionalView } from "./project-map/FunctionalView";
+import { TechnicalView } from "./project-map/TechnicalView";
 
-// M2 (#143) — tab "Mapa del proyecto" (Fase 2): el cuerpo ready delega a
-// FunctionalView (grafo SVG por columnas + evidencia) — la lista honesta de
-// chips de la Fase 1 se retira. El conmutador Funcional/Técnica llega en la
-// Fase 3 y el botón Exportar en la Fase 5. Contrato {state, post}; la carga
-// vive en el componente (molde ProductivityTab.tsx:44-47) y la verdad del
-// estado en el host (#111 — busySince) publicada por push
-// project_map_state. El plegado (open) sigue siendo estado LOCAL del
-// componente — NO campo del store global (análogo period/scope de
+// M2 (#143) — tab "Mapa del proyecto". Contrato {state, post} de los tabs del
+// SettingsHub; la carga vive en el componente (molde ProductivityTab.tsx:44-47)
+// y la verdad del estado en el host (#111 — busySince) publicada por push
+// project_map_state. El cuerpo ready delega a FunctionalView (grafo SVG por
+// columnas + evidencia); conmutador Funcional/Técnica — la vista Técnica
+// delega a TechnicalView (pi-lens) y su carga dispara el MISMO mensaje
+// project_map con view:"technical" (el efecto de [view] re-dispara al
+// conmutar). La vista activa y el plegado (open) siguen siendo estado
+// LOCAL del componente — NO campos del store global (análogo period/scope de
 // ProductivityTab.tsx:37-38).
 
 export function ProjectMapTab({
@@ -20,18 +22,29 @@ export function ProjectMapTab({
 	state: State;
 	post: (m: OutMessage) => void;
 }) {
+	// La vista activa es estado LOCAL (análogo period/scope de
+	// ProductivityTab.tsx:37-38) — NO campo del store global.
+	const [view, setView] = useState<"functional" | "technical">("functional");
 	// FR-3: colapsado por defecto — solo los journeys abiertos renderizan su
 	// grafo (render condicional real, molde TreePanel.visibleIds).
 	const [open, setOpen] = useState<Set<string>>(new Set());
 	const fn = state.projectMap?.functional;
-	// Spinner del host (#111).
-	const busy = state.projectMap?.busy === "functional";
+	const tech = state.projectMap?.technical;
+	// Spinner solo de la vista activa (busy del host #111).
+	const busy = state.projectMap?.busy === view;
 	const shots = state.projectMap?.shots ?? {};
 
-	// FR-10: carga al abrir + refresh manual (re-enviar el mismo mensaje).
+	// FR-10: carga al abrir + refresh manual (re-enviar el mismo mensaje). El
+	// switch de vista también dispara la carga de esa vista (mismo efecto);
+	// en Técnica se conserva el límite elegido (10/25/50) al re-disparar.
 	useEffect(() => {
-		post({ type: "project_map", view: "functional" });
-	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+		post({
+			type: "project_map",
+			view,
+			limit:
+				view === "technical" && tech?.status === "ready" ? tech.limit : undefined,
+		});
+	}, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const toggleOpen = (id: string): void => {
 		setOpen((prev) => {
@@ -50,36 +63,65 @@ export function ProjectMapTab({
 	return (
 		<div className="pm-tab">
 			<div className="pm-head">
+				<div className="seg-toggle">
+					<button
+						type="button"
+						className={"seg" + (view === "functional" ? " active" : "")}
+						onClick={() => setView("functional")}
+					>
+						Funcional
+					</button>
+					<button
+						type="button"
+						className={"seg" + (view === "technical" ? " active" : "")}
+						onClick={() => setView("technical")}
+					>
+						Técnica
+					</button>
+				</div>
 				<button
 					type="button"
 					className="pc-save"
 					disabled={busy}
-					onClick={() => post({ type: "project_map", view: "functional" })}
+					onClick={() =>
+						post({
+							type: "project_map",
+							view,
+							limit:
+								view === "technical" && tech?.status === "ready"
+									? tech.limit
+									: undefined,
+						})
+					}
 				>
 					<Codicon name="refresh" size={13} spin={busy} />
 					<span>{busy ? "Cargando…" : "Recargar"}</span>
 				</button>
 			</div>
 
-			{!fn || fn.status === "loading" ? (
-				<div className="cfg-stub">
-					<Codicon name="loading" size={14} spin /> Cargando mapa funcional...
-				</div>
-			) : fn.status === "empty" || fn.status === "error" ? (
-				<div className="cfg-stub pm-empty">
-					<Codicon name={fn.status === "error" ? "warning" : "map"} size={16} />
-					<span>{fn.hint}</span>
-				</div>
+			{view === "functional" ? (
+				!fn || fn.status === "loading" ? (
+					<div className="cfg-stub">
+						<Codicon name="loading" size={14} spin /> Cargando mapa funcional...
+					</div>
+				) : fn.status === "empty" || fn.status === "error" ? (
+					<div className="cfg-stub pm-empty">
+						<Codicon name={fn.status === "error" ? "warning" : "map"} size={16} />
+						<span>{fn.hint}</span>
+					</div>
+				) : (
+					<FunctionalView
+						data={fn.data}
+						loadedAt={fn.loadedAt}
+						shots={shots}
+						open={open}
+						onToggle={toggleOpen}
+						onToggleAll={toggleAll}
+						post={post}
+					/>
+				)
 			) : (
-				<FunctionalView
-					data={fn.data}
-					loadedAt={fn.loadedAt}
-					shots={shots}
-					open={open}
-					onToggle={toggleOpen}
-					onToggleAll={toggleAll}
-					post={post}
-				/>
+				<TechnicalView tech={tech} busy={busy} post={post} />
 			)}
 		</div>
 	);

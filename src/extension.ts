@@ -240,6 +240,11 @@ import {
 	safeResolveWithin,
 	type ProjectMapHostState,
 } from "./project-map/functional-inventory";
+// ══ Fase 3: mapa Técnico (pi-lens) — seam lens-engine.js ══
+import {
+	loadTechnicalMap,
+	TECH_POLL_DELAYS_MS,
+} from "./project-map/lens-project-report";
 
 const execFileP = promisify(execFile);
 
@@ -623,6 +628,11 @@ export async function activate(
 	// La verdad vive en el host (#111): busySince sobrevive re-montes del tab;
 	// la vista activa NO vive aquí (estado local del componente).
 	let pmState: ProjectMapHostState = {};
+	// M2 (#143) — epoch del re-poll técnico: invalida corridas previas (Recargar
+	// o cambio de límite mata el loop en su siguiente checkpoint sin tocar
+	// estado — sin timers huérfanos: el setTimeout pendiente (≤10 s) resuelve y
+	// el guard de epoch sale sin mutar).
+	let pmTechEpoch = 0;
 
 	function postCodebaseIndexState(): void {
 		const cfg = readCodebaseIndexConfig();
@@ -663,6 +673,73 @@ export async function activate(
 	// webview_ready para re-montes fríos del tab).
 	function postProjectMapState(): void {
 		post({ type: "project_map_state", state: pmState });
+	}
+
+	// M2 (#143) — carga del mapa Técnico (pi-lens). Cache fría → re-poll con
+	// backoff acotado (TECH_POLL_DELAYS_MS: 2s→5s→10s, 10 intentos ≈ 69 s de
+	// sleeps); size-skip → paro inmediato (lo decide loadTechnicalMap devolviendo
+	// empty/disabled — NO se re-polea: reintentar "shortly" sería guía
+	// activamente errónea, project-report.js:512-515). #111: busySince vive aquí.
+	// (Fase 4: la rama ready/empty añade refreshPmCross() — ver Changes de esa fase.)
+	function startTechnicalLoad(limit: number): void {
+		const epoch = ++pmTechEpoch;
+		pmState = {
+			...pmState,
+			technical: { status: "loading" },
+			busy: "technical",
+			busySince: Date.now(),
+		};
+		postProjectMapState();
+		void (async () => {
+			try {
+				for (let attempt = 0; ; attempt++) {
+					if (epoch !== pmTechEpoch) return; // suplantada — no tocar estado
+					const st = await loadTechnicalMap(
+						workspaceCwd(),
+						defaultAgentDir(),
+						limit,
+					);
+					if (epoch !== pmTechEpoch) return;
+					// Terminal todo lo que no sea building: ready/empty (y loading, que
+					// loadTechnicalMap nunca emite pero la unión PmTechnicalState incluye —
+					// sin esto el narrowing deja `loading|building` y st.hint no existe).
+					if (st.status !== "building") {
+						pmState = { ...pmState, technical: st, busy: null, busySince: null };
+						postProjectMapState();
+						return;
+					}
+					if (attempt >= TECH_POLL_DELAYS_MS.length) {
+						pmState = {
+							...pmState,
+							technical: { status: "empty", reason: "exhausted", hint: st.hint },
+							busy: null,
+							busySince: null,
+						};
+						postProjectMapState();
+						return;
+					}
+					pmState = {
+						...pmState,
+						technical: { ...st, attempts: attempt + 1 },
+					};
+					postProjectMapState();
+					await new Promise((r) => setTimeout(r, TECH_POLL_DELAYS_MS[attempt]));
+				}
+			} catch (e: any) {
+				if (epoch !== pmTechEpoch) return;
+				pmState = {
+					...pmState,
+					technical: {
+						status: "empty",
+						reason: "error",
+						hint: String(e?.message ?? e),
+					},
+					busy: null,
+					busySince: null,
+				};
+				postProjectMapState();
+			}
+		})();
 	}
 
 	/** #114 — Refresca la metadata de embeddings del índice (read-only) y la
@@ -3465,8 +3542,13 @@ export async function activate(
 			// M2 (#143) — carga/refresh del mapa Funcional. Read-only síncrono
 			// (lectura de inventory.json M8 + derivación de journeys): try/catch
 			// que SIEMPRE responde; busy/epoch para el spinner del botón (#111/#142).
-			// (La rama Técnica de este case llega en la Fase 3.)
 			case "project_map": {
+				if (msg.view === "technical") {
+					startTechnicalLoad(
+						typeof msg.limit === "number" && msg.limit > 0 ? msg.limit : 10,
+					);
+					break;
+				}
 				pmState = {
 					...pmState,
 					functional: { status: "loading" },

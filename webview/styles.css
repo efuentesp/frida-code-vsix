@@ -11587,6 +11587,80 @@ mark.hl {
 	gap: 4px;
 	align-items: flex-start;
 }
+/* ══ Fase 3: vista Técnica (.pm-list/.pm-row/.pm-note/…) ══ */
+.pm-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.pm-list-title {
+	font-size: 11px;
+	font-weight: 600;
+	margin: 6px 0 2px;
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	color: var(--vscode-foreground);
+}
+.pm-row {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	align-items: baseline;
+	width: 100%;
+	padding: 2px 6px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.pm-row:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.pm-row-main {
+	font-size: 11px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	overflow-wrap: anywhere;
+}
+.pm-row-meta {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+.pm-row.is-danger .pm-row-main {
+	color: var(--vscode-testing-iconFailed, #f85149);
+}
+.pm-row-dim {
+	opacity: 0.7;
+}
+.pm-note {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	display: flex;
+	gap: 4px;
+	align-items: flex-start;
+	overflow-wrap: anywhere;
+}
+.pm-note-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.pm-dead {
+	border-top: 1px solid var(--vscode-panel-border);
+	padding-top: 4px;
+}
+.pm-dead summary {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	cursor: pointer;
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	padding: 2px 0;
+}
 @media (prefers-reduced-motion: reduce) {
 	.pm-journey-head,
 	.pm-node,
