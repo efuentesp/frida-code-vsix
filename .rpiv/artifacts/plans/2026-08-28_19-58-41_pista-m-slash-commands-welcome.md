@@ -2262,17 +2262,17 @@ Problemas frecuentes — fila de `args.wage` falta (reemplazo de la fila):
 
 #### Automated Verification
 
-- [ ] Type checking pasa: `npm run typecheck`
-- [ ] Suite completa del repo pasa (fase terminal, baseline del proyecto): `npm test`
-- [ ] Motor intacto (AC del issue #140 — disciplina de diff vacío): `git diff --stat src/tools/frida-extensible-workflows/` no lista archivos modificados
-- [ ] Validador walkthrough alineado — texto viejo fuera: `grep -c '"30 pantallas"' src/tools/frida-app-walkthrough/workflow.ts` devuelve `0`
-- [ ] Validador walkthrough alineado — defaults FRD + comando: `grep -c '"10 pantallas (recomendado)"' src/tools/frida-app-walkthrough/workflow.ts` devuelve `1` y `grep -c '/walkthrough' src/tools/frida-app-walkthrough/workflow.ts` devuelve `1`
-- [ ] Validador understand alineado — texto viejo fuera: `grep -c '"10 hotspots"' src/tools/frida-understand-app/workflow.ts` devuelve `0`
-- [ ] Validador understand alineado — defaults FRD + comando: `grep -c '"8 hotspots (recomendado)"' src/tools/frida-understand-app/workflow.ts` devuelve `1` y `grep -c '/understand' src/tools/frida-understand-app/workflow.ts` devuelve `1`
-- [ ] String args de size-app alineado: `grep -c 'sugiere el comando /size' src/tools/frida-size-app/index.ts` devuelve `1`
-- [ ] How-to walkthrough alineado: `grep -c 'Tú: /walkthrough' docs/how-to-frida-app-walkthrough.md` devuelve al menos `2`, `grep -c '¿Cuántas pantallas únicas documentar?' docs/how-to-frida-app-walkthrough.md` devuelve al menos `2` y `grep -c 'maxScreens: 30' docs/how-to-frida-app-walkthrough.md` devuelve `0`
-- [ ] How-to understand alineado: `grep -c 'Tú: /understand' docs/how-to-frida-understand-app.md` devuelve al menos `2`, `grep -c '¿Cuántas áreas de riesgo (hotspots) explorar?' docs/how-to-frida-understand-app.md` devuelve al menos `2` y `grep -c 'maxHotspots: 10' docs/how-to-frida-understand-app.md` devuelve `0`
-- [ ] How-to size alineado: `grep -c 'Tú: /size' docs/how-to-frida-size-app.md` devuelve al menos `2`, `grep -c '¿Modo Basic COCOMO 81?' docs/how-to-frida-size-app.md` devuelve al menos `2` y `grep -c '¿Salario MENSUAL por persona?' docs/how-to-frida-size-app.md` devuelve al menos `2`
+- [x] Type checking pasa: `npm run typecheck`
+- [x] Suite completa del repo pasa (fase terminal, baseline del proyecto): `npm test`
+- [x] Motor intacto (AC del issue #140 — disciplina de diff vacío): `git diff --stat src/tools/frida-extensible-workflows/` no lista archivos modificados
+- [x] Validador walkthrough alineado — texto viejo fuera: `grep -c '"30 pantallas"' src/tools/frida-app-walkthrough/workflow.ts` devuelve `0`
+- [x] Validador walkthrough alineado — defaults FRD + comando: `grep -c '"10 pantallas (recomendado)"' src/tools/frida-app-walkthrough/workflow.ts` devuelve `1` y `grep -c '/walkthrough' src/tools/frida-app-walkthrough/workflow.ts` devuelve `1`
+- [x] Validador understand alineado — texto viejo fuera: `grep -c '"10 hotspots"' src/tools/frida-understand-app/workflow.ts` devuelve `0`
+- [x] Validador understand alineado — defaults FRD + comando: `grep -c '"8 hotspots (recomendado)"' src/tools/frida-understand-app/workflow.ts` devuelve `1` y `grep -c '/understand' src/tools/frida-understand-app/workflow.ts` devuelve `1`
+- [x] String args de size-app alineado: `grep -c 'sugiere el comando /size' src/tools/frida-size-app/index.ts` devuelve `1`
+- [x] How-to walkthrough alineado: `grep -c 'Tú: /walkthrough' docs/how-to-frida-app-walkthrough.md` devuelve al menos `2`, `grep -c '¿Cuántas pantallas únicas documentar?' docs/how-to-frida-app-walkthrough.md` devuelve al menos `2` y `grep -c 'maxScreens: 30' docs/how-to-frida-app-walkthrough.md` devuelve `0`
+- [x] How-to understand alineado: `grep -c 'Tú: /understand' docs/how-to-frida-understand-app.md` devuelve al menos `2`, `grep -c '¿Cuántas áreas de riesgo (hotspots) explorar?' docs/how-to-frida-understand-app.md` devuelve al menos `2` y `grep -c 'maxHotspots: 10' docs/how-to-frida-understand-app.md` devuelve `0`
+- [x] How-to size alineado: `grep -c 'Tú: /size' docs/how-to-frida-size-app.md` devuelve al menos `2`, `grep -c '¿Modo Basic COCOMO 81?' docs/how-to-frida-size-app.md` devuelve al menos `2` y `grep -c '¿Salario MENSUAL por persona?' docs/how-to-frida-size-app.md` devuelve al menos `2`
 
 #### Manual Verification
 
