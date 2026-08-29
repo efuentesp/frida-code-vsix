@@ -1831,6 +1831,11 @@ export async function activate(
 			if (def) {
 				await context.secrets.delete(def.secretKey);
 				delete keyCaches[providerId];
+				await frida.setKey(providerId, "");
+			}
+			if (activeModel?.provider === providerId) {
+				activeModel = undefined;
+				await context.globalState.update(ACTIVE_MODEL_KEY, undefined);
 			}
 			post({
 				type: "info",
@@ -5877,10 +5882,21 @@ export async function activate(
 				const defaultId = openaiDefaultModelId();
 				if (defaultId) await selectModel(providerId, defaultId);
 			}
+			// DevEngine: al configurar por primera vez (sin modelo activo aún),
+			// pre-seleccionar gpt-5.4-mini como default del provider.
+			if (providerId === SOFTTEK_PROVIDER && !activeModel) {
+				await selectModel(providerId, SOFTTEK_MODEL);
+			}
 			postResources();
+			postModels();
 		} else {
 			bootstrapSession(); // crea sesión y publica recursos al terminar el onboarding
 		}
+		post({
+			type: "info",
+			level: "success",
+			text: `API key de ${providerDisplayName(providerId)} guardada.`,
+		});
 		post({ type: "key_set" });
 		post({ type: "session_ready" });
 	}
