@@ -1854,7 +1854,11 @@ export async function activate(
 				if (!n || builtinNames.has(n)) continue;
 				extCommands.push({
 					name: n,
-					description: "",
+					// #140 (D9): el Map del SDK (Map<string, RegisteredCommand>)
+					// expone description opcional — el "" hardcodeado dejaba TODO
+					// comando de extensión sin descripción en el autocompletado "/"
+					// del Composer y en Recursos > Comandos.
+					description: String(e.commands?.get?.(n)?.description ?? ""),
 					source: "extension",
 					extension: extLabel,
 				});

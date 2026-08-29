@@ -248,16 +248,22 @@ describe("frida-understand-app · forma del script generado (#134)", () => {
 });
 
 describe("frida-understand-app · registro en runtime sobre el motor (#134)", () => {
+	// #140: el setup ahora también registra el comando /understand — el
+	// stub vacío (`as never`) ya no sirve (registerCommand incondicional).
+	// Los tests del comando viven en command.test.ts.
+	/** Stub mínimo de ExtensionAPI: solo registerCommand (no-op). */
+	const setupPi = (): unknown => ({ registerCommand: () => {} });
+
 	it("la factory registra el patrón (smoke de registro)", () => {
 		expect(findBuiltinPattern("understand-app")).toBeUndefined();
-		createFridaUnderstandApp()({} as never);
+		createFridaUnderstandApp()(setupPi() as never);
 		const found = findBuiltinPattern("understand-app");
 		expect(found?.name).toBe("understand-app");
 		expect(found?.description).toContain("docs/entendimiento/");
 	});
 
 	it("el catálogo lista el patrón junto a los builtin (toContain, no conteo)", () => {
-		createFridaUnderstandApp()({} as never);
+		createFridaUnderstandApp()(setupPi() as never);
 		const names = builtinPatternsCatalog().map((p) => p.name);
 		expect(names).toContain("understand-app");
 		expect(names).toContain("code-review"); // los 4 de #19 siguen
@@ -265,8 +271,8 @@ describe("frida-understand-app · registro en runtime sobre el motor (#134)", ()
 
 	it("la factory es idempotente por nombre (no duplica)", () => {
 		const factory = createFridaUnderstandApp();
-		factory({} as never);
-		factory({} as never);
+		factory(setupPi() as never);
+		factory(setupPi() as never);
 		expect(
 			builtinPatternsCatalog().filter((p) => p.name === "understand-app"),
 		).toHaveLength(1);
@@ -276,7 +282,7 @@ describe("frida-understand-app · registro en runtime sobre el motor (#134)", ()
 		const agentDir = mkdtempSync(join(tmpdir(), "understand-agentdir-"));
 		try {
 			fixtureLensEntry(agentDir);
-			createFridaUnderstandApp({ agentDir })({} as never);
+			createFridaUnderstandApp({ agentDir })(setupPi() as never);
 			const script = findBuiltinPattern("understand-app")?.resolve(VALID, {
 				cwd,
 			});
@@ -295,7 +301,7 @@ describe("frida-understand-app · registro en runtime sobre el motor (#134)", ()
 			createFridaUnderstandApp({
 				agentDir,
 				codebaseIndexEnabled: () => false,
-			})({} as never);
+			})(setupPi() as never);
 			const script = findBuiltinPattern("understand-app")?.resolve(VALID, {
 				cwd,
 			});

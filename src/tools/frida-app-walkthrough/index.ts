@@ -7,7 +7,9 @@
 // runtime (registerBuiltinPattern) y los prompts bundled en skills.ts.
 //
 // Uso:  workflow({ name: "app-walkthrough", args: { url: "https://app…",
-//        maxScreens: 30 } })
+//        maxScreens: 10 } })
+// Uso:  /walkthrough [url]   → QuickPicks por args requeridos → lanza el
+//        patrón vía chat (pi.sendUserMessage). Igual que /wf pero guiado.
 // El resolver 3-capas (reusado de #38) resuelve los prompts en launch-time:
 // defaults → .frida/app-walkthrough/stages.json →
 // ~/.frida/app-walkthrough/stages.json. El veto de acciones irreversibles
@@ -18,6 +20,7 @@ import {
 	registerBuiltinPattern,
 	type BuiltinPattern,
 } from "../frida-extensible-workflows/builtin-patterns";
+import { registerWalkthroughCommand } from "./command";
 import { resolveStagePrompts } from "./resolver";
 import {
 	generateAppWalkthroughWorkflow,
@@ -45,13 +48,26 @@ export const APP_WALKTHROUGH_PATTERN: BuiltinPattern = {
 	},
 };
 
+/** Opts de la factory: UI del slash command inyectable para tests (D3).
+ *  Producción omite `ui` y el handler carga vscode lazy (ver command.ts). */
+export interface CreateFridaAppWalkthroughOptions {
+	/** QuickPicks/InputBox del /walkthrough. Tests inyectan un fake. */
+	ui?: import("./command").SlashPickUI;
+}
+
 /** Factory de la extensión frida-app-walkthrough. */
-export function createFridaAppWalkthrough() {
-	return (_pi: ExtensionAPI): void => {
+export function createFridaAppWalkthrough(
+	opts: CreateFridaAppWalkthroughOptions = {},
+) {
+	return (pi: ExtensionAPI): void => {
 		// Registro en runtime (#133): el motor (frida-extensible-workflows)
 		// consume REGISTERED_PATTERNS vía findBuiltinPattern/
 		// builtinPatternsCatalog. Idempotente por nombre; el cwd se resuelve
 		// lazy en resolve().
 		registerBuiltinPattern(APP_WALKTHROUGH_PATTERN);
+		// #140: slash command /walkthrough — registro incondicional junto al
+		// patrón (mueren juntos ante invalidación de sesión; /reload
+		// re-registra ambos).
+		registerWalkthroughCommand(pi, opts.ui);
 	};
 }

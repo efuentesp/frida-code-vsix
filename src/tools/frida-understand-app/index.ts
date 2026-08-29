@@ -7,8 +7,10 @@
 // `understand-app` registrado en runtime (registerBuiltinPattern) y los
 // prompts bundled en skills.ts.
 //
-// Uso:  workflow({ name: "understand-app", args: { maxHotspots: 12,
+// Uso:  workflow({ name: "understand-app", args: { maxHotspots: 8,
 //        maxMinutes: 90 } })
+// Uso:  /understand   → QuickPick del presupuesto de hotspots → lanza el
+//        patrón vía chat (pi.sendUserMessage). Igual que /wf pero guiado.
 // El agente principal pregunta el presupuesto con ask_user_question ANTES
 // de lanzar (maxHotspots es requerido A PROPÓSITO, D13: tras el launch la
 // corrida es desatendida). El resolver 3-capas resuelve los prompts en
@@ -33,6 +35,7 @@ import {
 } from "../frida-extensible-workflows/builtin-patterns";
 import { piLensEntryPath } from "../frida-extensible-workflows/moat-factories";
 import { isInstalledAtPin } from "../frida-codebase-index/installer";
+import { registerUnderstandAppCommand } from "./command";
 import { resolveStagePrompts } from "./resolver";
 import {
 	generateUnderstandAppWorkflow,
@@ -115,6 +118,9 @@ export interface CreateFridaUnderstandAppOptions {
 	/** Toggle frida.codebaseIndex.enabled (default true) — evaluado en cada
 	 *  resolve() para interpolar CAPABILITIES.codebaseIndex fiel al estado. */
 	codebaseIndexEnabled?: () => boolean;
+	/** QuickPicks del /understand (#140). Tests inyectan un fake (D3);
+	 *  producción omite `ui` y el handler carga vscode lazy (command.ts). */
+	ui?: import("./command").SlashPickUI;
 }
 
 /** Factory de la extensión frida-understand-app. */
@@ -134,9 +140,13 @@ export function createFridaUnderstandApp(
 			);
 		},
 	};
-	return (_pi: ExtensionAPI): void => {
+	return (pi: ExtensionAPI): void => {
 		// Registro en runtime (#134): el motor consume REGISTERED_PATTERNS vía
 		// findBuiltinPattern/builtinPatternsCatalog. Idempotente por nombre.
 		registerBuiltinPattern(pattern);
+		// #140: slash command /understand — registro incondicional junto al
+		// patrón (mueren juntos ante invalidación de sesión; /reload
+		// re-registra ambos).
+		registerUnderstandAppCommand(pi, opts.ui);
 	};
 }

@@ -351,12 +351,18 @@ describe("frida-size-app · forma del script generado (#139)", () => {
 });
 
 describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)", () => {
+ // #140: el setup ahora también registra el comando /size — el
+ // stub vacío (`as never`) ya no sirve (registerCommand incondicional).
+ // Los tests del comando viven en command.test.ts.
+ /** Stub mínimo de ExtensionAPI: solo registerCommand (no-op). */
+ const setupPi = (): unknown => ({ registerCommand: () => {} });
+
  it("la factory registra el patrón (smoke de registro)", async () => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
    expect(findBuiltinPattern("size-app")).toBeUndefined();
    // ensureDeps rechazante: el disparo no toca la red (seam D2).
-   createFridaSizeApp({ ensureDeps: noNetworkDeps() })({} as never);
+   createFridaSizeApp({ ensureDeps: noNetworkDeps() })(setupPi() as never);
    const found = findBuiltinPattern("size-app");
    expect(found?.name).toBe("size-app");
    expect(found?.description).toContain("docs/dimensionamiento/");
@@ -376,7 +382,7 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
  it("el catálogo lista el patrón junto a los builtin (toContain, no conteo)", async () => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
-   createFridaSizeApp({ ensureDeps: noNetworkDeps() })({} as never);
+   createFridaSizeApp({ ensureDeps: noNetworkDeps() })(setupPi() as never);
    const names = builtinPatternsCatalog().map((p) => p.name);
    expect(names).toContain("size-app");
    expect(names).toContain("code-review"); // los builtin de #19 siguen
@@ -394,8 +400,8 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
    const factory = createFridaSizeApp({ ensureDeps: noNetworkDeps() });
-   factory({} as never);
-   factory({} as never);
+   factory(setupPi() as never);
+   factory(setupPi() as never);
    expect(
     builtinPatternsCatalog().filter((p) => p.name === "size-app"),
    ).toHaveLength(1);
@@ -419,7 +425,7 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
   try {
    fixtureSccAtPin(agentDir);
    fixtureLensEntry(agentDir);
-   createFridaSizeApp({ agentDir })({} as never);
+   createFridaSizeApp({ agentDir })(setupPi() as never);
    const script = findBuiltinPattern("size-app")?.resolve(VALID, { cwd });
    expect(script).toContain('"scc":true');
    expect(script).toContain('"lens":true');
@@ -442,7 +448,7 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
    createFridaSizeApp({
     agentDir,
     codebaseIndexEnabled: () => false,
-   })({} as never);
+   })(setupPi() as never);
    const script = findBuiltinPattern("size-app")?.resolve(VALID, { cwd });
    expect(script).toContain(
     'const CAPABILITIES = {"scc":true,"lens":true,"codebaseIndex":false}',
@@ -466,7 +472,7 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
     },
     digests: { [currentSccAsset() ?? "asset-test"]: "0".repeat(64) },
    };
-   createFridaSizeApp({ agentDir, ensureDeps: deps })({} as never);
+   createFridaSizeApp({ agentDir, ensureDeps: deps })(setupPi() as never);
    // El patrón quedó registrado ANTES de conocer el resultado.
    expect(findBuiltinPattern("size-app")?.name).toBe("size-app");
    // El disparo corrió y el catch tragó el rechazo (warn emitido).
@@ -492,7 +498,7 @@ describe("frida-size-app · registro en runtime + fire-and-forget (#139, D2/V6)"
      throw new Error("no debía descargar");
     },
    };
-   createFridaSizeApp({ agentDir, ensureDeps: deps })({} as never);
+   createFridaSizeApp({ agentDir, ensureDeps: deps })(setupPi() as never);
    expect(fetched).toBe(0);
    expect(warn).not.toHaveBeenCalled();
   } finally {

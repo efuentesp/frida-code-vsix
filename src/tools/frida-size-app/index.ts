@@ -10,6 +10,9 @@
 //
 // Uso:  workflow({ name: "size-app", args: { wage: 35000, currency: "MXN",
 //        cocomoType: "semi-detached", maxMinutes: 60 } })
+// Uso:  /size   → QuickPicks por modo COCOMO y salario (wage+currency) →
+//        lanza el patrón vía chat (pi.sendUserMessage). Igual que /wf
+//        pero guiado.
 // El agente principal pregunta el presupuesto con ask_user_question ANTES
 // de lanzar (wage es requerido A PROPÓSITO, D13: tras el launch la corrida
 // es desatendida). El resolver 3-capas resuelve los prompts en launch-time
@@ -60,6 +63,7 @@ import {
  validateSizeAppArgs,
  type SizeAppCapabilities,
 } from "./workflow";
+import { registerSizeAppCommand } from "./command";
 
 /** agentDir de Frida por defecto (~/.frida, ADR-0010) — lazy para que el
  *  aislamiento de HOME en tests aplique (os.homedir() lee process.env.HOME). */
@@ -148,6 +152,9 @@ export interface CreateFridaSizeAppOptions {
  /** Seam de tests sin red (D2): deps inyectadas al ensureBinary del
   *  disparo fire-and-forget — producción NO lo pasa (descarga real). */
  ensureDeps?: SccInstallDeps;
+ /** QuickPicks del /size (#140). Tests inyectan un fake (D3); producción
+  *  omite `ui` y el handler carga vscode lazy (command.ts). */
+ ui?: import("./command").SlashPickUI;
 }
 
 /** Factory de la extensión frida-size-app. */
@@ -169,10 +176,14 @@ export function createFridaSizeApp(opts: CreateFridaSizeAppOptions = {}) {
    );
   },
  };
- return (_pi: ExtensionAPI): void => {
+ return (pi: ExtensionAPI): void => {
   // Registro en runtime (#139): el motor consume REGISTERED_PATTERNS vía
   // findBuiltinPattern/builtinPatternsCatalog. Idempotente por nombre.
   registerBuiltinPattern(pattern);
+  // #140: slash command /size — registro incondicional junto al patrón
+  // (mueren juntos ante invalidación de sesión; /reload re-registra
+  // ambos).
+  registerSizeAppCommand(pi, opts.ui);
   // D2: descarga fire-and-forget del binario pineado (molde hermes
   // index.ts:181-190) — gate idempotente, JAMÁS bloquea ni tumba la
   // sesión: si la descarga sigue en curso o falló, CAPABILITIES.scc=false

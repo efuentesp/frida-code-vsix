@@ -145,16 +145,22 @@ describe("frida-app-walkthrough · forma del script generado (#133)", () => {
 });
 
 describe("frida-app-walkthrough · registro en runtime sobre el motor (#133)", () => {
+	// #140: el setup ahora también registra el comando /walkthrough — el
+	// stub vacío (`as never`) ya no sirve (registerCommand incondicional).
+	// Los tests del comando viven en command.test.ts.
+	/** Stub mínimo de ExtensionAPI: solo registerCommand (no-op). */
+	const setupPi = (): unknown => ({ registerCommand: () => {} });
+
 	it("la factory registra el patrón (smoke de registro)", () => {
 		expect(findBuiltinPattern("app-walkthrough")).toBeUndefined();
-		createFridaAppWalkthrough()({} as never);
+		createFridaAppWalkthrough()(setupPi() as never);
 		const found = findBuiltinPattern("app-walkthrough");
 		expect(found?.name).toBe("app-walkthrough");
 		expect(found?.description).toContain("docs/funcional/");
 	});
 
 	it("el catálogo lista el patrón junto a los builtin (toContain, no conteo)", () => {
-		createFridaAppWalkthrough()({} as never);
+		createFridaAppWalkthrough()(setupPi() as never);
 		const names = builtinPatternsCatalog().map((p) => p.name);
 		expect(names).toContain("app-walkthrough");
 		expect(names).toContain("code-review"); // los 4 de #19 siguen
@@ -162,8 +168,8 @@ describe("frida-app-walkthrough · registro en runtime sobre el motor (#133)", (
 
 	it("la factory es idempotente por nombre (no duplica)", () => {
 		const factory = createFridaAppWalkthrough();
-		factory({} as never);
-		factory({} as never);
+		factory(setupPi() as never);
+		factory(setupPi() as never);
 		expect(
 			builtinPatternsCatalog().filter((p) => p.name === "app-walkthrough"),
 		).toHaveLength(1);
