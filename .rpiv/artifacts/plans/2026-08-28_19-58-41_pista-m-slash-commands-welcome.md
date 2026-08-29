@@ -1932,11 +1932,11 @@ Agrega 3 cards `actionType: "insert"` al array `STARTER_CARDS` (4 → 7), despu�
 
 #### Automated Verification
 
-- [ ] Type checking pasa: `npm run typecheck`
-- [ ] Tests del Welcome pasan: `npx vitest run test/welcome.test.ts`
-- [ ] Las 3 cards nuevas presentes: `grep -cE "Documentar una App|Entender el Código|Dimensionar para Preventa" webview/components/Welcome.tsx` devuelve `3`
-- [ ] Las 4 existentes intactas (regresión FR-9): `grep -cE "Planificar con AiDD|Diseñar Pruebas \(TEA\)|Auditar Codebase|Explicar Arquitectura" webview/components/Welcome.tsx` devuelve `4`
-- [ ] Bundle rebuild refleja las cards: `npm run build:webview` exitoso y `grep -c "Documentar una App" dist-webview/assets/index-*.js` devuelve al menos `1`
+- [x] Type checking pasa: `npm run typecheck`
+- [x] Tests del Welcome pasan: `npx vitest run test/welcome.test.ts`
+- [x] Las 3 cards nuevas presentes: `grep -cE "Documentar una App|Entender el Código|Dimensionar para Preventa" webview/components/Welcome.tsx` devuelve `3`
+- [x] Las 4 existentes intactas (regresión FR-9): `grep -cE "Planificar con AiDD|Diseñar Pruebas \(TEA\)|Auditar Codebase|Explicar Arquitectura" webview/components/Welcome.tsx` devuelve `4`
+- [x] Bundle rebuild refleja las cards: `npm run build:webview` exitoso y `grep -c "Documentar una App" dist-webview/assets/index-*.js` devuelve al menos `1`
 
 #### Manual Verification
 
