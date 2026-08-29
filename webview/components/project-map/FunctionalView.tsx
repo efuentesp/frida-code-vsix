@@ -3,6 +3,8 @@ import type {
 	OutMessage,
 	PmCrossData,
 	PmCrossState,
+	PmExportPayload,
+	PmExportSection,
 	PmFunctionalData,
 	PmJourney,
 	PmScreen,
@@ -285,4 +287,71 @@ export function FunctionalView({
 			)}
 		</>
 	);
+}
+
+// ══ Fase 5 (FR-9): serializa la vista Funcional para el export HTML.
+// Reusa columnsOf (mismas columnas/aristas que el grafo en pantalla) y el
+// criterio de shots del on-demand: solo pantallas CON screenshot path piden
+// resolución al host (shot undefined); "" = sin captura definitiva. Los fails
+// y el cruce viajan como notas de texto (el HTML autónomo no tiene clic). ══
+export function serializeFunctionalExport(
+	data: PmFunctionalData,
+	open: Set<string>,
+	shots: Record<string, string>,
+	cross?: PmCrossState,
+): PmExportPayload {
+	const byId = new Map(data.screens.map((s) => [s.id, s]));
+	const edgeCount = data.journeys.reduce((acc, j) => acc + j.edges.length, 0);
+	const stop = data.stoppedBy;
+	const sections: PmExportSection[] = data.journeys.map((j) => {
+		const { columns, edges } = columnsOf(j, data.screens, shots);
+		const fails = j.edges.filter((e) => e.type === "attempted-failed");
+		return {
+			id: j.id,
+			title: `${j.id} · ${j.screenIds[0]} → ${j.screenIds[j.screenIds.length - 1]} (${j.screenIds.length} pantallas · ${j.edges.length} aristas)`,
+			open: open.has(j.id),
+			columns: columns.map((c) => {
+				const s = byId.get(c.id);
+				return {
+					id: c.id,
+					nodes: c.nodes.map((n) => ({
+						id: n.id,
+						title: n.title,
+						screenId: s?.screenshot ? n.id : undefined,
+						shot: s?.screenshot ? shots[n.id] : undefined,
+					})),
+				};
+			}),
+			edges,
+			notes: fails.map(
+				(e) =>
+					`#${e.step} ${e.description || e.kind} — ${CAUSE_LABEL[e.cause ?? ""] ?? e.cause ?? "fallo"}`,
+			),
+		};
+	});
+	const notes: string[] = [];
+	if (data.orphans.length > 0) {
+		notes.push(
+			`${data.orphans.length} screenId(s) del actionLog sin pantalla registrada (${data.orphans.join(", ")}) — se excluyeron del mapa`,
+		);
+	}
+	if (cross?.status === "ready" && cross.data.danglingScreens.length > 0) {
+		notes.push(
+			`la matriz M9 cita ${cross.data.danglingScreens.length} pantalla(s) no registrada(s) en M8 (${cross.data.danglingScreens.join(", ")}) — regenera M9 tras la corrida de M8`,
+		);
+	}
+	return {
+		view: "functional",
+		generatedAt: new Date().toISOString(),
+		title: "Mapa funcional",
+		meta: [
+			`${data.journeys.length} journeys · ${data.screens.length} pantallas · ${edgeCount} aristas`,
+			stop !== "" && stop !== "done"
+				? `cobertura parcial: ${STOP_REASON[stop] ?? stop}`
+				: "",
+			data.runUrl ? `recorrido de ${data.runUrl}` : "",
+		].filter(Boolean),
+		sections,
+		notes,
+	};
 }

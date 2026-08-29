@@ -5753,14 +5753,14 @@ describe("serializeTechnicalExport · payload de la vista Técnica", () => {
 
 #### Automated Verification
 
-- [ ] Typecheck limpio (host + webview): `npm run typecheck`
-- [ ] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
-- [ ] Baseline completo del proyecto (slice terminal): `npm test`
-- [ ] Seam export cableado: `grep -c 'buildExportHtml' src/extension.ts` devuelve ≥ 2 (import + case) y `grep -c '"export_map"' webview/types.ts` devuelve ≥ 1
-- [ ] Serializadores conectados al tab: `grep -c 'serializeFunctionalExport\|serializeTechnicalExport' webview/components/ProjectMapTab.tsx` devuelve ≥ 2
-- [ ] Escape del JSON embebido congelado por test: los casos "escHtml escapa", "JSON embebido sin </ crudo" e "inlina el shot cacheado y resuelve el faltante" del describe export-html en verde
-- [ ] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
-- [ ] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
+- [x] Typecheck limpio (host + webview): `npm run typecheck`
+- [x] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
+- [x] Baseline completo del proyecto (slice terminal): `npm test`
+- [x] Seam export cableado: `grep -c 'buildExportHtml' src/extension.ts` devuelve ≥ 2 (import + case) y `grep -c '"export_map"' webview/types.ts` devuelve ≥ 1
+- [x] Serializadores conectados al tab: `grep -c 'serializeFunctionalExport\|serializeTechnicalExport' webview/components/ProjectMapTab.tsx` devuelve ≥ 2
+- [x] Escape del JSON embebido congelado por test: los casos "escHtml escapa", "JSON embebido sin </ crudo" e "inlina el shot cacheado y resuelve el faltante" del describe export-html en verde
+- [x] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
+- [x] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
 
 #### Manual Verification
 

@@ -703,6 +703,46 @@ export type PmCrossState =
 	| { status: "omitted"; reason: "missing" | "corrupt"; hint: string }
 	| { status: "ready"; data: PmCrossData; loadedAt: number };
 
+// ══ Fase 5: espejo del export HTML autónomo (productor
+//    src/project-map/export-html.ts — builds separados) ══
+export interface PmExportNode {
+	id: string;
+	title: string;
+	/** Vista funcional: pantalla M8 — el host resuelve el PNG faltante. */
+	screenId?: string;
+	/** data-URI cacheada por la webview; "" = sin captura; undefined = resolver. */
+	shot?: string;
+	/** true = borde rojo (overlay de riesgo de la vista Técnica). */
+	danger?: boolean;
+}
+export interface PmExportEdge {
+	from: string;
+	to: string;
+	label?: string;
+}
+export interface PmExportColumn {
+	id: string;
+	title?: string;
+	nodes: PmExportNode[];
+}
+/** Sección exportable: un journey (Funcional) o un bloque (Técnica). */
+export interface PmExportSection {
+	id: string;
+	title: string;
+	open: boolean;
+	columns: PmExportColumn[];
+	edges: PmExportEdge[];
+	notes: string[];
+}
+export interface PmExportPayload {
+	view: "functional" | "technical";
+	generatedAt: string;
+	title: string;
+	meta: string[];
+	sections: PmExportSection[];
+	notes: string[];
+}
+
 /** Estado del tab Mapa publicado por el host (la vista activa NO vive aquí:
  *  es estado local del componente, análogo period/scope de ProductivityTab). */
 export interface ProjectMapUiState {
@@ -1386,6 +1426,9 @@ export type OutMessage =
 	// (FR-6).
 	| { type: "project_map_shot"; screenId: string }
 	| { type: "open_file"; file: string; line?: number }
+	// M2 (#143) Fase 5 — export HTML autónomo de la vista activa (FR-9) — la
+	// webview serializa el layout; el host ensambla + inlina PNGs.
+	| { type: "export_map"; payload: PmExportPayload }
 	| {
 			/** #121 (F7) — la UI cambia la config de roles; el host persiste en
 			 *  settings y re-publica el estado de modelos. */

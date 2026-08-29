@@ -7,8 +7,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectMapTab } from "../webview/components/ProjectMapTab";
-import { FunctionalView } from "../webview/components/project-map/FunctionalView";
-import { TechnicalView } from "../webview/components/project-map/TechnicalView";
+import {
+	FunctionalView,
+	serializeFunctionalExport,
+} from "../webview/components/project-map/FunctionalView";
+import {
+	TechnicalView,
+	serializeTechnicalExport,
+} from "../webview/components/project-map/TechnicalView";
 import type {
 	PmCrossState,
 	PmFunctionalData,
@@ -370,7 +376,7 @@ describe("FunctionalView · cruce M9 (slice 4)", () => {
 	});
 });
 
-describe("TechnicalView · cruce M9 (slice 4)", () => {
+	describe("TechnicalView · cruce M9 (slice 4)", () => {
 	it("ready + cross → sección Cruce funcional con pantallas por directorio", () => {
 		const html = renderTech(techReady, crossReady);
 		expect(html).toContain("Cruce funcional (M9)");
@@ -392,5 +398,52 @@ describe("TechnicalView · cruce M9 (slice 4)", () => {
 
 	it("sin cross → sin sección (retro-compatible)", () => {
 		expect(renderTech(techReady, undefined)).not.toContain("Cruce funcional");
+	});
+});
+
+// ══ Fase 5: serializadores del export (la mitad webview del seam FR-9;
+//    reusan los fixtures locked fnData/techReady/crossReady) ══
+
+describe("serializeFunctionalExport · payload de la vista Funcional", () => {
+	it("journey abierto viaja open, fails como notas, shot cacheado inlinado", () => {
+		const p = serializeFunctionalExport(
+			fnData,
+			new Set(["J01"]),
+			{ P01: "data:image/png;base64,QUJD" },
+			crossReady,
+		);
+		expect(p.view).toBe("functional");
+		expect(p.sections[0]?.open).toBe(true);
+		expect(p.sections[0]?.notes.join(" ")).toContain("sin progresión");
+		const p01 = p.sections[0]?.columns[0]?.nodes[0];
+		expect(p01?.screenId).toBe("P01");
+		expect(p01?.shot).toBe("data:image/png;base64,QUJD");
+	});
+
+	it("pantalla SIN screenshot path → nodo compacto (sin screenId ni shot)", () => {
+		const p = serializeFunctionalExport(
+			fnData,
+			new Set(["J01"]),
+			{},
+			undefined,
+		);
+		const p02 = p.sections[0]?.columns[1]?.nodes[0]; // P02 no tiene screenshot
+		expect(p02?.screenId).toBeUndefined();
+		expect(p02?.shot).toBeUndefined();
+	});
+});
+
+describe("serializeTechnicalExport · payload de la vista Técnica", () => {
+	it("sección de grafo + notas de hubs/riesgo + cruce por directorio", () => {
+		const p = serializeTechnicalExport(techReady, crossReady);
+		expect(p.view).toBe("technical");
+		expect(p.sections[0]?.columns.length).toBeGreaterThan(0);
+		expect(p.sections.some((s) => s.id === "hubs")).toBe(true);
+		expect(
+			p.sections.find((s) => s.id === "risk")?.notes.join(" "),
+		).toContain("score 1140");
+		expect(
+			p.sections.find((s) => s.id === "cross")?.notes.join(" "),
+		).toContain("P01 · P02");
 	});
 });

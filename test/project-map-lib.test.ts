@@ -25,6 +25,11 @@ import {
 	loadCrossMap,
 	normalizeModulePath,
 } from "../src/project-map/matrix-cross";
+import {
+	buildExportHtml,
+	escHtml,
+	type PmExportPayload,
+} from "../src/project-map/export-html";
 
 // Timeline canónico del ejemplo de design (corte por goto):
 //   J01: abre en paso 1 · traversed P01→P02 (form, paso 2) · traversed
@@ -764,5 +769,110 @@ describe("matrix-cross · joins pantalla↔módulo↔subsystem", () => {
 		expect(r.data.byScreen["P01"]).toEqual([
 			{ entryId: "M01", module: "src/a.ts" },
 		]);
+	});
+});
+
+// ══ Fase 5: export HTML autónomo (molde M8: escHtml + JSON embebido con
+//    escape de "</" + render vanilla — el test valida strings del documento,
+//    el render JS corre en el navegador al abrir el HTML) ══
+
+const EXPORT_FN: PmExportPayload = {
+	view: "functional",
+	generatedAt: "2026-08-29T00:00:00.000Z",
+	title: "Mapa funcional",
+	meta: ["2 journeys · 4 pantallas"],
+	sections: [
+		{
+			id: "J01",
+			title: "J01 · P01 → P03",
+			open: true,
+			columns: [
+				{ id: "P01", nodes: [{ id: "P01", title: "Login", screenId: "P01" }] },
+				{
+					id: "P02",
+					nodes: [
+						{
+							id: "P02",
+							title: "Dashboard",
+							screenId: "P02",
+							shot: "data:image/png;base64,QUJD",
+						},
+					],
+				},
+				{
+					id: "P03",
+						nodes: [{ id: "P03", title: "Filtros", screenId: "P03", shot: "" }],
+				},
+			],
+			edges: [{ from: "P01", to: "P02", label: "#2 form: creds" }],
+			notes: ["#4 filtro — sin progresión"],
+		},
+	],
+	notes: ["1 screenId(s) sin pantalla registrada (P99)"],
+};
+
+describe("export-html · HTML autónomo (molde M8)", () => {
+	it('escHtml escapa &<>" — nunca datos crudos en el documento', () => {
+		expect(escHtml('<b a="x">&</b>')).toBe(
+			'&lt;b a=&quot;x&quot;&gt;&amp;&lt;/b&gt;',
+		);
+	});
+
+	it("documento base: DOCTYPE + charset + JSON embebido + JS vanilla", () => {
+		const html = buildExportHtml(EXPORT_FN);
+		expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
+		expect(html).toContain('<meta charset="utf-8">');
+		expect(html).toContain("var DATA = ");
+		expect(html).toContain("createElementNS"); // render vanilla embebido
+	});
+
+	it('JSON embebido sin </ crudo (escape split del molde M8)', () => {
+		const html = buildExportHtml({
+			...EXPORT_FN,
+			title: "</script><b>x",
+		});
+		expect(html).not.toContain("</script><b>x");
+		expect(html).toContain("&lt;/script&gt;"); // escapado en el <title>/h1
+	});
+
+	it("inlina el shot cacheado y resuelve el faltante vía resolveShot", () => {
+		const html = buildExportHtml(EXPORT_FN, {
+			resolveShot: (sid) =>
+				sid === "P01" ? "data:image/png;base64,RESUELTO" : "",
+		});
+		expect(html).toContain("data:image/png;base64,QUJD"); // cacheada viaja
+		expect(html).toContain("data:image/png;base64,RESUELTO"); // resuelta inlinada
+	});
+
+	it('shot "" conservado (sin captura definitiva) y sin mutar el payload', () => {
+		const original = JSON.parse(JSON.stringify(EXPORT_FN));
+		const html = buildExportHtml(EXPORT_FN, {
+			resolveShot: () => "data:image/png;base64,X",
+		});
+		expect(html).toContain('"shot":""'); // P03 conserva su ""
+		expect(EXPORT_FN).toEqual(original); // el payload no se muta
+	});
+
+	it("payload técnico → título de vista y notas de listas en el JSON", () => {
+		const tech: PmExportPayload = {
+			view: "technical",
+			generatedAt: "2026-08-29T00:00:00.000Z",
+			title: "Mapa técnico",
+			meta: ["cobertura 90% (90/100 archivos)"],
+			sections: [
+				{
+					id: "hubs",
+					title: "Hubs (fan-in)",
+					open: false,
+					columns: [],
+					edges: [],
+						notes: ["src/extension.ts — fanIn 38 · impacto 12"],
+				},
+			],
+			notes: [],
+		};
+		const html = buildExportHtml(tech);
+		expect(html).toContain("Mapa técnico");
+		expect(html).toContain("fanIn 38");
 	});
 });

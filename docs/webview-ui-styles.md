@@ -97,3 +97,45 @@ Clases `<button>` auditadas en `webview/`: `.ap-item`, `.chip-x`,
 `.primary-btn`, `.seg`, `.stop`, `.sub-version`, `.switch`, `.turn-copy`,
 `.ui-dialog-send`, más la familia `.ccp-*`. Si agregás un botón nuevo,
 incluilo en este inventario y verificá su hover contra `button:hover`.
+
+## Tab "Mapa" del SettingsHub (M2 #143) — `.pm-*`
+
+Tab de visualización (solo lectura) con dos vistas (Funcional/Técnica).
+Estilos con prefijo propio `.pm-` (convención per-tab: `.ci-`/`.usage-`/`.prod-`/`.env-`).
+
+- **Shell**: `.pm-tab` (columna, gap 10), `.pm-head` (flex wrap), `.pm-meta`
+  (descripciónForeground 11px), `.pm-dot` separador, `.pm-badge`/
+  `.pm-badge.partial` (borde + texto charts-yellow).
+- **Conmutador**: reusa `.seg-toggle .seg` (SessionsPanel/UsageDashboard) —
+  NO es una tab bar nueva.
+- **Botones**: Recargar y Exportar reusan `.pc-save` (primario inventariado).
+  Botones propios contra la cascada global `button:hover` (0,1,1):
+  `.pm-journey-head:hover`, `.pm-expand-all:hover`, `.pm-row:hover` y
+  `.pm-cross-chip:hover` declaran el fondo en el propio `:hover` de la clase
+  ((0,2,0) > (0,1,1)); el texto lo gana siempre una regla propia — `inherit`
+  (`.pm-journey-head`, `.pm-row`), textLink (`.pm-cross-chip`) o
+  descriptionForeground→foreground al hover (`.pm-expand-all`) — nunca
+  `button` (0,0,1). Sin azul primario inyectado.
+  Nota: `.pm-journey-head:hover` originalmente (slice 1) solo declaraba
+  `filter: brightness(1.1)` y el `button:hover` global le inyectaba el azul
+  primario — corregido como revisión en cascada de una línea en el propio
+  slice 5 (ver Design History).
+- **Grafo SVG**: `.pm-canvas` (overflow auto, max-height 56vh), `.pm-graph`,
+  `.pm-edge`/`.pm-arrow` (textLink), `.pm-node`/`.pm-node-box` (+`.is-danger`
+  testing-iconFailed), `.pm-node-id` (mono 9px), `.pm-node-title`,
+  `.pm-col-title`, `.pm-shot-pending` (punteado), `.pm-shot-missing`,
+  `.pm-shot-label`, focus visible (`:focus .pm-node-box` stroke focusBorder).
+- **Journeys**: `.pm-journey` (tarjeta borde panel-border),
+  `.pm-journey-head` (botón fila completa), `.pm-journey-title`/
+  `.pm-journey-count`, `.pm-journey-body`, `.pm-fails`/`.pm-fail-row`
+  (editorWarning).
+- **Listas técnicas**: `.pm-list`/`.pm-list-title`, `.pm-row` (+`.is-danger`,
+  `.pm-row-dim`), `.pm-row-main` (mono, overflow-wrap anywhere),
+  `.pm-row-meta`, `.pm-note`/`.pm-note-list`, `.pm-dead` (<details> sutil).
+- **Cruce M9**: `.pm-cross`/`.pm-cross-row`/`.pm-cross-screen`/
+  `.pm-cross-chip` (pill mono textLink)/`.pm-cross-note`/`.pm-cross-dir`.
+- **Estados**: `.pm-empty` (fila hint+icono), `.pm-orphan-note`.
+- **reduced-motion**: media query al final desactiva transiciones de nodos,
+  aristas y cabeceras de journey.
+- El botón Exportar produce HTML autónomo con paleta FIJA (fuera de VS Code),
+  sin clases de este archivo.

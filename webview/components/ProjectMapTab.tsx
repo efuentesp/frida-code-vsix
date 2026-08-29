@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import type { OutMessage, State } from "../types";
 import { Codicon } from "./Codicon";
-import { FunctionalView } from "./project-map/FunctionalView";
-import { TechnicalView } from "./project-map/TechnicalView";
+import {
+	FunctionalView,
+	serializeFunctionalExport,
+} from "./project-map/FunctionalView";
+import {
+	TechnicalView,
+	serializeTechnicalExport,
+} from "./project-map/TechnicalView";
 
 // M2 (#143) — tab "Mapa del proyecto". Contrato {state, post} de los tabs del
 // SettingsHub; la carga vive en el componente (molde ProductivityTab.tsx:44-47)
@@ -62,6 +68,25 @@ export function ProjectMapTab({
 		setOpen(all ? new Set(fn.data.journeys.map((j) => j.id)) : new Set());
 	};
 
+	// ══ Fase 5 (FR-9): export HTML autónomo de la vista ACTIVA — la webview
+	// serializa el layout (journeys abiertos/columnas/shots cacheados), el host
+	// ensambla + inlina los PNGs faltantes. Solo con vista lista. ══
+	const exportable =
+		view === "functional" ? fn?.status === "ready" : tech?.status === "ready";
+	const doExport = (): void => {
+		if (view === "functional" && fn?.status === "ready") {
+			post({
+				type: "export_map",
+				payload: serializeFunctionalExport(fn.data, open, shots, cross),
+			});
+		} else if (view === "technical" && tech?.status === "ready") {
+			post({
+				type: "export_map",
+				payload: serializeTechnicalExport(tech, cross),
+			});
+		}
+	};
+
 	return (
 		<div className="pm-tab">
 			<div className="pm-head">
@@ -98,6 +123,17 @@ export function ProjectMapTab({
 				>
 					<Codicon name="refresh" size={13} spin={busy} />
 					<span>{busy ? "Cargando…" : "Recargar"}</span>
+				</button>
+				{/* ══ Fase 5: export HTML autónomo (.pc-save primario, codicon export) ══ */}
+				<button
+					type="button"
+					className="pc-save"
+					disabled={!exportable}
+					onClick={doExport}
+					title="Exportar la vista actual como HTML autónomo"
+				>
+					<Codicon name="export" size={13} />
+					<span>Exportar</span>
 				</button>
 			</div>
 

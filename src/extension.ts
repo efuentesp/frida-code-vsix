@@ -247,6 +247,8 @@ import {
 } from "./project-map/lens-project-report";
 // ══ Fase 4: cruce técnico↔funcional (matriz M9) ══
 import { loadCrossMap } from "./project-map/matrix-cross";
+// ══ Fase 5: export HTML autónomo de la vista activa (FR-9) ══
+import { buildExportHtml } from "./project-map/export-html";
 
 const execFileP = promisify(execFile);
 
@@ -3657,6 +3659,58 @@ export async function activate(
 					screenId,
 					dataUri: readScreenshotDataUri(workspaceCwd(), rel),
 				});
+				break;
+			}
+
+			// M2 (#143) — la webview serializa el layout; el host ensambla el
+			// documento e inlina los PNGs faltantes resolviendo screenId → screenshot
+			// desde SU inventory cargado (cero confianza en paths del cliente — molde
+			// del shot on-demand de la Fase 2). Molde del diálogo: exportUsage
+			// (:5872-5937) — DIÁLOGO PRIMERO: cancelar es no-op y el ensamblado
+			// (lecturas síncronas de PNGs, techo 4 MB c/u) solo ocurre tras confirmar.
+			// El try/catch SIEMPRE responde (toast de éxito/error, nunca silencio).
+			case "export_map": {
+				void (async () => {
+					try {
+						const p = msg.payload as {
+							view?: unknown;
+							sections?: unknown;
+						} | null;
+						if (
+							!p ||
+							(p.view !== "functional" && p.view !== "technical") ||
+							!Array.isArray(p.sections)
+						) {
+							throw new Error("payload de export sin forma esperada");
+						}
+						const uri = await vscode.window.showSaveDialog({
+							defaultUri: vscode.Uri.file(
+								`frida-mapa-${new Date().toISOString().slice(0, 10)}.html`,
+							),
+							filters: { HTML: ["html"] },
+						});
+						if (!uri) return; // cancelar = no-op silencioso (molde exportUsage)
+						const html = buildExportHtml(msg.payload, {
+							resolveShot: (screenId) => {
+								const fn = pmState.functional;
+								if (fn?.status !== "ready") return undefined;
+								const rel =
+									fn.data.screens.find((s) => s.id === screenId)?.screenshot ?? "";
+								return rel
+									? readScreenshotDataUri(workspaceCwd(), rel)
+									: undefined;
+							},
+						});
+						await vscode.workspace.fs.writeFile(uri, Buffer.from(html, "utf8"));
+						void vscode.window.showInformationMessage(
+							"Frida: mapa exportado a " + uri.fsPath,
+						);
+					} catch (e: any) {
+						void vscode.window.showErrorMessage(
+							"Frida: no se pudo exportar el mapa — " + String(e?.message ?? e),
+						);
+					}
+				})();
 				break;
 			}
 			case "check_environment": {

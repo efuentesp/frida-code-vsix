@@ -1,4 +1,10 @@
-import type { OutMessage, PmCrossState, PmTechnicalState } from "../../types";
+import type {
+	OutMessage,
+	PmCrossState,
+	PmExportPayload,
+	PmExportSection,
+	PmTechnicalState,
+} from "../../types";
 import { Codicon } from "../Codicon";
 import { GraphCanvas, type GraphColumn, type GraphEdge } from "./GraphCanvas";
 
@@ -298,7 +304,7 @@ export function TechnicalView({
 					))}
 				</section>
 			)}
-			{tech.data.deadWeight.files.length > 0 && (
+				{tech.data.deadWeight.files.length > 0 && (
 				<details className="pm-dead">
 					<summary>
 						<Codicon name="eye-closed" size={11} />
@@ -321,4 +327,114 @@ export function TechnicalView({
 			)}
 		</>
 	);
+}
+
+// ══ Fase 5 (FR-9): serializa la vista Técnica para el export HTML.
+// Sección de grafo (subsystems con overlay danger, reusa subsystemColumns) +
+// secciones-lista como notas (hubs/puntos de entrada/riesgo/cruce) +
+// deadWeight global. Sin shots: la vista Técnica no tiene capturas. ══
+export function serializeTechnicalExport(
+	tech: Extract<PmTechnicalState, { status: "ready" }>,
+	cross?: PmCrossState,
+): PmExportPayload {
+	const { columns, edges } = subsystemColumns(tech);
+	const t = tech.data.trust;
+	const sys = tech.data.subsystems;
+	const sections: PmExportSection[] = [
+		{
+			id: "subsystems",
+			title: `Subsystems (top ${tech.limit} por peso de imports)`,
+			open: true,
+			columns: columns.map((c) => ({
+				id: c.id,
+				title: c.title,
+				nodes: c.nodes.map((n) => ({
+					id: n.id,
+					title: n.title,
+					danger: n.tone === "danger" ? true : undefined,
+				})),
+			})),
+			edges,
+			notes: [
+				...sys.cycles
+					.slice(0, 5)
+					.map((c) => `ciclo: ${c.dirs.join(" ↔ ")} (${c.edgeCount} aristas)`),
+				...sys.violations
+					.slice(0, 5)
+					.map(
+						(v) =>
+							`capa: ${v.from} → ${v.to} minoritario (${v.count} vs ${v.dominantCount})`,
+					),
+			],
+		},
+		{
+			id: "hubs",
+			title: "Hubs (fan-in)",
+			open: false,
+			columns: [],
+			edges: [],
+			notes: tech.data.hubs.map(
+				(h) => `${h.file} — fanIn ${h.fanIn} · impacto ${h.blastRadius}`,
+			),
+		},
+		{
+			id: "entryPoints",
+			title: "Puntos de entrada",
+			open: false,
+			columns: [],
+			edges: [],
+			notes: tech.data.entryPoints.map((p) => `${p.file} — fanOut ${p.fanOut}`),
+		},
+		{
+			id: "risk",
+			title: "Riesgo (fanIn × complejidad)",
+			open: true,
+			columns: [],
+			edges: [],
+			notes: tech.data.riskHotspots.map(
+				(h) =>
+					`${h.file} — score ${h.score} (fanIn ${h.fanIn} × complejidad ${h.maxComplexity})`,
+			),
+		},
+	];
+	if (
+		cross?.status === "ready" &&
+		Object.keys(cross.data.byDirectory).length > 0
+	) {
+		sections.push({
+			id: "cross",
+			title: "Cruce funcional (M9)",
+			open: false,
+			columns: [],
+			edges: [],
+			notes: Object.entries(cross.data.byDirectory)
+				.slice(0, tech.limit)
+				.map(([dir, sids]) => `${dir}: ${sids.join(" · ")}`),
+		});
+	}
+	const notes: string[] = [];
+	if (tech.data.deadWeight.files.length > 0) {
+		notes.push(tech.data.deadWeight.disclaimer);
+		notes.push(
+			...tech.data.deadWeight.files.map((f) => `sin importadores: ${f.file}`),
+		);
+	}
+	if (cross?.status === "ready" && cross.data.unmatchedModules.length > 0) {
+		notes.push(
+			`${cross.data.unmatchedModules.length} módulo(s) de la matriz fuera de los subsystems del grafo`,
+		);
+	}
+	return {
+		view: "technical",
+		generatedAt: new Date().toISOString(),
+		title: "Mapa técnico",
+		meta: [
+			`grafo: ${t.graphBuiltAt || "—"}`,
+			`cobertura ${Math.round(t.coverage * 100)}% (${t.filesCovered}/${t.filesTotal} archivos)`,
+			t.stale ? "desactualizado" : "",
+			t.lowCoverage ? "cobertura baja" : "",
+		].filter(Boolean),
+		sections,
+		notes,
+	};
 }
