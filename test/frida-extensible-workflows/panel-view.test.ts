@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
 	runPill,
+	orphanStatusPill,
 	groupBar,
 	phaseChips,
 	AGENT_ICON,
@@ -77,6 +78,42 @@ describe("frida-extensible-workflows · runPill (#71)", () => {
 		expect(AGENT_ICON.failed).toBe("x");
 		expect(AGENT_ICON.running).toBe("loader-circle");
 		expect(AGENT_ICON.queued).toBe("circle");
+	});
+});
+
+describe("frida-extensible-workflows · orphanStatusPill (#149)", () => {
+	it("resuelve pill semántico para runs huérfanas terminadas", () => {
+		expect(
+			orphanStatusPill({ state: "completed", kind: "terminal" }),
+		).toMatchObject({
+			label: "COMPLETADO",
+			color: "#3fb950",
+			icon: "circle-check",
+		});
+		expect(
+			orphanStatusPill({ state: "stopped", kind: "terminal" }),
+		).toMatchObject({
+			label: "DETENIDO",
+			color: "#8b949e",
+			icon: "square",
+		});
+		expect(
+			orphanStatusPill({ state: "failed", kind: "terminal" }),
+		).toMatchObject({
+			label: "FALLÓ",
+			color: "#f85149",
+			icon: "circle-x",
+		});
+	});
+
+	it("resuelve pill de advertencia para runs huérfanas atoradas (stuck)", () => {
+		expect(
+			orphanStatusPill({ state: "running", kind: "stuck" }),
+		).toMatchObject({
+			label: "ATORADO",
+			color: "#d29922",
+			icon: "triangle-alert",
+		});
 	});
 });
 

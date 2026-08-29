@@ -43,6 +43,7 @@ import {
 import {
 	groupBar,
 	runPill,
+	orphanStatusPill,
 	timelineRows,
 	agentDisplayName,
 	collapsedHeader,
@@ -190,80 +191,154 @@ function OrphansSection(props: {
 }): ReactElement {
 	const { orphans, journal, setJournal, onChanged } = props;
 	const stuckCount = orphans.filter((o) => o.kind === "stuck").length;
-	// Purga individual (🗑): olderThanDays 0 — el usuario ya lo vió y decidió.
+	// Purga individual: olderThanDays 0 — el usuario ya lo vio y decidio.
 	const purgeOne = (o: OrphanRunView) => {
 		purgeOrphans({ runIds: [o.runId], olderThanDays: 0 })
 			.then(() => onChanged())
 			.catch(() => undefined);
 	};
-	// Lote: todos los huérfanos listados (incluye terminales), sin margen.
+	// Lote: todos los huerfanos listados (incluye terminales), sin margen.
 	const purgeAll = () => {
 		purgeOrphans({ runIds: orphans.map((o) => o.runId), olderThanDays: 0 })
 			.then(() => onChanged())
 			.catch(() => undefined);
 	};
 	return (
-		<fbox flexDirection="column" gap={4} padding={6}>
-			<fbox flexDirection="row" gap={4}>
-				<ficon name="trash-2" size={12} color="#8b949e" />
-				<ftext bold>Huérfanos de sesiones previas ({orphans.length})</ftext>
-				{stuckCount > 0 ? (
-					<fbox flexDirection="row" gap={3} alignItems="center">
-						<ficon name="triangle-alert" size={11} color="#d29922" />
-						<ftext color="#d29922" size={11}>
-							{stuckCount} atorado(s)
-						</ftext>
-					</fbox>
-				) : null}
-			</fbox>
-			{orphans.map((o) => (
-				<fbox key={o.runId} flexDirection="column" gap={2}>
-					<fbox flexDirection="row" gap={6} alignItems="center">
-						<ficon
-							name={o.kind === "stuck" ? "triangle-alert" : "circle"}
-							size={11}
-							color={o.kind === "stuck" ? "#d29922" : "#8b949e"}
-						/>
-						<ftext color={o.kind === "stuck" ? "#d29922" : "#8b949e"} size={11}>
-							{o.runId.slice(0, 8)} · {o.workflowName} · {o.state} ·{" "}
-							{Math.floor(o.ageDays)}d
-						</ftext>
-						<fbutton
-							variant="secondary"
-							onClick={() => {
-								if (journal?.runId === o.runId) {
-									setJournal(null);
-									return;
-								}
-								readOrphanJournal(o.runDir).then((text) =>
-									setJournal({ runId: o.runId, text }),
-								);
-							}}
+		<fbox flexDirection="column" gap={6} padding={6} cls="wf-orphans-section">
+			{/* Cabecera con titulo, badge y accion masiva */}
+			<fbox
+				flexDirection="row"
+				alignItems="center"
+				justifyContent="space-between"
+				cls="wf-orphans-head"
+			>
+				<fbox flexDirection="row" gap={6} alignItems="center">
+					<ficon name="trash-2" size={13} color="#8b949e" />
+					<ftext bold size={11}>
+						Huérfanos de sesiones previas
+					</ftext>
+					<ftext size={11} color="#8b949e">
+						({orphans.length})
+					</ftext>
+					{stuckCount > 0 ? (
+						<fbox
+							flexDirection="row"
+							gap={3}
+							alignItems="center"
+							cls="wf-pill"
 						>
-							<fbox flexDirection="row" gap={4} alignItems="center">
-								<ficon name="file-text" size={11} />
-								<ftext size={11}>
-									{journal?.runId === o.runId ? "Ocultar" : "Journal"}
-								</ftext>
-							</fbox>
-						</fbutton>
-						<fbutton variant="secondary" onClick={() => purgeOne(o)}>
-							<ficon name="trash-2" size={11} />
-						</fbutton>
-					</fbox>
-					{journal?.runId === o.runId ? (
-						<ftext size={11} color="#888">
-							{journal.text}
-						</ftext>
+							<ficon name="triangle-alert" size={10} color="#d29922" />
+							<ftext color="#d29922" size={10} bold>
+								{stuckCount} atorado(s)
+							</ftext>
+						</fbox>
 					) : null}
 				</fbox>
-			))}
-			<fbutton variant="secondary" onClick={purgeAll}>
-				<fbox flexDirection="row" gap={4} alignItems="center">
-					<ficon name="trash-2" size={11} />
-					<ftext size={11}>Purgar los {orphans.length} huérfanos</ftext>
-				</fbox>
-			</fbutton>
+
+				<fbutton variant="secondary" onClick={purgeAll}>
+					<fbox flexDirection="row" gap={4} alignItems="center">
+						<ficon name="trash-2" size={11} />
+						<ftext size={11}>Purgar todos ({orphans.length})</ftext>
+					</fbox>
+				</fbutton>
+			</fbox>
+
+			{/* Lista de tarjetas compactas individuales */}
+			<fbox flexDirection="column" gap={4}>
+				{orphans.map((o) => {
+					const pill = orphanStatusPill(o);
+					const isJournalOpen = journal?.runId === o.runId;
+					return (
+						<fbox
+							key={o.runId}
+							flexDirection="column"
+							gap={4}
+							bordered
+							padding={6}
+							cls="wf-orphan-card"
+						>
+							<fbox
+								flexDirection="row"
+								alignItems="center"
+								justifyContent="space-between"
+								gap={6}
+							>
+								{/* Identificacion del workflow + Run ID */}
+								<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+									<ficon name={pill.icon} size={12} color={pill.color} />
+									<ftext bold size={11}>
+										{o.workflowName}
+									</ftext>
+									<ftext size={10} color="#8b949e" cls="wf-mono">
+										{o.runId.slice(0, 8)}
+									</ftext>
+								</fbox>
+
+								{/* Pill de estado + antiguedad */}
+								<fbox flexDirection="row" gap={6} alignItems="center">
+									<fbox
+										flexDirection="row"
+										gap={4}
+										alignItems="center"
+										cls="wf-pill"
+									>
+										<ftext color={pill.color} size={10} bold>
+											{pill.label}
+										</ftext>
+									</fbox>
+
+									<ftext size={10} color="#8b949e">
+										{Math.floor(o.ageDays)}d
+									</ftext>
+
+									{/* Acciones contextuales */}
+									<fbutton
+										variant="secondary"
+										onClick={() => {
+											if (isJournalOpen) {
+												setJournal(null);
+												return;
+											}
+											readOrphanJournal(o.runDir).then((text) =>
+												setJournal({ runId: o.runId, text }),
+											);
+										}}
+									>
+										<fbox flexDirection="row" gap={3} alignItems="center">
+											<ficon name="file-text" size={10} />
+											<ftext size={10}>
+												{isJournalOpen ? "Ocultar" : "Journal"}
+											</ftext>
+										</fbox>
+									</fbutton>
+
+									<fbutton
+										variant="secondary"
+										onClick={() => purgeOne(o)}
+										title="Purgar huérfano"
+									>
+										<ficon name="trash-2" size={10} />
+									</fbutton>
+								</fbox>
+							</fbox>
+
+							{/* Visor de Journal tipo consola/terminal */}
+							{isJournalOpen ? (
+								<fbox
+									flexDirection="column"
+									gap={2}
+									padding={6}
+									cls="wf-orphan-journal"
+								>
+									<ftext size={10} color="#8b949e" cls="wf-mono">
+										{journal?.text || "(Journal vacío)"}
+									</ftext>
+								</fbox>
+							) : null}
+						</fbox>
+					);
+				})}
+			</fbox>
 		</fbox>
 	);
 }

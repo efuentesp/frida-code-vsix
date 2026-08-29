@@ -7390,10 +7390,15 @@ mark.hl {
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 	display: flex;
 	flex-direction: column;
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
 }
 .pc-card:hover {
-	border-color: var(--vscode-focusBorder, var(--vscode-textLink-foreground, #007acc));
+	border-color: var(
+		--vscode-focusBorder,
+		var(--vscode-textLink-foreground, #007acc)
+	);
 }
 .pc-head {
 	display: flex;
@@ -7446,7 +7451,9 @@ mark.hl {
 	align-items: center;
 	justify-content: center;
 	color: var(--vscode-descriptionForeground);
-	transition: transform 0.15s ease, color 0.12s ease;
+	transition:
+		transform 0.15s ease,
+		color 0.12s ease;
 }
 .pc-head:hover .pc-chevron {
 	color: var(--vscode-foreground);
@@ -7505,7 +7512,8 @@ mark.hl {
 	gap: 10px;
 	margin-top: 8px;
 	padding-top: 10px;
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 }
 
 /* Catálogo de modelos aportados por el proveedor */
@@ -10767,6 +10775,38 @@ mark.hl {
 }
 .wf-agent-card:hover {
 	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+
+/* ── WorkflowPanel: Huérfanos de sesiones previas (Propuesta 1) ── */
+.wf-orphans-section {
+	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	margin-top: 4px;
+	padding-top: 6px;
+}
+.wf-orphans-head {
+	padding: 2px 0 4px 0;
+}
+.wf-orphan-card {
+	border-radius: 4px;
+	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.04));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+.wf-orphan-card:hover {
+	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
+}
+.wf-mono {
+	font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+	font-variant-numeric: tabular-nums;
+}
+.wf-orphan-journal {
+	border-radius: 3px;
+	background: var(--vscode-terminal-background, rgba(0, 0, 0, 0.2));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	max-height: 140px;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
 }
 
 /* ── Web-Friendly Tree & Chip Foundations ────────────────────────────── */

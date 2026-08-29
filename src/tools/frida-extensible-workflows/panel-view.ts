@@ -11,6 +11,7 @@ import {
 	type AgentProgressState,
 	type AgentProgressView,
 	type GroupProgressView,
+	type OrphanRunView,
 	type WorkflowRunState,
 	type WorkflowRunView,
 } from "./store";
@@ -384,4 +385,14 @@ export function timelineRows(
 			agents,
 		};
 	});
+}
+
+/** Pill de estado para runs huérfanas de sesiones previas (#149). */
+export function orphanStatusPill(
+	orphan: Pick<OrphanRunView, "state" | "kind">,
+): RunPill {
+	if (orphan.kind === "stuck") {
+		return { icon: "triangle-alert", label: "ATORADO", color: "#d29922" };
+	}
+	return runPill(orphan.state as WorkflowRunState);
 }

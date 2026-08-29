@@ -36,7 +36,7 @@ export function ProviderConfig({
 	onLogout: (id: string) => void;
 }) {
 	const [expanded, setExpanded] = useState(
-		defaultExpanded ?? (deviceCode != null),
+		defaultExpanded ?? deviceCode != null,
 	);
 	const [key, setKey] = useState("");
 	const [showKey, setShowKey] = useState(false);
@@ -116,10 +116,7 @@ export function ProviderConfig({
 								</span>
 							)}
 							<span className="pc-chevron" aria-hidden="true">
-								<Codicon
-									name={expanded ? "chevron-down" : "chevron-right"}
-									size={14}
-								/>
+								<Codicon name={expanded ? "chevron-down" : "chevron-right"} size={14} />
 							</span>
 						</div>
 					</div>
@@ -242,64 +239,64 @@ export function ProviderConfig({
 									<div className="pc-actions">
 										{provider.authed && (
 											<button className="pc-sec" onClick={cancelEdit}>
-										Cancelar
-									</button>
-								)}
-								<button className="pc-save" onClick={save} disabled={!key.trim()}>
-									Guardar key
+												Cancelar
+											</button>
+										)}
+										<button className="pc-save" onClick={save} disabled={!key.trim()}>
+											Guardar key
+										</button>
+										{meta.getKeyUrl && (
+											<a
+												className="pc-ext"
+												href={meta.getKeyUrl}
+												target="_blank"
+												rel="noreferrer"
+											>
+												Obtener key <Codicon name="link-external" size={11} />
+											</a>
+										)}
+									</div>
+								</>
+							)
+						) : provider.authed ? (
+							<div className="pc-authed">
+								<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
+									<Codicon name="sign-out" size={12} /> Olvidar acceso
 								</button>
-								{meta.getKeyUrl && (
-									<a
-										className="pc-ext"
-										href={meta.getKeyUrl}
-										target="_blank"
-										rel="noreferrer"
-									>
-										Obtener key <Codicon name="link-external" size={11} />
-									</a>
-								)}
 							</div>
-						</>
-					)
-				) : provider.authed ? (
-					<div className="pc-authed">
-						<button className="pc-link-btn" onClick={() => setConfirmForget(true)}>
-							<Codicon name="sign-out" size={12} /> Olvidar acceso
-						</button>
-					</div>
-				) : deviceCode ? (
-					<div className="oauth-banner">
-						<div className="oauth-title">Iniciando sesión…</div>
-						<div className="oauth-hint">
-							Entra este código en el navegador que se abrió:
-						</div>
-						<div className="oauth-code-row">
-							<div className="oauth-code">{deviceCode.userCode}</div>
-							<button
-								type="button"
-								className="oauth-copy-btn"
-								onClick={copyDeviceCode}
-								title="Copiar código al portapapeles"
-							>
-								<Codicon name={copiedCode ? "check" : "copy"} size={12} />
-								<span>{copiedCode ? "Copiado" : "Copiar"}</span>
+						) : deviceCode ? (
+							<div className="oauth-banner">
+								<div className="oauth-title">Iniciando sesión…</div>
+								<div className="oauth-hint">
+									Entra este código en el navegador que se abrió:
+								</div>
+								<div className="oauth-code-row">
+									<div className="oauth-code">{deviceCode.userCode}</div>
+									<button
+										type="button"
+										className="oauth-copy-btn"
+										onClick={copyDeviceCode}
+										title="Copiar código al portapapeles"
+									>
+										<Codicon name={copiedCode ? "check" : "copy"} size={12} />
+										<span>{copiedCode ? "Copiado" : "Copiar"}</span>
+									</button>
+								</div>
+								<a
+									className="oauth-link"
+									href={deviceCode.verificationUri}
+									target="_blank"
+									rel="noreferrer"
+								>
+									{deviceCode.verificationUri} <Codicon name="link-external" size={11} />
+								</a>
+							</div>
+						) : (
+							<button className="pc-save" onClick={() => onLogin(provider.id)}>
+								<Codicon name="sign-in" size={13} /> Iniciar sesión
 							</button>
-						</div>
-						<a
-							className="oauth-link"
-							href={deviceCode.verificationUri}
-							target="_blank"
-							rel="noreferrer"
-						>
-							{deviceCode.verificationUri} <Codicon name="link-external" size={11} />
-						</a>
+						)}
 					</div>
-				) : (
-					<button className="pc-save" onClick={() => onLogin(provider.id)}>
-						<Codicon name="sign-in" size={13} /> Iniciar sesión
-					</button>
-				)}
-			</div>
 				</div>
 			)}
 		</div>
