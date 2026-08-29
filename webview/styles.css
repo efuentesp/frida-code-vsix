@@ -11410,3 +11410,118 @@ mark.hl {
 		transition: none !important;
 	}
 }
+
+/* ══ Fase 1: tab Mapa del proyecto (.pm-*) — M2 #143 ══ */
+.pm-tab {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.pm-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.pm-meta {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+.pm-dot {
+	opacity: 0.6;
+}
+.pm-badge {
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-descriptionForeground);
+}
+.pm-badge.partial {
+	border-color: var(--vscode-charts-yellow, #cca700);
+	color: var(--vscode-charts-yellow, #cca700);
+}
+.pm-journey {
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 8px;
+	overflow: hidden;
+}
+.pm-journey-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+	width: 100%;
+	cursor: pointer;
+	background: var(--vscode-list-hoverBackground);
+	border: none;
+	color: inherit;
+	text-align: left;
+}
+/* (revisión en cascada ratificada en el slice 5 del diseño: background
+   declarado en el propio :hover — (0,2,0) vence al button:hover global
+   (0,1,1) que inyectaba el azul primario; ver docs/webview-ui-styles.md) */
+.pm-journey-head:hover {
+	background: var(--vscode-list-hoverBackground);
+	filter: brightness(1.1);
+}
+.pm-journey-title {
+	font-size: 12px;
+	font-weight: 600;
+}
+.pm-journey-count {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+}
+/* (provisional de la lista honesta de la Fase 1: fila de chips — la Fase 2
+   sustituye los chips por el grafo SVG y deja el body en column) */
+.pm-journey-body {
+	padding: 6px 8px;
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.pm-screen-chip {
+	font-size: 10px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	padding: 1px 6px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+	background: transparent;
+}
+.pm-expand-all {
+	font-size: 10px;
+	padding: 1px 8px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+}
+.pm-expand-all:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground);
+}
+.pm-empty {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.pm-orphan-note {
+	font-size: 11px;
+	color: var(--vscode-charts-yellow, #cca700);
+	display: flex;
+	gap: 4px;
+	align-items: flex-start;
+}
+@media (prefers-reduced-motion: reduce) {
+	.pm-journey-head {
+		transition: none !important;
+	}
+}

@@ -608,6 +608,17 @@ export function reduce(state: State, msg: InMessage): State {
 		case "codebase_index_state":
 			return { ...state, codebaseIndex: msg.state };
 
+		// M2 (#143) — estado del tab Mapa del proyecto (lib src/project-map/* del
+		// host; espejo UI en types.ts). #126: el mensaje DEBE caer al dispatch.
+		// (fix del triage Step 5: merge — el host nunca envía shots; un replace
+		//  borraría la cache de data-URIs en cada push, contradiciendo el criterio
+		//  manual de re-monte de la Fase 2)
+		case "project_map_state":
+			return {
+				...state,
+				projectMap: { ...msg.state, shots: state.projectMap?.shots },
+			};
+
 		// #112 — lista de archivos presentes en el índice (consulta read-only).
 		case "codebase_index_files":
 			return {

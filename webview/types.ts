@@ -580,6 +580,65 @@ export interface CodebaseIndexUiState {
 	};
 }
 
+// ── M2 (#143): estado del tab "Mapa del proyecto" — espeja los productores
+// de src/project-map/* del host (builds separados, molde UsageReportView).
+// Unión DISCRIMINADA igual que el productor (fix del slice-verifier: un espejo
+// plano rompe el narrowing del consumidor — TS2345).
+export interface PmScreen {
+	id: string;
+	title: string;
+	canon: string;
+	origin: string;
+	firstSeenStep: number;
+	/** Snapshot (relativo al cwd de la corrida; "" si no aplica). */
+	snapshot: string;
+	/** PNG (relativo; "" si el screenshot falló). */
+	screenshot: string;
+	purpose: string;
+	userRoles: string[];
+}
+export interface PmJourneyEdge {
+	type: "traversed" | "attempted-failed";
+	from: string;
+	to: string;
+	kind: string;
+	description: string;
+	step: number;
+	cause?: string;
+	detail?: string;
+}
+export interface PmJourney {
+	id: string;
+	startStep: number;
+	screenIds: string[];
+	edges: PmJourneyEdge[];
+}
+export interface PmFunctionalData {
+	screens: PmScreen[];
+	journeys: PmJourney[];
+	stoppedBy: string;
+	orphans: string[];
+	runUrl: string;
+}
+export type PmFunctionalState =
+	| { status: "loading" }
+	| { status: "empty"; reason: "missing" | "corrupt"; hint: string }
+	| { status: "error"; hint: string }
+	| { status: "ready"; data: PmFunctionalData; loadedAt: number };
+/** Estado del tab Mapa publicado por el host (la vista activa NO vive aquí:
+ *  es estado local del componente, análogo period/scope de ProductivityTab). */
+export interface ProjectMapUiState {
+	functional?: PmFunctionalState;
+	busy?: "functional" | null;
+	/** Epoch ms del inicio de la acción (#111): sobrevive re-montes. */
+	busySince?: number | null;
+	/** Cache de screenshots on-demand (data-URI por screenId). Lo llena el
+	 *  reducer con project_map_shot (In) — el host NUNCA lo manda en
+	 *  project_map_state; "" = respondido sin captura. (Campo adelantado de
+	 *  la Fase 2: el reducer de la Fase 1 ya hace merge de shots.) */
+	shots?: Record<string, string>;
+}
+
 export type DependencyCategory = "core" | "extension" | "optional";
 export type SupportedPlatform = "win32" | "darwin" | "linux";
 
@@ -851,6 +910,8 @@ export interface State {
 	sessionPatterns?: SessionPatternUi[];
 	/** Estado del índice de código (frida-codebase-index) para el tab Index. */
 	codebaseIndex?: CodebaseIndexUiState;
+	/** M2 (#143) — estado del tab "Mapa del proyecto". */
+	projectMap?: ProjectMapUiState;
 	/** Archivos presentes en el índice (#112) — respuesta a action:"files". */
 	codebaseIndexFiles?: {
 		available: boolean;
@@ -1040,6 +1101,9 @@ export type InMessage =
 	| { type: "composer_insert"; text: string }
 	| { type: "open_settings"; tab?: string }
 	| { type: "codebase_index_state"; state: CodebaseIndexUiState }
+	// M2 (#143) — estado del tab Mapa del proyecto (lib src/project-map/* del
+	// host; espejo UI en types.ts). #126: el mensaje DEBE caer al dispatch.
+	| { type: "project_map_state"; state: ProjectMapUiState }
 	| {
 			type: "codebase_index_ping_result";
 			provider: string;
@@ -1225,6 +1289,9 @@ export type OutMessage =
 			model?: string;
 			rebuild?: boolean;
 	  }
+	// M2 (#143) — carga/refresh del mapa del proyecto (Fase 1: Funcional;
+	// la vista Técnica llega en Fase 3).
+	| { type: "project_map"; view: "functional" | "technical"; limit?: number }
 	| {
 			/** #121 (F7) — la UI cambia la config de roles; el host persiste en
 			 *  settings y re-publica el estado de modelos. */

@@ -107,3 +107,25 @@ describe("webview store · tree_data y fork_points llegan al reducer", () => {
 		expect(s.forkPoints).toHaveLength(1);
 	});
 });
+
+// M2 (#143): project_map_state llena state.projectMap (condición de render
+// del ProjectMapTab) — el mensaje DEBE caer al dispatch general (#126).
+describe("webview store · project_map_state/project_map_shot llegan al reducer", () => {
+	it("project_map_state llena state.projectMap", () => {
+		const s = reduce(initialState, {
+			type: "project_map_state",
+			state: {
+				functional: {
+					status: "empty",
+					reason: "missing",
+					hint: "sin docs/funcional",
+				},
+				busy: null,
+			},
+		});
+		expect(s.projectMap?.functional?.status).toBe("empty");
+		expect(s.projectMap?.functional).toMatchObject({
+			reason: "missing",
+		});
+	});
+});

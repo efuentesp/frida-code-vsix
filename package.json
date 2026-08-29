@@ -93,6 +93,10 @@
       {
         "command": "frida.codebaseIndex",
         "title": "Frida: Codebase Index"
+      },
+      {
+        "command": "frida.projectMap",
+        "title": "Frida: Mapa del proyecto"
       }
     ],
     "menus": {

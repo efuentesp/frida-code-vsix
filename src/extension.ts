@@ -234,6 +234,10 @@ import {
 	classifySeverity,
 	type LensDiagnosticsPayload,
 } from "./lens-diagnostics-bridge";
+import {
+	loadFunctionalMap,
+	type ProjectMapHostState,
+} from "./project-map/functional-inventory";
 
 const execFileP = promisify(execFile);
 
@@ -613,6 +617,10 @@ export async function activate(
 	// ¿El webview ya montó su listener (llegó webview_ready)? Distingue apertura
 	// en caliente (post directo confiable) de arranque frío (flush diferido).
 	let webviewReady = false;
+	// M2 (#143) — estado del tab "Mapa del proyecto" (lib src/project-map/*).
+	// La verdad vive en el host (#111): busySince sobrevive re-montes del tab;
+	// la vista activa NO vive aquí (estado local del componente).
+	let pmState: ProjectMapHostState = {};
 
 	function postCodebaseIndexState(): void {
 		const cfg = readCodebaseIndexConfig();
@@ -647,6 +655,12 @@ export async function activate(
 				},
 			},
 		});
+	}
+
+	// M2 (#143) — publica el estado del tab Mapa al webview (re-posteado en
+	// webview_ready para re-montes fríos del tab).
+	function postProjectMapState(): void {
+		post({ type: "project_map_state", state: pmState });
 	}
 
 	/** #114 — Refresca la metadata de embeddings del índice (read-only) y la
@@ -2527,6 +2541,9 @@ export async function activate(
 				postToolToggles();
 				postPermissionsConfig();
 				postCodebaseIndexState();
+				// M2 (#143) — re-posteo del estado del mapa para re-montes fríos del
+				// tab (hueco que lensStatus NO cubre — no repetirlo).
+				postProjectMapState();
 				// #114 — metadata real del motor del índice (async, read-only)
 				void refreshCiIndexMeta();
 				// #117 — semáforo OpenAI de las tarjetas (async, best-effort)
@@ -3441,6 +3458,36 @@ export async function activate(
 						action: "rebuild",
 					});
 				}
+				break;
+			}
+			// M2 (#143) — carga/refresh del mapa Funcional. Read-only síncrono
+			// (lectura de inventory.json M8 + derivación de journeys): try/catch
+			// que SIEMPRE responde; busy/epoch para el spinner del botón (#111/#142).
+			// (La rama Técnica de este case llega en la Fase 3.)
+			case "project_map": {
+				pmState = {
+					...pmState,
+					functional: { status: "loading" },
+					busy: "functional",
+					busySince: Date.now(),
+				};
+				postProjectMapState();
+				try {
+					pmState = {
+						...pmState,
+						functional: loadFunctionalMap(workspaceCwd()),
+						busy: null,
+						busySince: null,
+					};
+				} catch (e: any) {
+					pmState = {
+						...pmState,
+						functional: { status: "error", hint: e?.message ?? String(e) },
+						busy: null,
+						busySince: null,
+					};
+				}
+				postProjectMapState();
 				break;
 			}
 			case "check_environment": {
@@ -5960,6 +6007,17 @@ export async function activate(
 				// post se perdería y el flush de webview_ready es quien abre el tab.
 				if (webviewReady) {
 					post({ type: "open_settings", tab: "codebaseIndex" });
+					pendingSettingsTab = undefined;
+				}
+			});
+		}),
+		// M2 (#143) — abre el SettingsHub en el tab Mapa (molde frida.codebaseIndex:
+		// post directo en caliente, flush de webview_ready en frío).
+		vscode.commands.registerCommand("frida.projectMap", () => {
+			pendingSettingsTab = "projectMap";
+			void vscode.commands.executeCommand("frida.openPanel").then(() => {
+				if (webviewReady) {
+					post({ type: "open_settings", tab: "projectMap" });
 					pendingSettingsTab = undefined;
 				}
 			});

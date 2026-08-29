@@ -1300,13 +1300,13 @@ describe("ProjectMapTab · estados", () => {
 
 #### Automated Verification
 
-- [ ] Aterrizaje previo del working tree ANTES del primer commit de M2: commit conjunto con `test/dist-bundle-integrity.test.ts` trackeado + rebuild de `dist-webview/` (`npm run build:webview`); `git status --porcelain` sin residuos en dist-webview tras ese commit
-- [ ] Bundle en el MISMO commit que la fuente: tras el cambio, `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
-- [ ] Diff funcional limpio (sin config biome en el repo): `git diff --check` sin errores y el diff del commit no contiene reformatos ajenos al cambio
-- [ ] Typecheck limpio (host + webview): `npm run typecheck`
-- [ ] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
-- [ ] Seam completo (grep): `grep -c '"project_map_state"' webview/store.ts` devuelve ≥1, `grep -c '"project_map"' src/extension.ts` devuelve ≥1 y `grep -c 'ProjectMapTab' webview/components/SettingsHub.tsx` devuelve ≥2 (import + render)
-- [ ] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
+- [x] Aterrizaje previo del working tree ANTES del primer commit de M2: commit conjunto con `test/dist-bundle-integrity.test.ts` trackeado + rebuild de `dist-webview/` (`npm run build:webview`); `git status --porcelain` sin residuos en dist-webview tras ese commit (be7dc1c)
+- [x] Bundle en el MISMO commit que la fuente: tras el cambio, `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
+- [x] Diff funcional limpio (sin config biome en el repo): `git diff --check` sin errores y el diff del commit no contiene reformatos ajenos al cambio
+- [x] Typecheck limpio (host + webview): `npm run typecheck`
+- [x] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts` (25/25)
+- [x] Seam completo (grep): `grep -c '"project_map_state"' webview/store.ts` devuelve ≥1 (1), `grep -c '"project_map"' src/extension.ts` devuelve ≥1 (1) y `grep -c 'ProjectMapTab' webview/components/SettingsHub.tsx` devuelve ≥2 (2: import + render)
+- [x] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
 
 #### Manual Verification
 
