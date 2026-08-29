@@ -3703,14 +3703,14 @@ NOTA: en la forma final del diseño, `renderTech` acepta además el parámetro o
 
 #### Automated Verification
 
-- [ ] Typecheck limpio (host + webview): `npm run typecheck`
-- [ ] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
-- [ ] Seam técnico en el dispatcher: `grep -c 'loadTechnicalMap' src/extension.ts` devuelve ≥ 2 (import + invocación)
-- [ ] Espejo técnico en tipos: `grep -c 'PmTechnicalState' webview/types.ts` devuelve ≥ 2 y `grep -c '"technical"' webview/types.ts` devuelve ≥ 2
-- [ ] Parse lenient del size-skip (sin strings completos hardcodeados en src): `grep -c 'isSizeSkipHint' src/project-map/lens-project-report.ts` devuelve ≥ 2
-- [ ] Schedule de re-poll congelado por test: el caso "TECH_POLL_DELAYS_MS congelado" afirma length 10, rampa no-decreciente 2000→10000
-- [ ] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
-- [ ] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
+- [x] Typecheck limpio (host + webview): `npm run typecheck`
+- [x] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
+- [x] Seam técnico en el dispatcher: `grep -c 'loadTechnicalMap' src/extension.ts` devuelve ≥ 2 (import + invocación)
+- [x] Espejo técnico en tipos: `grep -c 'PmTechnicalState' webview/types.ts` devuelve ≥ 2 y `grep -c '"technical"' webview/types.ts` devuelve ≥ 2
+- [x] Parse lenient del size-skip (sin strings completos hardcodeados en src): `grep -c 'isSizeSkipHint' src/project-map/lens-project-report.ts` devuelve ≥ 2
+- [x] Schedule de re-poll congelado por test: el caso "TECH_POLL_DELAYS_MS congelado" afirma length 10, rampa no-decreciente 2000→10000
+- [x] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
+- [x] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
 
 #### Manual Verification
 
