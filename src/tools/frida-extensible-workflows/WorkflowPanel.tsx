@@ -221,12 +221,7 @@ function OrphansSection(props: {
 						({orphans.length})
 					</ftext>
 					{stuckCount > 0 ? (
-						<fbox
-							flexDirection="row"
-							gap={3}
-							alignItems="center"
-							cls="wf-pill"
-						>
+						<fbox flexDirection="row" gap={3} alignItems="center" cls="wf-pill">
 							<ficon name="triangle-alert" size={10} color="#d29922" />
 							<ftext color="#d29922" size={10} bold>
 								{stuckCount} atorado(s)
@@ -276,12 +271,7 @@ function OrphansSection(props: {
 
 								{/* Pill de estado + antiguedad */}
 								<fbox flexDirection="row" gap={6} alignItems="center">
-									<fbox
-										flexDirection="row"
-										gap={4}
-										alignItems="center"
-										cls="wf-pill"
-									>
+									<fbox flexDirection="row" gap={4} alignItems="center" cls="wf-pill">
 										<ftext color={pill.color} size={10} bold>
 											{pill.label}
 										</ftext>
@@ -306,9 +296,7 @@ function OrphansSection(props: {
 									>
 										<fbox flexDirection="row" gap={3} alignItems="center">
 											<ficon name="file-text" size={10} />
-											<ftext size={10}>
-												{isJournalOpen ? "Ocultar" : "Journal"}
-											</ftext>
+											<ftext size={10}>{isJournalOpen ? "Ocultar" : "Journal"}</ftext>
 										</fbox>
 									</fbutton>
 

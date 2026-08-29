@@ -3,6 +3,7 @@ import {
 	extractConclusionText,
 	extractProposals,
 	extractQuestionFollowups,
+	extractSkillFollowups,
 	getContextualFollowups,
 } from "../webview/followup-rules";
 import type { Turn } from "../webview/types";
@@ -179,5 +180,79 @@ Ticker al lado del composer.
 		];
 		const followups = getContextualFollowups(turns);
 		expect(followups.some((f) => f.id === "workflow-status")).toBe(true);
+	});
+
+	describe("extractSkillFollowups (#150)", () => {
+		it("extrae skills en bloques de código markdown con argumentos entrecomillados", () => {
+			const text =
+				"Para continuar con la fase, ejecuta el siguiente skill:\n```bash\n/skill:implement \"Phase 1: Implementar componentes\"\n```";
+			const skills = extractSkillFollowups(text);
+			expect(skills).toHaveLength(1);
+			expect(skills[0].id).toBe("skill-implement-0");
+			expect(skills[0].prompt).toBe(
+				'/skill:implement "Phase 1: Implementar componentes"',
+			);
+			expect(skills[0].label).toContain("/skill:implement");
+			expect(skills[0].iconName).toBe("sparkle");
+		});
+
+		it("extrae skills en código en línea (inline backticks) simples y con argumentos", () => {
+			const text =
+				"Puedes continuar ejecutando `/skill:implement Phase 2: Refactor` o validar con `/skill:validate` ahora.";
+			const skills = extractSkillFollowups(text);
+			expect(skills).toHaveLength(2);
+			expect(skills[0].prompt).toBe("/skill:implement Phase 2: Refactor");
+			expect(skills[1].prompt).toBe("/skill:validate");
+			expect(skills[1].label).toBe("/skill:validate");
+		});
+
+		it("extrae skills desde viñetas y listas numeradas", () => {
+			const text = `
+Siguientes pasos sugeridos:
+1. \`/skill:plan "Arquitectura de base de datos"\`
+2. \`/skill:implement\`
+3. \`/skill:validate\`
+`;
+			const skills = extractSkillFollowups(text);
+			expect(skills).toHaveLength(3);
+			expect(skills[0].prompt).toBe(
+				'/skill:plan "Arquitectura de base de datos"',
+			);
+			expect(skills[1].prompt).toBe("/skill:implement");
+			expect(skills[2].prompt).toBe("/skill:validate");
+		});
+
+		it("limpia correctamente palabras sueltas de prosa cuando el skill no tiene argumentos reales", () => {
+			const text = "Usa /skill:commit para guardar todos los cambios.";
+			const skills = extractSkillFollowups(text);
+			expect(skills).toHaveLength(1);
+			expect(skills[0].prompt).toBe("/skill:commit");
+			expect(skills[0].label).toBe("/skill:commit");
+		});
+
+		it("prioriza los skills propuestos en getContextualFollowups sobre propuestas y herramientas", () => {
+			const turns: Turn[] = [
+				makeTurn({
+					segments: [
+						{
+							kind: "tool",
+							tool: "edit",
+							args: { path: "src/app.ts" },
+							state: "ok",
+							startedAt: 10,
+						},
+						{
+							kind: "text",
+							text:
+								"He terminado la fase. Para continuar ejecuta:\n```\n/skill:implement \"Phase 2: Tests\"\n```\n### Propuesta A: Algo más\n¿Cuál prefieres?",
+						},
+					],
+				}),
+			];
+			const followups = getContextualFollowups(turns);
+			expect(followups).toHaveLength(1);
+			expect(followups[0].id).toBe("skill-implement-0");
+			expect(followups[0].prompt).toBe('/skill:implement "Phase 2: Tests"');
+		});
 	});
 });

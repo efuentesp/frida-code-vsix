@@ -21,6 +21,86 @@ export function extractConclusionText(turn: Turn): string {
 }
 
 /**
+ * Extrae invocaciones de skills (/skill:nombre [args]) sugeridas explícitamente por el asistente.
+ * Soporta bloques de código (```bash ...```), inline code (`/skill:...`), viñetas o texto plano.
+ */
+export function extractSkillFollowups(text: string): FollowupSuggestion[] {
+	if (!text || !text.includes("/skill:")) return [];
+	const suggestions: FollowupSuggestion[] = [];
+	const seenPrompts = new Set<string>();
+
+	const lines = text.split(/\r?\n/);
+	for (const line of lines) {
+		const regex =
+			/(?:`{1,3}\s*)?\/skill:([a-zA-Z0-9_-]+)(?:[ \t]+([^\r\n`]+))?(?:`{1,3})?/g;
+		let m: RegExpExecArray | null;
+		while ((m = regex.exec(line)) !== null) {
+			const name = m[1];
+			const matchStr = m[0];
+			const isInsideBackticks =
+				matchStr.startsWith("`") ||
+				line.trim().startsWith("```") ||
+				line.trim().startsWith("/skill:");
+			let rawArgs = (m[2] || "").trim();
+
+			// Limpieza de backticks residuales
+			rawArgs = rawArgs.replace(/`+$/, "").replace(/^`+/, "").trim();
+
+			// Si los argumentos están entrecomillados, aislar el bloque entrecomillado
+			if (rawArgs.startsWith('"')) {
+				const nextQuote = rawArgs.indexOf('"', 1);
+				if (nextQuote !== -1) {
+					rawArgs = rawArgs.slice(0, nextQuote + 1);
+				}
+			} else if (rawArgs.startsWith("'")) {
+				const nextQuote = rawArgs.indexOf("'", 1);
+				if (nextQuote !== -1) {
+					rawArgs = rawArgs.slice(0, nextQuote + 1);
+				}
+			} else if (!isInsideBackticks) {
+				// En prosa sin backticks ni comillas, solo capturar flags o identificadores de fase
+				if (/^--?[a-zA-Z0-9_-]+/i.test(rawArgs)) {
+					const flagMatch = rawArgs.match(
+						/^(--?[a-zA-Z0-9_=-]+(?:\s+--?[a-zA-Z0-9_=-]+)*)/,
+					);
+					rawArgs = flagMatch ? flagMatch[1] : "";
+				} else if (/^Phase\s+\d+/i.test(rawArgs)) {
+					const phaseMatch = rawArgs.match(
+						/^(Phase\s+\d+(?:\s*:\s*[^\s,;.]+)?)/i,
+					);
+					rawArgs = phaseMatch ? phaseMatch[1] : "";
+				} else {
+					rawArgs = "";
+				}
+			}
+
+			// Limpiar puntuación exterior
+			rawArgs = rawArgs.replace(/[\s.,;:)]+$/, "").trim();
+
+			const prompt = rawArgs ? `/skill:${name} ${rawArgs}` : `/skill:${name}`;
+			if (!seenPrompts.has(prompt)) {
+				seenPrompts.add(prompt);
+				let shortArgs = rawArgs;
+				if (shortArgs.length > 24) {
+					shortArgs = shortArgs.slice(0, 23).trimEnd() + "…";
+				}
+				const label = shortArgs
+					? `/skill:${name} ${shortArgs}`
+					: `/skill:${name}`;
+				suggestions.push({
+					id: `skill-${name}-${suggestions.length}`,
+					label,
+					prompt,
+					iconName: "sparkle",
+				});
+			}
+		}
+	}
+
+	return suggestions.slice(0, 3);
+}
+
+/**
  * 1. Extrae propuestas / alternativas si el asistente las presentó explícitamente.
  *    Ejemplos: "### Propuesta 1: ...", "Propuesta A: ...", "**Opción 1**", "PROPUESTA 1".
  */
@@ -229,14 +309,29 @@ export function getContextualFollowups(
 
 	// 2. Analizar semánticamente el texto de conclusión del asistente
 	const conclusion = extractConclusionText(lastTurn);
+	const assistantFullText = lastTurn.segments
+		.filter(
+			(s): s is Extract<Segment, { kind: "text" }> =>
+				s.kind === "text" && typeof s.text === "string",
+		)
+		.map((s) => s.text)
+		.join("\n\n");
 
-	// Nivel A: ¿El asistente presentó propuestas / alternativas?
+	// Nivel A: ¿El asistente propuso explícitamente skills para continuar?
+	const skillFollowups = extractSkillFollowups(
+		conclusion.includes("/skill:") ? conclusion : assistantFullText,
+	);
+	if (skillFollowups.length > 0) {
+		return skillFollowups;
+	}
+
+	// Nivel B: ¿El asistente presentó propuestas / alternativas?
 	const proposals = extractProposals(conclusion);
 	if (proposals.length > 0) {
 		return proposals;
 	}
 
-	// Nivel B: ¿El asistente formuló una pregunta de cierre / call to action?
+	// Nivel C: ¿El asistente formuló una pregunta de cierre / call to action?
 	const questionFollowups = extractQuestionFollowups(conclusion);
 	if (questionFollowups.length > 0) {
 		return questionFollowups;

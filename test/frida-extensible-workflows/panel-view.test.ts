@@ -97,19 +97,17 @@ describe("frida-extensible-workflows · orphanStatusPill (#149)", () => {
 			color: "#8b949e",
 			icon: "square",
 		});
-		expect(
-			orphanStatusPill({ state: "failed", kind: "terminal" }),
-		).toMatchObject({
-			label: "FALLÓ",
-			color: "#f85149",
-			icon: "circle-x",
-		});
+		expect(orphanStatusPill({ state: "failed", kind: "terminal" })).toMatchObject(
+			{
+				label: "FALLÓ",
+				color: "#f85149",
+				icon: "circle-x",
+			},
+		);
 	});
 
 	it("resuelve pill de advertencia para runs huérfanas atoradas (stuck)", () => {
-		expect(
-			orphanStatusPill({ state: "running", kind: "stuck" }),
-		).toMatchObject({
+		expect(orphanStatusPill({ state: "running", kind: "stuck" })).toMatchObject({
 			label: "ATORADO",
 			color: "#d29922",
 			icon: "triangle-alert",

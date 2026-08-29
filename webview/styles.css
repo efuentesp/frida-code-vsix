@@ -10779,7 +10779,8 @@ mark.hl {
 
 /* ── WorkflowPanel: Huérfanos de sesiones previas (Propuesta 1) ── */
 .wf-orphans-section {
-	border-top: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	border-top: 1px solid
+		var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
 	margin-top: 4px;
 	padding-top: 6px;
 }
@@ -10790,7 +10791,9 @@ mark.hl {
 	border-radius: 4px;
 	background: var(--vscode-editor-background, rgba(128, 128, 128, 0.04));
 	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
-	transition: border-color 0.12s ease, background-color 0.12s ease;
+	transition:
+		border-color 0.12s ease,
+		background-color 0.12s ease;
 }
 .wf-orphan-card:hover {
 	border-color: var(--vscode-focusBorder, rgba(128, 128, 128, 0.35));
