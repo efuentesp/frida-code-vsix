@@ -52,6 +52,7 @@ import {
 } from "./tools/frida-permission-system/config-store";
 import {
 	DEVENGINE_BASE_URL,
+	SOFTTEK_MODEL,
 	SOFTTEK_PROVIDER,
 	SOFTTEK_PROVIDER_DISPLAY,
 } from "./providers/softtek-provider";
@@ -76,7 +77,6 @@ import {
 	forensicLine,
 	forensicLogPath,
 	formatModelRef,
-	type ForensicAppender,
 } from "./tools/frida-forensics";
 import {
 	MOONSHOT_PROVIDER,

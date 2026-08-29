@@ -125,6 +125,7 @@ export function OnboardingWizard({
 							provider={chosen}
 							meta={providerMeta(chosen.id, chosen.oauth)}
 							deviceCode={chosen.oauth ? deviceCode : undefined}
+							defaultExpanded={true}
 							onSetKey={onSetKey}
 							onLogin={onLogin}
 							onLogout={onLogout}

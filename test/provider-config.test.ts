@@ -37,7 +37,7 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 		models: [],
 	};
 
-	it("renderiza proveedor OAuth conectado con status pill, modelos y botón de cerrar sesión", () => {
+	it("renderiza proveedor contraído por defecto con información relevante en la cabecera", () => {
 		const onSetKey = vi.fn();
 		const onLogin = vi.fn();
 		const onLogout = vi.fn();
@@ -58,7 +58,42 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 			}),
 		);
 
-		expect(html).toContain("pc-card");
+		expect(html).toContain("pc-card collapsed");
+		expect(html).toContain("Frida Enterprise");
+		expect(html).toContain("pc-badge ok");
+		expect(html).toContain("Conectado");
+		expect(html).toContain("2 modelos");
+		expect(html).toContain("En uso");
+		expect(html).toContain("Demeter Bloom");
+		expect(html).toContain("codicon-chevron-right");
+		// En estado contraído, la lista completa y acciones no se renderizan
+		expect(html).not.toContain("Ceres Spark");
+		expect(html).not.toContain("pc-link-btn");
+	});
+
+	it("renderiza proveedor OAuth conectado expandido con status pill, modelos y botón de cerrar sesión", () => {
+		const onSetKey = vi.fn();
+		const onLogin = vi.fn();
+		const onLogout = vi.fn();
+
+		const html = renderToStaticMarkup(
+			React.createElement(ProviderConfig, {
+				provider: mockEnterprise,
+				meta: {
+					id: "frida-enterprise",
+					name: "Frida Enterprise",
+					authType: "oauth",
+					blurb: "Modelos optimizados para desarrollo y razonamiento profundo.",
+				},
+				activeModelId: "demeter-bloom",
+				defaultExpanded: true,
+				onSetKey,
+				onLogin,
+				onLogout,
+			}),
+		);
+
+		expect(html).toContain("pc-card expanded");
 		expect(html).toContain("Frida Enterprise");
 		expect(html).toContain("pc-badge ok");
 		expect(html).toContain("Conectado");
@@ -69,7 +104,7 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 		expect(html).toContain("Olvidar acceso");
 	});
 
-	it("renderiza proveedor API Key conectado con status pill y modelos", () => {
+	it("renderiza proveedor API Key conectado expandido con status pill y modelos", () => {
 		const onSetKey = vi.fn();
 		const onLogin = vi.fn();
 		const onLogout = vi.fn();
@@ -83,19 +118,21 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 					authType: "apikey",
 					blurb: "Modelos Claude de última generación.",
 				},
+				defaultExpanded: true,
 				onSetKey,
 				onLogin,
 				onLogout,
 			}),
 		);
 
+		expect(html).toContain("pc-card expanded");
 		expect(html).toContain("Anthropic");
 		expect(html).toContain("Claude 3.5 Sonnet");
 		expect(html).toContain("Cambiar API key");
 		expect(html).toContain("Olvidar API key");
 	});
 
-	it("renderiza proveedor no conectado con formulario de ingreso de clave y link externo", () => {
+	it("renderiza proveedor no conectado expandido con formulario de ingreso de clave y link externo", () => {
 		const onSetKey = vi.fn();
 		const onLogin = vi.fn();
 		const onLogout = vi.fn();
@@ -110,12 +147,14 @@ describe("ProviderConfig & ProveedoresTab (Propuesta 1: VS Code Accounts & Model
 					keyPlaceholder: "sk-...",
 					getKeyUrl: "https://platform.openai.com/api-keys",
 				},
+				defaultExpanded: true,
 				onSetKey,
 				onLogin,
 				onLogout,
 			}),
 		);
 
+		expect(html).toContain("pc-card expanded");
 		expect(html).toContain("OpenAI");
 		expect(html).toContain("pc-input");
 		expect(html).toContain("Guardar key");

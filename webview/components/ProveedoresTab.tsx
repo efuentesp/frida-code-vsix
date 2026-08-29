@@ -70,6 +70,7 @@ export function ProveedoresTab({
 				activeModel?.provider === p.id ? activeModel.modelId : undefined
 			}
 			highlightQuery={hq}
+			defaultExpanded={Boolean(q || highlightQuery.trim())}
 			onSetKey={onSetKey}
 			onLogin={onLogin}
 			onLogout={onLogout}
