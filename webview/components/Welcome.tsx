@@ -48,6 +48,36 @@ const STARTER_CARDS: StarterCard[] = [
 		prompt: "Explica la arquitectura y componentes clave de este proyecto.",
 		actionType: "submit",
 	},
+	// #140 (Pista M): cards de los comandos slash — actionType "insert"
+	// para no enviar (el usuario completa URL/presupuesto tras el comando;
+	// /walkthrough acepta URL inline, de ahí su espacio final, D5).
+	{
+		id: "walkthrough",
+		title: "Documentar una App",
+		desc:
+			"Recorre la app como usuario real y genera la documentación funcional (pantallas, journeys, reglas, roles).",
+		iconName: "window",
+		prompt: "/walkthrough ",
+		actionType: "insert",
+	},
+	{
+		id: "understand",
+		title: "Entender el Código",
+		desc:
+			"Produce el entendimiento técnico del repo con evidencia: 7 preguntas del día 1, riesgos y modelo LikeC4.",
+		iconName: "remote-explorer",
+		prompt: "/understand",
+		actionType: "insert",
+	},
+	{
+		id: "size",
+		title: "Dimensionar para Preventa",
+		desc:
+			"KLOC, COCOMO, deuda técnica y costo con salario mensual para la conversación de preventa.",
+		iconName: "graph",
+		prompt: "/size",
+		actionType: "insert",
+	},
 ];
 
 const SHORTCUTS = [
