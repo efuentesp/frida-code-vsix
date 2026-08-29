@@ -236,6 +236,8 @@ import {
 } from "./lens-diagnostics-bridge";
 import {
 	loadFunctionalMap,
+	readScreenshotDataUri,
+	safeResolveWithin,
 	type ProjectMapHostState,
 } from "./project-map/functional-inventory";
 
@@ -3488,6 +3490,67 @@ export async function activate(
 					};
 				}
 				postProjectMapState();
+				break;
+			}
+
+			// M2 (#143) — abrir evidencia desde el mapa. Paths del inventory relativos
+			// al cwd de la corrida → rebase + guard de contención SIEMPRE; texto vía
+			// openAtLine, binario (PNG) vía vscode.open (BINARY_EXT, nivel módulo).
+			// Try/catch degrada a showErrorMessage — nunca silencio.
+			case "open_file": {
+				const file = typeof msg.file === "string" ? msg.file : "";
+				if (!file) break;
+				const abs = safeResolveWithin(workspaceCwd(), file);
+				if (!abs) {
+					void vscode.window.showErrorMessage(
+						"Frida: ruta fuera del workspace — " + file,
+					);
+					break;
+				}
+				const ext = path.extname(abs).slice(1).toLowerCase();
+				void (async () => {
+					try {
+						if (BINARY_EXT.has(ext)) {
+							await vscode.commands.executeCommand(
+								"vscode.open",
+								vscode.Uri.file(abs),
+							);
+						} else {
+							await openAtLine(
+								abs,
+								typeof msg.line === "number" ? msg.line : undefined,
+							);
+						}
+					} catch (e: any) {
+						void vscode.window.showErrorMessage(
+							"No se pudo abrir " + file + ": " + String(e?.message ?? e),
+						);
+					}
+				})();
+				break;
+			}
+
+			// M2 (#143) — screenshot on-demand: el webview manda SOLO el screenId; el
+			// host resuelve el path desde el inventory YA cargado en pmState (cero
+			// confianza en paths del cliente) y responde SIEMPRE (dataUri "" = sin
+			// captura → la UI no reintenta; #142 sin espera eterna).
+			case "project_map_shot": {
+				const screenId = String(msg.screenId ?? "");
+				if (!screenId) break;
+				const rel =
+					pmState.functional?.status === "ready"
+						? (pmState.functional.data.screens.find((s) => s.id === screenId)
+								?.screenshot ?? "")
+						: "";
+				if (!rel) {
+					post({ type: "project_map_shot", screenId, dataUri: "" });
+					break;
+				}
+				post({
+					type: "project_map_shot",
+					screenId,
+					dataUri: readScreenshotDataUri(workspaceCwd(), rel),
+				});
 				break;
 			}
 			case "check_environment": {

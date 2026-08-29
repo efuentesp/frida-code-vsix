@@ -8,7 +8,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadFunctionalMap } from "../src/project-map/functional-inventory";
+import {
+	loadFunctionalMap,
+	readScreenshotDataUri,
+	safeResolveWithin,
+} from "../src/project-map/functional-inventory";
 import { deriveJourneys, type PmAction } from "../src/project-map/journeys";
 
 // Timeline canónico del ejemplo de design (corte por goto):
@@ -260,5 +264,63 @@ describe("loadFunctionalMap · degradación digna y payload honesto", () => {
 				r.data.journeys.every((j) => j.screenIds.every((sid) => sid !== "P99")),
 			).toBe(true);
 		}
+	});
+});
+
+// ══ Fase 2: guard de contención + lector de PNGs como data-URI ══
+
+describe("safeResolveWithin · guard de contención (molde agents-sync safeJoin)", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("rel dentro del cwd → abs resuelto", () => {
+		const cwd = makeCwd();
+		expect(safeResolveWithin(cwd, "docs/a.png")).toBe(
+			path.resolve(cwd, "docs/a.png"),
+		);
+	});
+	it("escape ../ → null", () => {
+		expect(safeResolveWithin(makeCwd(), "../escape.png")).toBeNull();
+	});
+	it("path absoluto → null (nunca sale del workspace)", () => {
+		expect(safeResolveWithin(makeCwd(), "/etc/passwd")).toBeNull();
+	});
+});
+
+describe("readScreenshotDataUri · data-URI on-demand", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("PNG del workspace → data:image/png;base64", () => {
+		const cwd = makeCwd();
+		fs.mkdirSync(path.join(cwd, "docs/funcional/screenshots"), {
+			recursive: true,
+		});
+		fs.writeFileSync(
+			path.join(cwd, "docs/funcional/screenshots/P01.png"),
+			"png-fake",
+		);
+		expect(readScreenshotDataUri(cwd, "docs/funcional/screenshots/P01.png")).toBe(
+			"data:image/png;base64," + Buffer.from("png-fake").toString("base64"),
+		);
+	});
+	it('escape del cwd / extensión no-imagen / inexistente → ""', () => {
+		const cwd = makeCwd();
+		expect(readScreenshotDataUri(cwd, "../../etc/passwd")).toBe("");
+		expect(readScreenshotDataUri(cwd, "docs/funcional/x.json")).toBe("");
+		expect(readScreenshotDataUri(cwd, "no-existe.png")).toBe("");
+	});
+	it('> 4MB → "" (techo anti-postMessage)', () => {
+		const cwd = makeCwd();
+		fs.mkdirSync(path.join(cwd, "shots"), { recursive: true });
+		fs.writeFileSync(
+			path.join(cwd, "shots/big.png"),
+			Buffer.alloc(4 * 1024 * 1024 + 1),
+		);
+		expect(readScreenshotDataUri(cwd, "shots/big.png")).toBe("");
 	});
 });

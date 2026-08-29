@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectMapTab } from "../webview/components/ProjectMapTab";
+import { FunctionalView } from "../webview/components/project-map/FunctionalView";
 import type { PmFunctionalData, State } from "../webview/types";
 
 const baseState: State = {
@@ -62,6 +63,17 @@ const fnData: PmFunctionalData = {
 					kind: "form",
 					description: "creds",
 					step: 2,
+				},
+				// Fase 2: edge attempted-failed para el test de la lista de fallos.
+				{
+					type: "attempted-failed",
+					from: "P01",
+					to: "",
+					kind: "form",
+					description: "filtro x",
+					step: 3,
+					cause: "no-progression",
+					detail: "la pantalla no cambió tras la acción",
 				},
 			],
 		},
@@ -122,7 +134,61 @@ describe("ProjectMapTab · estados", () => {
 		expect(html).toContain("J01");
 		expect(html).toContain("1 journey");
 		expect(html).toContain("cobertura parcial: tope de pantallas");
-		// FR-3: colapsado por defecto — los chips NO renderizan sin expandir.
-		expect(html).not.toContain("pm-screen-chip");
+		// FR-3: colapsado por defecto — el grafo NO renderiza sin expandir.
+		expect(html).not.toContain("pm-graph");
+	});
+});
+
+// ══ Fase 2: FunctionalView directo (open inyectado — el toggle vive en
+//    ProjectMapTab y renderToStaticMarkup no corre efectos NI handlers) ══
+
+function renderFn(
+	data: PmFunctionalData,
+	shots: Record<string, string>,
+	open: string[],
+): string {
+	return renderToStaticMarkup(
+		React.createElement(FunctionalView, {
+			data,
+			loadedAt: 1,
+			shots,
+			open: new Set(open),
+			onToggle: () => {},
+			onToggleAll: () => {},
+			post: vi.fn(),
+		}),
+	);
+}
+
+describe("FunctionalView · grafo SVG por columnas (slice 2)", () => {
+	it("journey cerrado → cabecera plegable SIN grafo en el DOM (render condicional)", () => {
+		const html = renderFn(fnData, {}, []);
+		expect(html).toContain("pm-journey-head");
+		expect(html).toContain("J01");
+		expect(html).not.toContain("pm-graph");
+	});
+
+	it("journey abierto → columnas por pantalla + arista bezier", () => {
+		const html = renderFn(fnData, {}, ["J01"]);
+		expect(html).toContain("pm-graph");
+		expect(html).toContain(">P01<");
+		expect(html).toContain(">P02<");
+		expect(html).toContain("pm-edge");
+		expect(html).toContain("pm-node");
+	});
+
+	it("shots on-demand: pendiente → capturando…; cacheado → data-URI; fallido → sin captura", () => {
+		expect(renderFn(fnData, {}, ["J01"])).toContain("capturando…");
+		expect(
+			renderFn(fnData, { P01: "data:image/png;base64,QUJD" }, ["J01"]),
+		).toContain("data:image/png;base64,QUJD");
+		expect(renderFn(fnData, { P01: "" }, ["J01"])).toContain("sin captura");
+	});
+
+	it("attempted-failed se lista bajo el grafo con su causa", () => {
+		const html = renderFn(fnData, {}, ["J01"]);
+		expect(html).toContain("pm-fail-row");
+		expect(html).toContain("#3");
+		expect(html).toContain("sin progresión");
 	});
 });

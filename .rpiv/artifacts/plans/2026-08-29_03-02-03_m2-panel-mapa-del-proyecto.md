@@ -2403,12 +2403,12 @@ describe("readScreenshotDataUri · data-URI on-demand", () => {
 
 #### Automated Verification
 
-- [ ] Typecheck limpio (host + webview): `npm run typecheck`
-- [ ] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
-- [ ] Seam reducer completo: `grep -c '"project_map_shot"' webview/store.ts` devuelve ≥ 1
-- [ ] Seam dispatcher: `grep -c '"open_file"' src/extension.ts` devuelve ≥ 1 y `grep -c '"project_map_shot"' src/extension.ts` devuelve ≥ 1
-- [ ] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
-- [ ] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
+- [x] Typecheck limpio (host + webview): `npm run typecheck`
+- [x] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
+- [x] Seam reducer completo: `grep -c '"project_map_shot"' webview/store.ts` devuelve ≥ 1
+- [x] Seam dispatcher: `grep -c '"open_file"' src/extension.ts` devuelve ≥ 1 y `grep -c '"project_map_shot"' src/extension.ts` devuelve ≥ 1
+- [x] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
+- [x] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
 
 #### Manual Verification
 

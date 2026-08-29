@@ -128,4 +128,26 @@ describe("webview store · project_map_state/project_map_shot llegan al reducer"
 			reason: "missing",
 		});
 	});
+
+	// ══ Fase 2: cache del shot on-demand (merge, no replace) ══
+	it("project_map_shot cachea el data-URI (merge, sin perder functional)", () => {
+		const s0 = reduce(initialState, {
+			type: "project_map_state",
+			state: { functional: { status: "loading" }, busy: "functional" },
+		});
+		const s1 = reduce(s0, {
+			type: "project_map_shot",
+			screenId: "P02",
+			dataUri: "data:image/png;base64,AAA",
+		});
+		expect(s1.projectMap?.functional?.status).toBe("loading"); // conservado
+		expect(s1.projectMap?.shots?.["P02"]).toBe("data:image/png;base64,AAA");
+		const s2 = reduce(s1, {
+			type: "project_map_shot",
+			screenId: "P03",
+			dataUri: "",
+		});
+		expect(s2.projectMap?.shots?.["P02"]).toBeDefined(); // merge
+		expect(s2.projectMap?.shots?.["P03"]).toBe("");
+	});
 });

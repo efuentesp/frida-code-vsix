@@ -619,6 +619,22 @@ export function reduce(state: State, msg: InMessage): State {
 				projectMap: { ...msg.state, shots: state.projectMap?.shots },
 			};
 
+		// M2 (#143) — shot on-demand del mapa (molde codebase_index_files #112:
+		// consulta read-only separada del estado). Merge — no replace — para no
+		// perder los ya cacheados ni el functional; #126: el mensaje DEBE caer al
+		// dispatch general.
+		case "project_map_shot":
+			return {
+				...state,
+				projectMap: {
+					...state.projectMap,
+					shots: {
+						...(state.projectMap?.shots ?? {}),
+						[msg.screenId]: msg.dataUri,
+					},
+				},
+			};
+
 		// #112 — lista de archivos presentes en el índice (consulta read-only).
 		case "codebase_index_files":
 			return {

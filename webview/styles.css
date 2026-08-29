@@ -11478,23 +11478,90 @@ mark.hl {
 	font-size: 10px;
 	color: var(--vscode-descriptionForeground);
 }
-/* (provisional de la lista honesta de la Fase 1: fila de chips — la Fase 2
-   sustituye los chips por el grafo SVG y deja el body en column) */
+/* ══ Fase 2: grafo SVG (.pm-canvas/.pm-graph/…) — donde estaban los chips ══ */
+.pm-canvas {
+	overflow: auto;
+	max-height: 56vh;
+	border: 1px solid var(--vscode-panel-border);
+	border-radius: 6px;
+	background: var(--vscode-editor-background);
+}
+.pm-graph {
+	display: block;
+}
+.pm-edge {
+	fill: none;
+	stroke: var(--vscode-textLink-foreground, #4daafc);
+	stroke-width: 1.4;
+}
+.pm-arrow {
+	fill: var(--vscode-textLink-foreground, #4daafc);
+}
+.pm-node.is-clickable {
+	cursor: pointer;
+}
+.pm-node:focus {
+	outline: none;
+}
+.pm-node:focus .pm-node-box,
+.pm-node.is-clickable:hover .pm-node-box {
+	stroke: var(--vscode-focusBorder, #007fd4);
+	stroke-width: 2;
+}
+.pm-node-box {
+	fill: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.08));
+	stroke: var(--vscode-panel-border);
+}
+.pm-node-box.is-danger {
+	stroke: var(--vscode-testing-iconFailed, #f85149);
+}
+.pm-node-id {
+	font-size: 9px;
+	font-weight: 700;
+	fill: var(--vscode-descriptionForeground);
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+.pm-node-title {
+	font-size: 10.5px;
+	fill: var(--vscode-foreground);
+}
+.pm-col-title {
+	font-size: 10px;
+	font-weight: 600;
+	fill: var(--vscode-descriptionForeground);
+}
+.pm-shot-pending {
+	fill: none;
+	stroke: var(--vscode-panel-border);
+	stroke-dasharray: 3 3;
+}
+.pm-shot-missing {
+	fill: rgba(127, 127, 127, 0.06);
+	stroke: var(--vscode-panel-border);
+}
+.pm-shot-label {
+	font-size: 9px;
+	fill: var(--vscode-descriptionForeground);
+}
+.pm-fails {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding-top: 4px;
+}
+.pm-fail-row {
+	font-size: 10.5px;
+	color: var(--vscode-editorWarning-foreground, #cca700);
+	display: flex;
+	gap: 4px;
+	align-items: flex-start;
+}
+/* (forma final del fence del diseño — el grafo se apila verticalmente) */
 .pm-journey-body {
 	padding: 6px 8px;
 	display: flex;
-	flex-direction: row;
-	flex-wrap: wrap;
+	flex-direction: column;
 	gap: 4px;
-}
-.pm-screen-chip {
-	font-size: 10px;
-	font-family: var(--vscode-editor-font-family, monospace);
-	padding: 1px 6px;
-	border-radius: 8px;
-	border: 1px solid var(--vscode-panel-border);
-	color: var(--vscode-foreground);
-	background: transparent;
 }
 .pm-expand-all {
 	font-size: 10px;
@@ -11521,7 +11588,10 @@ mark.hl {
 	align-items: flex-start;
 }
 @media (prefers-reduced-motion: reduce) {
-	.pm-journey-head {
+	.pm-journey-head,
+	.pm-node,
+	.pm-node-box,
+	.pm-edge {
 		transition: none !important;
 	}
 }

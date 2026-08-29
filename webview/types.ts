@@ -634,8 +634,7 @@ export interface ProjectMapUiState {
 	busySince?: number | null;
 	/** Cache de screenshots on-demand (data-URI por screenId). Lo llena el
 	 *  reducer con project_map_shot (In) — el host NUNCA lo manda en
-	 *  project_map_state; "" = respondido sin captura. (Campo adelantado de
-	 *  la Fase 2: el reducer de la Fase 1 ya hace merge de shots.) */
+	 *  project_map_state; "" = respondido sin captura. */
 	shots?: Record<string, string>;
 }
 
@@ -1104,6 +1103,14 @@ export type InMessage =
 	// M2 (#143) — estado del tab Mapa del proyecto (lib src/project-map/* del
 	// host; espejo UI en types.ts). #126: el mensaje DEBE caer al dispatch.
 	| { type: "project_map_state"; state: ProjectMapUiState }
+	// M2 (#143) Fase 2 — respuesta del shot on-demand (molde
+	// codebase_index_files #112: consulta read-only separada del estado).
+	| {
+			type: "project_map_shot";
+			screenId: string;
+			/** "" = sin captura (definitivo para la UI). */
+			dataUri: string;
+	  }
 	| {
 			type: "codebase_index_ping_result";
 			provider: string;
@@ -1292,6 +1299,10 @@ export type OutMessage =
 	// M2 (#143) — carga/refresh del mapa del proyecto (Fase 1: Funcional;
 	// la vista Técnica llega en Fase 3).
 	| { type: "project_map"; view: "functional" | "technical"; limit?: number }
+	// M2 (#143) Fase 2 — petición de shot on-demand + apertura de evidencia
+	// (FR-6).
+	| { type: "project_map_shot"; screenId: string }
+	| { type: "open_file"; file: string; line?: number }
 	| {
 			/** #121 (F7) — la UI cambia la config de roles; el host persiste en
 			 *  settings y re-publica el estado de modelos. */

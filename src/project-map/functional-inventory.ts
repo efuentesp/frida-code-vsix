@@ -171,3 +171,41 @@ export function loadFunctionalMap(cwd: string): FunctionalLoadResult {
 		loadedAt: Date.now(),
 	};
 }
+
+// ══ Fase 2: guard de contención + lector de PNGs como data-URI ══
+
+/** Guard de contención (molde safeJoin de frida-pipeline/agents-sync.ts:89-94,
+ *  función PRIVADA ahí — patrón re-implementado, no importado): resolve
+ *  (root, rel) que NO escapa de root. null si el path sale del cwd. */
+export function safeResolveWithin(cwd: string, rel: string): string | null {
+	const resolved = path.resolve(cwd, rel);
+	const root = path.resolve(cwd) + path.sep;
+	return resolved.startsWith(root) ? resolved : null;
+}
+
+const IMG_MIME: Record<string, string> = {
+	png: "image/png",
+	jpg: "image/jpeg",
+	jpeg: "image/jpeg",
+	gif: "image/gif",
+	webp: "image/webp",
+	bmp: "image/bmp",
+};
+
+/** Lee una captura del workspace como data-URI (CSP img-src data: ya lo
+ *  permite — webview-html-core.ts:17, probado en Turn.tsx:76). "" ante
+ *  cualquier fallo: escape del cwd, extensión no-imagen, ausente, o >4 MB
+ *  (techo anti-postMessage: base64 infla +33%). */
+export function readScreenshotDataUri(cwd: string, rel: string): string {
+	const abs = safeResolveWithin(cwd, rel);
+	if (!abs) return "";
+	const mime = IMG_MIME[path.extname(abs).slice(1).toLowerCase()];
+	if (!mime) return "";
+	try {
+		const st = fs.statSync(abs);
+		if (!st.isFile() || st.size > 4 * 1024 * 1024) return "";
+		return `data:${mime};base64,${fs.readFileSync(abs).toString("base64")}`;
+	} catch {
+		return "";
+	}
+}
