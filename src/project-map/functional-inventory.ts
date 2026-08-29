@@ -16,6 +16,9 @@ import { deriveJourneys, type PmJourney, type PmAction } from "./journeys";
 // ══ Fase 3: fusión — estado técnico del tab (tipos del seam pi-lens; sin
 //    ciclo: lens-project-report NO importa de functional-inventory) ══
 import type { PmTechnicalState } from "./lens-project-report";
+// ══ Fase 4: fusión — estado del cruce (tipos del seam M9; sin ciclo:
+//    matrix-cross NO importa de functional-inventory) ══
+import type { PmCrossState } from "./matrix-cross";
 
 /** Pantalla M8 normalizada para la UI (paths relativos al cwd de la corrida). */
 export interface PmScreen {
@@ -61,6 +64,8 @@ export interface ProjectMapHostState {
 	busy?: "functional" | "technical" | null;
 	/** Epoch ms del inicio de la acción (#111): sobrevive re-montes del tab. */
 	busySince?: number | null;
+	// ══ Fase 4: cruce técnico↔funcional (matriz M9) ══
+	cross?: PmCrossState;
 }
 
 export type FunctionalLoadResult = PmFunctionalState;

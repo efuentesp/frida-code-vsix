@@ -683,6 +683,26 @@ export type PmTechnicalState =
 	  }
 	| { status: "ready"; data: PmTechnicalData; loadedAt: number; limit: number };
 
+// ══ Fase 4: espejo del cruce técnico↔funcional (productor
+//    src/project-map/matrix-cross.ts — builds separados) ══
+export interface PmCrossEntry {
+	id: string;
+	functionality: string;
+	screenIds: string[];
+	modules: string[];
+	endpointCount: number;
+}
+export interface PmCrossData {
+	entries: PmCrossEntry[];
+	byScreen: Record<string, { entryId: string; module: string }[]>;
+	byDirectory: Record<string, string[]>;
+	danglingScreens: string[];
+	unmatchedModules: string[];
+}
+export type PmCrossState =
+	| { status: "omitted"; reason: "missing" | "corrupt"; hint: string }
+	| { status: "ready"; data: PmCrossData; loadedAt: number };
+
 /** Estado del tab Mapa publicado por el host (la vista activa NO vive aquí:
  *  es estado local del componente, análogo period/scope de ProductivityTab). */
 export interface ProjectMapUiState {
@@ -693,6 +713,8 @@ export interface ProjectMapUiState {
 	busy?: "functional" | "technical" | null;
 	/** Epoch ms del inicio de la acción (#111): sobrevive re-montes. */
 	busySince?: number | null;
+	// ══ Fase 4: cruce técnico↔funcional (matriz M9) ══
+	cross?: PmCrossState;
 	/** Cache de screenshots on-demand (data-URI por screenId). Lo llena el
 	 *  reducer con project_map_shot (In) — el host NUNCA lo manda en
 	 *  project_map_state; "" = respondido sin captura. */

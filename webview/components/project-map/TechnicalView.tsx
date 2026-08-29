@@ -1,4 +1,4 @@
-import type { OutMessage, PmTechnicalState } from "../../types";
+import type { OutMessage, PmCrossState, PmTechnicalState } from "../../types";
 import { Codicon } from "../Codicon";
 import { GraphCanvas, type GraphColumn, type GraphEdge } from "./GraphCanvas";
 
@@ -80,10 +80,14 @@ export function TechnicalView({
 	tech,
 	busy,
 	post,
+	cross,
 }: {
 	tech: PmTechnicalState | undefined;
 	busy: boolean;
 	post: (m: OutMessage) => void;
+	/** ══ Fase 4: cruce técnico↔funcional (matriz M9) — opcional para no
+	 *  romper consumers sin cruce (tests de la fase anterior). */
+	cross?: PmCrossState;
 }) {
 	const currentLimit = tech?.status === "ready" ? tech.limit : undefined;
 
@@ -207,6 +211,33 @@ export function TechnicalView({
 							</span>
 						</div>
 					))}
+				</div>
+			)}
+			{/* ══ Fase 4: cruce funcional — pantallas cubiertas por directorio
+			    (cap coherente con el límite del grafo) + módulos fuera ══ */}
+			{cross?.status === "ready" &&
+				Object.keys(cross.data.byDirectory).length > 0 && (
+					<section className="pm-list">
+						<h4 className="pm-list-title">
+							<Codicon name="link" size={12} /> Cruce funcional (M9)
+						</h4>
+						{Object.entries(cross.data.byDirectory)
+							.slice(0, tech.limit)
+							.map(([dir, sids]) => (
+								<div key={dir} className="pm-cross-dir">
+									<span className="pm-row-main">{dir}</span>
+									<span className="pm-row-meta">{sids.join(" · ")}</span>
+								</div>
+							))}
+					</section>
+			)}
+			{cross?.status === "ready" && cross.data.unmatchedModules.length > 0 && (
+				<div className="pm-note">
+					<Codicon name="warning" size={11} />
+					<span>
+						{cross.data.unmatchedModules.length} módulo(s) de la matriz fuera de
+						los subsystems del grafo.
+					</span>
 				</div>
 			)}
 			{tech.data.hubs.length > 0 && (

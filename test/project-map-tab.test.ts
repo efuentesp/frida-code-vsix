@@ -10,6 +10,7 @@ import { ProjectMapTab } from "../webview/components/ProjectMapTab";
 import { FunctionalView } from "../webview/components/project-map/FunctionalView";
 import { TechnicalView } from "../webview/components/project-map/TechnicalView";
 import type {
+	PmCrossState,
 	PmFunctionalData,
 	PmTechnicalState,
 	State,
@@ -151,6 +152,7 @@ function renderFn(
 	data: PmFunctionalData,
 	shots: Record<string, string>,
 	open: string[],
+	cross?: PmCrossState,
 ): string {
 	return renderToStaticMarkup(
 		React.createElement(FunctionalView, {
@@ -161,6 +163,7 @@ function renderFn(
 			onToggle: () => {},
 			onToggleAll: () => {},
 			post: vi.fn(),
+			cross,
 		}),
 	);
 }
@@ -238,12 +241,16 @@ const techReady: PmTechnicalState = {
 	},
 };
 
-function renderTech(tech: PmTechnicalState | undefined): string {
+function renderTech(
+	tech: PmTechnicalState | undefined,
+	cross?: PmCrossState,
+): string {
 	return renderToStaticMarkup(
 		React.createElement(TechnicalView, {
 			tech,
 			busy: false,
 			post: vi.fn(),
+			cross,
 		}),
 	);
 }
@@ -301,5 +308,89 @@ describe("TechnicalView · estados (slice 3)", () => {
 		expect(html).toContain("cobertura 90%");
 		expect(html).toContain("sin importadores conocidos");
 		expect(html).toContain("pm-node-box is-danger"); // dir "src" hospeda hotspot
+	});
+});
+
+// ══ Fase 4: cruce técnico↔funcional en ambas vistas ══
+
+const crossReady: PmCrossState = {
+	status: "ready",
+	loadedAt: 1,
+	data: {
+		entries: [
+			{
+				id: "M01",
+				functionality: "inicio de sesión",
+				screenIds: ["P01", "P02"],
+				modules: ["src/auth.js"],
+				endpointCount: 1,
+			},
+		],
+		byScreen: { P01: [{ entryId: "M01", module: "src/auth.js" }] },
+		byDirectory: { src: ["P01", "P02"] },
+		danglingScreens: [],
+		unmatchedModules: [],
+	},
+};
+
+describe("FunctionalView · cruce M9 (slice 4)", () => {
+	it("journey abierto con cruce → chips de módulo (open_file al clic)", () => {
+		const html = renderFn(fnData, {}, ["J01"], crossReady);
+		expect(html).toContain("pm-cross-chip");
+		expect(html).toContain("src/auth.js");
+	});
+
+	it("omitted → nota de omisión FR-7, sin chips ni error", () => {
+		const html = renderFn(fnData, {}, ["J01"], {
+			status: "omitted",
+			reason: "missing",
+			hint:
+				"Sin matriz M9 — corre el patrón traffic2api (M9) para generar docs/api/ y enlazar pantallas↔módulos",
+		});
+		expect(html).toContain("traffic2api (M9)");
+		expect(html).not.toContain("pm-cross-chip");
+	});
+
+	it("pantallas colgantes → nota de matriz stale", () => {
+		const html = renderFn(fnData, {}, ["J01"], {
+			status: "ready",
+			loadedAt: 1,
+			data: {
+				...crossReady.data,
+				byScreen: {},
+				danglingScreens: ["P09"],
+			},
+		});
+		expect(html).toContain("no registrada");
+	});
+
+	it("sin cruce (undefined) → sin sección ni nota (retro-compatible)", () => {
+		const html = renderFn(fnData, {}, ["J01"]);
+		expect(html).not.toContain("pm-cross");
+	});
+});
+
+describe("TechnicalView · cruce M9 (slice 4)", () => {
+	it("ready + cross → sección Cruce funcional con pantallas por directorio", () => {
+		const html = renderTech(techReady, crossReady);
+		expect(html).toContain("Cruce funcional (M9)");
+		expect(html).toContain("P01 · P02");
+	});
+
+	it("unmatched → nota de módulos fuera del grafo", () => {
+		const html = renderTech(techReady, {
+			status: "ready",
+			loadedAt: 1,
+			data: {
+				...crossReady.data,
+				byDirectory: {},
+				unmatchedModules: ["vendor/x.js"],
+			},
+		});
+		expect(html).toContain("fuera de los subsystems");
+	});
+
+	it("sin cross → sin sección (retro-compatible)", () => {
+		expect(renderTech(techReady, undefined)).not.toContain("Cruce funcional");
 	});
 });

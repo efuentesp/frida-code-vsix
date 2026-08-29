@@ -20,6 +20,11 @@ import {
 	loadTechnicalMap,
 	TECH_POLL_DELAYS_MS,
 } from "../src/project-map/lens-project-report";
+import {
+	CROSS_MISSING_HINT,
+	loadCrossMap,
+	normalizeModulePath,
+} from "../src/project-map/matrix-cross";
 
 // Timeline canónico del ejemplo de design (corte por goto):
 //   J01: abre en paso 1 · traversed P01→P02 (form, paso 2) · traversed
@@ -501,5 +506,263 @@ describe("lens-project-report · seam pi-lens (mock honesto del contrato)", () =
 		} finally {
 			warn.mockRestore();
 		}
+	});
+});
+
+// ══ Fase 4: cruce técnico↔funcional — fixtures honestos del schema
+//    MATRIX_SCHEMA del writer (traffic2api/workflow.ts:605, 1266-1276) ══
+
+function makeApiCwd(inv?: unknown): string {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "frida-pm-x-"));
+	tmpDirs.push(dir);
+	if (inv !== undefined) {
+		fs.mkdirSync(path.join(dir, "docs/api/artifacts"), { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, "docs/api/artifacts/inventory.json"),
+			typeof inv === "string" ? inv : JSON.stringify(inv),
+		);
+	}
+	return dir;
+}
+
+const MATRIX_INV = {
+	matrix: [
+		{
+			id: "M01",
+			functionality: "inicio de sesión",
+			screenIds: ["P01", "P02"],
+			endpoints: [{ id: "E01", method: "POST", path: "/login" }],
+			modules: [
+				{ path: "./src/auth.js", evidence: "route POST /login" },
+				{ path: "webview\\login-form.tsx", evidence: "form creds" },
+			],
+			evidence: "walk step 2",
+		},
+		{
+			// sin id — el normalizador asigna M02 por orden (defense del writer)
+			functionality: "administración de usuarios",
+			screenIds: ["P04", "P99"],
+			endpoints: [{ id: "", method: "GET", path: "/users" }],
+			modules: [
+				{ path: "src/admin/users.ts", evidence: "handler" },
+				{ path: "server.js", evidence: "bootstrap" },
+			],
+			evidence: "",
+		},
+	],
+	orphans: { apiSinUi: [], uiSinCodigo: [] },
+	deadZone: [],
+	summary: "fixture honesto",
+};
+
+const KNOWN_SCREENS = ["P01", "P02", "P03", "P04"];
+const DIRS = ["src", "webview", "(root)"];
+
+describe("matrix-cross · normalización de módulos (paths LLM)", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("strip ./ y backslashes → cwd-relativa POSIX", () => {
+		expect(normalizeModulePath("/x", "./src/a.ts")).toBe("src/a.ts");
+		expect(normalizeModulePath("/x", "webview\\b.tsx")).toBe("webview/b.tsx");
+	});
+
+	it('absoluto bajo el cwd → relativiza; fuera o vacío → ""', () => {
+		const cwd = makeCwd();
+		expect(normalizeModulePath(cwd, path.resolve(cwd, "src/a.ts"))).toBe(
+			"src/a.ts",
+		);
+		expect(normalizeModulePath(cwd, "/fuera/de/aqui.ts")).toBe("");
+		expect(normalizeModulePath(cwd, "")).toBe("");
+	});
+});
+
+describe("matrix-cross · degradación digna (FR-7)", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("sin docs/api → omitted/missing con workaround M9", () => {
+		const r = loadCrossMap(makeApiCwd(), KNOWN_SCREENS, DIRS);
+		expect(r.status).toBe("omitted");
+		if (r.status === "omitted") {
+			expect(r.reason).toBe("missing");
+			expect(r.hint).toBe(CROSS_MISSING_HINT);
+			expect(r.hint).toContain("traffic2api (M9)");
+		}
+	});
+
+	it("JSON corrupto → omitted/corrupt, sin throw", () => {
+		const r = loadCrossMap(makeApiCwd("{no-json"), KNOWN_SCREENS, DIRS);
+		expect(r.status).toBe("omitted");
+		if (r.status === "omitted") expect(r.reason).toBe("corrupt");
+	});
+
+	it("sin matrix[] → omitted/corrupt (canon de forma)", () => {
+		const r = loadCrossMap(
+			makeApiCwd({ orphans: MATRIX_INV.orphans, deadZone: [], summary: "x" }),
+			KNOWN_SCREENS,
+			DIRS,
+		);
+		expect(r.status).toBe("omitted");
+		if (r.status === "omitted") expect(r.reason).toBe("corrupt");
+	});
+});
+
+describe("matrix-cross · joins pantalla↔módulo↔subsystem", () => {
+	afterEach(() => {
+		for (const d of tmpDirs.splice(0))
+			fs.rmSync(d, { recursive: true, force: true });
+	});
+
+	it("join funcional + ids normalizados por orden + dangling", () => {
+		const r = loadCrossMap(makeApiCwd(MATRIX_INV), KNOWN_SCREENS, DIRS);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.entries.map((x) => x.id)).toEqual(["M01", "M02"]);
+		expect(r.data.entries[0]?.modules).toEqual([
+			"src/auth.js",
+			"webview/login-form.tsx",
+		]);
+		expect(r.data.entries[0]?.endpointCount).toBe(1);
+		expect(r.data.byScreen["P01"]?.map((l) => l.module)).toEqual([
+			"src/auth.js",
+			"webview/login-form.tsx",
+		]);
+		expect(r.data.byScreen["P04"]?.map((l) => l.module)).toEqual([
+			"src/admin/users.ts",
+			"server.js",
+		]);
+		expect(r.data.byScreen["P99"]).toBeUndefined();
+		expect(r.data.danglingScreens).toEqual(["P99"]);
+	});
+
+	it("join técnico por prefijo de segmentos completos + (root)", () => {
+		const r = loadCrossMap(makeApiCwd(MATRIX_INV), KNOWN_SCREENS, DIRS);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byDirectory["src"]).toEqual(["P01", "P02", "P04"]);
+		expect(r.data.byDirectory["webview"]).toEqual(["P01", "P02"]);
+		expect(r.data.byDirectory["(root)"]).toEqual(["P04"]); // server.js raíz
+		expect(r.data.unmatchedModules).toEqual([]);
+	});
+
+	it("srca NO matchea src; módulo fuera → unmatched", () => {
+		const r = loadCrossMap(
+			makeApiCwd({
+				matrix: [
+					{
+						id: "M01",
+						functionality: "f",
+						screenIds: ["P01"],
+						endpoints: [],
+						modules: [{ path: "srca/x.js" }],
+					},
+				],
+				orphans: MATRIX_INV.orphans,
+				deadZone: [],
+				summary: "",
+			}),
+			KNOWN_SCREENS,
+			["src"],
+		);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byDirectory).toEqual({});
+		expect(r.data.unmatchedModules).toEqual(["srca/x.js"]);
+	});
+
+	it("directorio citado tal cual (sin extensión) matchea su subsystem", () => {
+		const r = loadCrossMap(
+			makeApiCwd({
+				matrix: [
+					{
+						id: "M01",
+						functionality: "f",
+						screenIds: ["P01"],
+						endpoints: [],
+						modules: [{ path: "src" }],
+					},
+				],
+				orphans: MATRIX_INV.orphans,
+				deadZone: [],
+				summary: "",
+			}),
+			KNOWN_SCREENS,
+			["src", "(root)"],
+		);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byDirectory["src"]).toEqual(["P01"]);
+	});
+
+	it("módulo cuenta en TODOS los dirs ancestro presentes", () => {
+		const r = loadCrossMap(
+			makeApiCwd({
+				matrix: [
+					{
+						id: "M01",
+						functionality: "f",
+						screenIds: ["P01"],
+						endpoints: [],
+						modules: [{ path: "src/admin/users.ts" }],
+					},
+				],
+				orphans: MATRIX_INV.orphans,
+				deadZone: [],
+				summary: "",
+			}),
+			KNOWN_SCREENS,
+			["src", "src/admin"],
+		);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byDirectory["src"]).toEqual(["P01"]);
+		expect(r.data.byDirectory["src/admin"]).toEqual(["P01"]);
+	});
+
+	it("sin Técnica (dirs=[]) el cruce por pantalla funciona igual", () => {
+		const r = loadCrossMap(makeApiCwd(MATRIX_INV), KNOWN_SCREENS, []);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byDirectory).toEqual({});
+		expect(r.data.unmatchedModules).toEqual([]); // sin referencia no hay "fuera de"
+		expect(r.data.byScreen["P01"]?.length).toBe(2);
+	});
+
+	it("dedup: mismo módulo en dos entradas para la misma pantalla → un link", () => {
+		const r = loadCrossMap(
+			makeApiCwd({
+				matrix: [
+					{
+						id: "M01",
+						functionality: "a",
+						screenIds: ["P01"],
+						endpoints: [],
+						modules: [{ path: "src/a.ts" }],
+					},
+					{
+						id: "M02",
+						functionality: "b",
+						screenIds: ["P01"],
+						endpoints: [],
+						modules: [{ path: "./src/a.ts" }],
+					},
+				],
+				orphans: MATRIX_INV.orphans,
+				deadZone: [],
+				summary: "",
+			}),
+			KNOWN_SCREENS,
+			["src"],
+		);
+		expect(r.status).toBe("ready");
+		if (r.status !== "ready") return;
+		expect(r.data.byScreen["P01"]).toEqual([
+			{ entryId: "M01", module: "src/a.ts" },
+		]);
 	});
 });

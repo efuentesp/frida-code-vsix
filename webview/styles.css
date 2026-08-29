@@ -11661,6 +11661,51 @@ mark.hl {
 	align-items: center;
 	padding: 2px 0;
 }
+/* ══ Fase 4: cruce técnico↔funcional (.pm-cross*) ══ */
+.pm-cross {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding-top: 4px;
+}
+.pm-cross-row {
+	display: flex;
+	gap: 6px;
+	align-items: baseline;
+	flex-wrap: wrap;
+	font-size: 10.5px;
+}
+.pm-cross-screen {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-weight: 700;
+	color: var(--vscode-descriptionForeground);
+}
+.pm-cross-chip {
+	font-size: 10px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	padding: 0 6px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	background: transparent;
+	color: var(--vscode-textLink-foreground, #4daafc);
+	cursor: pointer;
+}
+.pm-cross-chip:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.pm-cross-chip:focus {
+	outline: 1px solid var(--vscode-focusBorder, #007fd4);
+}
+.pm-cross-note {
+	padding-top: 2px;
+}
+.pm-cross-dir {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	align-items: baseline;
+	padding: 2px 6px;
+}
 @media (prefers-reduced-motion: reduce) {
 	.pm-journey-head,
 	.pm-node,

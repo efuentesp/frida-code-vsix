@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type {
 	OutMessage,
+	PmCrossData,
+	PmCrossState,
 	PmFunctionalData,
 	PmJourney,
 	PmScreen,
@@ -67,6 +69,17 @@ function columnsOf(
 	};
 }
 
+/** ══ Fase 4: filas de cruce del journey — solo pantallas con módulos
+ *  (sin ruido para journeys sin cruce). */
+function crossOfJourney(
+	j: PmJourney,
+	cross: PmCrossData,
+): { sid: string; links: { entryId: string; module: string }[] }[] {
+	return j.screenIds
+		.filter((sid) => (cross.byScreen[sid] ?? []).length > 0)
+		.map((sid) => ({ sid, links: cross.byScreen[sid] }));
+}
+
 export function FunctionalView({
 	data,
 	loadedAt,
@@ -75,6 +88,7 @@ export function FunctionalView({
 	onToggle,
 	onToggleAll,
 	post,
+	cross,
 }: {
 	data: PmFunctionalData;
 	loadedAt: number;
@@ -83,6 +97,9 @@ export function FunctionalView({
 	onToggle: (id: string) => void;
 	onToggleAll: (all: boolean) => void;
 	post: (m: OutMessage) => void;
+	/** ══ Fase 4: cruce técnico↔funcional (matriz M9) — opcional para no
+	 *  romper consumers sin cruce (tests de las fases previas). */
+	cross?: PmCrossState;
 }) {
 	const requested = useRef<Set<string>>(new Set());
 
@@ -155,6 +172,23 @@ export function FunctionalView({
 				)}
 			</div>
 			{data.runUrl && <div className="pm-meta">Recorrido de {data.runUrl}</div>}
+			{/* ══ Fase 4: notas del cruce (FR-7 omisión + matriz stale) ══ */}
+			{cross?.status === "omitted" && (
+				<div className="pm-note pm-cross-note">
+					<Codicon name="link" size={11} />
+					<span>{cross.hint}</span>
+				</div>
+			)}
+			{cross?.status === "ready" && cross.data.danglingScreens.length > 0 && (
+				<div className="pm-note pm-cross-note">
+					<Codicon name="warning" size={11} />
+					<span>
+						La matriz M9 cita {cross.data.danglingScreens.length} pantalla(s) no
+						registrada(s) en M8 ({cross.data.danglingScreens.join(", ")}) —
+						regenera M9 tras la corrida de M8.
+					</span>
+				</div>
+			)}
 			{data.journeys.length === 0 ? (
 				<div className="cfg-stub">
 					Sin journeys derivables del actionLog
@@ -198,12 +232,38 @@ export function FunctionalView({
 									{fails.length > 0 && (
 										<div className="pm-fails">
 											{fails.map((e) => (
-												<div key={e.step} className="pm-fail-row" title={e.detail}>
-													<Codicon name="warning" size={11} />
-													<span>
-														#{e.step} {e.description || e.kind} —{" "}
-														{CAUSE_LABEL[e.cause ?? ""] ?? e.cause ?? "fallo"}
-													</span>
+											<div key={e.step} className="pm-fail-row" title={e.detail}>
+												<Codicon name="warning" size={11} />
+												<span>
+													#{e.step} {e.description || e.kind} —{" "}
+													{CAUSE_LABEL[e.cause ?? ""] ?? e.cause ?? "fallo"}
+												</span>
+											</div>
+										))}
+									</div>
+								)}
+								{/* ══ Fase 4: chips de módulo (open_file) para las pantallas del
+								    journey con cruce M9 ══ */}
+								{cross?.status === "ready" &&
+									crossOfJourney(j, cross.data).length > 0 && (
+										<div className="pm-cross">
+											{crossOfJourney(j, cross.data).map(({ sid, links }) => (
+												<div key={sid} className="pm-cross-row">
+													<span className="pm-cross-screen">{sid}</span>
+													<span>→</span>
+													{links.map((l) => (
+														<button
+															key={l.entryId + l.module}
+															type="button"
+															className="pm-cross-chip"
+															title={`implementa ${sid} (${l.entryId})`}
+															onClick={() =>
+																post({ type: "open_file", file: l.module })
+															}
+														>
+															{l.module}
+														</button>
+													))}
 												</div>
 											))}
 										</div>

@@ -245,6 +245,8 @@ import {
 	loadTechnicalMap,
 	TECH_POLL_DELAYS_MS,
 } from "./project-map/lens-project-report";
+// ══ Fase 4: cruce técnico↔funcional (matriz M9) ══
+import { loadCrossMap } from "./project-map/matrix-cross";
 
 const execFileP = promisify(execFile);
 
@@ -705,6 +707,7 @@ export async function activate(
 					// sin esto el narrowing deja `loading|building` y st.hint no existe).
 					if (st.status !== "building") {
 						pmState = { ...pmState, technical: st, busy: null, busySince: null };
+						refreshPmCross(); // ══ Fase 4: dirs disponibles → join técnico ══
 						postProjectMapState();
 						return;
 					}
@@ -740,6 +743,26 @@ export async function activate(
 				postProjectMapState();
 			}
 		})();
+	}
+
+	// ══ Fase 4: cruce técnico↔funcional (matriz M9) ══
+	// Se recalcula con los insumos disponibles en cada completion: pantallas
+	// M8 al terminar la carga funcional, subsystems al terminar la técnica.
+	// Lectura síncrona barata (un JSON) — sin busy propio; viaja en el
+	// SIEMPRE-posteado project_map_state. Sin Técnica cargada el join por
+	// directorio queda vacío y el cruce por pantalla funciona igual (FR-8
+	// antes de abrir Técnica).
+	function refreshPmCross(): void {
+		const fn = pmState.functional;
+		const tech = pmState.technical;
+		pmState = {
+			...pmState,
+			cross: loadCrossMap(
+				workspaceCwd(),
+				fn?.status === "ready" ? fn.data.screens.map((s) => s.id) : [],
+				tech?.status === "ready" ? tech.data.subsystems.directories : [],
+			),
+		};
 	}
 
 	/** #114 — Refresca la metadata de embeddings del índice (read-only) y la
@@ -3571,6 +3594,7 @@ export async function activate(
 						busySince: null,
 					};
 				}
+				refreshPmCross(); // ══ Fase 4: pantallas disponibles → join funcional ══
 				postProjectMapState();
 				break;
 			}

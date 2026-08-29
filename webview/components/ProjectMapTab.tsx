@@ -33,6 +33,8 @@ export function ProjectMapTab({
 	// Spinner solo de la vista activa (busy del host #111).
 	const busy = state.projectMap?.busy === view;
 	const shots = state.projectMap?.shots ?? {};
+	// ══ Fase 4: cruce técnico↔funcional (matriz M9) — se pasa a ambas vistas ══
+	const cross = state.projectMap?.cross;
 
 	// FR-10: carga al abrir + refresh manual (re-enviar el mismo mensaje). El
 	// switch de vista también dispara la carga de esa vista (mismo efecto);
@@ -118,10 +120,11 @@ export function ProjectMapTab({
 						onToggle={toggleOpen}
 						onToggleAll={toggleAll}
 						post={post}
+						cross={cross}
 					/>
 				)
 			) : (
-				<TechnicalView tech={tech} busy={busy} post={post} />
+				<TechnicalView tech={tech} busy={busy} post={post} cross={cross} />
 			)}
 		</div>
 	);

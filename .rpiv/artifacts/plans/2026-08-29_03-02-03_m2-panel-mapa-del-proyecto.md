@@ -4707,14 +4707,14 @@ describe("TechnicalView · cruce M9 (slice 4)", () => {
 
 #### Automated Verification
 
-- [ ] Typecheck limpio (host + webview): `npm run typecheck`
-- [ ] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
-- [ ] Cruce cableado en el host: `grep -c 'loadCrossMap' src/extension.ts` devuelve ≥ 2 (import + refreshPmCross) y `grep -c 'refreshPmCross' src/extension.ts` devuelve ≥ 3 (definición + carga funcional + técnica lista)
-- [ ] Cruce en ambas vistas: `grep -c 'cross' webview/components/project-map/FunctionalView.tsx` devuelve ≥ 3 y `grep -c 'cross' webview/components/project-map/TechnicalView.tsx` devuelve ≥ 3
-- [ ] Espejo de tipos del cruce: `grep -c 'PmCrossState' webview/types.ts` devuelve ≥ 2
-- [ ] Join por prefijo de segmentos congelado por test: los casos "srca NO matchea src", "módulo raíz → (root)" y "directorio citado tal cual" del describe matrix-cross en verde
-- [ ] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
-- [ ] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
+- [x] Typecheck limpio (host + webview): `npm run typecheck`
+- [x] Tests del slice en verde: `npx vitest run test/project-map-lib.test.ts test/project-map-tab.test.ts test/webview-store.test.ts`
+- [x] Cruce cableado en el host: `grep -c 'loadCrossMap' src/extension.ts` devuelve ≥ 2 (import + refreshPmCross) y `grep -c 'refreshPmCross' src/extension.ts` devuelve ≥ 3 (definición + carga funcional + técnica lista)
+- [x] Cruce en ambas vistas: `grep -c 'cross' webview/components/project-map/FunctionalView.tsx` devuelve ≥ 3 y `grep -c 'cross' webview/components/project-map/TechnicalView.tsx` devuelve ≥ 3
+- [x] Espejo de tipos del cruce: `grep -c 'PmCrossState' webview/types.ts` devuelve ≥ 2
+- [x] Join por prefijo de segmentos congelado por test: los casos "srca NO matchea src", "módulo raíz → (root)" y "directorio citado tal cual" del describe matrix-cross en verde
+- [x] Bundle en el MISMO commit que la fuente: `npm run build:webview` + `npx vitest run test/dist-bundle-integrity.test.ts` en verde
+- [x] Motor congelado: `git diff --stat src/tools/frida-extensible-workflows/core/` vacío
 
 #### Manual Verification
 
