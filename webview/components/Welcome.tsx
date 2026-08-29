@@ -67,7 +67,7 @@ const STARTER_CARDS: StarterCard[] = [
 			"Produce el entendimiento técnico del repo con evidencia: 7 preguntas del día 1, riesgos y modelo LikeC4.",
 		iconName: "remote-explorer",
 		prompt: "/understand",
-		actionType: "insert",
+		actionType: "submit",
 	},
 	{
 		id: "size",
@@ -76,7 +76,7 @@ const STARTER_CARDS: StarterCard[] = [
 			"KLOC, COCOMO, deuda técnica y costo con salario mensual para la conversación de preventa.",
 		iconName: "graph",
 		prompt: "/size",
-		actionType: "insert",
+		actionType: "submit",
 	},
 ];
 
