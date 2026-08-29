@@ -376,7 +376,7 @@ describe("FunctionalView · cruce M9 (slice 4)", () => {
 	});
 });
 
-	describe("TechnicalView · cruce M9 (slice 4)", () => {
+describe("TechnicalView · cruce M9 (slice 4)", () => {
 	it("ready + cross → sección Cruce funcional con pantallas por directorio", () => {
 		const html = renderTech(techReady, crossReady);
 		expect(html).toContain("Cruce funcional (M9)");
@@ -421,12 +421,7 @@ describe("serializeFunctionalExport · payload de la vista Funcional", () => {
 	});
 
 	it("pantalla SIN screenshot path → nodo compacto (sin screenId ni shot)", () => {
-		const p = serializeFunctionalExport(
-			fnData,
-			new Set(["J01"]),
-			{},
-			undefined,
-		);
+		const p = serializeFunctionalExport(fnData, new Set(["J01"]), {}, undefined);
 		const p02 = p.sections[0]?.columns[1]?.nodes[0]; // P02 no tiene screenshot
 		expect(p02?.screenId).toBeUndefined();
 		expect(p02?.shot).toBeUndefined();
@@ -439,11 +434,11 @@ describe("serializeTechnicalExport · payload de la vista Técnica", () => {
 		expect(p.view).toBe("technical");
 		expect(p.sections[0]?.columns.length).toBeGreaterThan(0);
 		expect(p.sections.some((s) => s.id === "hubs")).toBe(true);
-		expect(
-			p.sections.find((s) => s.id === "risk")?.notes.join(" "),
-		).toContain("score 1140");
-		expect(
-			p.sections.find((s) => s.id === "cross")?.notes.join(" "),
-		).toContain("P01 · P02");
+		expect(p.sections.find((s) => s.id === "risk")?.notes.join(" ")).toContain(
+			"score 1140",
+		);
+		expect(p.sections.find((s) => s.id === "cross")?.notes.join(" ")).toContain(
+			"P01 · P02",
+		);
 	});
 });

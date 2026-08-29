@@ -74,7 +74,9 @@ function asStringArray(v: unknown): string[] {
 /** Normaliza un modules[].path free-form del LLM a cwd-relativa POSIX.
  *  "" = irrecuperable (vacío, o absoluto fuera del cwd). */
 export function normalizeModulePath(cwd: string, raw: string): string {
-	let p = String(raw ?? "").trim().replace(/\\/g, "/");
+	let p = String(raw ?? "")
+		.trim()
+		.replace(/\\/g, "/");
 	if (!p) return "";
 	while (p.startsWith("./")) p = p.slice(2);
 	if (path.isAbsolute(p)) {
@@ -140,10 +142,7 @@ export function loadCrossMap(
 		const rec = (r ?? {}) as Record<string, unknown>;
 		const mods = (Array.isArray(rec.modules) ? rec.modules : [])
 			.map((m) =>
-				normalizeModulePath(
-					cwd,
-					asString((m as Record<string, unknown>)?.path),
-				),
+				normalizeModulePath(cwd, asString((m as Record<string, unknown>)?.path)),
 			)
 			.filter((p) => p !== "");
 		const modules: string[] = [];
@@ -156,9 +155,7 @@ export function loadCrossMap(
 			functionality: asString(rec.functionality),
 			screenIds,
 			modules,
-			endpointCount: Array.isArray(rec.endpoints)
-				? rec.endpoints.length
-				: 0,
+			endpointCount: Array.isArray(rec.endpoints) ? rec.endpoints.length : 0,
 		};
 	});
 

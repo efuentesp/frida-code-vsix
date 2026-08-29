@@ -239,14 +239,10 @@ export function buildExportHtml(
 	html.push("footer .note{padding:2px 0}");
 	html.push("</style></head><body>");
 	html.push(
-		"<header><h1>" +
-			escHtml(payload.title) +
-			'</h1><p id="meta"></p></header>',
+		"<header><h1>" + escHtml(payload.title) + '</h1><p id="meta"></p></header>',
 	);
 	html.push('<main id="app"></main>');
-	html.push(
-		'<footer id="foot"><div class="note" id="gen"></div></footer>',
-	);
+	html.push('<footer id="foot"><div class="note" id="gen"></div></footer>');
 	html.push("<script>var DATA = " + dataJson + ";");
 	html.push(JS_RENDERER);
 	html.push(

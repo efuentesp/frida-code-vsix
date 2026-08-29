@@ -186,8 +186,8 @@ export function FunctionalView({
 					<Codicon name="warning" size={11} />
 					<span>
 						La matriz M9 cita {cross.data.danglingScreens.length} pantalla(s) no
-						registrada(s) en M8 ({cross.data.danglingScreens.join(", ")}) —
-						regenera M9 tras la corrida de M8.
+						registrada(s) en M8 ({cross.data.danglingScreens.join(", ")}) — regenera
+						M9 tras la corrida de M8.
 					</span>
 				</div>
 			)}
@@ -234,42 +234,40 @@ export function FunctionalView({
 									{fails.length > 0 && (
 										<div className="pm-fails">
 											{fails.map((e) => (
-											<div key={e.step} className="pm-fail-row" title={e.detail}>
-												<Codicon name="warning" size={11} />
-												<span>
-													#{e.step} {e.description || e.kind} —{" "}
-													{CAUSE_LABEL[e.cause ?? ""] ?? e.cause ?? "fallo"}
-												</span>
-											</div>
-										))}
-									</div>
-								)}
-								{/* ══ Fase 4: chips de módulo (open_file) para las pantallas del
-								    journey con cruce M9 ══ */}
-								{cross?.status === "ready" &&
-									crossOfJourney(j, cross.data).length > 0 && (
-										<div className="pm-cross">
-											{crossOfJourney(j, cross.data).map(({ sid, links }) => (
-												<div key={sid} className="pm-cross-row">
-													<span className="pm-cross-screen">{sid}</span>
-													<span>→</span>
-													{links.map((l) => (
-														<button
-															key={l.entryId + l.module}
-															type="button"
-															className="pm-cross-chip"
-															title={`implementa ${sid} (${l.entryId})`}
-															onClick={() =>
-																post({ type: "open_file", file: l.module })
-															}
-														>
-															{l.module}
-														</button>
-													))}
+												<div key={e.step} className="pm-fail-row" title={e.detail}>
+													<Codicon name="warning" size={11} />
+													<span>
+														#{e.step} {e.description || e.kind} —{" "}
+														{CAUSE_LABEL[e.cause ?? ""] ?? e.cause ?? "fallo"}
+													</span>
 												</div>
 											))}
 										</div>
 									)}
+									{/* ══ Fase 4: chips de módulo (open_file) para las pantallas del
+								    journey con cruce M9 ══ */}
+									{cross?.status === "ready" &&
+										crossOfJourney(j, cross.data).length > 0 && (
+											<div className="pm-cross">
+												{crossOfJourney(j, cross.data).map(({ sid, links }) => (
+													<div key={sid} className="pm-cross-row">
+														<span className="pm-cross-screen">{sid}</span>
+														<span>→</span>
+														{links.map((l) => (
+															<button
+																key={l.entryId + l.module}
+																type="button"
+																className="pm-cross-chip"
+																title={`implementa ${sid} (${l.entryId})`}
+																onClick={() => post({ type: "open_file", file: l.module })}
+															>
+																{l.module}
+															</button>
+														))}
+													</div>
+												))}
+											</div>
+										)}
 								</div>
 							)}
 						</div>

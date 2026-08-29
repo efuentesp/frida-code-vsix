@@ -801,7 +801,7 @@ const EXPORT_FN: PmExportPayload = {
 				},
 				{
 					id: "P03",
-						nodes: [{ id: "P03", title: "Filtros", screenId: "P03", shot: "" }],
+					nodes: [{ id: "P03", title: "Filtros", screenId: "P03", shot: "" }],
 				},
 			],
 			edges: [{ from: "P01", to: "P02", label: "#2 form: creds" }],
@@ -814,7 +814,7 @@ const EXPORT_FN: PmExportPayload = {
 describe("export-html · HTML autónomo (molde M8)", () => {
 	it('escHtml escapa &<>" — nunca datos crudos en el documento', () => {
 		expect(escHtml('<b a="x">&</b>')).toBe(
-			'&lt;b a=&quot;x&quot;&gt;&amp;&lt;/b&gt;',
+			"&lt;b a=&quot;x&quot;&gt;&amp;&lt;/b&gt;",
 		);
 	});
 
@@ -826,7 +826,7 @@ describe("export-html · HTML autónomo (molde M8)", () => {
 		expect(html).toContain("createElementNS"); // render vanilla embebido
 	});
 
-	it('JSON embebido sin </ crudo (escape split del molde M8)', () => {
+	it("JSON embebido sin </ crudo (escape split del molde M8)", () => {
 		const html = buildExportHtml({
 			...EXPORT_FN,
 			title: "</script><b>x",
@@ -866,7 +866,7 @@ describe("export-html · HTML autónomo (molde M8)", () => {
 					open: false,
 					columns: [],
 					edges: [],
-						notes: ["src/extension.ts — fanIn 38 · impacto 12"],
+					notes: ["src/extension.ts — fanIn 38 · impacto 12"],
 				},
 			],
 			notes: [],

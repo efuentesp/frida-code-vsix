@@ -236,13 +236,13 @@ export function TechnicalView({
 								</div>
 							))}
 					</section>
-			)}
+				)}
 			{cross?.status === "ready" && cross.data.unmatchedModules.length > 0 && (
 				<div className="pm-note">
 					<Codicon name="warning" size={11} />
 					<span>
-						{cross.data.unmatchedModules.length} módulo(s) de la matriz fuera de
-						los subsystems del grafo.
+						{cross.data.unmatchedModules.length} módulo(s) de la matriz fuera de los
+						subsystems del grafo.
 					</span>
 				</div>
 			)}
@@ -304,7 +304,7 @@ export function TechnicalView({
 					))}
 				</section>
 			)}
-				{tech.data.deadWeight.files.length > 0 && (
+			{tech.data.deadWeight.files.length > 0 && (
 				<details className="pm-dead">
 					<summary>
 						<Codicon name="eye-closed" size={11} />

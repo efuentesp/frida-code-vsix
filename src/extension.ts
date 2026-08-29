@@ -3696,9 +3696,7 @@ export async function activate(
 								if (fn?.status !== "ready") return undefined;
 								const rel =
 									fn.data.screens.find((s) => s.id === screenId)?.screenshot ?? "";
-								return rel
-									? readScreenshotDataUri(workspaceCwd(), rel)
-									: undefined;
+								return rel ? readScreenshotDataUri(workspaceCwd(), rel) : undefined;
 							},
 						});
 						await vscode.workspace.fs.writeFile(uri, Buffer.from(html, "utf8"));
