@@ -151,3 +151,95 @@ describe("webview store · project_map_state/project_map_shot llegan al reducer"
 		expect(s2.projectMap?.shots?.["P03"]).toBe("");
 	});
 });
+
+// M3 (#144): sonar_gate_state llena state.sonar (condición de render del tab
+// Sonar y del badge) — replace plano (D4): el mensaje único lleva TODO el
+// estado; nada se llena por un segundo mensaje. #126: cae al dispatch general.
+describe("webview store · sonar_gate_state llega al reducer (replace plano)", () => {
+	const settings = { maxWarnings: 0, disabledFamilies: [], historyLimit: 500 };
+	const readyState = {
+		status: "ready" as const,
+		settings,
+		data: {
+			ts: 1750000000000,
+			verdict: "fail" as const,
+			degraded: false,
+			causes: [],
+			blocking: 1,
+			errors: 1,
+			warnings: 0,
+			effectiveWarnings: 0,
+			diff: { added: 1, resolved: 0 },
+			countsPorFamilia: { errores: 1 },
+			issues: [
+				{
+					key: "src/a.ts:42:F821",
+					path: "src/a.ts",
+					line: 42,
+					rule: "F821",
+					tool: "ruff",
+					severity: "error" as const,
+					family: "errores" as const,
+				},
+			],
+			issuesTruncated: false,
+			busTruncated: false,
+			trend: [],
+			familiesUnavailable: [],
+		},
+	};
+
+	/** Narrowing por discriminante (lección M2, webview/types.ts:585: un espejo
+	 *  plano rompe el narrowing del consumidor — TS2339): data sólo existe en "ready". */
+	function expectReady(
+		s: ReturnType<typeof reduce>,
+	): Extract<import("../webview/types").SonarUiState, { status: "ready" }> {
+		if (s.sonar?.status !== "ready")
+			throw new Error(`expected ready, got ${s.sonar?.status}`);
+		return s.sonar;
+	}
+
+	it("sonar_gate_state llena state.sonar (tab y badge leen el mismo campo)", () => {
+		const s = reduce(initialState, {
+			type: "sonar_gate_state",
+			state: readyState,
+		});
+		const sonar = expectReady(s);
+		expect(sonar.status).toBe("ready");
+		expect(sonar.data.verdict).toBe("fail");
+		expect(sonar.data.diff).toEqual({ added: 1, resolved: 0 });
+		expect(sonar.data.issues[0].key).toBe("src/a.ts:42:F821");
+		expect(s.sonar?.settings).toEqual(settings);
+	});
+
+	it("replace plano NO muta otros campos del state", () => {
+		let s = reduce(initialState, {
+			type: "lens_status",
+			loaded: true,
+			active: true,
+		});
+		s = reduce(s, {
+			type: "sonar_gate_state",
+			state: { status: "no-data", settings: { ...settings, maxWarnings: 3 } },
+		});
+		expect(s.sonar?.status).toBe("no-data");
+		// (no-data no tiene data — el narrowing de expectReady fallaría aquí a propósito)
+		expect(s.sonar?.settings.maxWarnings).toBe(3);
+		// lensStatus intacto (el panel lens existente no se toca):
+		expect(s.lensStatus).toEqual({ loaded: true, active: true });
+	});
+
+	it("un segundo sonar_gate_state REEMPLAZA al anterior (sin merge)", () => {
+		let s = reduce(initialState, {
+			type: "sonar_gate_state",
+			state: readyState,
+		});
+		s = reduce(s, {
+			type: "sonar_gate_state",
+			state: { status: "no-data", settings },
+		});
+		expect(s.sonar?.status).toBe("no-data");
+		// el ready anterior NO sobrevive (replace, no merge). Narrowing por `in`:
+		expect(s.sonar !== undefined && "data" in s.sonar).toBe(false);
+	});
+});

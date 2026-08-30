@@ -215,6 +215,7 @@ import {
 	isTodoEnabled,
 	readCodebaseIndexConfig,
 	readGatePatterns,
+	readSonarConfig,
 	readToolToggles,
 	setTelemetryOptIn,
 	writeToolToggle,
@@ -249,6 +250,29 @@ import {
 import { loadCrossMap } from "./project-map/matrix-cross";
 // ══ Fase 5: export HTML autónomo de la vista activa (FR-9) ══
 import { buildExportHtml } from "./project-map/export-html";
+// ══ M3 (#144): frida-sonar — SEAM (porción Slice 2 del fence fusionado del design) ══
+// Imports de la lib pura (Slice 1). El bloque completo aterriza AQUÍ (tsconfig
+// sin noUnusedLocals): las funciones que usan las Fases 3 y 6 ya quedan importadas.
+import {
+	anyTruncated,
+	buildTurnSnapshot,
+	flattenIssues,
+	mergeSonarPayload,
+	progressLineFromUpdate,
+	type SonarConsolidated,
+	type SonarEntry,
+	type SonarFamily,
+	type SonarIssue,
+	type SonarVerdict,
+	type TurnSnapshot,
+} from "./sonar/gate";
+import {
+	appendEntry,
+	emptySnapshot,
+	loadSnapshot,
+	saveSnapshot,
+	snapshotPath,
+} from "./sonar/snapshot-store";
 
 const execFileP = promisify(execFile);
 
@@ -637,6 +661,100 @@ export async function activate(
 	// estado — sin timers huérfanos: el setTimeout pendiente (≤10 s) resuelve y
 	// el guard de epoch sale sin mutar).
 	let pmTechEpoch = 0;
+
+	// ══ M3 (#144): frida-sonar — estado host + cadena de cómputo (porción
+	// Slice 2 del fence fusionado del design: las secciones (3) y (6)–(10)
+	// llegan en la Fase 3; runFullGate en la Fase 6) ══
+	type SonarSettingsHost = {
+		maxWarnings: number;
+		disabledFamilies: SonarFamily[];
+		historyLimit: number;
+	};
+	type SonarTurnHost = {
+		ts: number;
+		verdict: SonarVerdict;
+		degraded: boolean;
+		causes: string[];
+		blocking: number;
+		errors: number;
+		warnings: number;
+		effectiveWarnings: number;
+		diff: { added: number; resolved: number };
+		countsPorFamilia: Partial<Record<SonarFamily, number>>;
+		issues: SonarIssue[];
+		issuesTruncated: boolean;
+		busTruncated: boolean;
+		trend: Array<{ ts: number; verdict: SonarVerdict; warnings: number }>;
+		familiesUnavailable: Array<{ family: string; cause: string }>;
+	};
+	/** FR-7 — gate completo bajo demanda (NO por turno: no appendea al historial). */
+	type SonarFullGateHost = {
+		busy: boolean;
+		/** #111 — epoch ms del inicio; sobrevive re-montes del tab. DOBLE papel:
+		 *  reloj del tab Y identidad de la corrida (guard de generación, molde
+		 *  pmTechEpoch — newSession/switchSession lo resetean a null y toda
+		 *  completación en vuelo queda obsoleta sin sobreescribir estado). */
+		busySince: number | null;
+		/** Línea de progreso ASCII (progressLineFromUpdate) o mensaje de error. */
+		lastLine?: string;
+		/** Veredicto enriquecido al terminar (o parcial tras timeout). */
+		result?: SonarTurnHost;
+	};
+	type SonarHostState =
+		| { status: "not-installed"; hint: string; settings: SonarSettingsHost }
+		| {
+				status: "no-data";
+				hint?: string;
+				settings: SonarSettingsHost;
+				fullGate?: SonarFullGateHost;
+		  }
+		| {
+				status: "error";
+				hint: string;
+				settings: SonarSettingsHost;
+				fullGate?: SonarFullGateHost;
+		  }
+		| {
+				status: "ready";
+				data: SonarTurnHost;
+				settings: SonarSettingsHost;
+				fullGate?: SonarFullGateHost;
+		  };
+
+	let sonarState: SonarHostState = {
+		status: "no-data",
+		settings: readSonarConfig(),
+	};
+	const sonarConsolidated: SonarConsolidated = new Map();
+	const sonarComputeChain: Promise<void> = Promise.resolve();
+	const sonarFullGate: SonarFullGateHost = { busy: false, busySince: null };
+
+	function postSonarState(): void {
+		// D4: el fullGate viaja DENTRO del mensaje único (not-installed no lo
+		// lleva por tipo — D9: nada que correr sin pi-lens).
+		const state =
+			sonarState.status === "not-installed"
+				? sonarState
+				: { ...sonarState, fullGate: sonarFullGate };
+		post({ type: "sonar_gate_state", state });
+	}
+
+	function refreshSonarLensLoaded(): void {
+		const settings = readSonarConfig();
+		if (!isLensLoaded()) {
+			sonarState = {
+				status: "not-installed",
+				hint:
+					"pi-lens no está cargado. Instálalo en ~/.frida (npm i pi-lens en ~/.frida/npm) y recarga Frida (/reload) para activar el gate de calidad.",
+				settings,
+			};
+			return;
+		}
+		sonarState =
+			sonarState.status === "ready" || sonarState.status === "error"
+				? { ...sonarState, settings }
+				: { status: "no-data", settings };
+	}
 
 	function postCodebaseIndexState(): void {
 		const cfg = readCodebaseIndexConfig();
@@ -2653,6 +2771,10 @@ export async function activate(
 				// M2 (#143) — re-posteo del estado del mapa para re-montes fríos del
 				// tab (hueco que lensStatus NO cubre — no repetirlo).
 				postProjectMapState();
+				// M3 (#144) — re-post del estado del gate de sonar (re-montes fríos
+				// del tab/badge; refreshSonarLensLoaded relee pi-lens + settings).
+				refreshSonarLensLoaded();
+				postSonarState();
 				// #114 — metadata real del motor del índice (async, read-only)
 				void refreshCiIndexMeta();
 				// #117 — semáforo OpenAI de las tarjetas (async, best-effort)
@@ -3716,6 +3838,16 @@ export async function activate(
 				})();
 				break;
 			}
+
+			// M3 (#144) — acciones del tab Sonar. FASE 2: sólo la rama refresh
+			// (re-publicar estado; verbatim del design menos la rama run_full_gate,
+			// que referencia runFullGate() y llega en la Fase 6).
+			case "sonar_gate":
+				if (msg.action === "refresh") {
+					refreshSonarLensLoaded();
+					postSonarState();
+				}
+				break;
 			case "check_environment": {
 				post({ type: "environment_checking", checking: true });
 				try {

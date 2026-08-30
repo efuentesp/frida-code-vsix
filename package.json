@@ -227,6 +227,26 @@
           "default": [],
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
         },
+        "frida.sonar.maxWarnings": {
+          "type": "number",
+          "default": 0,
+          "markdownDescription": "Warnings toleradas por el quality gate **frida-sonar** (tab Sonar de Configuración) antes de degradar el veredicto a WARN. 0 = estricto (cualquier warning cuenta). Aplica en vivo al siguiente turno."
+        },
+        "frida.sonar.disabledFamilies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["warnings", "complejidad", "dup", "ciclos", "dead-code"]
+          },
+          "default": [],
+          "markdownDescription": "Familias de warnings excluidas del conteo del gate, del diff por turno y del desglose del tab Sonar (best-effort: knip/jscpd/madge sólo aportan totales en el gate completo). Las familias bloqueantes (errores, secrets, cve) no se pueden deshabilitar."
+        },
+        "frida.sonar.historyLimit": {
+          "type": "number",
+          "default": 500,
+          "minimum": 1,
+          "markdownDescription": "Entradas de historial que conserva el snapshot de sonar por proyecto (`<globalStorage>/sonar/…`); la más vieja se elimina primero (FIFO)."
+        },
         "frida.devengine.contextWindow": {
           "type": [
             "number",

@@ -690,6 +690,13 @@ export function reduce(state: State, msg: InMessage): State {
 				lensStatus: { loaded: msg.loaded, active: msg.active },
 			};
 
+		// M3 (#144) — estado del tab Sonar + badge (frida-sonar). Replace plano
+		// (D4): el mensaje único lleva TODO el estado; ningún campo se llena por
+		// un segundo mensaje — el merge de project_map_state NO aplica. #126:
+		// el mensaje DEBE caer al dispatch general.
+		case "sonar_gate_state":
+			return { ...state, sonar: msg.state };
+
 		// #20 — chip 🎯 del footer: null limpia el goal.
 		case "goal_state":
 			return { ...state, goal: msg.goal ?? undefined };

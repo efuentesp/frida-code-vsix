@@ -11,6 +11,7 @@ import { TOOL_TOGGLE_BY_KEY, TOOL_TOGGLES } from "./tool-toggles";
 import type { UserRole } from "./usage/report-schema";
 import type { EmbeddingsProviderSetting } from "./tools/frida-codebase-index/host-setup";
 import type { ModelRolesConfig } from "./model-roles";
+import { sanitizeDisabledFamilies, type SonarFamily } from "./sonar/gate";
 
 export const CONFIG_SECTION = "frida";
 
@@ -418,5 +419,33 @@ export function readCodebaseIndexConfig(): CodebaseIndexConfig {
 		customDimensions: Number(
 			cfg.get<number>("codebaseIndex.embeddings.custom.dimensions", 0),
 		),
+	};
+}
+
+// === Sonar (frida-sonar, M3 / issue #144) ===
+
+/** Config de frida.sonar.* (getter en vivo — molde readGatePatterns). */
+export interface SonarConfig {
+	/** Warnings toleradas antes de WARN (0 = estricto). */
+	maxWarnings: number;
+	/** Familias excluidas del conteo WARN/diff/desglose (best-effort, D3).
+	 *  Las bloqueantes (errores/secrets/cve) jamás se deshabilitan. */
+	disabledFamilies: SonarFamily[];
+	/** Entradas de historial por snapshot (poda FIFO, FR-9). */
+	historyLimit: number;
+}
+
+/** Snapshot en vivo de los umbrales del gate de calidad. La lib
+ *  (src/sonar/gate.ts) NUNCA lee settings: los recibe por parámetro (D7). */
+export function readSonarConfig(): SonarConfig {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const mw = Number(cfg.get<number>("sonar.maxWarnings", 0));
+	const hl = Number(cfg.get<number>("sonar.historyLimit", 500));
+	return {
+		maxWarnings: Number.isFinite(mw) && mw >= 0 ? Math.floor(mw) : 0,
+		disabledFamilies: sanitizeDisabledFamilies(
+			readStringArray("sonar.disabledFamilies"),
+		),
+		historyLimit: Number.isFinite(hl) && hl > 0 ? Math.floor(hl) : 500,
 	};
 }

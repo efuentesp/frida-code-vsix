@@ -829,6 +829,103 @@ export interface LensStatus {
 	active: boolean;
 }
 
+// ── M3 (#144): frida-sonar — quality gate de código estático local ──
+// Espejo del productor src/sonar/gate.ts + estado de sesión del host
+// (builds separados, molde PmTechnicalState — unión discriminada).
+
+/** Familias del gate (FR-3) — espejo de SonarFamily (src/sonar/gate.ts). */
+export type SonarFamily =
+	| "errores"
+	| "secrets"
+	| "cve"
+	| "warnings"
+	| "complejidad"
+	| "dup"
+	| "ciclos"
+	| "dead-code";
+
+export type SonarVerdict = "pass" | "warn" | "fail" | "no-data";
+
+/** Issue consolidada — refs SIN message (NFR secrets). Espejo de SonarIssue. */
+export interface SonarIssueUi {
+	key: string;
+	path: string;
+	line?: number;
+	rule?: string;
+	tool: string;
+	severity: "error" | "warning";
+	family: SonarFamily;
+}
+
+/** Umbrales activos (frida.sonar.* — leídos en vivo por el host, D7). */
+export interface SonarSettingsUi {
+	maxWarnings: number;
+	disabledFamilies: SonarFamily[];
+	historyLimit: number;
+}
+
+/** Punto de la serie de tendencia (una entrada de historial por turno). */
+export interface SonarTrendPoint {
+	ts: number;
+	verdict: SonarVerdict;
+	warnings: number;
+}
+
+/** Estado del último gate por turno (veredicto + diff + issues + tendencia). */
+export interface SonarTurnData {
+	ts: number;
+	verdict: SonarVerdict;
+	degraded: boolean;
+	causes: string[];
+	blocking: number;
+	errors: number;
+	/** totalWarnings crudo de details. */
+	warnings: number;
+	/** Tras exclusión best-effort (D3). */
+	effectiveWarnings: number;
+	diff: { added: number; resolved: number };
+	countsPorFamilia: Partial<Record<SonarFamily, number>>;
+	issues: SonarIssueUi[];
+	/** issues viene truncada a 400 (presupuesto de postMessage). */
+	issuesTruncated: boolean;
+	/** Algún archivo llegó truncado al cap del bus (12) — aviso honesto. */
+	busTruncated: boolean;
+	trend: SonarTrendPoint[];
+	familiesUnavailable: Array<{ family: string; cause: string }>;
+}
+
+/** Gate completo bajo demanda (FR-7; sólo cuando el usuario lo pide). */
+export interface SonarFullGateState {
+	busy: boolean;
+	/** #111 — epoch ms del inicio; el reloj sobrevive re-montes del tab. */
+	busySince: number | null;
+	lastLine?: string;
+	/** Veredicto enriquecido al terminar (o parcial tras timeout). */
+	result?: SonarTurnData;
+}
+
+/** Estado del tab Sonar publicado por el host (unión honesta, D9). */
+export type SonarUiState =
+	| { status: "not-installed"; hint: string; settings: SonarSettingsUi }
+	| {
+			status: "no-data";
+			hint?: string;
+			settings: SonarSettingsUi;
+			fullGate?: SonarFullGateState;
+	  }
+	| {
+			status: "error";
+			hint: string;
+			settings: SonarSettingsUi;
+			fullGate?: SonarFullGateState;
+	  }
+	| {
+			status: "ready";
+			data: SonarTurnData;
+			settings: SonarSettingsUi;
+			fullGate?: SonarFullGateState;
+	  };
+
 // #20 — snapshot del goal activo publicado por frida-goal (chip 🎯 del footer).
 // undefined = sin goal; status complete llega una vez (con resumen) y luego se
 // limpia desde el host.
@@ -1058,6 +1155,8 @@ export interface State {
 	 *  NO en la conversación. Se limpia al recibir respuesta exitosa o nuevo run. */
 	providerError?: string;
 	lensStatus?: LensStatus;
+	/** M3 (#144) — estado del tab Sonar + badge de gate (frida-sonar). */
+	sonar?: SonarUiState;
 	/** Texto a insertar en el composer (vía un overlay, p.ej. SkillsPanel al hacer
 	 *  clic en "insertar $name"). `n` es un nonce: cada inserción lo incrementa para
 	 *  que el useEffect del Composer dispare aun cuando el texto sea idéntico. */
@@ -1250,6 +1349,9 @@ export type InMessage =
 	  }
 	| { type: "environment_status"; status: EnvironmentReport }
 	| { type: "environment_checking"; checking: boolean }
+	// M3 (#144) — estado del tab Sonar + badge (frida-sonar). #126: el
+	// mensaje DEBE caer al dispatch general (badge y tab leen state.sonar).
+	| { type: "sonar_gate_state"; state: SonarUiState }
 	| { type: "error"; text: string };
 
 // webview → host
@@ -1444,4 +1546,8 @@ export type OutMessage =
 			type: "ui_hide_thinking_set";
 			value: boolean;
 	  }
+	// M3 (#144) — acciones del tab Sonar: refresh = re-publicar estado (carga al
+	// montar); run_full_gate = gate completo bajo demanda (FR-7: tool viva
+	// mode=full + refreshRunners=all, progreso vía sonar_gate_state).
+	| { type: "sonar_gate"; action: "refresh" | "run_full_gate" }
 	| { type: "check_environment" };
