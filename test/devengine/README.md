@@ -20,7 +20,10 @@ Suite de pruebas end-to-end para el proveedor **Softtek DevEngine** de Frida Cod
 
 ### Credenciales
 
-Las pruebas live requieren la API key de DevEngine. Configúrala en **una de estas fuentes**:
+Las pruebas live requieren la API key de DevEngine — **usa tu propia key del
+gateway** (el equipo DevEngine la genera). Viaja como header `X-Api-Key`
+(única forma que acepta el gateway, sin `Authorization`). Configúrala en
+**una de estas fuentes** (prioridad: env var > auth.json):
 
 #### Opción 1: Variable de entorno (recomendada para CI)
 
@@ -39,6 +42,17 @@ Crea o edita `~/.frida/auth.json`:
   }
 }
 ```
+
+### Otros overrides (útiles para validar fixes en staging)
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `DEVENGINE_BASE_URL` | `https://mywork.softtek.com/apg/devengine` | Apuntar las pruebas a otro entorno (staging/preprod) |
+| `DEVENGINE_MODELS` | catálogo completo (csv) | Reducir la matriz: `DEVENGINE_MODELS="gpt-5.6-sol"` |
+| `DEVENGINE_STABILITY_N` | 10 | Requests por modelo en el soak |
+| `DEVENGINE_TIMEOUT` | 120000 | Timeout del caso de prueba (ms) |
+
+⚠️ Nunca commitear la key: se lee en runtime, ningún archivo del repo la contiene.
 
 ### Variables opcionales
 
