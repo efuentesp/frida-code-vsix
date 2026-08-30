@@ -49,7 +49,7 @@ ADR-0009) **hasta confirmar cada fix con el gate automatizado nuevo**:
 `test/devengine/e2e/reporte-regresion-devengine.md` —
 
 | Probe | Issue del reporte 1 | Status | Estado |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | P1 | `reasoning_content` rechazado en historial → 500 | 200 | ✅ **RESUELTO** |
 | P2 | `content: null` + `tool_calls` → 500 | 200 | ✅ **RESUELTO** |
 | P3 | `/models` sin `context_length` (overflow → 500 opaco) | 200 | ❌ **PENDIENTE** (lista 6 modelos, ninguno con context_length/context_window) |
