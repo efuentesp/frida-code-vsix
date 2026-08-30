@@ -726,8 +726,8 @@ export async function activate(
 		settings: readSonarConfig(),
 	};
 	const sonarConsolidated: SonarConsolidated = new Map();
-	const sonarComputeChain: Promise<void> = Promise.resolve();
-	const sonarFullGate: SonarFullGateHost = { busy: false, busySince: null };
+	let sonarComputeChain: Promise<void> = Promise.resolve();
+	let sonarFullGate: SonarFullGateHost = { busy: false, busySince: null };
 
 	function postSonarState(): void {
 		// D4: el fullGate viaja DENTRO del mensaje único (not-installed no lo
@@ -1318,6 +1318,231 @@ export async function activate(
 		}
 	}
 
+	// ══ M3 (#144): frida-sonar — SNAPSHOT POR TURNO (porción Slice 3 del fence
+	// fusionado del design) ══
+
+	// ── (3) Helpers del bus y cómputo de snapshot por turno ──
+	function sonarOnLens(payload: LensDiagnosticsPayload): void {
+		mergeSonarPayload(sonarConsolidated, payload, workspaceCwd());
+	}
+
+	function lensAndSonar(payload: LensDiagnosticsPayload): void {
+		mergeLens(payload);
+		sonarOnLens(payload);
+	}
+
+	function findLensDiagnosticsTool(): any | undefined {
+		const rl: any = frida?.session?.resourceLoader;
+		const exts = rl?.getExtensions?.()?.extensions ?? [];
+		for (const extension of exts) {
+			const tool = extension?.tools?.get?.("lens_diagnostics");
+			if (tool) return tool;
+		}
+		return undefined;
+	}
+
+	/** SonarTurnHost compartido: snapshot por turno (tendencia del historial
+	 *  recién persistido) y gate completo (tendencia del último snapshot — la
+	 *  sección full no la renderiza; un helper, cero duplicación). */
+	function sonarTurnHostFrom(
+		turn: TurnSnapshot,
+		consolidated: SonarConsolidated,
+		trendEntries: readonly SonarEntry[],
+	): SonarTurnHost {
+		const issues = turn.issues.slice(0, 400);
+		return {
+			ts: turn.entry.ts,
+			verdict: turn.verdict.verdict,
+			degraded: turn.verdict.degraded,
+			causes: turn.verdict.causes,
+			blocking: turn.verdict.blocking,
+			errors: turn.verdict.errors,
+			warnings: turn.verdict.warnings,
+			effectiveWarnings: turn.verdict.effectiveWarnings,
+			diff: turn.entry.diff,
+			countsPorFamilia: turn.entry.countsPorFamilia,
+			issues,
+			issuesTruncated: turn.issues.length > issues.length,
+			busTruncated: anyTruncated(consolidated),
+			trend: trendEntries.slice(-50).map((entry) => ({
+				ts: entry.ts,
+				verdict: entry.verdict,
+				warnings: entry.warnings,
+			})),
+			familiesUnavailable: turn.verdict.familiesUnavailable,
+		};
+	}
+
+	async function computeTurnSnapshot(): Promise<void> {
+		const settings = readSonarConfig();
+		const cwd = workspaceCwd();
+		const tool = findLensDiagnosticsTool();
+		if (!tool) {
+			sonarState = isLensLoaded()
+				? {
+						status: "error",
+						hint:
+							"pi-lens está cargado, pero la tool lens_diagnostics no está disponible en la sesión activa.",
+						settings,
+					}
+				: {
+						status: "not-installed",
+						hint:
+							"pi-lens no está cargado. Instálalo en ~/.frida (npm i pi-lens en ~/.frida/npm) y recarga Frida (/reload) para activar el gate de calidad.",
+						settings,
+					};
+			postSonarState();
+			return;
+		}
+		// toolCallId (etiqueta del registro de la llamada — molde codebase_index_action),
+		// no una query.
+		const toolCallId = `frida-sonar-turn-${Date.now()}`;
+		const result = await tool.execute(
+			toolCallId,
+			{ mode: "all" },
+			undefined,
+			undefined,
+			{ cwd },
+		);
+		const file = snapshotPath(context.globalStorageUri.fsPath, cwd);
+		const previous = loadSnapshot(file) ?? emptySnapshot(cwd);
+		const turn = buildTurnSnapshot({
+			ts: Date.now(),
+			details: result?.details,
+			issues: flattenIssues(sonarConsolidated),
+			prevIssues: previous.issues,
+			thresholds: settings,
+		});
+		const persisted = appendEntry(
+			previous,
+			turn.entry,
+			turn.issues,
+			settings.historyLimit,
+		);
+		if (!saveSnapshot(file, persisted)) {
+			console.warn("[frida-sonar] no se pudo persistir el snapshot:", file);
+		}
+		if (turn.verdict.verdict === "no-data") {
+			sonarState = {
+				status: "no-data",
+				hint: "pi-lens todavía no tiene diagnósticos de esta sesión.",
+				settings,
+			};
+		} else {
+			sonarState = {
+				status: "ready",
+				settings,
+				data: sonarTurnHostFrom(turn, sonarConsolidated, persisted.entries),
+			};
+		}
+		postSonarState();
+	}
+
+	function scheduleSonarTurnSnapshot(): void {
+		sonarComputeChain = sonarComputeChain
+			.then(computeTurnSnapshot)
+			.catch((error: unknown) => {
+				const hint = String((error as { message?: unknown })?.message ?? error);
+				console.warn("[frida-sonar] falló el snapshot del turno:", error);
+				sonarState = { status: "error", hint, settings: readSonarConfig() };
+				postSonarState();
+			});
+	}
+
+	// ══ M3 (#144): frida-sonar — GATE COMPLETO BAJO DEMANDA (porción Slice 6
+	// del fence fusionado del design) ══
+
+	/** Ejecuta lens_diagnostics mode=full + refreshRunners=all con la tool VIVA
+	 *  de la sesión (D6 — mismo recorrido que isLensLoaded). El timeout de 5 min
+	 *  es el wall-clock INTERNO del productor: al abortar retorna parciales con
+	 *  details.timedOut — sin race de promesas en el host. Progreso: 4º arg onUpdate →
+	 *  progressLineFromUpdate (ASCII, sin la barra de bloques del productor) →
+	 *  fullGate.lastLine + re-post (el reloj del tab deriva de busySince en cada
+	 *  push, sin timers del webview). NO appendea al historial (FR-9: append sólo
+	 *  por turno); el diff del resultado es informativo, contra las issues del
+	 *  último snapshot persistido. SIEMPRE resuelve (catch ruidoso interno).
+	 *  Guard de generación: `startedAt` identifica la corrida; si una corrida
+	 *  quedó obsoleta (newSession/switchSession reseteó el fullGate, u otra
+	 *  corrida arrancó), su completación NO sobreescribe el estado (molde
+	 *  pmTechEpoch). */
+	async function runFullGate(): Promise<void> {
+		if (sonarFullGate.busy) return; // guard reentrancia (doble click)
+		const settings = readSonarConfig();
+		const cwd = workspaceCwd();
+		const tool = findLensDiagnosticsTool();
+		if (!tool) {
+			sonarState = isLensLoaded()
+				? {
+						status: "error",
+						hint:
+							"pi-lens está cargado, pero la tool lens_diagnostics no está disponible en la sesión activa.",
+						settings,
+					}
+				: {
+						status: "not-installed",
+						hint:
+							"pi-lens no está cargado. Instálalo en ~/.frida (npm i pi-lens en ~/.frida/npm) y recarga Frida (/reload) para activar el gate de calidad.",
+						settings,
+					};
+			postSonarState();
+			return;
+		}
+		const startedAt = Date.now();
+		sonarFullGate = { busy: true, busySince: startedAt }; // #111 — el reloj vive aquí
+		postSonarState();
+		try {
+			// toolCallId (etiqueta del registro de la llamada — molde codebase_index_action),
+			// no una query.
+			const toolCallId = `frida-sonar-full-${Date.now()}`;
+			const result = await tool.execute(
+				toolCallId,
+				{ mode: "full", refreshRunners: "all" },
+				undefined,
+				(update: unknown) => {
+					if (sonarFullGate.busy !== true || sonarFullGate.busySince !== startedAt)
+						return; // corrida obsoleta: ni progreso ni post
+					const line = progressLineFromUpdate(update);
+					if (line === undefined) return;
+					sonarFullGate = { ...sonarFullGate, lastLine: line };
+					postSonarState();
+				},
+				{ cwd },
+			);
+			// Corrida obsoleta (newSession/switchSession u otra corrida la reemplazó):
+			// su resultado NO aterriza en el estado de la sesión vigente.
+			if (sonarFullGate.busySince !== startedAt) return;
+			const file = snapshotPath(context.globalStorageUri.fsPath, cwd);
+			const previous = loadSnapshot(file) ?? emptySnapshot(cwd);
+			// Veredicto sobre los AGREGADOS del full (los analyzers pesados sólo
+			// aportan totales aquí — asimetría del full-scan) + desglose per-issue del
+			// consolidado (el sweep LSP confirmado se reconcilió al widget-state y ya
+			// viajó por el bus ANTES de que execute resolviera).
+			const turn = buildTurnSnapshot({
+				ts: Date.now(),
+				details: result?.details,
+				issues: flattenIssues(sonarConsolidated),
+				prevIssues: previous.issues,
+				thresholds: settings,
+			});
+			sonarFullGate = {
+				busy: false,
+				busySince: null,
+				lastLine: undefined,
+				result: sonarTurnHostFrom(turn, sonarConsolidated, previous.entries),
+			};
+		} catch (e) {
+			if (sonarFullGate.busySince !== startedAt) return; // corrida obsoleta
+			const hint = String((e as { message?: unknown })?.message ?? e);
+			console.warn("[frida-sonar] falló el gate completo:", e);
+			sonarFullGate = {
+				busy: false,
+				busySince: null,
+				lastLine: `Falló el gate completo: ${hint}`,
+			};
+		}
+		postSonarState();
+	}
+
 	async function ensureSession(): Promise<FridaSession> {
 		if (frida) return frida;
 		if (!fridaPromise) {
@@ -1364,7 +1589,7 @@ export async function activate(
 					todoEnabled: isTodoEnabled,
 					contextEnabled: isContextEnabled,
 					getGatePatterns: readGatePatterns,
-					onLensDiagnostics: mergeLens,
+					onLensDiagnostics: lensAndSonar,
 					// #20 — chip 🎯 del footer + avisos del runtime de frida-goal.
 					onGoalState: (goal) => postGoalState(goal),
 					onGoalNotify: (_level, text) => post({ type: "info", text }),
@@ -2466,6 +2691,7 @@ export async function activate(
 					// issue #3: red de seguridad — asegura que el footer de git refleje el
 					// estado final del turno aunque falte una tool del set {edit, write}.
 					scheduleWorkspaceRefresh();
+					scheduleSonarTurnSnapshot();
 					break;
 				case "auto_retry_start":
 					// El provider falló con un error retriable: el SDK reintentará. Mostramos
@@ -3839,13 +4065,15 @@ export async function activate(
 				break;
 			}
 
-			// M3 (#144) — acciones del tab Sonar. FASE 2: sólo la rama refresh
-			// (re-publicar estado; verbatim del design menos la rama run_full_gate,
-			// que referencia runFullGate() y llega en la Fase 6).
+			// M3 (#144) — acciones del tab Sonar: refresh = re-publicar estado;
+			// run_full_gate = gate completo bajo demanda (FR-7: tool viva
+			// mode=full + refreshRunners=all, progreso vía sonar_gate_state).
 			case "sonar_gate":
 				if (msg.action === "refresh") {
 					refreshSonarLensLoaded();
 					postSonarState();
+				} else if (msg.action === "run_full_gate") {
+					void runFullGate(); // SIEMPRE resuelve; errores ruidosos adentro
 				}
 				break;
 			case "check_environment": {
@@ -5714,6 +5942,13 @@ export async function activate(
 		lensAccum.clear();
 		lensAnyTruncated = false;
 		flushLens();
+		sonarConsolidated.clear();
+		// El reset del fullGate hace obsoleta cualquier corrida en vuelo (guard de
+		// generación: busySince=null ≠ startedAt de la corrida vieja — su
+		// completación salta el write sin sobreescribir el estado de la sesión nueva).
+		sonarFullGate = { busy: false, busySince: null };
+		sonarState = { status: "no-data", settings: readSonarConfig() };
+		postSonarState();
 		resetQueue();
 		post({ type: "info", text: "Nueva sesión iniciada." });
 		if (Object.keys(keyCaches).length > 0) bootstrapSession(); // recrea la sesión para mostrar recursos
@@ -5823,7 +6058,7 @@ export async function activate(
 				todoEnabled: isTodoEnabled,
 				contextEnabled: isContextEnabled,
 				getGatePatterns: readGatePatterns,
-				onLensDiagnostics: mergeLens,
+				onLensDiagnostics: lensAndSonar,
 				onGoalState: (goal) => postGoalState(goal),
 				onGoalNotify: (_level, text) => post({ type: "info", text }),
 				onProviderError,
@@ -5864,6 +6099,10 @@ export async function activate(
 			lensAccum.clear();
 			lensAnyTruncated = false;
 			flushLens();
+			sonarConsolidated.clear();
+			sonarFullGate = { busy: false, busySince: null };
+			sonarState = { status: "no-data", settings: readSonarConfig() };
+			postSonarState();
 			postHistory();
 			sendModelInfo();
 			postResources();

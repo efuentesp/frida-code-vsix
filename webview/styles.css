@@ -11915,3 +11915,244 @@ mark.hl {
 		transition: none !important;
 	}
 }
+
+/* ══ M3 (#144): tab Sonar del SettingsHub (.sn-*) — frida-sonar ══
+   Prefijo per-tab (convención .ci-/.usage-/.prod-/.env-/.pm- —
+   docs/webview-ui-styles.md). Colores por veredicto: pass=iconPassed,
+   warn=editorWarning, fail=errorForeground, no-data=descriptionForeground. */
+.sn-tab {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.sn-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.sn-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 600;
+}
+.sn-verdict-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.sn-verdict {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 12px;
+	font-weight: 700;
+	padding: 3px 10px;
+	border-radius: 10px;
+	border: 1px solid var(--vscode-panel-border);
+}
+.sn-verdict.is-pass {
+	border-color: var(--vscode-testing-iconPassed, #73c991);
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.sn-verdict.is-warn {
+	border-color: var(--vscode-editorWarning-foreground, #cca700);
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.sn-verdict.is-fail {
+	border-color: var(--vscode-errorForeground, #f85149);
+	color: var(--vscode-errorForeground, #f85149);
+}
+.sn-verdict.is-nodata {
+	color: var(--vscode-descriptionForeground);
+}
+.sn-diff {
+	display: inline-flex;
+	gap: 8px;
+	font-size: 11px;
+}
+.sn-diff-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.sn-diff-res {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--vscode-errorForeground, #f85149);
+}
+.sn-meta {
+	font-size: 11px;
+	color: var(--vscode-descriptionForeground);
+}
+.sn-families {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.sn-chip {
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	color: var(--vscode-foreground);
+}
+.sn-chip.is-off {
+	opacity: 0.55;
+	text-decoration: line-through;
+}
+.sn-chip.is-nd {
+	border-style: dashed;
+	color: var(--vscode-descriptionForeground);
+}
+.sn-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.sn-list-title {
+	font-size: 11px;
+	font-weight: 600;
+	margin: 6px 0 2px;
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	color: var(--vscode-foreground);
+}
+.sn-issue {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	align-items: baseline;
+	width: 100%;
+	padding: 2px 6px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+/* Cascada global button:hover (0,1,1): el fondo se declara en el propio
+   :hover de la clase — (0,2,0) vence; docs/webview-ui-styles.md. */
+.sn-issue:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.sn-issue-main {
+	font-size: 11px;
+	font-family: var(--vscode-editor-font-family, monospace);
+	overflow-wrap: anywhere;
+}
+.sn-issue-meta {
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	white-space: nowrap;
+}
+.sn-issue.is-error .sn-issue-main {
+	color: var(--vscode-errorForeground, #f85149);
+}
+.sn-issue.is-warning .sn-issue-main {
+	color: var(--vscode-editorWarning-foreground, #d29922);
+}
+.sn-note {
+	font-size: 10.5px;
+	color: var(--vscode-descriptionForeground);
+	display: flex;
+	gap: 4px;
+	align-items: flex-start;
+	overflow-wrap: anywhere;
+}
+.sn-note.is-warn {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.sn-trend {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	padding: 4px 2px 2px;
+}
+.sn-trend-bar {
+	width: 8px;
+	min-height: 4px;
+	border-radius: 2px 2px 0 0;
+	background: var(--vscode-panel-border);
+}
+.sn-trend-bar.is-pass {
+	background: var(--vscode-testing-iconPassed, #73c991);
+}
+.sn-trend-bar.is-warn {
+	background: var(--vscode-editorWarning-foreground, #cca700);
+}
+.sn-trend-bar.is-fail {
+	background: var(--vscode-errorForeground, #f85149);
+}
+.sn-trend-bar.is-nodata {
+	background: var(--vscode-panel-border);
+}
+.sn-retry {
+	font-size: 10px;
+	padding: 1px 8px;
+	border-radius: 8px;
+	border: 1px solid var(--vscode-panel-border);
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+}
+.sn-retry:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground);
+}
+.sn-empty {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* Badge de gate en la franja del chat (M3 #144, FR-6 — Slice 5): pill
+   compacta junto al panel lens (.lens-panel le presta el molde: margen 6/12,
+   borde, fondo textBlockQuote). Colores por veredicto: pass=iconPassed,
+   warn=editorWarning, fail=errorForeground (mismos tokens que .sn-verdict).
+   El diff reusa .sn-diff/.sn-diff-add/.sn-diff-res del tab (Slice 4). */
+.sn-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 12px;
+	padding: 4px 10px;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 10px;
+	border: 1px solid var(--vscode-panel-border);
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.06));
+	color: var(--vscode-foreground);
+	cursor: pointer;
+}
+/* Cascada global button:hover (0,1,1): el fondo se declara en el propio
+   :hover de la clase — (0,2,0) vence; docs/webview-ui-styles.md. */
+.sn-badge:hover {
+	background: var(--vscode-list-hoverBackground);
+}
+.sn-badge.is-pass {
+	border-color: var(--vscode-testing-iconPassed, #73c991);
+	color: var(--vscode-testing-iconPassed, #73c991);
+}
+.sn-badge.is-warn {
+	border-color: var(--vscode-editorWarning-foreground, #cca700);
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.sn-badge.is-fail {
+	border-color: var(--vscode-errorForeground, #f85149);
+	color: var(--vscode-errorForeground, #f85149);
+}
+.sn-badge-label {
+	font-weight: 700;
+}
+.sn-badge-deg {
+	color: var(--vscode-editorWarning-foreground, #cca700);
+}

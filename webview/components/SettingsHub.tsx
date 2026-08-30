@@ -6,6 +6,7 @@ import { EnvironmentTab } from "./EnvironmentTab";
 import { IndexTab } from "./IndexTab";
 import { ProductivityTab } from "./ProductivityTab";
 import { ProjectMapTab } from "./ProjectMapTab";
+import { SonarTab } from "./SonarTab";
 import { ProveedoresTab } from "./ProveedoresTab";
 import { RolesSection } from "./ModelPanel";
 import { ResourcesContent } from "./ResourcesPanel";
@@ -21,7 +22,8 @@ export type SettingsTab =
 	| "productivity"
 	| "codebaseIndex"
 	| "projectMap"
-	| "environment";
+	| "environment"
+	| "sonar";
 
 const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "providers", label: "Proveedores", iconName: "plug" },
@@ -34,6 +36,7 @@ const TABS: { id: SettingsTab; label: string; iconName: string }[] = [
 	{ id: "codebaseIndex", label: "Index", iconName: "database" },
 	{ id: "projectMap", label: "Mapa", iconName: "map" },
 	{ id: "environment", label: "Entorno", iconName: "pulse" },
+	{ id: "sonar", label: "Sonar", iconName: "verified" },
 ];
 
 export function SettingsHub({
@@ -465,6 +468,8 @@ export function SettingsHub({
 						{tab === "projectMap" && <ProjectMapTab state={state} post={post} />}
 
 						{tab === "environment" && <EnvironmentTab state={state} post={post} />}
+
+						{tab === "sonar" && <SonarTab state={state} post={post} />}
 					</>
 				)}
 			</div>

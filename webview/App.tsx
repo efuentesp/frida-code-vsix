@@ -33,6 +33,7 @@ import { SettingsHub, type SettingsTab } from "./components/SettingsHub";
 import { ForkPanel } from "./components/ForkPanel";
 import { TreePanel } from "./components/TreePanel";
 import { LensDiagnostics } from "./components/LensDiagnostics";
+import { SonarGateBadge } from "./components/SonarGateBadge";
 import { QueuePanel } from "./components/QueuePanel";
 import { Icon } from "./components/Icon";
 import { Codicon } from "./components/Codicon";
@@ -758,6 +759,18 @@ export function App() {
 					onMove={(id, dir) => post({ type: "queue_move", id, dir })}
 				/>
 				<LensDiagnostics lens={state.lens} />
+				{/* M3 (#144) — badge de quality gate junto al panel lens: se auto-oculta
+					 (return null) fuera de status ready. Clic → hub directo al tab «Sonar»
+					 (molde onOpenProviders; el key={settingsTab} fuerza el re-monte en el
+					 tab pedido). #126: App.tsx no intercepta mensajes nuevos —
+					 sonar_gate_state YA cae al dispatch general desde la Fase 2. */}
+				<SonarGateBadge
+					sonar={state.sonar}
+					onOpen={() => {
+						setConfigOpen(true);
+						setSettingsTab("sonar");
+					}}
+				/>
 				<Followups
 					items={followups}
 					onSelect={(text) => post({ type: "submit", text, mode: "steer" })}

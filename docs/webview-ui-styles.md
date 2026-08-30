@@ -95,7 +95,8 @@ una posterior de igual especificidad — el `width:100%` "existía" en fuente y
 Clases `<button>` auditadas en `webview/`: `.ap-item`, `.chip-x`,
 `.info-toast-close`, `.yes`/`.no`, `.onb-link-btn`, `.pc-save`, `.primary`,
 `.primary-btn`, `.seg`, `.stop`, `.sub-version`, `.switch`, `.turn-copy`,
-`.ui-dialog-send`, más la familia `.ccp-*`. Si agregás un botón nuevo,
+`.ui-dialog-send`, más las familias `.ccp-*` y `.sn-*` (`.sn-issue`,
+`.sn-retry`, `.sn-badge`). Si agregás un botón nuevo,
 incluilo en este inventario y verificá su hover contra `button:hover`.
 
 ## Tab "Mapa" del SettingsHub (M2 #143) — `.pm-*`
@@ -139,3 +140,33 @@ Estilos con prefijo propio `.pm-` (convención per-tab: `.ci-`/`.usage-`/`.prod-
   aristas y cabeceras de journey.
 - El botón Exportar produce HTML autónomo con paleta FIJA (fuera de VS Code),
   sin clases de este archivo.
+
+## Tab "Sonar" del SettingsHub (M3 #144) — `.sn-*`
+
+Tab de calidad (solo lectura) con estados honestos (unión not-installed /
+no-data / error / ready publicada por `sonar_gate_state`). Prefijo propio
+`.sn-` (misma convención que `.pm-`).
+
+- **Shell**: `.sn-tab` (columna, gap 10), `.sn-head` (flex wrap: título +
+  Recargar — `.pc-save` reusado, oculto en not-installed, D9), `.sn-meta`
+  (descriptionForeground 11px).
+- **Veredicto**: `.sn-verdict` (+`.is-pass` iconPassed / `.is-warn`
+  editorWarning / `.is-fail` errorForeground / `.is-nodata`
+  descriptionForeground) y `.sn-diff-add`/`.sn-diff-res` (codicons
+  diff-added/diff-removed, `+N -M` ASCII).
+- **Familias**: `.sn-chip` (conteo por familia; `.is-off` atenuada+tachada =
+  deshabilitada por setting; `.is-nd` borde punteado = familia fría «0/nd»).
+- **Issues**: `.sn-issue` (botón fila completa: `.sn-issue-main` mono +
+  `.sn-issue-meta` regla/tool; `.is-error`/`.is-warning` colorean el path) —
+  clic → `open_file` (reuso M2). Nunca renderiza `message` (NFR secrets).
+- **Tendencia**: `.sn-trend`/`.sn-trend-bar` (barras div con height inline,
+  color por veredicto — sin glifos unicode).
+- **Botones contra la cascada global `button:hover`**: `.sn-issue:hover` y
+  `.sn-retry:hover` declaran el fondo en el propio `:hover` ((0,2,0) >
+  (0,1,1), molde `.pm-row`/`.pm-expand-all`); `.sn-retry` es la píldora
+  fantasma de Reintentar.
+- **Badge (franja del chat, M3 #144)**: `.sn-badge` (pill de veredicto junto
+  al panel lens; `.is-pass`/`.is-warn`/`.is-fail` colorean; `.sn-badge:hover`
+  declara fondo propio — (0,2,0) > (0,1,1); el diff reusa
+  `.sn-diff-add`/`.sn-diff-res` del tab; `.sn-badge-deg` para el warning de
+  gate degradado).
