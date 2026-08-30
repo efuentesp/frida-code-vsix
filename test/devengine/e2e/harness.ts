@@ -176,7 +176,14 @@ export async function makeEngine(opts: EngineOpts) {
 			description: string;
 			parameters: any;
 		}>,
-		turnOpts: { maxTokens?: number; reasoningEffort?: string } = {},
+		turnOpts: {
+			maxTokens?: number;
+			reasoningEffort?: string;
+			/** Timeout HTTP del cliente para ESTA vuelta (ms). Sin él, el default
+		 *  del SDK openai (10 min) deja colgado el test si el gateway no
+		 *  responde — ver stream-failure-signatures.test.ts (firma B). */
+			timeoutMs?: number;
+		} = {},
 	): Promise<TurnResult> {
 		let finalText = "";
 		let thinkingChars = 0;
@@ -199,6 +206,9 @@ export async function makeEngine(opts: EngineOpts) {
 						},
 						maxTokens: turnOpts.maxTokens ?? 4000,
 						reasoningEffort: turnOpts.reasoningEffort ?? "medium",
+						...(turnOpts.timeoutMs === undefined
+							? {}
+							: { timeoutMs: turnOpts.timeoutMs }),
 						onPayload: (p: any) => {
 							lastPayload = p;
 							return undefined; // sin mutación: el payload viaja tal cual

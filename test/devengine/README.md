@@ -7,10 +7,14 @@ Suite de pruebas end-to-end para el proveedor **Softtek DevEngine** de Frida Cod
 | Dimensión | Archivo | Pruebas | Tiempo |
 |-----------|---------|---------|--------|
 | Tools conformance | `tools-conformance.test.ts` | 3 | <1s |
+| Diagnóstico de gateway | `gateway-diagnosis.test.ts` | 10 | <1s |
+| **Firmas de fallo en streaming** (incidente 29-30/ago, sin red) | `stream-failure-signatures.test.ts` | 3 | ~2s |
+| Live regression (gate issues reporte 1) | `e2e/live-regression.e2e.test.ts` | 4 probes | ~1 min |
+| Live stability (soak, detecta firmas A/B) | `e2e/live-stability.e2e.test.ts` | 1 | ~10-40 min |
 | Live tools E2E | `e2e/live-tools.e2e.test.ts` | 15 | ~5 min |
 | Live reasoning | `e2e/live-reasoning.e2e.test.ts` | 4 | ~2 min |
 | Live multiturn | `e2e/live-multiturn.e2e.test.ts` | 2 | ~1 min |
-| **Total** | | **~24** | **~8 min** |
+| **Total** | | **~40** | **~50 min** |
 
 ## ⚙️ Configuración
 
@@ -53,6 +57,15 @@ npx vitest run test/devengine/
 # Solo conformance (sin red, rápido)
 npx vitest run test/devengine/tools-conformance.test.ts
 
+# Firmas de fallo del incidente de streaming (determinista, sin red)
+npx vitest run test/devengine/stream-failure-signatures.test.ts
+
+# Gate de regresión de los issues del primer reporte (P1-P4)
+DEVENGINE_API_KEY="tu-key" npx vitest run test/devengine/e2e/live-regression.e2e.test.ts
+
+# Soak de estabilidad (dispara y clasifica firmas A/B del incidente)
+DEVENGINE_API_KEY="tu-key" npx vitest run test/devengine/e2e/live-stability.e2e.test.ts
+
 # Solo live tools (matriz completa)
 npx vitest run test/devengine/e2e/live-tools.e2e.test.ts
 
@@ -81,6 +94,19 @@ Los reportes se regeneran en cada corrida y son útiles para:
 - Auditar qué tools/efforts funcionan
 - Diagnosticar regresiones
 - Compartir evidencia con el equipo del gateway
+
+### Incidente de streaming 29-30/ago (fix-frida-gateway-2.md)
+
+El gateway falló episódicamente con dos firmas: error SSE en español sin status
+(FIRMA A) y sin respuesta >60s (FIRMA B). Detalles y repro:
+
+- `stream-failure-signatures.test.ts` reproduce ambas firmas deterministamente
+  (servidor SSE local) + caso CONTROL que exonera al cliente.
+- `e2e/live-stability.e2e.test.ts` dispara N requests reales por modelo y
+  clasifica cada fallo por firma (`reporte-stability-devengine.md`).
+- `e2e/live-regression.e2e.test.ts` es el gate de los P1-P4 del primer
+  reporte (`reporte-regresion-devengine.md`) — ROJO mientras el gateway no
+  los resuelva; al pasar en verde, Frida retira los workarounds (ADR-0009).
 
 ## 🔍 Bugs conocidos de DevEngine (ADR-0009)
 
