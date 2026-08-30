@@ -5,7 +5,7 @@ Suite de pruebas end-to-end para el proveedor **Softtek DevEngine** de Frida Cod
 ## 🎯 Qué cubre
 
 | Dimensión | Archivo | Pruebas | Tiempo |
-|-----------|---------|---------|--------|
+| ----------- | --------- | --------- | -------- |
 | Tools conformance | `tools-conformance.test.ts` | 3 | <1s |
 | Diagnóstico de gateway | `gateway-diagnosis.test.ts` | 10 | <1s |
 | **Firmas de fallo en streaming** (incidente 29-30/ago, sin red) | `stream-failure-signatures.test.ts` | 3 | ~2s |
@@ -43,7 +43,7 @@ Crea o edita `~/.frida/auth.json`:
 ### Variables opcionales
 
 | Variable | Default | Descripción |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `DEVENGINE_BASE_URL` | `https://mywork.softtek.com/apg/devengine` | URL base del gateway |
 | `DEVENGINE_MODEL` | `gpt-5.4-mini` | Modelo para las pruebas |
 | `DEVENGINE_TIMEOUT` | `120000` | Timeout por prueba (ms) |
@@ -91,6 +91,7 @@ Cada suite live genera un reporte markdown en `test/devengine/e2e/`:
 - `reporte-multiturn-devengine.md` — Resultados de conversaciones multiturno
 
 Los reportes se regeneran en cada corrida y son útiles para:
+
 - Auditar qué tools/efforts funcionan
 - Diagnosticar regresiones
 - Compartir evidencia con el equipo del gateway
@@ -133,7 +134,7 @@ Las pruebas incluyen **detectores** para bugs conocidos del gateway:
 Esta suite es un **subset** de las pruebas de FE adaptado a DevEngine:
 
 | Característica | FE | DevEngine |
-|----------------|----|-----------| 
+| ---------------- | ---- | ----------- |
 | Adapter complejo | ✅ | ❌ (usa OpenAI estándar) |
 | Identidad obligatoria | ✅ | ❌ |
 | Dual-endpoint | ✅ | ❌ (solo chat/completions) |

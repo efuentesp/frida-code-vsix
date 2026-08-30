@@ -70,7 +70,8 @@ function classifyFailure(errorMessage: string): string {
 	const msg = String(errorMessage ?? "");
 	if (/Error procesando la respuesta del proveedor/.test(msg))
 		return "FIRMA-A: error SSE del gateway sin status (upstream falló a mitad del stream)";
-	if (/timed? ?out/i.test(msg)) return "FIRMA-B: gateway sin respuesta (timeout del cliente)";
+	if (/timed? ?out/i.test(msg))
+		return "FIRMA-B: gateway sin respuesta (timeout del cliente)";
 	if (/^\s*5\d\d/.test(msg) || /internal server error/i.test(msg))
 		return "HTTP-5xx del gateway";
 	if (/^\s*4\d\d/.test(msg)) return "HTTP-4xx del gateway";
@@ -166,8 +167,7 @@ describe("E2E live STABILITY: DevEngine × N requests (detecta firmas A/B del in
 			);
 			if (bySig.size > 0) {
 				lines.push("- Fallos por firma:");
-				for (const [sig, count] of bySig)
-					lines.push(`  - \`${sig}\`: ${count}`);
+				for (const [sig, count] of bySig) lines.push(`  - \`${sig}\`: ${count}`);
 			}
 			lines.push("");
 			lines.push(
@@ -194,6 +194,7 @@ describe("E2E live STABILITY: DevEngine × N requests (detecta firmas A/B del in
 			).toBe(0);
 		},
 		// N × modelos × (timeout por request + margen)
-		DEVENGINE_TIMEOUT + N * DEVENGINE_MODELS.length * (PER_REQUEST_TIMEOUT_MS + 10_000),
+		DEVENGINE_TIMEOUT +
+			N * DEVENGINE_MODELS.length * (PER_REQUEST_TIMEOUT_MS + 10_000),
 	);
 });

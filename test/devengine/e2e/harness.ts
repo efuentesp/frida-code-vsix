@@ -112,7 +112,8 @@ export function createCoreTools(sandboxRoot: string): Record<
 	}
 > {
 	const toolsPath = findInNodeModules(`${PACA}/dist/core/tools/index.js`);
-	if (!toolsPath) throw new Error("tools/index.js de pi-coding-agent no encontrado");
+	if (!toolsPath)
+		throw new Error("tools/index.js de pi-coding-agent no encontrado");
 	const { createAllToolDefinitions } = require_(toolsPath);
 	return createAllToolDefinitions(sandboxRoot);
 }
@@ -180,8 +181,8 @@ export async function makeEngine(opts: EngineOpts) {
 			maxTokens?: number;
 			reasoningEffort?: string;
 			/** Timeout HTTP del cliente para ESTA vuelta (ms). Sin él, el default
-		 *  del SDK openai (10 min) deja colgado el test si el gateway no
-		 *  responde — ver stream-failure-signatures.test.ts (firma B). */
+			 *  del SDK openai (10 min) deja colgado el test si el gateway no
+			 *  responde — ver stream-failure-signatures.test.ts (firma B). */
 			timeoutMs?: number;
 		} = {},
 	): Promise<TurnResult> {
@@ -195,46 +196,45 @@ export async function makeEngine(opts: EngineOpts) {
 		let result: any;
 		try {
 			const res = await collectStream(
-				stream(
-					model as any,
-					{ messages: messages as any, tools } as any,
-					{
-						apiKey: opts.key,
-						headers: {
-							"X-Api-Key": opts.key,
-							"authorization": null, // el host lo anula: solo X-Api-Key
-						},
-						maxTokens: turnOpts.maxTokens ?? 4000,
-						reasoningEffort: turnOpts.reasoningEffort ?? "medium",
-						...(turnOpts.timeoutMs === undefined
-							? {}
-							: { timeoutMs: turnOpts.timeoutMs }),
-						onPayload: (p: any) => {
-							lastPayload = p;
-							return undefined; // sin mutación: el payload viaja tal cual
-						},
+				stream(model as any, { messages: messages as any, tools } as any, {
+					apiKey: opts.key,
+					headers: {
+						"X-Api-Key": opts.key,
+						authorization: null, // el host lo anula: solo X-Api-Key
 					},
-					),
-				);
-				result = res;
-			} catch (err: any) {
-				// Dumpea el último payload para diagnóstico (el 500 del gateway no
-				// trae body — mismo problema que motivó el dump del host, ADR-0009).
-				if (lastPayload) {
-					try {
-						const fsp = await import("node:fs/promises");
-						await fsp.writeFile(
-									"/tmp/devengine-last-failing-payload.json",
-									JSON.stringify(lastPayload, null, 2),
-						);
-					} catch { /* noop */ }
+					maxTokens: turnOpts.maxTokens ?? 4000,
+					reasoningEffort: turnOpts.reasoningEffort ?? "medium",
+					...(turnOpts.timeoutMs === undefined
+						? {}
+						: { timeoutMs: turnOpts.timeoutMs }),
+					onPayload: (p: any) => {
+						lastPayload = p;
+						return undefined; // sin mutación: el payload viaja tal cual
+					},
+				}),
+			);
+			result = res;
+		} catch (err: any) {
+			// Dumpea el último payload para diagnóstico (el 500 del gateway no
+			// trae body — mismo problema que motivó el dump del host, ADR-0009).
+			if (lastPayload) {
+				try {
+					const fsp = await import("node:fs/promises");
+					await fsp.writeFile(
+						"/tmp/devengine-last-failing-payload.json",
+						JSON.stringify(lastPayload, null, 2),
+					);
+				} catch {
+					/* noop */
 				}
+			}
 			throw err;
 		}
 
 		for (const block of (result?.content ?? []) as any[]) {
 			if (block.type === "text") finalText += block.text ?? "";
-			if (block.type === "thinking") thinkingChars += (block.thinking ?? "").length;
+			if (block.type === "thinking")
+				thinkingChars += (block.thinking ?? "").length;
 			if (block.type === "toolCall") {
 				fnCalls.push({
 					name: block.name,
@@ -248,7 +248,10 @@ export async function makeEngine(opts: EngineOpts) {
 		}
 
 		// usage.reasoning (nombre pi-ai; el probe muestra el campo así)
-		reasoningTokens = (result as any)?.usage?.reasoning ?? (result as any)?.usage?.reasoning_tokens ?? 0;
+		reasoningTokens =
+			(result as any)?.usage?.reasoning ??
+			(result as any)?.usage?.reasoning_tokens ??
+			0;
 
 		return {
 			fnCalls,
@@ -270,7 +273,9 @@ async function loadOpenAICompletions() {
 		`${PACA}/node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js`,
 	);
 	if (!apiPath)
-		throw new Error("openai-completions.js de pi-ai no encontrado (¿fuera del repo?)");
+		throw new Error(
+			"openai-completions.js de pi-ai no encontrado (¿fuera del repo?)",
+		);
 	return await import(pathToFileURL(apiPath).href);
 }
 
@@ -285,7 +290,7 @@ export async function collectStream(s: any): Promise<any> {
 				ev.error?.errorMessage ??
 					ev.error?.message ??
 					ev.partial?.errorMessage ??
-				"stream error",
+					"stream error",
 			);
 	}
 	return message;

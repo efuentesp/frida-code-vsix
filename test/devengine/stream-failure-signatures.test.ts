@@ -38,8 +38,7 @@ async function loadStream(): Promise<any> {
 	const apiPath = findInNodeModules(
 		`${PACA}/node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js`,
 	);
-	if (!apiPath)
-		throw new Error("openai-completions.js de pi-ai no encontrado");
+	if (!apiPath) throw new Error("openai-completions.js de pi-ai no encontrado");
 	const mod = await import(pathToFileURL(apiPath).href);
 	return mod.stream;
 }
@@ -117,8 +116,9 @@ function closeServer(handle?: FakeServerHandle) {
 	return new Promise<void>((resolve) => {
 		if (!handle) return resolve();
 		// closeAllConnections mata sockets colgados (firma B); Node >= 18.2.
-		(handle.server as unknown as { closeAllConnections?: () => void })
-			.closeAllConnections?.();
+		(
+			handle.server as unknown as { closeAllConnections?: () => void }
+		).closeAllConnections?.();
 		handle.server.close(() => resolve());
 	});
 }
@@ -256,7 +256,9 @@ describe("Firmas de fallo del gateway DevEngine (incidente 29-30/ago, sin red)",
 			writeHead();
 			res.write(chunk({ role: "assistant", content: "" }, null));
 			await sleep(20);
-			res.write(chunk({ content: "Una API REST expone recursos vía HTTP." }, null));
+			res.write(
+				chunk({ content: "Una API REST expone recursos vía HTTP." }, null),
+			);
 			await sleep(20);
 			res.write(chunk({}, "stop"));
 			res.write("data: [DONE]\n\n");
