@@ -2,14 +2,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { applyStageTransition, openBoard, saveBoard } from "../../src/tools/frida-workflow/board";
+import {
+	applyStageTransition,
+	openBoard,
+	saveBoard,
+} from "../../src/tools/frida-workflow/board";
 import {
 	frida,
 	setBoardShowHandler,
 } from "../../src/tools/frida-workflow/extension-api";
 
 const PLAN = "plan.md";
-const PLAN3 = "# Plan\n\n## F01 — Primera\n## F02 — Segunda\n## F03 — Tercera\n";
+const PLAN3 =
+	"# Plan\n\n## F01 — Primera\n## F02 — Segunda\n## F03 — Tercera\n";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -21,8 +26,16 @@ function newBoard(): string {
 	dirs.push(cwd);
 	const board = openBoard(cwd, PLAN, PLAN3);
 	// Done con transición real (el status directo no cuenta para firstRealGap)
-	applyStageTransition(board, "F01", { stage: "commit", runId: "fixture", ts: "t1" });
-	applyStageTransition(board, "F02", { stage: "commit", runId: "fixture", ts: "t2" });
+	applyStageTransition(board, "F01", {
+		stage: "commit",
+		runId: "fixture",
+		ts: "t1",
+	});
+	applyStageTransition(board, "F02", {
+		stage: "commit",
+		runId: "fixture",
+		ts: "t2",
+	});
 	saveBoard(cwd, PLAN, board);
 	return cwd;
 }

@@ -14,7 +14,12 @@
 //   workflow usan "frida-workflow" + runId propio).
 // - Escritura atómica (tmp+rename, #159): lectores jamás ven archivos a
 //   medias.
-import { applyStageTransition, firstRealGap, loadBoard, saveBoard } from "./board";
+import {
+	applyStageTransition,
+	firstRealGap,
+	loadBoard,
+	saveBoard,
+} from "./board";
 import type { Board } from "./board";
 
 export interface BoardTransitionInput {
