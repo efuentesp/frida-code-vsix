@@ -1,82 +1,240 @@
 /// <reference path="../assets.d.ts" />
-import { useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Codicon } from "./Codicon";
 import logo from "../assets/frida-logo.png";
+import type { SettingsTab } from "./SettingsHub";
+import type { WorkspaceInfo } from "../types";
+
+export type WelcomeCategory = "greenfield" | "brownfield" | "control";
 
 interface StarterCard {
 	id: string;
 	title: string;
 	desc: string;
 	iconName: string;
-	prompt: string;
-	actionType?: "submit" | "insert";
+	prompt?: string;
+	actionType: "submit" | "insert" | "settings" | "roadmap";
+	settingsTab?: SettingsTab;
+	badge?: string;
+	badgeTitle?: string;
 }
 
-const STARTER_CARDS: StarterCard[] = [
+interface CategoryConfig {
+	id: WelcomeCategory;
+	label: string;
+	iconName: string;
+	tagline: string;
+	cards: StarterCard[];
+}
+
+const CATEGORIES: CategoryConfig[] = [
 	{
-		id: "aidd-plan",
-		title: "Planificar con AiDD",
-		desc:
-			"Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
+		id: "greenfield",
+		label: "De cero",
 		iconName: "rocket",
-		prompt: "/wf aidd-plan ",
-		actionType: "insert",
+		tagline:
+			"De la idea al software: planificación, arquitectura y desarrollo autónomo.",
+		cards: [
+			{
+				id: "aidd-plan",
+				title: "Planificar con AiDD",
+				desc:
+					"Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
+				iconName: "rocket",
+				prompt: "/wf aidd-plan ",
+				actionType: "insert",
+			},
+			{
+				id: "aidd-ship",
+				title: "Desarrollar Autónomo",
+				desc:
+					"Ciclos autónomos de implementación, validación de tests y commits estructurados.",
+				iconName: "tools",
+				prompt: "/wf aidd-ship ",
+				actionType: "insert",
+			},
+			{
+				id: "tea-test",
+				title: "Diseñar Pruebas (TEA)",
+				desc:
+					"Diseña la matriz de pruebas por escenarios y criterios de aceptación BDD.",
+				iconName: "beaker",
+				prompt:
+					"Ejecuta el workflow tea-test-design para diseñar las pruebas del proyecto.",
+				actionType: "submit",
+			},
+			{
+				id: "team-packs",
+				title: "Packs de Equipo",
+				desc:
+					"Plantillas de arquitectura y estándares compartidos de la organización.",
+				iconName: "package",
+				actionType: "roadmap",
+				badge: "ROADMAP",
+				badgeTitle: "Pista P3: Ecosistema de packs y estándares corporativos",
+			},
+		],
 	},
 	{
-		id: "tea-test",
-		title: "Diseñar Pruebas (TEA)",
-		desc: "Diseña la matriz de pruebas por escenarios y criterios de aceptación.",
-		iconName: "beaker",
-		prompt:
-			"Ejecuta el workflow tea-test-design para diseñar las pruebas del proyecto.",
-		actionType: "submit",
+		id: "brownfield",
+		label: "Existente",
+		iconName: "repo",
+		tagline:
+			"Entender, documentar, auditar y dimensionar aplicaciones existentes.",
+		cards: [
+			{
+				id: "understand",
+				title: "Entender el Código",
+				desc:
+					"7 preguntas clave del día 1, mapa de riesgos y modelo de arquitectura LikeC4.",
+				iconName: "remote-explorer",
+				prompt: "/understand",
+				actionType: "submit",
+			},
+			{
+				id: "walkthrough",
+				title: "Documentar la App",
+				desc:
+					"Recorre la app como usuario real y genera la documentación funcional completa.",
+				iconName: "window",
+				prompt: "/walkthrough ",
+				actionType: "insert",
+			},
+			{
+				id: "size",
+				title: "Dimensionar para Preventa",
+				desc:
+					"KLOC, complejidad, deuda técnica y estimación COCOMO para propuestas.",
+				iconName: "graph",
+				prompt: "/size",
+				actionType: "submit",
+			},
+			{
+				id: "traffic2api",
+				title: "Del Tráfico a la API",
+				desc:
+					"Captura tráfico de red y deriva contratos y especificaciones OpenAPI.",
+				iconName: "pulse",
+				prompt: "/traffic2api",
+				actionType: "submit",
+			},
+			{
+				id: "project-map",
+				title: "Mapa del Proyecto",
+				desc:
+					"Navegación interactiva de módulos, dependencias y grafo funcional del repo.",
+				iconName: "map",
+				actionType: "settings",
+				settingsTab: "projectMap",
+			},
+			{
+				id: "codebase-audit",
+				title: "Auditar Codebase",
+				desc:
+					"Inspecciona calidad, modularidad, patrones de diseño y consistencia.",
+				iconName: "search-sparkle",
+				prompt: "Realiza una auditoría integral del código en src/",
+				actionType: "submit",
+			},
+			{
+				id: "explain-arch",
+				title: "Explicar Arquitectura",
+				desc:
+					"Estructura de capas, flujo de datos y dependencias principales del workspace.",
+				iconName: "symbol-structure",
+				prompt: "Explica la arquitectura y componentes clave de este proyecto.",
+				actionType: "submit",
+			},
+			{
+				id: "modernize",
+				title: "Modernizar Legado",
+				desc: "Estrategia y ejecución de migración de stacks antiguos a modernos.",
+				iconName: "sparkle",
+				actionType: "roadmap",
+				badge: "ROADMAP",
+				badgeTitle: "Pista M6 (P3): Modernización automática de apps legadas",
+			},
+		],
 	},
 	{
-		id: "codebase-audit",
-		title: "Auditar Codebase",
-		desc: "Inspecciona calidad, modularidad, patrones de reuso y consistencia.",
-		iconName: "search-sparkle",
-		prompt: "Realiza una auditoría integral del código en src/",
-		actionType: "submit",
-	},
-	{
-		id: "explain-arch",
-		title: "Explicar Arquitectura",
-		desc:
-			"Explica la estructura, módulos principales y flujo de datos del workspace.",
-		iconName: "symbol-structure",
-		prompt: "Explica la arquitectura y componentes clave de este proyecto.",
-		actionType: "submit",
-	},
-	// #140 (Pista M): cards de los comandos slash — actionType "insert"
-	// para no enviar (el usuario completa URL/presupuesto tras el comando;
-	// /walkthrough acepta URL inline, de ahí su espacio final, D5).
-	{
-		id: "walkthrough",
-		title: "Documentar una App",
-		desc:
-			"Recorre la app como usuario real y genera la documentación funcional (pantallas, journeys, reglas, roles).",
-		iconName: "window",
-		prompt: "/walkthrough ",
-		actionType: "insert",
-	},
-	{
-		id: "understand",
-		title: "Entender el Código",
-		desc:
-			"Produce el entendimiento técnico del repo con evidencia: 7 preguntas del día 1, riesgos y modelo LikeC4.",
-		iconName: "remote-explorer",
-		prompt: "/understand",
-		actionType: "submit",
-	},
-	{
-		id: "size",
-		title: "Dimensionar para Preventa",
-		desc:
-			"KLOC, COCOMO, deuda técnica y costo con salario mensual para la conversación de preventa.",
-		iconName: "graph",
-		prompt: "/size",
-		actionType: "submit",
+		id: "control",
+		label: "Control Studio",
+		iconName: "shield",
+		tagline:
+			"Gobernanza agéntica, calidad, sandboxes, métricas y observabilidad.",
+		cards: [
+			{
+				id: "approval",
+				title: "Seguridad y Aprobaciones",
+				desc:
+					"Políticas de ejecución: Manual, Auto-edit o YOLO con auditoría de gates.",
+				iconName: "shield",
+				actionType: "settings",
+				settingsTab: "approval",
+			},
+			{
+				id: "usage",
+				title: "Uso, Métricas y Costos",
+				desc:
+					"Telemetría de tokens, desglose por modelo y reporte de consumo facturable.",
+				iconName: "graph",
+				actionType: "settings",
+				settingsTab: "usage",
+			},
+			{
+				id: "agents",
+				title: "Subagentes en Paralelo",
+				desc:
+					"Supervisa y coordina agentes secundarios en worktrees y tareas concurrentes.",
+				iconName: "organization",
+				prompt: "/agents",
+				actionType: "submit",
+			},
+			{
+				id: "sandboxes",
+				title: "Sandboxes Aislados",
+				desc:
+					"Contenedores seguros para ejecución y prueba de código sin riesgo local.",
+				iconName: "package",
+				prompt: "/sandbox",
+				actionType: "submit",
+			},
+			{
+				id: "workflows",
+				title: "Panel de Workflows",
+				desc: "Visualizador en vivo de etapas, gates, estado y avance de flujos.",
+				iconName: "gear",
+				prompt: "/wf",
+				actionType: "submit",
+			},
+			{
+				id: "sonar",
+				title: "Quality Gate Sonar",
+				desc:
+					"Puertas de calidad, cobertura de código y métricas estáticas de análisis.",
+				iconName: "verified",
+				actionType: "settings",
+				settingsTab: "sonar",
+			},
+			{
+				id: "skills",
+				title: "Catálogo de Skills",
+				desc:
+					"Biblioteca de habilidades especializadas ($commit, $code-review...).",
+				iconName: "sparkle",
+				prompt: "/skills",
+				actionType: "submit",
+			},
+			{
+				id: "models",
+				title: "Cambiar Modelo / LLM",
+				desc:
+					"Configuración de proveedores DevEngine, Anthropic, OpenAI o Copilot.",
+				iconName: "plug",
+				actionType: "settings",
+				settingsTab: "models",
+			},
+		],
 	},
 ];
 
@@ -208,36 +366,71 @@ const HELP_CATEGORIES: HelpCategory[] = [
 export function Welcome({
 	onPrompt,
 	onInsert,
+	onOpenSettings,
+	workspace,
 }: {
 	onPrompt?: (text: string) => void;
 	onInsert?: (text: string) => void;
+	onOpenSettings?: (tab: SettingsTab) => void;
+	workspace?: WorkspaceInfo;
 }) {
-	const [activeCategory, setActiveCategory] = useState("files");
+	// Auto-detección inteligente: si el workspace tiene diffs o rama activa → brownfield, sino greenfield.
+	// El mensaje "workspace" llega de forma asíncrona (git status + postMessage)
+	// DESPUÉS del primer render, así que useState inicial nunca ve la detección:
+	// sincronizamos por efecto mientras el usuario no haya elegido una tab a mano.
+	const detectedCategory: WelcomeCategory = useMemo(() => {
+		if (
+			workspace?.dirty ||
+			(workspace?.diff &&
+				(workspace.diff.added > 0 ||
+					workspace.diff.modified > 0 ||
+					workspace.diff.deleted > 0)) ||
+			(workspace?.branch && workspace.branch !== "")
+		) {
+			return "brownfield";
+		}
+		return "greenfield";
+	}, [workspace]);
+
+	const [activeCategory, setActiveCategory] =
+		useState<WelcomeCategory>(detectedCategory);
+	const [userPicked, setUserPicked] = useState(false);
+
+	useEffect(() => {
+		if (!userPicked) setActiveCategory(detectedCategory);
+	}, [detectedCategory, userPicked]);
+	const [activeHelpCategory, setActiveHelpCategory] = useState("files");
+
+	const currentCatConfig =
+		CATEGORIES.find((c) => c.id === activeCategory) ?? CATEGORIES[0];
 
 	const handleCardClick = (card: StarterCard) => {
-		if (card.actionType === "insert" && onInsert) {
+		if (card.actionType === "roadmap") return;
+		if (card.actionType === "settings" && card.settingsTab && onOpenSettings) {
+			onOpenSettings(card.settingsTab);
+			return;
+		}
+		if (card.actionType === "insert" && card.prompt && onInsert) {
 			onInsert(card.prompt);
-		} else if (onPrompt) {
+		} else if (card.actionType === "submit" && card.prompt && onPrompt) {
 			onPrompt(card.prompt);
 		}
 	};
 
-	const currentCat =
-		HELP_CATEGORIES.find((c) => c.id === activeCategory) ?? HELP_CATEGORIES[0];
+	const currentHelpCat =
+		HELP_CATEGORIES.find((c) => c.id === activeHelpCategory) ??
+		HELP_CATEGORIES[0];
 
 	return (
 		<div className="welcome-wrapper">
 			<div className="welcome">
-				{/* Hero: Logo 96px + Título + Subtítulo */}
+				{/* Hero: Logo 96px + Título Rebrandeado + Tagline */}
 				<div className="welcome-hero">
 					<div className="welcome-logo">
-						<img src={logo} className="welcome-logo-img" alt="Frida Code" />
+						<img src={logo} className="welcome-logo-img" alt="Frida Studio" />
 					</div>
-					<h1>Frida Code</h1>
-					<p className="welcome-sub">
-						Asistente inteligente de código de Softtek AppDev. ¿En qué podemos
-						trabajar hoy?
-					</p>
+					<h1>Frida Studio</h1>
+					<p className="welcome-sub">Agentic Software Factory · Softtek AppDev</p>
 				</div>
 
 				{/* Quick Insert Pills (@ / $) */}
@@ -256,29 +449,66 @@ export function Welcome({
 					))}
 				</div>
 
-				{/* 2x2 Starter Cards (Copilot Canvas) */}
+				{/* Segmented Category Tabs */}
+				<div className="welcome-category-tabs" role="tablist">
+					{CATEGORIES.map((cat) => {
+						const active = cat.id === activeCategory;
+						return (
+							<button
+								key={cat.id}
+								type="button"
+								role="tab"
+								aria-selected={active}
+								className={`welcome-cat-tab${active ? " active" : ""}`}
+								onClick={() => {
+									setUserPicked(true);
+									setActiveCategory(cat.id);
+								}}
+							>
+								<Codicon name={cat.iconName} size={13} className="welcome-cat-icon" />
+								<span>{cat.label}</span>
+							</button>
+						);
+					})}
+				</div>
+
+				{/* Category Subtitle */}
+				<p className="welcome-cat-desc">{currentCatConfig.tagline}</p>
+
+				{/* Responsive Starter Cards Grid */}
 				<div className="welcome-cards">
-					{STARTER_CARDS.map((c) => (
-						<div
-							key={c.id}
-							className="starter-card"
-							onClick={() => handleCardClick(c)}
-							role="button"
-							tabIndex={0}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									e.preventDefault();
-									handleCardClick(c);
-								}
-							}}
-						>
-							<div className="starter-card-head">
-								<Codicon name={c.iconName} size={14} className="starter-card-icon" />
-								<span>{c.title}</span>
+					{currentCatConfig.cards.map((c) => {
+						const isRoadmap = c.actionType === "roadmap";
+						return (
+							<div
+								key={c.id}
+								className={`starter-card${isRoadmap ? " roadmap" : ""}`}
+								onClick={() => handleCardClick(c)}
+								role={isRoadmap ? "article" : "button"}
+								tabIndex={isRoadmap ? -1 : 0}
+								title={isRoadmap ? c.badgeTitle : undefined}
+								onKeyDown={(e) => {
+									if (!isRoadmap && (e.key === "Enter" || e.key === " ")) {
+										e.preventDefault();
+										handleCardClick(c);
+									}
+								}}
+							>
+								<div className="starter-card-head">
+									<div className="starter-card-title-group">
+										<Codicon name={c.iconName} size={14} className="starter-card-icon" />
+										<span>{c.title}</span>
+									</div>
+									{c.badge && (
+										<span className="starter-card-badge" title={c.badgeTitle}>
+											{c.badge}
+										</span>
+									)}
+								</div>
+								<p className="starter-card-desc">{c.desc}</p>
 							</div>
-							<p className="starter-card-desc">{c.desc}</p>
-						</div>
-					))}
+						);
+					})}
 				</div>
 
 				{/* Collapsible Categorized Tips Hub */}
@@ -294,7 +524,7 @@ export function Welcome({
 						{/* Category Tabs */}
 						<div className="wh-tabs" role="tablist">
 							{HELP_CATEGORIES.map((cat) => {
-								const active = cat.id === activeCategory;
+								const active = cat.id === activeHelpCategory;
 								return (
 									<button
 										key={cat.id}
@@ -302,7 +532,7 @@ export function Welcome({
 										role="tab"
 										aria-selected={active}
 										className={`wh-tab-btn${active ? " active" : ""}`}
-										onClick={() => setActiveCategory(cat.id)}
+										onClick={() => setActiveHelpCategory(cat.id)}
 									>
 										<Codicon name={cat.iconName} size={12} />
 										<span>{cat.label}</span>
@@ -314,10 +544,10 @@ export function Welcome({
 						{/* Active Category Content Card */}
 						<div className="wh-card">
 							<div className="wh-card-title">
-								<Codicon name={currentCat.iconName} size={13} />
-								<span>{currentCat.title}</span>
+								<Codicon name={currentHelpCat.iconName} size={13} />
+								<span>{currentHelpCat.title}</span>
 							</div>
-							<div className="wh-card-body">{currentCat.content}</div>
+							<div className="wh-card-body">{currentHelpCat.content}</div>
 						</div>
 					</div>
 				</details>
