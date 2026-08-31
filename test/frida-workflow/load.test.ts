@@ -108,11 +108,9 @@ describe("loadWorkflows — cascada por capas", () => {
 		},
 	);
 
-	(distReady ? it : it.skip)(
-		"cablea el alias typebox prometido (#151)",
-		() => {
-			const wf = loadDist();
-			const agent = agentWithConfig(`import { Type } from "typebox";
+	(distReady ? it : it.skip)("cablea el alias typebox prometido (#151)", () => {
+		const wf = loadDist();
+		const agent = agentWithConfig(`import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { defineWorkflow, acts, typeboxSchema } from "frida-workflow";
 const _v = Value ? 1 : 0;
@@ -130,16 +128,15 @@ export const workflows = [
 	}),
 ];
 `);
-			const loaded = wf.loadWorkflows({
+		const loaded = wf.loadWorkflows({
 			cwd: newDir(),
 			agentDir: agent,
 			dslBundlePath: DIST,
-			});
-			expect(loaded.issues).toEqual([]);
-			expect(loaded.workflows.get("tb-wf")).toBeDefined();
-			expect(loaded.origins.get("tb-wf")).toBe("user");
-		},
-	);
+		});
+		expect(loaded.issues).toEqual([]);
+		expect(loaded.workflows.get("tb-wf")).toBeDefined();
+		expect(loaded.origins.get("tb-wf")).toBe("user");
+	});
 
 	it("sin dslBundlePath, los configs plain-data siguen cargando", () => {
 		const agent = agentWithConfig(`export const workflows = [

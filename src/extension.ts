@@ -5342,10 +5342,7 @@ export async function activate(
 				name: "sdd-ship",
 				stages: { elaborate: {}, implement: {}, validate: {}, commit: {} },
 				edges: {
-					validate: defineRoute(
-						["commit", "implement", "stop"],
-						() => "stop",
-					),
+					validate: defineRoute(["commit", "implement", "stop"], () => "stop"),
 				},
 			}),
 		);

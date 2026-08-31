@@ -1,9 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	utimesSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { defineSddWorkflow } from "../../src/tools/frida-workflow/sdd-factory";
-import type { CollectCtx, RouteCtx } from "../../src/tools/frida-workflow/types";
+import type {
+	CollectCtx,
+	RouteCtx,
+} from "../../src/tools/frida-workflow/types";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -27,7 +36,10 @@ function projectWithValidations(
 }
 
 /** RouteCtx mínimo para invocar el EdgeFn directamente. */
-function ctx(cwd: string, overrides?: { passed?: boolean; stagesCompleted?: number }): RouteCtx {
+function ctx(
+	cwd: string,
+	overrides?: { passed?: boolean; stagesCompleted?: number },
+): RouteCtx {
 	return {
 		output: { data: { passed: overrides?.passed }, artifacts: [] },
 		state: { stagesCompleted: overrides?.stagesCompleted ?? 1 },
@@ -76,15 +88,18 @@ describe("defineSddWorkflow — shape (#188)", () => {
 
 describe("defineSddWorkflow — route por verdict", () => {
 	it("informe fresco pass → commit (aunque el output diga fail — #174)", () => {
-		const proj = projectWithValidations({
-			name: "viejo.md",
-			verdict: "fail",
-			mtime: t(0),
-		}, {
-			name: "nuevo.md",
-			verdict: "pass",
-			mtime: t(5),
-		});
+		const proj = projectWithValidations(
+			{
+				name: "viejo.md",
+				verdict: "fail",
+				mtime: t(0),
+			},
+			{
+				name: "nuevo.md",
+				verdict: "pass",
+				mtime: t(5),
+			},
+		);
 		const wf = defineSddWorkflow({ name: "s", start: "elaborate" });
 		const route = wf.edges.validate as (c: RouteCtx) => string;
 		expect(route(ctx(proj, { passed: false }))).toBe("commit");
@@ -135,19 +150,23 @@ describe("defineSddWorkflow — route por verdict", () => {
 
 describe("defineSddWorkflow — collector", () => {
 	it("entrega el informe .md más reciente del validationDir", () => {
-		const proj = projectWithValidations({
-			name: "a-viejo.md",
-			verdict: "fail",
-			mtime: t(0),
-		}, {
-			name: "z-reciente.md",
-			verdict: "pass",
-			mtime: t(9),
-		}, {
-			name: "m-medio.md",
-			verdict: "fail",
-			mtime: t(3),
-		});
+		const proj = projectWithValidations(
+			{
+				name: "a-viejo.md",
+				verdict: "fail",
+				mtime: t(0),
+			},
+			{
+				name: "z-reciente.md",
+				verdict: "pass",
+				mtime: t(9),
+			},
+			{
+				name: "m-medio.md",
+				verdict: "fail",
+				mtime: t(3),
+			},
+		);
 		const wf = defineSddWorkflow({ name: "s" });
 		const collector = wf.stages.validate?.outcome?.collector!;
 		const res = collector({

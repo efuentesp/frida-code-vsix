@@ -89,19 +89,17 @@ function gitShortSha(cwd: string): string | undefined {
 
 /** #179 — Reset de ciclo al INICIAR un run: la fase del input vuelve a la
  *  primera columna si ya tenía transiciones (nuevo intento tras breaker/pausa). */
-function applyRuntimeBoardReset(
-	ctx: { runId: string; workflow: string; input: string; cwd: string },
-): void {
+function applyRuntimeBoardReset(ctx: {
+	runId: string;
+	workflow: string;
+	input: string;
+	cwd: string;
+}): void {
 	const extracted = extractPhaseId(ctx.input);
 	if (!extracted?.phaseId) return;
 	try {
 		const spec = resolveBoardSpec(ctx.workflow);
-		const board = openBoard(
-			ctx.cwd,
-			extracted.planPathToken,
-			undefined,
-			spec,
-		);
+		const board = openBoard(ctx.cwd, extracted.planPathToken, undefined, spec);
 		board.workflow = ctx.workflow;
 		restartUnit(board, extracted.phaseId, {
 			runId: ctx.runId,

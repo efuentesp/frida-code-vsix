@@ -69,9 +69,7 @@ function newestMdCollector(dir: string) {
 				.sort((a, b) => b.m - a.m)[0]!.f;
 			return {
 				kind: "ok" as const,
-				artifacts: [
-					{ handle: fs(join(dir, newest)), role: "primary" },
-				],
+				artifacts: [{ handle: fs(join(dir, newest)), role: "primary" }],
 			};
 		} catch (e) {
 			return { kind: "fatal", message: String(e) };
@@ -86,9 +84,7 @@ const dir2 = (cwd: string, dir: string) => join(cwd, dir);
 function readFreshVerdict(dir: string, verdictKey: string) {
 	return (cwd: string): boolean | undefined => {
 		try {
-			const files = readdirSync(join(cwd, dir)).filter((f) =>
-				f.endsWith(".md"),
-			);
+			const files = readdirSync(join(cwd, dir)).filter((f) => f.endsWith(".md"));
 			const newest = files
 				.map((f) => ({ f, m: statSync(join(cwd, dir, f)).mtimeMs }))
 				.sort((a, b) => b.m - a.m)[0];

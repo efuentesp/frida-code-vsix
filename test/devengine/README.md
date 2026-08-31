@@ -46,7 +46,7 @@ Crea o edita `~/.frida/auth.json`:
 ### Otros overrides (útiles para validar fixes en staging)
 
 | Variable | Default | Uso |
-|----------|---------|-----|
+| ---------- | --------- | ----- |
 | `DEVENGINE_BASE_URL` | `https://mywork.softtek.com/apg/devengine` | Apuntar las pruebas a otro entorno (staging/preprod) |
 | `DEVENGINE_MODELS` | catálogo completo (csv) | Reducir la matriz: `DEVENGINE_MODELS="gpt-5.6-sol"` |
 | `DEVENGINE_STABILITY_N` | 10 | Requests por modelo en el soak |

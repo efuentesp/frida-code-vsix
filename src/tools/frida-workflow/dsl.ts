@@ -43,6 +43,7 @@ export interface ProducesOptions {
 	loop?: LoopDef;
 	reads?: ReadSpec[];
 	verify?: VerifyDef;
+	inheritsArtifacts?: boolean;
 }
 
 /** `kind: "produces". La skill escribe un artefacto que la siguiente lee. */
@@ -58,6 +59,7 @@ export function produces(opts: ProducesOptions): StageDef {
 		loop: opts.loop,
 		reads: opts.reads,
 		verify: opts.verify,
+		inheritsArtifacts: opts.inheritsArtifacts,
 	};
 }
 
@@ -71,6 +73,7 @@ export interface ActsOptions {
 	maxRetries?: number;
 	loop?: LoopDef;
 	reads?: ReadSpec[];
+	inheritsArtifacts?: boolean;
 }
 
 /** `kind: "side-effect"`. El efecto ES el trabajo; hereda el artefacto upstream. */
@@ -85,6 +88,7 @@ export function acts(opts: ActsOptions = {}): StageDef {
 		maxRetries: opts.maxRetries,
 		loop: opts.loop,
 		reads: opts.reads,
+		inheritsArtifacts: opts.inheritsArtifacts,
 	};
 }
 

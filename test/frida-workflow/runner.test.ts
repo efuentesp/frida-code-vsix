@@ -306,7 +306,10 @@ describe("handleWfSlash — registry + preview/lista (Fase 1)", () => {
  * `validate` siempre produce verdict FAIL; el umbral del breaker es parametrizable. */
 function sddShipLike(breakerAt: number) {
 	const artifacts = [
-		{ handle: { kind: "fs" as const, path: "/tmp/validation.md" }, role: "primary" as const },
+		{
+			handle: { kind: "fs" as const, path: "/tmp/validation.md" },
+			role: "primary" as const,
+		},
 	];
 	return defineWorkflow({
 		name: `sdd-ship-like-${breakerAt}`,
@@ -326,8 +329,7 @@ function sddShipLike(breakerAt: number) {
 			elaborate: "implement",
 			implement: "validate",
 			validate: defineRoute(["commit", "implement", "stop"], (ctx) => {
-				const passed =
-					(ctx.output.data as { passed?: boolean })?.passed === true;
+				const passed = (ctx.output.data as { passed?: boolean })?.passed === true;
 				if (passed) return "commit";
 				if (ctx.state.stagesCompleted >= breakerAt) return "stop";
 				return "implement";

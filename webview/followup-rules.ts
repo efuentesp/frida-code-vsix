@@ -65,9 +65,7 @@ export function extractSkillFollowups(text: string): FollowupSuggestion[] {
 					);
 					rawArgs = flagMatch ? flagMatch[1] : "";
 				} else if (/^Phase\s+\d+/i.test(rawArgs)) {
-					const phaseMatch = rawArgs.match(
-						/^(Phase\s+\d+(?:\s*:\s*[^\s,;.]+)?)/i,
-					);
+					const phaseMatch = rawArgs.match(/^(Phase\s+\d+(?:\s*:\s*[^\s,;.]+)?)/i);
 					rawArgs = phaseMatch ? phaseMatch[1] : "";
 				} else {
 					rawArgs = "";
@@ -84,9 +82,7 @@ export function extractSkillFollowups(text: string): FollowupSuggestion[] {
 				if (shortArgs.length > 24) {
 					shortArgs = shortArgs.slice(0, 23).trimEnd() + "…";
 				}
-				const label = shortArgs
-					? `/skill:${name} ${shortArgs}`
-					: `/skill:${name}`;
+				const label = shortArgs ? `/skill:${name} ${shortArgs}` : `/skill:${name}`;
 				suggestions.push({
 					id: `skill-${name}-${suggestions.length}`,
 					label,

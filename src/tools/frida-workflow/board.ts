@@ -404,7 +404,8 @@ export function hasIdenticalTransition(
 	input: StageTransitionInput,
 ): boolean {
 	return unit.transitions.some(
-		(t) => t.runId === input.runId && t.stage === input.stage && t.ts === input.ts,
+		(t) =>
+			t.runId === input.runId && t.stage === input.stage && t.ts === input.ts,
 	);
 }
 

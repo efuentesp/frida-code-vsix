@@ -67,7 +67,10 @@ export function sanitizeInput(input: string): string {
 /** #158 — Normaliza un id de fase para comparar: "F10c.3" ≡ "f10c-3" ≡ "f10c_3" ≡ "F10C.3".
  *  Todos los separadores (espacios, puntos, guiones, bajos) fuera + lowercase. */
 export function normalizePhaseId(id: string): string {
-	return id.trim().toLowerCase().replace(/[\s._-]+/g, "");
+	return id
+		.trim()
+		.toLowerCase()
+		.replace(/[\s._-]+/g, "");
 }
 
 /** #157/#158 — Extrae (planPathToken, fase) de un input de workflow.
@@ -142,7 +145,12 @@ export function appendPhaseProgress(
 		? readFileSync(file, "utf8")
 				.split("\n")
 				.filter((l) => l.trim().length > 0)
-		: [`# Progreso del plan — ${slug}`, "", "| Fase | Run | Completado |", "| --- | --- | --- |"];
+		: [
+				`# Progreso del plan — ${slug}`,
+				"",
+				"| Fase | Run | Completado |",
+				"| --- | --- | --- |",
+			];
 	existing.push(`| ${phaseId} | ${runId} | ${completedAtIso} |`);
 	mkdirSync(dirname(file), { recursive: true });
 	writeFileSync(file, existing.join("\n") + "\n", "utf8");
@@ -180,7 +188,8 @@ export function bootstrapPlanProgressFromRuns(
 		}
 		const input = rows.find((r) => r.type === "workflow")?.input;
 		const hasCommit = rows.some(
-			(r) => r.type === "stage" && r.stage === "commit" && r.status === "completed",
+			(r) =>
+				r.type === "stage" && r.stage === "commit" && r.status === "completed",
 		);
 		if (!input || !hasCommit) continue;
 		const extracted = extractPhaseId(input);

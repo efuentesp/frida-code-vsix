@@ -384,7 +384,7 @@ export function App() {
 					<span className="avatar ai sm">
 						<FridaRobotIcon size={12} />
 					</span>{" "}
-					Frida Code
+					Frida Studio
 				</span>
 				{state.lensStatus?.loaded && (
 					<Tooltip
@@ -548,6 +548,11 @@ export function App() {
 								text,
 							})
 						}
+						onOpenSettings={(tab) => {
+							setConfigOpen(true);
+							setSettingsTab(tab);
+						}}
+						workspace={state.workspace}
 					/>
 				)}
 				{state.compactions

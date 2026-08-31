@@ -185,7 +185,7 @@ Ticker al lado del composer.
 	describe("extractSkillFollowups (#150)", () => {
 		it("extrae skills en bloques de código markdown con argumentos entrecomillados", () => {
 			const text =
-				"Para continuar con la fase, ejecuta el siguiente skill:\n```bash\n/skill:implement \"Phase 1: Implementar componentes\"\n```";
+				'Para continuar con la fase, ejecuta el siguiente skill:\n```bash\n/skill:implement "Phase 1: Implementar componentes"\n```';
 			const skills = extractSkillFollowups(text);
 			expect(skills).toHaveLength(1);
 			expect(skills[0].id).toBe("skill-implement-0");
@@ -215,9 +215,7 @@ Siguientes pasos sugeridos:
 `;
 			const skills = extractSkillFollowups(text);
 			expect(skills).toHaveLength(3);
-			expect(skills[0].prompt).toBe(
-				'/skill:plan "Arquitectura de base de datos"',
-			);
+			expect(skills[0].prompt).toBe('/skill:plan "Arquitectura de base de datos"');
 			expect(skills[1].prompt).toBe("/skill:implement");
 			expect(skills[2].prompt).toBe("/skill:validate");
 		});
@@ -244,7 +242,7 @@ Siguientes pasos sugeridos:
 						{
 							kind: "text",
 							text:
-								"He terminado la fase. Para continuar ejecuta:\n```\n/skill:implement \"Phase 2: Tests\"\n```\n### Propuesta A: Algo más\n¿Cuál prefieres?",
+								'He terminado la fase. Para continuar ejecuta:\n```\n/skill:implement "Phase 2: Tests"\n```\n### Propuesta A: Algo más\n¿Cuál prefieres?',
 						},
 					],
 				}),

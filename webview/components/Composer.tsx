@@ -54,6 +54,38 @@ const scrollActiveIntoView = (el: HTMLElement | null) => {
 	if (el) requestAnimationFrame(() => el.scrollIntoView({ block: "nearest" }));
 };
 
+const PROMPT_HISTORY_KEY = "frida_command_history_v1";
+const MAX_PROMPT_HISTORY = 300;
+
+function loadPersistentHistory(): string[] {
+	try {
+		const raw = localStorage.getItem(PROMPT_HISTORY_KEY);
+		if (raw) {
+			const parsed = JSON.parse(raw);
+			if (Array.isArray(parsed)) {
+				return parsed.filter(
+					(item): item is string =>
+						typeof item === "string" && item.trim().length > 0,
+				);
+			}
+		}
+	} catch {
+		// fallback si localStorage no está disponible
+	}
+	return [];
+}
+
+function savePersistentHistory(history: string[]): void {
+	try {
+		localStorage.setItem(
+			PROMPT_HISTORY_KEY,
+			JSON.stringify(history.slice(0, MAX_PROMPT_HISTORY)),
+		);
+	} catch {
+		// ignore
+	}
+}
+
 export function Composer({
 	onSubmit,
 	onSearch,
@@ -70,7 +102,7 @@ export function Composer({
 	onSetThinking,
 	onCycleMode,
 	expanded,
-	onExpandedChange,
+	onExpandedChange: _onExpandedChange,
 	insertSignal,
 	onOpenProviders,
 }: {
@@ -110,7 +142,7 @@ export function Composer({
 }) {
 	const [text, setText] = useState("");
 	const [images, setImages] = useState<ImageAttachment[]>([]);
-	const historyRef = useRef<string[]>([]);
+	const historyRef = useRef<string[]>(loadPersistentHistory());
 	const histIdx = useRef(-1);
 	const draftRef = useRef("");
 	const [activeQuery, setActiveQuery] = useState<string | null>(null); // "@"
@@ -484,10 +516,14 @@ export function Composer({
 		const t = text.trim();
 		if (t) {
 			const h = historyRef.current;
-			if (h[0] !== t) {
-				h.unshift(t);
-				if (h.length > 100) h.pop();
+			// Si ya existía en el historial, removerlo de la posición previa para que suba al tope (como bash)
+			const existingIdx = h.indexOf(t);
+			if (existingIdx >= 0) {
+				h.splice(existingIdx, 1);
 			}
+			h.unshift(t);
+			if (h.length > MAX_PROMPT_HISTORY) h.pop();
+			savePersistentHistory(h);
 		}
 		setText("");
 		setImages([]);
@@ -589,24 +625,32 @@ export function Composer({
 				el.selectionStart === 0 && el.selectionStart === el.selectionEnd;
 			const atEnd =
 				el.selectionStart === text.length && el.selectionStart === el.selectionEnd;
-			// Historial del input (↑/↓ en los bordes, como bash).
-			if (e.key === "ArrowUp" && atStart) {
+			// Historial del input (↑/↓ en los bordes o vacío, como bash/Linux).
+			if (e.key === "ArrowUp" && (atStart || !text.trim())) {
 				const h = historyRef.current;
 				if (h.length > 0) {
 					e.preventDefault();
 					if (histIdx.current === -1) {
 						draftRef.current = text;
 						histIdx.current = 0;
-					} else if (histIdx.current < h.length - 1) histIdx.current++;
-					setText(h[histIdx.current]);
+					} else if (histIdx.current < h.length - 1) {
+						histIdx.current++;
+					}
+					const nextVal = h[histIdx.current] ?? "";
+					setText(nextVal);
 					requestAnimationFrame(() => {
-						el.setSelectionRange(0, 0);
+						const n = nextVal.length;
+						el.setSelectionRange(n, n);
 						grow(el);
 					});
 				}
 				return;
 			}
-			if (e.key === "ArrowDown" && histIdx.current >= 0 && atEnd) {
+			if (
+				e.key === "ArrowDown" &&
+				histIdx.current >= 0 &&
+				(atEnd || !text.trim())
+			) {
 				e.preventDefault();
 				const h = historyRef.current;
 				if (histIdx.current === 0) {
@@ -614,7 +658,8 @@ export function Composer({
 					histIdx.current = -1;
 				} else {
 					histIdx.current--;
-					setText(h[histIdx.current]);
+					const nextVal = h[histIdx.current] ?? "";
+					setText(nextVal);
 				}
 				requestAnimationFrame(() => {
 					const n = el.value.length;
@@ -756,30 +801,6 @@ export function Composer({
 						onClick={(e) => recompute(e.target as HTMLTextAreaElement)}
 						onKeyDown={onKeyDown}
 					/>
-					<Tooltip
-						label={expanded ? "Contraer editor" : "Expandir editor"}
-						side="top"
-					>
-						<button
-							className={"bar-ico" + (expanded ? " active" : "")}
-							disabled={pendingDialog}
-							onClick={() => {
-								const next = !expanded;
-								onExpandedChange?.(next);
-								const el = ref.current;
-								if (!el) return;
-								if (next)
-									el.style.height = ""; // deja que .input-expanded fije la altura
-								else requestAnimationFrame(() => grow(el)); // vuelve a auto-grow
-							}}
-						>
-							{expanded ? (
-								<Codicon name="screen-normal" size={14} />
-							) : (
-								<Codicon name="screen-full" size={14} />
-							)}
-						</button>
-					</Tooltip>
 				</div>
 				{atFiles.length > 0 && (
 					<div className="chips">

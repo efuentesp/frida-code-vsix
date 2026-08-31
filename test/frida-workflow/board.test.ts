@@ -726,7 +726,11 @@ describe("board — dedup de transiciones (#185)", () => {
 		dedupeBoard(board);
 		expect(u.transitions.filter((t) => t.runId === "r1").length).toBe(1);
 		// La clave idéntica en OTRA unidad no se roba la transición
-		applyStageTransition(board, "F02", { stage: "commit", runId: "r1", ts: "t1" });
+		applyStageTransition(board, "F02", {
+			stage: "commit",
+			runId: "r1",
+			ts: "t1",
+		});
 		const u2 = board.units.find((x) => x.id === "F02")!;
 		expect(u2.transitions.filter((t) => t.runId === "r1").length).toBe(1);
 	});

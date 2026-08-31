@@ -206,7 +206,12 @@ describe("plan-utils — progreso de plan (#158)", () => {
 				{ type: "stage", runId: name, stage: "validate", status: "completed" },
 			];
 			if (withCommit) {
-				rows.push({ type: "stage", runId: name, stage: "commit", status: "completed" });
+				rows.push({
+					type: "stage",
+					runId: name,
+					stage: "commit",
+					status: "completed",
+				});
 			}
 			fs.writeFileSync(
 				path.join(runsDir, `${name}.jsonl`),
@@ -247,7 +252,9 @@ describe("plan-utils — progreso de plan (#158)", () => {
 		expect(r!.isPlanComplete).toBe(true); // tmp ya tiene TODO registrado en este punto
 		// Caso limpio en un cwd sin progreso:
 		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "plan-utils-158b-"));
-		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), { recursive: true });
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
 		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
 		const r2 = resolveNextStep(`"${PLAN} Phase F10c.2"`, tmp2);
 		expect(r2!.nextPhase?.id).toBe("F10c.3");
