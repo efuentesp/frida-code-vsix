@@ -113,6 +113,7 @@ import {
 	scanSkillContracts,
 	setSkillContracts,
 	bootstrapBoardFromRuns,
+	setBoardShowHandler,
 	loadBoard,
 	openBoard,
 	saveBoard,
@@ -5321,6 +5322,10 @@ export async function activate(
 	registerCommandRunner((cmd) => {
 		void runPrompt(cmd);
 	});
+
+	// #161 — frida.board.show() de extensiones/skills headless: mismo canal
+	// que un submit del usuario (runPrompt intercepta los built-in como /board).
+	setBoardShowHandler(() => void runPrompt("/board"));
 
 	// #158 — Bootstrap del progreso de planes desde el histórico de runs JSONL
 	// (idempotente: deduplica por fase). Cubre fases completadas antes de esta

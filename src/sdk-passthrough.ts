@@ -14,3 +14,6 @@
 // resuelve a este passthrough que sí exporta defineTool.
 
 export * from "@earendil-works/pi-coding-agent";
+
+// #161 — Superficie frida.* de Frida (board como API para extensiones del agente).
+export { frida } from "./tools/frida-workflow/extension-api";

@@ -85,6 +85,9 @@ export type { ToolCallLike, GitCommitData } from "./outcomes";
 // Schemas (Fase 2)
 export { typeboxSchema, validateSchema, summarizeIssues } from "./schema";
 export { defineSddWorkflow } from "./sdd-factory";
+// #161 — Superficie frida.board.* (extensionApi; ver extension-api.ts para el contrato).
+export { frida, setBoardShowHandler } from "./extension-api";
+export type { BoardTransitionInput } from "./extension-api";
 export type { SddWorkflowOptions } from "./sdd-factory";
 
 // Validación de grafo (Fase 2)
