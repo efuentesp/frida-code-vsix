@@ -217,7 +217,6 @@ function PhaseCard({
 	const hasBadges =
 		children.length > 0 ||
 		blockedDeps.length > 0 ||
-		!!(unit.deps && unit.deps.length > 0) ||
 		fails > 0 ||
 		blocked ||
 		lastArtifacts(unit).length > 0; // #180 — renglón 2 sólo si hay contenido
@@ -272,17 +271,7 @@ function PhaseCard({
 							<ficon name="git-branch" size={9} />
 							<ftext size={10}>{blockedDeps.join(",")}</ftext>
 						</fbox>
-					) : unit.deps && unit.deps.length > 0 ? (
-						<fbox
-							flexDirection="row"
-							gap={2}
-							alignItems="center"
-							cls="kb-deps"
-							title={`Dependencias satisfechas: ${unit.deps.join(", ")}`}
-						>
-							<ficon name="check" size={9} />
-						</fbox>
-					) : null}
+				) : null} // #182 — deps satisfechas sin check: el ▶ activo ya lo comunica
 					{fails > 0 ? (
 						<fbox
 							flexDirection="row"
