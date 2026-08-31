@@ -103,6 +103,7 @@ import { getTodoState } from "./tools/todo-web/store";
 import { expandAskPrompt } from "./tools/ask-user-question-web";
 import {
 	createFridaWorkflowHost,
+	encodeCwd,
 	handleWfSlash,
 	validateWorkflow,
 } from "./tools/frida-workflow";
@@ -112,6 +113,7 @@ import type {
 	WorkflowOrigin,
 } from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
+import { bootstrapPlanProgressFromRuns } from "./tools/frida-workflow/plan-utils";
 import {
 	getWorkflowRuns as getFridaWorkflowRuns,
 	registerCommandRunner,
@@ -5188,6 +5190,23 @@ export async function activate(
 		void runPrompt(cmd);
 	});
 
+	// #158 — Bootstrap del progreso de planes desde el histórico de runs JSONL
+	// (idempotente: deduplica por fase). Cubre fases completadas antes de esta
+	// versión para que la tarjeta sugiera el primer hueco real desde el arranque.
+	{
+		const runsDirBase = path.join(context.globalStorageUri.fsPath, "workflows");
+		const registered = bootstrapPlanProgressFromRuns(
+			path.join(runsDirBase, encodeCwd(workspaceCwd()), "runs"),
+			workspaceCwd(),
+		);
+		if (registered > 0) {
+			post({
+				type: "info",
+				text: `Progreso de planes restaurado: ${registered} fase(s) registradas.`,
+			});
+		}
+	}
+
 	// /wf sola → QuickPick agrupado (Patrones agénticos / Internos / Globales / Proyecto).
 	async function pickWorkflow(
 		loaded: LoadedWorkflows,
@@ -6690,9 +6709,7 @@ export async function activate(
 					type: "info",
 					text: "No hay workflows en ejecución. Usa /wf <nombre> para iniciar uno.",
 				});
-			} else {
-				if (actExtensible.length > 0) requestPanelShow();
-			}
+			} else if (actExtensible.length > 0) requestPanelShow();
 			void vscode.commands.executeCommand("frida.codeView.focus");
 		}),
 		// #84: ancla permanente — conteo vivo de runs; click = mostrar el panel.

@@ -9,8 +9,10 @@
 import type { ReactElement } from "react";
 import { registerLifecycle, type LifecycleListeners } from "./lifecycle";
 import { createWorkflowPanelElement } from "./WorkflowPanel";
+import { appendPhaseProgress, extractPhaseId } from "./plan-utils";
 import {
 	endRun,
+	getWorkflowRuns,
 	stageEnd,
 	stageError,
 	stageRetry,
@@ -42,7 +44,34 @@ export function createWorkflowLifecycle(): LifecycleListeners {
 		onLoopCap: () => {},
 		// onRoute: el panel no muestra routes explícitamente (la próxima stageStart
 		// refleja el avance); se deja vacío a propósito.
-		onWorkflowEnd: (result, ctx) => endRun(result, ctx),
+		onWorkflowEnd: (result, ctx) => {
+			// #158 — Registrar progreso ANTES de endRun: la fase del run queda en el
+			// archivo de progreso y el re-render de la tarjeta ya sugiere el primer
+			// hueco real. Sólo runs con etapa commit completada cuentan como avance.
+			if (result.success) {
+				const run = getWorkflowRuns().runs.find((r) => r.runId === ctx.runId);
+				const committed = run?.stages.some(
+					(s) => s.name === "commit" && s.status === "completed",
+				);
+				if (run && committed && ctx.input) {
+					const extracted = extractPhaseId(ctx.input);
+					if (extracted?.phaseId) {
+						try {
+							appendPhaseProgress(
+								ctx.cwd,
+								extracted.planPathToken,
+								extracted.phaseId,
+								ctx.runId,
+								new Date().toISOString(),
+							);
+						} catch {
+							/* best-effort: sin archivo, la tarjeta degrada a fase siguiente */
+						}
+					}
+				}
+			}
+			endRun(result, ctx);
+		},
 	};
 }
 
