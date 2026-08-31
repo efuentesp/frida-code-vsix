@@ -121,7 +121,10 @@ import type {
 	Workflow,
 	WorkflowOrigin,
 } from "./tools/frida-workflow";
-import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
+import {
+	wireWorkflowPanel,
+	remountWorkflowPanel,
+} from "./tools/frida-workflow/panel";
 import { bootstrapPlanProgressFromRuns } from "./tools/frida-workflow/plan-utils";
 import { extractPhaseId } from "./tools/frida-workflow/plan-utils";
 import { createBoardOverlayElement } from "./tools/frida-workflow/board-ui";
@@ -3050,6 +3053,10 @@ export async function activate(
 					// el estado (idempotente).
 					const s = await ensureSession();
 					s.webBridge.republish();
+					// #165 — La webview se (re)montó: el mount del footer del panel de
+					// workflows se pierde al recrearse la webview — re-montarlo para que
+					// el panel reaparezca (con los runs que el store ya conserva).
+					remountWorkflowPanel(s.webBridge);
 					sendModelInfo();
 					postResources();
 					postModels();
@@ -5128,6 +5135,11 @@ export async function activate(
 						onAdvance: (planPath, phaseId) => {
 							boardOverlayHandle?.unmount();
 							boardUnsubscribe?.();
+							// #165 — Enfocar el chat: el panel del workflow vive en el footer
+							// de la vista; al lanzar desde el tablero lo traemos a la vista.
+							void vscode.commands.executeCommand(
+								"frida.codeView.focus",
+							);
 							// #163 — El workflow dueño del board arma el comando (p. ej. sdd-ship).
 							runCustomCommand(
 								`/wf ${data.workflow ?? "sdd-ship"} "${planPath} Phase ${phaseId}"`,
@@ -5143,7 +5155,7 @@ export async function activate(
 		};
 		mount(board);
 		// #163 — Overlay vivo: cada transición del board (validate FAIL incluido)
-			// re-monta el tablero con los datos frescos — la tarjeta se mueve en vivo.
+		// re-monta el tablero con los datos frescos — la tarjeta se mueve en vivo.
 		boardUnsubscribe = subscribeBoardChanges(() => {
 			const fresh = loadBoard(cwd, planToken);
 			if (fresh) mount(fresh);

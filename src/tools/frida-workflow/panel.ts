@@ -186,6 +186,15 @@ export function mountWorkflowPanel(webBridge: WorkflowWebBridge): {
 	return panelMounted;
 }
 
+/** #165 — La webview se (re)montó: el mount del footer se PIERDE cuando VS Code
+ *  recrea/deshidrata la webview del chat. Re-montar el panel sin re-registrar
+ *  el lifecycle (el store conserva los runs; el panel simplemente reaparece). */
+export function remountWorkflowPanel(webBridge: WorkflowWebBridge): void {
+	panelMounted?.unmount();
+	panelMounted = undefined;
+	mountWorkflowPanel(webBridge);
+}
+
 /** Sólo tests. */
 export function _resetWorkflowPanel(): void {
 	panelMounted = undefined;
