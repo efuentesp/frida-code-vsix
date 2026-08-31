@@ -7,7 +7,7 @@
 // → store → el panel se re-renderiza solo (useSyncExternalStore).
 
 import type { ReactElement } from "react";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import {
@@ -64,9 +64,7 @@ function findElaborationArtifact(
 			.filter((f) => f.endsWith(".md") && normalizePhaseId(f).includes(key))
 			.map((f) => ({ f, m: statSync(join(dir, f)).mtimeMs }))
 			.sort((a, b) => b.m - a.m);
-		return files[0]
-			? [{ kind: "elaboration", path: join(dir, files[0].f) }]
-			: [];
+		return files[0] ? [{ kind: "elaboration", path: join(dir, files[0].f) }] : [];
 	} catch {
 		return [];
 	}
@@ -92,12 +90,12 @@ function applyRuntimeBoardTransition(
 	const extracted = extractPhaseId(ctx.input);
 	if (!extracted?.phaseId) return;
 	try {
-		const planAbs = join(ctx.cwd, extracted.planPathToken);
-		const planContent = existsSync(planAbs)
-			? readFileSync(planAbs, "utf8")
-			: undefined;
+		// #164 — SIN planContent en runtime: re-sincronizar el plan en cada etapa
+		// colaba unidades duplicadas cuando el "plan" tiene headers agrupados
+		// (p. ej. el roadmap maestro: ## F0..## F6–F8 vs filas F01–F17). El sync de
+		// unidades (y splits) ocurre en /board y en el bootstrap, no aquí.
 		const spec = resolveBoardSpec(ctx.workflow);
-		const board = openBoard(ctx.cwd, extracted.planPathToken, planContent, spec);
+		const board = openBoard(ctx.cwd, extracted.planPathToken, undefined, spec);
 		board.workflow = ctx.workflow; // #163 — la UI arma /wf <workflow> desde el tablero
 		let artifacts: BoardArtifactLink[] = [];
 		if (output?.primaryHandle) {

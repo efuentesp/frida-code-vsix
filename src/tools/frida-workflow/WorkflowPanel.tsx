@@ -10,7 +10,7 @@
 //
 // Tags intrinsic de frida-webview (fbox/ftext/ficon), tipados en src/frida-webview/index.ts.
 
-import { useSyncExternalStore, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore, useState } from "react";
 import type { ReactElement } from "react";
 import {
 	abortRun,
@@ -125,6 +125,21 @@ function WorkflowPanel(): ReactElement | null {
 	const [collapsedRuns, setCollapsedRuns] = useState<Set<string>>(new Set());
 	const [panelCollapsed, setPanelCollapsed] = useState(false);
 	const [dismissed, setDismissed] = useState(false);
+
+	// #164 — Run NUEVO ⇒ reabrir el panel: si el usuario cerró el panel ([X])
+	// y un workflow arranca (p. ej. ▶ desde el tablero), debe volver a verse.
+	// Antes: dismissed persistía y un run rápido pasaba completamente invisible.
+	const seenRunIds = useRef<Set<string>>(new Set());
+	useEffect(() => {
+		let hasNew = false;
+		for (const r of state.runs) {
+			if (!seenRunIds.current.has(r.runId)) {
+				seenRunIds.current.add(r.runId);
+				hasNew = true;
+			}
+		}
+		if (hasNew) setDismissed(false);
+	}, [state.runs]);
 
 	// Más reciente primero.
 	const runs = [...state.runs].reverse();
