@@ -271,7 +271,8 @@ function PhaseCard({
 							<ficon name="git-branch" size={9} />
 							<ftext size={10}>{blockedDeps.join(",")}</ftext>
 						</fbox>
-				) : null} // #182 — deps satisfechas sin check: el ▶ activo ya lo comunica
+				) : null}
+				{/* #182 — deps satisfechas sin check: el ▶ activo ya lo comunica */}
 					{fails > 0 ? (
 						<fbox
 							flexDirection="row"
