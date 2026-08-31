@@ -84,6 +84,8 @@ export type { ToolCallLike, GitCommitData } from "./outcomes";
 
 // Schemas (Fase 2)
 export { typeboxSchema, validateSchema, summarizeIssues } from "./schema";
+export { defineSddWorkflow } from "./sdd-factory";
+export type { SddWorkflowOptions } from "./sdd-factory";
 
 // Validación de grafo (Fase 2)
 export { validateWorkflow, hasErrors } from "./validate";
