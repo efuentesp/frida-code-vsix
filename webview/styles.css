@@ -12581,8 +12581,20 @@ mark.hl {
 	animation: kb-pulse 1.6s ease-in-out infinite;
 	border-radius: 4px;
 }
+/* #178 — Bloqueado por deps: icono candado PURO (sin caja/opacidad de botón).
+	Tooltip habilitado (sin pointer-events: none) para explicar las deps. */
 .kb-advance-disabled {
-	opacity: 0.35;
+	display: inline-flex;
+	align-items: center;
 	cursor: default;
-	pointer-events: none;
+	user-select: none;
+}
+
+/* #177 — Dependencias en la tarjeta: pendientes (naranja) / satisfechas (verde) */
+.kb-deps {
+	color: var(--vscode-charts-green, #4ec9b0);
+	user-select: none;
+}
+.kb-deps-pending {
+	color: var(--vscode-charts-orange, #d18616);
 }

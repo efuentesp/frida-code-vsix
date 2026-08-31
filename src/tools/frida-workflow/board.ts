@@ -67,6 +67,10 @@ export interface BoardUnit {
 	/** "plan": nació del plan original; "split": la añadió un skill que partió la fase. */
 	origin: "plan" | "split";
 	status: string; // columna actual
+	/** #177 — Ids de las fases de las que depende (tabla del plan). Su ▶ sólo
+	 *  se habilita cuando TODAS están done — habilita ejecución en paralelo
+	 *  de items independientes. */
+	deps?: string[];
 	transitions: BoardTransition[];
 }
 
@@ -489,6 +493,21 @@ export function applyStageTransition(
 }
 
 // ── Cierre y primer hueco (DFS) ─────────────────────────────────────────────
+
+/** #177 — Dependencias aún NO satisfechas de una unidad (ids de fases). */
+export function pendingDeps(board: Board, unit: BoardUnit): string[] {
+	if (!unit.deps || unit.deps.length === 0) return [];
+	return unit.deps.filter((d) => {
+		const dep = board.units.find((u) => u.id === d);
+		return !dep || !isUnitDone(board, dep);
+	});
+}
+
+/** #177 — ¿Todas las dependencias de la unidad están done? (habilita su ▶;
+ *  permite correr en paralelo items con deps satisfechas e independientes). */
+export function depsSatisfied(board: Board, unit: BoardUnit): boolean {
+	return pendingDeps(board, unit).length === 0;
+}
 
 export function isUnitDone(board: Board, unit: BoardUnit): boolean {
 	if (unit.status === board.doneColumn) return true;

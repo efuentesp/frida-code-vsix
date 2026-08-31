@@ -7,6 +7,7 @@ import * as path from "node:path";
 import { defineRoute } from "../../src/tools/frida-workflow";
 import {
 	applyStageTransition,
+	depsSatisfied,
 	deriveBoardSpec,
 	boardChildren,
 	boardFilePath,
@@ -19,6 +20,7 @@ import {
 	setSkillContracts,
 	syncUnitsFromPlan,
 	validateFails,
+	pendingDeps,
 	type Board,
 } from "../../src/tools/frida-workflow/board";
 import {
@@ -536,5 +538,34 @@ describe("board — breaker trip (#172)", () => {
 		expect(last.blocked).toBe(true);
 		expect(last.regress).toBeUndefined();
 		expect(validateFails(board.units[0]!)).toBe(3); // badge de ciclos
+	});
+});
+
+// ── #177 — Dependencias: gating del ▶ y paralelismo ─────────────────────────
+describe("board — dependencias (#177)", () => {
+	it("pendingDeps/depsSatisfied: bloquea hasta que TODAS las deps están done", () => {
+		// tmp FRESCO: el board compartido arrastra estados de tests previos.
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-deps-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		const board = openBoard(tmp2, PLAN, PLAN5);
+		const u = board.units.find((x) => x.id === "F10c.4")!;
+		u.deps = ["F10c.1", "F10c.2"];
+		expect(pendingDeps(board, u)).toEqual(["F10c.1", "F10c.2"]);
+		expect(depsSatisfied(board, u)).toBe(false);
+
+		applyStageTransition(board, "F10c.1", { stage: "commit", runId: "r", ts: "t" });
+		expect(pendingDeps(board, u)).toEqual(["F10c.2"]); // parcial
+
+		applyStageTransition(board, "F10c.2", { stage: "commit", runId: "r", ts: "t" });
+		expect(depsSatisfied(board, u)).toBe(true); // habilita el ▶
+	});
+
+	it("sin deps declaradas → satisfechas (item independiente, paralelo)", () => {
+		const board = openBoard(tmp, PLAN, PLAN5);
+		const u = board.units.find((x) => x.id === "F10c.5")!;
+		expect(depsSatisfied(board, u)).toBe(true);
 	});
 });

@@ -232,6 +232,8 @@ export {
 	syncUnitsFromPlan,
 	applyStageTransition,
 	boardChildren,
+	depsSatisfied,
+	pendingDeps,
 	isUnitDone,
 	firstRealGap,
 	bootstrapBoardFromRuns,

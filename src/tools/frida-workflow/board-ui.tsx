@@ -18,8 +18,10 @@ import type { ReactElement } from "react";
 import type { Board, BoardUnit } from "./board";
 import {
 	boardChildren,
+	depsSatisfied,
 	firstRealGap,
 	isUnitDone,
+	pendingDeps,
 	validateFails,
 } from "./board";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
@@ -75,10 +77,13 @@ function BoardPanel({
 	// #175 — Fase EN EJECUCIÓN (reactivo): pulso en su tarjeta, sin ▶, y el resto
 	// del backlog con ▶ deshabilitado hasta que el run termine.
 	const runsState = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
-	const activeRun = runsState.runs.find((r) => r.status === "running");
-	const runningPhase = activeRun?.input
-		? extractPhaseId(activeRun.input)?.phaseId
-		: undefined;
+	// #177 — Fases EN EJECUCIÓN (SET: flujos en paralelo permitidos por deps).
+	const runningPhases = new Set(
+		runsState.runs
+			.filter((r) => r.status === "running")
+			.map((r) => (r.input ? extractPhaseId(r.input)?.phaseId : undefined))
+			.filter((p): p is string => !!p),
+	);
 	const gap = firstRealGap(board);
 	const roots = board.units.filter((u) => u.parentId === undefined);
 	const doneCount = roots.filter((r) => isUnitDone(board, r)).length;
@@ -166,7 +171,7 @@ function BoardPanel({
 									key={u.id}
 									board={board}
 									unit={u}
-									runningPhase={runningPhase}
+									runningPhases={runningPhases}
 									isGap={gap?.id === u.id}
 									expanded={expanded.has(u.id)}
 									onToggle={() => toggleUnit(u.id)}
@@ -184,7 +189,7 @@ function BoardPanel({
 function PhaseCard({
 	board,
 	unit,
-	runningPhase,
+	runningPhases,
 	isGap,
 	expanded,
 	onToggle,
@@ -192,8 +197,8 @@ function PhaseCard({
 }: {
 	board: Board;
 	unit: BoardUnit;
-	/** #175 — id de la fase en ejecución (run activo), si hay. */
-	runningPhase?: string;
+	/** #175/#177 — ids de fases en ejecución (runs activos, en paralelo). */
+	runningPhases: Set<string>;
 	isGap: boolean;
 	expanded: boolean;
 	onToggle: () => void;
@@ -202,8 +207,10 @@ function PhaseCard({
 	const children = boardChildren(board, unit.id);
 	const doneChildren = children.filter((c) => isUnitDone(board, c)).length;
 	const isDone = isUnitDone(board, unit);
-	const isRunning = unit.id === runningPhase; // #175 — pulso + sin ▶
-	const othersBlocked = runningPhase !== undefined && !isRunning; // #175 — ▶ deshabilitado
+	const isRunning = runningPhases.has(unit.id); // #175 — pulso + sin ▶
+	// #177 — El ▶ se habilita por DEPENDENCIAS (no por actividad): paralelo real.
+	const blockedDeps = pendingDeps(board, unit);
+	const depsOk = depsSatisfied(board, unit);
 	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
 	const blocked = unit.transitions.at(-1)?.blocked === true; // #172 — breaker
 	const accent = isDone
@@ -234,6 +241,28 @@ function PhaseCard({
 					>
 						{doneChildren}/{children.length}
 					</ftext>
+				) : null}
+				{blockedDeps.length > 0 ? (
+					<fbox
+						flexDirection="row"
+						gap={2}
+						alignItems="center"
+						cls="kb-deps kb-deps-pending"
+						title={`Depende de: ${blockedDeps.join(", ")} — el ▶ se habilita al completarlas`}
+					>
+						<ficon name="git-branch" size={9} />
+						<ftext size={10}>{blockedDeps.join(",")}</ftext>
+					</fbox>
+				) : unit.deps && unit.deps.length > 0 ? (
+					<fbox
+						flexDirection="row"
+						gap={2}
+						alignItems="center"
+						cls="kb-deps"
+						title={`Dependencias satisfechas: ${unit.deps.join(", ")}`}
+					>
+						<ficon name="check" size={9} />
+					</fbox>
 				) : null}
 				{fails > 0 ? (
 					<fbox
@@ -283,7 +312,7 @@ function PhaseCard({
 							flexDirection="row"
 							gap={4}
 							alignItems="center"
-							cls={`kb-sub${isGap && gapIsChild(board, c) ? " kb-gap" : ""}${c.id === runningPhase ? " kb-sub-running" : ""}`}
+							cls={`kb-sub${isGap && gapIsChild(board, c) ? " kb-gap" : ""}${runningPhases.has(c.id) ? " kb-sub-running" : ""}`}
 						>
 							<ftext size={10} bold color={subColor(board, c)}>
 								{c.id}
@@ -298,19 +327,7 @@ function PhaseCard({
 
 			<UnitArtifacts unit={unit} actions={actions} />
 
-			{isRunning ? null : othersBlocked ? (
-				// #175 — Hay una fase en ejecución: ▶ deshabilitado hasta terminar.
-				<fbox
-					cls="kb-advance-disabled"
-					title="Hay una fase en ejecución — disponible al terminar el run"
-				>
-					<ficon
-						name="play"
-						size={11}
-						color="var(--vscode-disabledForeground, #5a5a5a)"
-					/>
-				</fbox>
-			) : isDone ? null : isGap ? (
+			{isRunning ? null : depsOk ? isDone ? null : isGap ? (
 				// #175 — Mismo look que el botón «Avanzar» del panel del workflow.
 				<fbutton
 					variant="primary"
@@ -329,6 +346,18 @@ function PhaseCard({
 					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
 				>
 					<ficon name="play" size={11} color="var(--vscode-foreground)" />
+				</fbox>
+			) : (
+				// #178 — Bloqueado por dependencias: icono puro (candado, sin caja).
+				<fbox
+					cls="kb-advance-disabled"
+					title={`Depende de: ${blockedDeps.join(", ")} — disponible al completarlas`}
+				>
+					<ficon
+						name="lock"
+						size={10}
+						color="var(--vscode-descriptionForeground)"
+					/>
 				</fbox>
 			)}
 		</fbox>
