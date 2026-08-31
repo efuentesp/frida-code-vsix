@@ -266,13 +266,28 @@ function WorkflowPanel(): ReactElement | null {
 				</fbox>
 			}
 			actions={
-				<fbox
-					onClick={() => setDismissed(true)}
-					cls="wf-close-icon-only"
-					title="Cerrar panel de workflows"
-				>
-					<ficon name="x" size={12} color="#8b949e" />
-				</fbox>
+				// #170 — Bloqueado con runs activos: candado (cerrar por error dejaba
+				// al usuario sin panel durante la ejecución). Al terminar, vuelve la x.
+				activeCount > 0 ? (
+					<fbox
+						cls="wf-close-locked"
+						title="Panel bloqueado: hay workflow(s) en ejecución — se puede cerrar al terminar"
+					>
+						<ficon
+							name="lock"
+							size={12}
+							color="var(--vscode-descriptionForeground)"
+						/>
+					</fbox>
+				) : (
+					<fbox
+						onClick={() => setDismissed(true)}
+						cls="wf-close-icon-only"
+						title="Cerrar panel de workflows"
+					>
+						<ficon name="x" size={12} color="#8b949e" />
+					</fbox>
+				)
 			}
 		>
 			<fbox flexDirection="column" gap={6}>
