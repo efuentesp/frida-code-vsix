@@ -6898,9 +6898,10 @@ kbd {
 /* #163 — Botón discreto en tarjetas ejecutables que NO son el hueco sugerido */
 .kb-advance-quiet {
 	background: transparent;
-	color: var(--vscode-descriptionForeground);
-	padding: 2px 4px;
-	opacity: 0.75;
+	color: var(--vscode-foreground);
+	padding: 2px 5px;
+	border-radius: 4px;
+	opacity: 0.9;
 }
 .kb-advance-quiet:hover {
 	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));

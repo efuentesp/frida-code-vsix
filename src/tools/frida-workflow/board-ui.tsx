@@ -215,7 +215,11 @@ function PhaseCard({
 					cls={`kb-advance${isGap ? "" : " kb-advance-quiet"}`}
 					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
 				>
-					<ficon name="play" size={10} />
+					<ficon
+						name="play"
+						size={11}
+						color="var(--vscode-foreground)"
+					/>
 					{isGap ? (
 						<ftext size={10} bold>
 							Avanzar {unit.id}
@@ -267,11 +271,14 @@ function lastArtifacts(unit: BoardUnit): {
 	path: string;
 	label?: string;
 }[] {
-	const byKind = new Map<string, { kind: string; path: string; label?: string }>();
+	const byKind = new Map<
+		string,
+		{ kind: string; path: string; label?: string }
+	>();
 	for (let i = unit.transitions.length - 1; i >= 0; i--) {
 		for (const a of unit.transitions[i]!.artifacts ?? []) {
 			if (!byKind.has(a.kind))
-					byKind.set(a.kind, { kind: a.kind, path: a.path, label: a.label });
+				byKind.set(a.kind, { kind: a.kind, path: a.path, label: a.label });
 		}
 	}
 	return [...byKind.values()];
