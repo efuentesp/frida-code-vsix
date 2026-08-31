@@ -17,6 +17,7 @@ import {
 	isUnitDone,
 	loadBoard,
 	openBoard,
+	resolveNextStepWithBoard,
 	saveBoard,
 	setSkillContracts,
 	restartUnit,
@@ -28,6 +29,7 @@ import {
 } from "../../src/tools/frida-workflow/board";
 import {
 	appendPhaseProgress,
+	progressFilePath,
 	normalizePhaseId,
 	readCompletedPhases,
 } from "../../src/tools/frida-workflow/plan-utils";
@@ -733,5 +735,84 @@ describe("board — dedup de transiciones (#185)", () => {
 		});
 		const u2 = board.units.find((x) => x.id === "F02")!;
 		expect(u2.transitions.filter((t) => t.runId === "r1").length).toBe(1);
+	});
+});
+
+// ── #193 — Escalera: board completo ⇒ plan completo (no «Avanzar a F0») ─────
+describe("board — resolveNextStepWithBoard (#193)", () => {
+	const PLAN_PDLE2 = ".frida/artifacts/plans/plan-pdle2-grupos.md";
+	const PLAN_PDLE2_MD = [
+		"# Plan dos niveles",
+		"## F0 — Cimientos",
+		"### F01 · Fundación reproducible",
+		"### F02 · Perfilado de datos legado",
+		"## F1 — Núcleo transversal",
+		"### F04 · Identidad y acceso",
+	].join("\n");
+
+	beforeAll(() => {
+		fs.writeFileSync(path.join(tmp, PLAN_PDLE2), PLAN_PDLE2_MD);
+	});
+
+	/** Los tests comparten tmp+PLAN: resetear el board persistido Y el progress
+	 *  file (#158) para que cada caso arranque del estado que construye
+	 *  (openBoard NO limpia el board guardado — hereda transiciones del test
+	 *  anterior; el progress alimenta la sugerencia relativa). */
+	const resetBoard = (plan: string) => {
+		const file = boardFilePath(tmp, plan);
+		if (fs.existsSync(file)) fs.rmSync(file);
+		const progress = progressFilePath(tmp, plan);
+		if (fs.existsSync(progress)) fs.rmSync(progress);
+	};
+
+	it("board completo y cobertura total ⇒ isPlanComplete sin botón fantasma", () => {
+		resetBoard(PLAN);
+		const board = openBoard(tmp, PLAN, PLAN5);
+		for (const u of board.units)
+			applyStageTransition(board, u.id, { stage: "commit", runId: "t", ts: "t" });
+		saveBoard(tmp, PLAN, board);
+		const res = resolveNextStepWithBoard(`${PLAN} Phase F10c.3`, tmp);
+		expect(res.boardGap).toBeUndefined();
+		expect(res.effective?.isPlanComplete).toBe(true);
+		expect(res.effective?.nextPhase).toBeUndefined();
+		expect(res.effective?.shipCommand).toBeUndefined();
+	});
+
+	it("board con hueco ⇒ sugiere el gap (comportamiento previo)", () => {
+		resetBoard(PLAN);
+		const board = openBoard(tmp, PLAN, PLAN5);
+		for (const u of board.units.slice(0, 2))
+			applyStageTransition(board, u.id, { stage: "commit", runId: "t", ts: "t" });
+		saveBoard(tmp, PLAN, board);
+		const res = resolveNextStepWithBoard(`${PLAN} Phase F10c.3`, tmp);
+		expect(res.boardGap?.id).toBe("F10c.3");
+		expect(res.effective?.isPlanComplete).toBe(false);
+		expect(res.effective?.shipCommand).toContain("Phase F10c.3");
+	});
+
+	it("board sin unidad para una fase del plan ⇒ NO declara completo (guard)", () => {
+		resetBoard(PLAN);
+		const board = openBoard(tmp, PLAN, PLAN5);
+		for (const u of board.units)
+			applyStageTransition(board, u.id, { stage: "commit", runId: "t", ts: "t" });
+		board.units = board.units.filter((u) => u.id !== "F10c.5"); // plan la conoce, board no
+		saveBoard(tmp, PLAN, board);
+		const res = resolveNextStepWithBoard(`${PLAN} Phase F10c.3`, tmp);
+		expect(res.effective?.isPlanComplete).toBe(false);
+	});
+
+	it("formato pdle2 (grupos h2 + fases h3 ·) ⇒ completa con las fases reales", () => {
+		const board = openBoard(tmp, PLAN_PDLE2, PLAN_PDLE2_MD);
+		// Con el fix #193 el board se crea con las FASES h3 (no los grupos h2).
+		expect(board.units.map((u) => u.id).sort()).toEqual(["F01", "F02", "F04"]);
+		for (const u of board.units)
+			applyStageTransition(board, u.id, { stage: "commit", runId: "t", ts: "t" });
+		saveBoard(tmp, PLAN_PDLE2, board);
+		const res = resolveNextStepWithBoard(`${PLAN_PDLE2} Phase F02`, tmp);
+		// Antes: parser veía grupos [F0, F1] jamás presentes en el board →
+		// «Avanzar a F0» con shipCommand sobre una fase inexistente.
+		expect(res.effective?.isPlanComplete).toBe(true);
+		expect(res.effective?.nextPhase).toBeUndefined();
+		expect(res.effective?.shipCommand).toBeUndefined();
 	});
 });

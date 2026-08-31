@@ -27,23 +27,37 @@ export interface NextStepSuggestion {
 	shipCommand?: string;
 }
 
-/** Extrae las fases declaradas como encabezados `## F10c.N — Título` o `## Phase N: Título` de un plan Markdown. */
+/** Extrae las fases declaradas como encabezados `## F10c.N — Título` o `## Phase N: Título` de un plan Markdown.
+ *
+ * #193 — Planes de dos niveles: h2 = GRUPOS (`## F0 — Cimientos`…), h3 =
+ * FASES reales (`### F16 · Título`, separador punto medio). Si hay h3 con id
+ * de fase, son las unidades ejecutables: preferirlas sobre los grupos h2
+ * (parsear los grupos como fases hacía sugerir «Avanzar a F0» — fase
+ * inexistente — cuando el board ya estaba completo). */
 export function parsePlanPhases(planContent: string): PlanPhaseInfo[] {
-	const phases: PlanPhaseInfo[] = [];
-	// Soporta tanto `## F10c.1 — Titulo` como `## F01 - Titulo` o `## Phase 1: Titulo`
-	const regex = /^##\s+(?:Phase\s+)?(F[\w.]+(?:\.\w+)?|\d+)\s*[—–\-:]\s*(.+)$/gm;
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(planContent)) !== null) {
-		const rawId = match[1]!.trim();
-		const id = rawId.startsWith("F") ? rawId : `Phase ${rawId}`;
-		const title = match[2]!.trim();
-		phases.push({
-			id,
-			title,
-			fullName: `${id} — ${title}`,
-		});
-	}
-	return phases;
+	// Separadores: em/en dash, guion, dos puntos y punto medio (·).
+	const collect = (regex: RegExp): PlanPhaseInfo[] => {
+		const found: PlanPhaseInfo[] = [];
+		let match: RegExpExecArray | null;
+		while ((match = regex.exec(planContent)) !== null) {
+			const rawId = match[1]!.trim();
+			const id = rawId.startsWith("F") ? rawId : `Phase ${rawId}`;
+			const title = match[2]!.trim();
+			found.push({
+				id,
+				title,
+				fullName: `${id} — ${title}`,
+			});
+		}
+		return found;
+	};
+	const h3 = collect(
+		/^###\s+(?:Phase\s+)?(F[\w.]+(?:\.\w+)?|\d+)\s*[—–\-:·]\s*(.+)$/gm,
+	);
+	const h2 = collect(
+		/^##\s+(?:Phase\s+)?(F[\w.]+(?:\.\w+)?|\d+)\s*[—–\-:·]\s*(.+)$/gm,
+	);
+	return h3.length > 0 ? h3 : h2;
 }
 
 /** Limpia cualquier envoltorio de comillas o escapes de un string de entrada. */

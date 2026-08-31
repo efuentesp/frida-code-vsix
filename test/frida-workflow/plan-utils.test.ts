@@ -44,6 +44,33 @@ Contenido...
 		expect(phases[2]?.id).toBe("F10c.3");
 	});
 
+	// #193 — Planes de dos niveles: h2 = grupos, h3 = fases reales.
+	it("prefiere fases h3 (·) sobre grupos h2 — formato pdle2", () => {
+		const planMd = [
+			"# Plan pdle2",
+			"## F0 — Cimientos",
+			"### F01 · Fundación reproducible",
+			"### F02 · Perfilado de datos legado",
+			"## F1 — Núcleo transversal",
+			"### F04 · Identidad y acceso",
+		].join("\n");
+		const phases = parsePlanPhases(planMd);
+		// Antes: veía los GRUPOS ["F0","F1"] — nunca las fases reales.
+		expect(phases.map((p) => p.id)).toEqual(["F01", "F02", "F04"]);
+	});
+
+	it("sin h3, los h2 siguen siendo las fases (regresión)", () => {
+		const planMd = "## F01 — Fundación\n## F02 — Perfilado\n";
+		const phases = parsePlanPhases(planMd);
+		expect(phases.map((p) => p.id)).toEqual(["F01", "F02"]);
+	});
+
+	it("h2 con punto medio (·) también matchea", () => {
+		const planMd = "## F01 · Fundación\n";
+		const phases = parsePlanPhases(planMd);
+		expect(phases.map((p) => p.id)).toEqual(["F01"]);
+	});
+
 	// #154 — heurística del banner «pausa (3 ciclos)»
 	describe("countTrailingFailedValidates", () => {
 		const fail = {

@@ -20,7 +20,7 @@ import {
 	renameSync,
 	writeFileSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import {
 	extractPhaseId,
 	normalizePhaseId,
@@ -725,6 +725,33 @@ export interface NextStepWithBoard {
 	effective: ReturnType<typeof import("./plan-utils").resolveNextStep>;
 }
 
+/** #193 — ¿El board cubre TODAS las fases del plan (con unidad done)? Board
+ *  sin hueco ≠ plan completo si quedan fases sin unidad; pero si cada fase
+ *  parseada tiene unidad done, el plan está cerrado según la fuente
+ *  autoritativa. Sin plan legible se confía en el board (conservador). */
+function boardCoversPlan(
+	board: Board,
+	planPathToken: string,
+	cwd: string,
+): boolean {
+	try {
+		const full = isAbsolute(planPathToken)
+			? planPathToken
+			: join(cwd, planPathToken);
+		if (!existsSync(full)) return true;
+		const phases = parsePlanPhases(readFileSync(full, "utf8"));
+		if (phases.length === 0) return true;
+		const done = new Set(
+			board.units
+				.filter((u) => isUnitDone(board, u))
+				.map((u) => normalizePhaseId(u.id)),
+		);
+		return phases.every((p) => done.has(normalizePhaseId(p.id)));
+	} catch {
+		return true;
+	}
+}
+
 /** Resuelve el siguiente paso consultando primero el board jerárquico. */
 export function resolveNextStepWithBoard(input: string, cwd: string) {
 	const extracted = extractPhaseId(sanitizeInput(input));
@@ -749,6 +776,22 @@ export function resolveNextStepWithBoard(input: string, cwd: string) {
 								elaborateCommand: `/skill:elaborate ${extracted.planPathToken} Phase ${gap.id}`,
 							}
 						: rel,
+				};
+			}
+			// #193 — Board sin hueco + cobertura total: plan COMPLETO según la
+			// fuente autoritativa (#159). Antes se degradaba a la sugerencia
+			// relativa y, con grupos h2 parseados como fases + progress
+			// desactualizado, sugería «Avanzar a F0» (fase inexistente).
+			if (rel && boardCoversPlan(board, extracted.planPathToken, cwd)) {
+				return {
+					boardGap: undefined,
+					effective: {
+						...rel,
+						nextPhase: undefined,
+						isPlanComplete: true,
+						shipCommand: undefined,
+						elaborateCommand: undefined,
+					},
 				};
 			}
 		}
