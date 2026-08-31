@@ -494,6 +494,30 @@ export function applyStageTransition(
 
 // ── Cierre y primer hueco (DFS) ─────────────────────────────────────────────
 
+/** #179 — Reinicio de ciclo: un NUEVO run sobre una fase que ya tenía
+ *  transiciones (p. ej. relanzada tras el breaker) devuelve la tarjeta a la
+ *  PRIMERA columna para recorrer el ciclo completo otra vez. Registra la
+ *  transición restart (y despeja el badge de bloqueada: pasa a ser la última).
+ *  Sin transiciones previas (primer arranque) no hace nada. */
+export function restartUnit(
+	board: Board,
+	unitId: string,
+	input: { runId: string; ts: string; source?: string },
+): BoardUnit | undefined {
+	const unit = board.units.find((u) => u.id === unitId);
+	if (!unit || unit.transitions.length === 0) return unit;
+	const first = board.columns[0]!;
+	unit.status = first;
+	unit.transitions.push({
+		to: first,
+		stage: "restart",
+		runId: input.runId,
+		ts: input.ts,
+		source: input.source,
+	});
+	return unit;
+}
+
 /** #177 — Dependencias aún NO satisfechas de una unidad (ids de fases). */
 export function pendingDeps(board: Board, unit: BoardUnit): string[] {
 	if (!unit.deps || unit.deps.length === 0) return [];

@@ -18,6 +18,7 @@ import {
 	openBoard,
 	saveBoard,
 	setSkillContracts,
+	restartUnit,
 	syncUnitsFromPlan,
 	validateFails,
 	pendingDeps,
@@ -556,10 +557,18 @@ describe("board — dependencias (#177)", () => {
 		expect(pendingDeps(board, u)).toEqual(["F10c.1", "F10c.2"]);
 		expect(depsSatisfied(board, u)).toBe(false);
 
-		applyStageTransition(board, "F10c.1", { stage: "commit", runId: "r", ts: "t" });
+		applyStageTransition(board, "F10c.1", {
+			stage: "commit",
+			runId: "r",
+			ts: "t",
+		});
 		expect(pendingDeps(board, u)).toEqual(["F10c.2"]); // parcial
 
-		applyStageTransition(board, "F10c.2", { stage: "commit", runId: "r", ts: "t" });
+		applyStageTransition(board, "F10c.2", {
+			stage: "commit",
+			runId: "r",
+			ts: "t",
+		});
 		expect(depsSatisfied(board, u)).toBe(true); // habilita el ▶
 	});
 
@@ -567,5 +576,64 @@ describe("board — dependencias (#177)", () => {
 		const board = openBoard(tmp, PLAN, PLAN5);
 		const u = board.units.find((x) => x.id === "F10c.5")!;
 		expect(depsSatisfied(board, u)).toBe(true);
+	});
+});
+
+// ── #179 — Reinicio de ciclo: relanzada tras breaker recorre el kanban otra vez
+describe("board — restart de ciclo (#179)", () => {
+	it("breaker (validate blocked) → restartUnit → backlog → elaborate AVANZA", () => {
+		const spec = {
+			columns: ["backlog", "elaborate", "implement", "validate", "commit"],
+			stageColumns: {
+				elaborate: "elaborate",
+				implement: "implement",
+				validate: "validate",
+				commit: "commit",
+			},
+			doneColumn: "commit",
+			validateRegress: "implement",
+		};
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-restart-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		const board = openBoard(tmp2, PLAN, PLAN5, spec);
+		const t = (stage: string, passed?: boolean, breakerTrip?: boolean) =>
+			applyStageTransition(board, "F10c.1", {
+				stage,
+				runId: "r1",
+				ts: "t",
+				passed,
+				breakerTrip,
+				spec,
+			});
+
+		// Ciclo 1 completo hasta el breaker: tarjeta queda en validate blocked.
+		t("elaborate");
+		t("implement");
+		t("validate", false, true);
+		expect(board.units[0]!.status).toBe("validate");
+		expect(board.units[0]!.transitions.at(-1)!.blocked).toBe(true);
+
+		// RELANZAMIENTO (nuevo run): onWorkflowStart → restartUnit.
+		restartUnit(board, "F10c.1", { runId: "r2", ts: "t2", source: "sdd-ship" });
+		expect(board.units[0]!.status).toBe("backlog"); // vuelve al inicio
+		const last = board.units[0]!.transitions.at(-1)!;
+		expect(last.stage).toBe("restart"); // badge de bloqueada despejado
+		expect(last.blocked).toBeUndefined();
+
+		// El nuevo ciclo avanza desde backlog: onStageStart(elaborate) mueve.
+		t("elaborate");
+		expect(board.units[0]!.status).toBe("elaborate"); // ¡se mueve!
+		t("implement");
+		expect(board.units[0]!.status).toBe("implement");
+	});
+
+	it("restartUnit sobre fase SIN transiciones (primer arranque) es no-op", () => {
+		const board = openBoard(tmp, PLAN, PLAN5);
+		const u = restartUnit(board, "F10c.5", { runId: "r", ts: "t" });
+		expect(u?.status).toBe("backlog");
+		expect(u?.transitions.length).toBe(0); // sin transición restart espuria
 	});
 });

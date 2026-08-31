@@ -24,6 +24,7 @@ import {
 } from "./plan-utils";
 import {
 	applyStageTransition,
+	restartUnit,
 	openBoard,
 	resolveBoardSpec,
 	resolveStageKind,
@@ -83,6 +84,33 @@ function gitShortSha(cwd: string): string | undefined {
 		}).trim();
 	} catch {
 		return undefined;
+	}
+}
+
+/** #179 — Reset de ciclo al INICIAR un run: la fase del input vuelve a la
+ *  primera columna si ya tenía transiciones (nuevo intento tras breaker/pausa). */
+function applyRuntimeBoardReset(
+	ctx: { runId: string; workflow: string; input: string; cwd: string },
+): void {
+	const extracted = extractPhaseId(ctx.input);
+	if (!extracted?.phaseId) return;
+	try {
+		const spec = resolveBoardSpec(ctx.workflow);
+		const board = openBoard(
+			ctx.cwd,
+			extracted.planPathToken,
+			undefined,
+			spec,
+		);
+		board.workflow = ctx.workflow;
+		restartUnit(board, extracted.phaseId, {
+			runId: ctx.runId,
+			ts: new Date().toISOString(),
+			source: ctx.workflow,
+		});
+		saveBoard(ctx.cwd, extracted.planPathToken, board);
+	} catch {
+		/* best-effort */
 	}
 }
 
@@ -163,7 +191,13 @@ function applyRuntimeBoardTransition(
 /** Listener que traduce eventos de lifecycle a mutaciones del store. */
 export function createWorkflowLifecycle(): LifecycleListeners {
 	return {
-		onWorkflowStart: (ctx) => startRun(ctx),
+		onWorkflowStart: (ctx) => {
+			startRun(ctx);
+			// #179 — Nuevo ciclo sobre la fase: reset de la tarjeta a la primera
+			// columna (relanzadas tras el breaker vuelven a recorrer el kanban
+			// completo y se despeja el badge de bloqueada).
+			applyRuntimeBoardReset(ctx);
+		},
 		onStageStart: (stage, ctx) => {
 			stageStart(stage, ctx);
 			// #171 — Movimiento TEMPRANO: la tarjeta pasa a la columna de la etapa
