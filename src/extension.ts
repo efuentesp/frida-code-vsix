@@ -132,6 +132,22 @@ import { bootstrapPlanProgressFromRuns } from "./tools/frida-workflow/plan-utils
 import { extractPhaseId } from "./tools/frida-workflow/plan-utils";
 import { createBoardOverlayElement } from "./tools/frida-workflow/board-ui";
 import {
+	createPipelineOverlayElement,
+	featureTitle,
+} from "./tools/frida-workflow/features-ui";
+import type { PipelineOverlayData } from "./tools/frida-workflow/features-ui";
+import {
+	advanceFeature,
+	computeFeatureReconcile,
+	loadFeatures,
+	reconcileFeatures,
+	shipBadge,
+	shipFeature,
+	subscribeFeaturesChanges,
+} from "./tools/frida-workflow/features";
+import { startPipelineMonitor } from "./tools/frida-workflow/monitor-server";
+import type { PipelineMonitorHandle } from "./tools/frida-workflow/monitor-server";
+import {
 	getWorkflowRuns as getFridaWorkflowRuns,
 	registerCommandRunner,
 	registerRerunHandler,
@@ -150,8 +166,6 @@ import {
 } from "./tools/frida-extensible-workflows/store";
 import {
 	computePipelineStatus,
-	formatPipelineStatus,
-	wirePipelinePanel,
 	getModelsConfigPath,
 	loadModelsConfig,
 	invalidateModelsConfigCache,
@@ -678,6 +692,9 @@ export async function activate(
 	// ¿El webview ya montó su listener (llegó webview_ready)? Distingue apertura
 	// en caliente (post directo confiable) de arranque frío (flush diferido).
 	let webviewReady = false;
+	// FR#10 — URL del monitor del pipeline (D3): el servidor resuelve async; se
+	// cachea aquí y webview_ready la re-envía (i-2).
+	let monitorUrl: string | undefined;
 	// M2 (#143) — estado del tab "Mapa del proyecto" (lib src/project-map/*).
 	// La verdad vive en el host (#111): busySince sobrevive re-montes del tab;
 	// la vista activa NO vive aquí (estado local del componente).
@@ -3043,6 +3060,11 @@ export async function activate(
 				if (lastGoalState !== undefined) {
 					post({ type: "goal_state", goal: lastGoalState ?? null });
 				}
+				// Fase 8 (FR#10) — re-envía la URL del monitor si el servidor ya
+				// resolvió (arranque frío: el post original no tenía listener).
+				if (monitorUrl) {
+					post({ type: "monitor_url", url: monitorUrl });
+				}
 				if (pendingSettingsTab) {
 					post({ type: "open_settings", tab: pendingSettingsTab });
 					pendingSettingsTab = undefined;
@@ -3060,6 +3082,9 @@ export async function activate(
 					// workflows se pierde al recrearse la webview — re-montarlo para que
 					// el panel reaparezca (con los runs que el store ya conserva).
 					remountWorkflowPanel(s.webBridge);
+					// Pipeline N1 (lección ba40da0): re-montaje idempotente si estaba
+					// abierto; su cascada re-ordena board/workflow debajo (D8).
+					pipelineRemount?.();
 					sendModelInfo();
 					postResources();
 					postModels();
@@ -4223,7 +4248,8 @@ export async function activate(
 		},
 		{
 			name: "pipeline",
-			description: "Estado del orquestador frida-pipeline",
+			description:
+				"Pipeline SDD de planeación (features en discover→🚀 ready-to-ship)",
 		},
 		{
 			name: "board",
@@ -4349,7 +4375,7 @@ export async function activate(
 				postWfCommand(arg);
 				break;
 			case "pipeline":
-				void postPipelineCommand();
+				await mountPipelineOverlay();
 				break;
 			case "skills":
 				postSkillsCommand();
@@ -5069,6 +5095,9 @@ export async function activate(
 	// workflow autónomo sobre la hoja sugerida (firstRealGap del board).
 	let boardOverlayHandle: { unmount: () => void } | undefined;
 	let boardUnsubscribe: (() => void) | undefined;
+	/** Re-monta el board abierto con datos frescos: /pipeline (N1) lo invoca tras
+	 *  cada montaje suyo para quedar ARRIBA (orden de footers D8). */
+	let boardRemount: (() => void) | undefined;
 	async function mountBoardOverlay(arg: string): Promise<void> {
 		const s = await ensureSession();
 		const cwd = workspaceCwd();
@@ -5149,6 +5178,7 @@ export async function activate(
 						onClose: () => {
 							boardOverlayHandle?.unmount();
 							boardUnsubscribe?.();
+							boardRemount = undefined;
 						},
 					}),
 				"footer", // #169 — panel colapsable del footer (como el WorkflowPanel)
@@ -5164,6 +5194,12 @@ export async function activate(
 			const fresh = loadBoard(cwd, planToken);
 			if (fresh) mount(fresh);
 		});
+		// D8 — orden de footers: /pipeline (N1) re-monta el board abierto tras
+		// cada montaje suyo para quedar ARRIBA (el board re-monta el workflow).
+		boardRemount = () => {
+			const fresh = loadBoard(cwd, planToken);
+			mount(fresh ?? board);
+		};
 	}
 
 	// /context: reporte de uso del contexto como panel overlay (barra segmentada
@@ -5540,20 +5576,162 @@ export async function activate(
 		return m ? Number(m[1]) : undefined;
 	}
 
-	// /pipeline: estado del orquestador frida-pipeline (ADR-0021). Fase 1: monta el
-	// banner persistente en el footer y postea el status actual al chat. Las
-	// Fases 2+ añadirán el resto de slash commands (/frida-models, /frida-update-agents,
-	// /frida-lanes) sin tocar este entry point.
-	async function postPipelineCommand(): Promise<void> {
+	// /pipeline — overlay N1 del pipeline SDD (FR#1): TODAS las features de un
+	// solo features.json (sin escalera de resolución del /board). El reconciler
+	// adopta FRDs nuevos antes del primer render (FR#3); las suscripciones
+	// (features + board N2) re-montan con datos frescos: movimiento temprano,
+	// relink y badge n/m en vivo. Orden de footers (D8): N1 → N2 → workflow —
+	// cada montaje de N1 re-monta la cascada completa (board si está abierto,
+	// workflow SIEMPRE).
+	let pipelineOverlayHandle: { unmount: () => void } | undefined;
+	let pipelineUnsubscribe: (() => void) | undefined;
+	/** Re-monta el overlay N1 con datos frescos si está abierto (webview_ready). */
+	let pipelineRemount: (() => void) | undefined;
+	/** FR#14 — banner ámbar de avance con prerrequisitos incompletos. Memoria
+	 *  de sesión del panel (D8): el dismiss persiste hasta un nuevo disparo. */
+	const pipelineWarnings = new Map<string, string>();
+	const pipelineWarningsDismissed = new Set<string>();
+
+	async function mountPipelineOverlay(): Promise<void> {
 		const s = await ensureSession();
-		// Idempotente: si el panel ya está montado, retorna el mismo handle.
-		wirePipelinePanel(s.webBridge);
-		const status = computePipelineStatus();
-		const text = formatPipelineStatus(status);
-		post({
-			type: status.siblings.allPresent ? "info" : "warning",
-			text,
-		});
+		const cwd = workspaceCwd();
+		pipelineOverlayHandle?.unmount();
+		pipelineUnsubscribe?.();
+		// FR#3 — adopción de FRDs antes del primer render (idempotente; si
+		// adopta, su saveFeatures emite y la suscripción monta sola — el mount
+		// final re-monta igual con datos frescos).
+		reconcileFeatures(cwd);
+
+		const buildData = (): PipelineOverlayData => {
+			const state = loadFeatures(cwd) ?? { v: 1, features: [], updatedAt: "" };
+			const desyncById = new Map(
+				computeFeatureReconcile(cwd).map((r) => [r.id, r.desync]),
+			);
+			const status = computePipelineStatus();
+			return {
+				features: state.features.map((f) => ({
+					...f,
+					desync: desyncById.get(f.id) ?? false,
+					badge: shipBadge(cwd, f),
+				})),
+				status: {
+					level: status.level,
+					summary: `orquestador v${status.siblings.fridaVersion} · hermanas ${status.siblings.presentCount}/${status.siblings.expectedCount}`,
+					detail:
+						`Skills ${status.counts.skills.present}/${status.counts.skills.expected}` +
+						` · Agentes ${status.counts.agents.present}/${status.counts.agents.expected}` +
+						` · Workflows ${status.counts.workflows.present}/${status.counts.workflows.expected}` +
+						(status.siblings.allPresent
+							? ""
+							: ` — faltan: ${status.siblings.siblings
+									.filter((x) => !x.present)
+									.map((x) => x.id)
+									.join(", ")}`),
+				},
+				warnings: [...pipelineWarnings.entries()]
+					.filter(([id]) => !pipelineWarningsDismissed.has(id))
+					.map(([id, text]) => ({ id, text })),
+			};
+		};
+
+		const sRef = s;
+		const mount = (data: PipelineOverlayData): void => {
+			pipelineOverlayHandle?.unmount();
+			pipelineOverlayHandle = sRef.webBridge.mountPersistent(
+				() =>
+					createPipelineOverlayElement(data, {
+						onAdvance: (id) => {
+							// FR#4 — movimiento temprano (#171): la tarjeta se mueve AL
+							// CLIC y el comando viaja por el mismo pipeline que un submit
+							// (runPrompt intercepta built-ins; /skill: pasa por B1). El
+							// comando llega computado PRE-move (AdvanceResult.command).
+							const r = advanceFeature(cwd, id, "pipeline-ui");
+							if (r.moved && r.command) {
+								void vscode.commands.executeCommand("frida.codeView.focus");
+								runCustomCommand(r.command);
+								// FR#14 — el emit SÍNCRONO de advanceFeature (dentro de
+								// saveFeatures) ya re-montó ANTES de armar el warning:
+								// si la memoria cambió, re-montamos para que el banner
+								// ámbar sea visible AL DISPARO (el watcher llega en S6).
+								let warningsChanged = false;
+								if (!r.prerequisitesMet) {
+									pipelineWarnings.set(
+										id,
+										`«${featureTitle(r.feature ?? { id })}» → ${r.to}: el artefacto previo no está en el FS — la skill podría no encontrarlo.`,
+									);
+									pipelineWarningsDismissed.delete(id);
+									warningsChanged = true;
+								} else if (pipelineWarnings.delete(id)) {
+									warningsChanged = true;
+								}
+								if (warningsChanged) mount(buildData());
+							}
+						},
+						onShip: (id) => {
+							// FR#5 — ship manual N1→N2: fases del plan en backlog, CERO
+							// ejecución (espejo del escalón /board: openBoard→saveBoard).
+							const r = shipFeature(cwd, id, "pipeline-ui");
+							if (r.moved) {
+								post({
+									type: "info",
+									text: `🚀 Ship listo: ${r.phaseCount} fase(s) en backlog del board — /board ${r.planPath}`,
+								});
+							} else if (r.failure === "no-plan") {
+								post({
+									type: "warning",
+									text: `«${featureTitle(r.feature ?? { id })}» no tiene plan enlazado — completa /skill:plan antes de shipear.`,
+								});
+							}
+						},
+						onRunEmptyCommand: runEmptyPipelineCommand,
+						onDismissWarning: (id) => {
+							pipelineWarningsDismissed.add(id);
+							mount(buildData());
+						},
+						onClose: () => {
+							pipelineOverlayHandle?.unmount();
+							pipelineUnsubscribe?.();
+							pipelineRemount = undefined;
+						},
+					}),
+				"footer",
+			);
+			// D8 — orden de footers: N1 arriba → N2 (si abierto; su re-montaje lo
+			// deja debajo de N1) → workflow SIEMPRE re-montado al final (el mount
+			// interno del board NO lo re-monta — D8 manda AND, no OR).
+			if (boardRemount) boardRemount();
+			remountWorkflowPanel(sRef.webBridge);
+		};
+
+		pipelineRemount = () => mount(buildData());
+		const offFeatures = subscribeFeaturesChanges(() => mount(buildData()));
+		const offBoard = subscribeBoardChanges(() => mount(buildData()));
+		pipelineUnsubscribe = () => {
+			offFeatures();
+			offBoard();
+		};
+		mount(buildData());
+	}
+
+	/** FR#15 — comando del estado vacío: el `<placeholder>` se completa con un
+	 *  InputBox (molde postWfCommand) y se inyecta por el canal estándar. */
+	function runEmptyPipelineCommand(template: string): void {
+		const ph = template.match(/<([^>]+)>/);
+		if (!ph) {
+			runCustomCommand(template);
+			return;
+		}
+		void vscode.window
+			.showInputBox({
+				title: `Comando: ${template}`,
+				prompt: `Valor para <${ph[1]}>`,
+				placeHolder: `Ej. ${ph[1]}>`,
+			})
+			.then((val) => {
+				if (!val || !val.trim()) return;
+				void vscode.commands.executeCommand("frida.codeView.focus");
+				runCustomCommand(template.replace(`<${ph[1]}>`, val.trim()));
+			});
 	}
 
 	// /frida-models: editor de overrides de modelo por skill (ADR-0021 Fase 3).
@@ -6898,6 +7076,47 @@ export async function activate(
 				off1();
 				off2();
 				item.dispose();
+			});
+		})(),
+		// D3 — Monitor HTTP+SSE del pipeline (FR#7/FR#8): servidor loopback puerto
+		// efímero activo desde activate. El ▶ del HTML dispara el MISMO canal que
+		// el overlay (onCommand → focus + runCustomCommand, Desired End State).
+		// Sin servidor el host sigue vivo (NFR degradación: el HTML es un espejo).
+		(() => {
+			let disposed = false;
+			let monitor: PipelineMonitorHandle | undefined;
+			void startPipelineMonitor({
+				cwd: workspaceCwd(),
+				onCommand: (command) => {
+					void vscode.commands.executeCommand("frida.codeView.focus");
+					runCustomCommand(command);
+				},
+			}).then(
+				(handle) => {
+					if (disposed) {
+						handle.dispose();
+						return;
+					}
+					monitor = handle;
+					// FR#10 (i-3) — publica la URL al webview (monitorUrl + post
+					// monitor_url); webview_ready la re-envía en arranque frío.
+					monitorUrl = handle.url;
+					post({ type: "monitor_url", url: handle.url });
+				},
+				(err) => {
+					/* sin monitor: /pipeline y /board siguen operativos — pero se registra
+					 UNA vez para que un monitor muerto sea diagnosticable durante la
+					 verificación manual (curl 401 / navegador dejarán de responder;
+					 fix del Step 4). */
+					console.warn(
+						"startPipelineMonitor falló — monitor no disponible:",
+						err instanceof Error ? err.message : String(err),
+					);
+				},
+			);
+			return new vscode.Disposable(() => {
+				disposed = true;
+				monitor?.dispose();
 			});
 		})(),
 		vscode.commands.registerCommand("frida.openHelp", async () => {

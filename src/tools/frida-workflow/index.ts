@@ -291,3 +291,36 @@ export type {
 	FeatureTransition,
 	FeaturesFile,
 } from "./features";
+
+// Motor declarativo de paneles de método (FR#9): SDD-N1 es la primera
+// configuración; un método nuevo registra su spec en runtime sin tocar el
+// motor (dirección consumidor→motor, patrón #38).
+export {
+	SDD_PANEL_SPEC,
+	listPanelSpecs,
+	registerPanelSpec,
+	resolvePanelSpec,
+	validatePanelSpec,
+	_resetPanelSpecs,
+} from "./panel-spec";
+export type {
+	PanelSpec,
+	PanelColumnSpec,
+	PanelEmptyStateSpec,
+	PanelAdvanceKind,
+} from "./panel-spec";
+
+// Monitor HTTP+SSE del pipeline (FR#7/FR#8): servidor loopback que sirve el
+// espejo HTML del ecosistema (N1 features + N2 boards) con broadcast SSE.
+export { MONITOR_DEBOUNCE_MS, startPipelineMonitor } from "./monitor-server";
+export type {
+	MonitorBoardView,
+	MonitorFeatureView,
+	MonitorSnapshot,
+	MonitorUnitView,
+	PipelineMonitorHandle,
+	PipelineMonitorOptions,
+} from "./monitor-server";
+
+// Páginas del monitor (FR#7): hub de métodos (D7) + /sdd con N1 y N2 juntos.
+export { renderMonitorHubPage, renderSddPage } from "./monitor-html";

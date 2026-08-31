@@ -12619,3 +12619,159 @@ mark.hl {
 	flex-shrink: 0;
 	white-space: nowrap;
 }
+
+/* ── Pipeline SDD N1 (/pipeline, panel colapsable footer) — espejo kb-* ── */
+.pl-panel {
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+	border-radius: 6px;
+	background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.1));
+}
+.pl-metric {
+	font-variant-numeric: tabular-nums;
+}
+.pl-board {
+	overflow-x: auto;
+	scrollbar-width: thin;
+	padding-bottom: 4px;
+}
+.pl-col {
+	min-width: 190px;
+	max-width: 260px;
+	flex: 1 1 190px;
+	gap: 6px;
+}
+.pl-col-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.pl-card {
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background, #1e1e1e);
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+.pl-card:hover {
+	border-color: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.4));
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.06));
+}
+/* FR#12 — tarjeta desincronizada: borde ámbar sutil (patrón kb-gap). */
+.pl-card.pl-card-desync {
+	border-color: var(--vscode-list-warningForeground, #cca700);
+	box-shadow: 0 0 0 1px var(--vscode-list-warningForeground, #cca700) inset;
+}
+.pl-card-bar {
+	width: 3px;
+	align-self: stretch;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+.pl-card-title {
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* FR#11 — mini-timeline: 4 estados por punto. */
+.pl-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+	transition: background-color 0.2s ease;
+}
+.pl-dot.done {
+	background: var(--vscode-charts-green, #4ec9b0);
+}
+.pl-dot.current {
+	background: var(--vscode-focusBorder, #58a6ff);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #58a6ff) inset;
+}
+.pl-dot.paused {
+	background: var(--vscode-list-warningForeground, #cca700);
+	box-shadow: 0 0 0 1px var(--vscode-list-warningForeground, #cca700) inset;
+}
+.pl-dot.next {
+	background: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+}
+.pl-badges {
+	flex-wrap: wrap;
+	row-gap: 2px;
+}
+.pl-badges > * {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+/* FR#12 — ámbar desincronizado (contador del header y badge de tarjeta). */
+.pl-desync {
+	color: var(--vscode-list-warningForeground, #cca700);
+	user-select: none;
+}
+/* FR#11 — icono de pausa en la tarjeta. */
+.pl-paused {
+	color: var(--vscode-list-warningForeground, #cca700);
+}
+/* FR#14 — banner ámbar dismissible. */
+.pl-warn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	border: 1px solid var(--vscode-list-warningForeground, #cca700);
+	background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.1));
+	color: var(--vscode-list-warningForeground, #cca700);
+}
+.pl-warn-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.pl-warn-dismiss {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	opacity: 0.7;
+	padding: 2px;
+	border-radius: 4px;
+}
+.pl-warn-dismiss:hover {
+	opacity: 1;
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+/* FR#15 — estado vacío: comando monospace (patrón wf-cmd-hint). */
+.pl-cmd {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+}
+/* FR#15 — contenedor del estado vacío. */
+.pl-empty {
+	padding: 4px 8px;
+}
+/* D5 — sección compacta del orquestador. */
+.pl-orch {
+	user-select: none;
+	opacity: 0.9;
+}
+.pl-close {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	padding: 3px;
+	border-radius: 4px;
+	opacity: 0.7;
+}
+.pl-close:hover {
+	opacity: 1;
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}

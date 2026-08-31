@@ -59,14 +59,6 @@ export {
 	formatSiblingsStatus,
 } from "./setup-command";
 
-// Wire del banner
-export {
-	wirePipelinePanel,
-	mountPipelinePanel,
-	_resetPipelinePanel,
-} from "./panel";
-export type { PipelineWebBridge } from "./panel";
-
 // Guidance (Fase 2) — exportado para tests y verificación del gate
 export {
 	resolveGuidance,
