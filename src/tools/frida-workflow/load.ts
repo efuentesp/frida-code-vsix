@@ -74,10 +74,7 @@ export interface LoadOptions {
  *  Idempotente por hash del bundle (versiones distintas no colisionan).
  *  Si tmpdir() no es escribible, cae al bundle directo (comportamiento previo). */
 export function dslAliasTarget(bundlePath: string): string {
-	const hash = createHash("sha1")
-		.update(bundlePath)
-		.digest("hex")
-		.slice(0, 12);
+	const hash = createHash("sha1").update(bundlePath).digest("hex").slice(0, 12);
 	const wrapper = join(tmpdir(), `frida-dsl-${hash}.cjs`);
 	const content = `// Auto-generado por frida-workflow (#189) — no editar.\nmodule.exports = require(${JSON.stringify(bundlePath)});\n`;
 	try {
@@ -146,8 +143,19 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 
 	const loadFile = (file: string): WorkflowModule => {
 		try {
-			const alias: Record<string, string> | undefined = opts.dslBundlePath
-				? { "frida-workflow": dslAliasTarget(opts.dslBundlePath) }
+			const dslTarget = opts.dslBundlePath
+				? dslAliasTarget(opts.dslBundlePath)
+				: undefined;
+			// #151 — alias completo prometido por index.ts: "typebox" y
+			// "typebox/value" también resuelven al bundle DSL (que re-exporta
+			// Type/Value/typeboxSchema). Así los configs pueden importar Type
+			// directamente de "typebox" sin instalar nada.
+			const alias: Record<string, string> | undefined = dslTarget
+				? {
+						"frida-workflow": dslTarget,
+						typebox: dslTarget,
+						"typebox/value": dslTarget,
+					}
 				: undefined;
 			const jiti = createJiti(file, alias ? { alias } : {});
 			return unwrapDefault(jiti(file));

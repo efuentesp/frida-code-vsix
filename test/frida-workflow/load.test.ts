@@ -1,9 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { dslAliasTarget, loadWorkflows } from "../../src/tools/frida-workflow/load";
+import {
+	dslAliasTarget,
+	loadWorkflows,
+} from "../../src/tools/frida-workflow/load";
 
 /** Bundle SDK real — reproduce el path del bug #189: la jiti embebida del
  *  bundle es la que tropieza con `node:` imports al re-evaluar el bundle.
@@ -77,23 +87,59 @@ describe("loadWorkflows — cascada por capas", () => {
 		},
 	);
 
-	(distReady ? it : it.skip)("project config gana por nombre sobre user config", () => {
-		const wf = loadDist();
-		const agent = agentWithConfig(`export const workflows = [
+	(distReady ? it : it.skip)(
+		"project config gana por nombre sobre user config",
+		() => {
+			const wf = loadDist();
+			const agent = agentWithConfig(`export const workflows = [
 	{ name: "dup", start: "a", stages: { a: {} }, edges: { a: "stop" } },
 ];`);
-		const proj = projectWithConfig(`export const workflows = [
+			const proj = projectWithConfig(`export const workflows = [
 	{ name: "dup", start: "b", stages: { b: {} }, edges: { b: "stop" } },
 ];`);
-		const loaded = wf.loadWorkflows({
-			cwd: proj,
+			const loaded = wf.loadWorkflows({
+				cwd: proj,
+				agentDir: agent,
+				dslBundlePath: DIST,
+			});
+			expect(loaded.issues).toEqual([]);
+			expect(loaded.origins.get("dup")).toBe("project");
+			expect(loaded.workflows.get("dup")?.start).toBe("b");
+		},
+	);
+
+	(distReady ? it : it.skip)(
+		"cablea el alias typebox prometido (#151)",
+		() => {
+			const wf = loadDist();
+			const agent = agentWithConfig(`import { Type } from "typebox";
+import { Value } from "typebox/value";
+import { defineWorkflow, acts, typeboxSchema } from "frida-workflow";
+const _v = Value ? 1 : 0;
+export const workflows = [
+	defineWorkflow({
+		name: "tb-wf",
+		start: "a",
+		stages: {
+			a: acts({
+				skill: "implement",
+				outputSchema: typeboxSchema(Type.Object({ ok: Type.Boolean() })),
+			}),
+		},
+		edges: { a: "stop" },
+	}),
+];
+`);
+			const loaded = wf.loadWorkflows({
+			cwd: newDir(),
 			agentDir: agent,
 			dslBundlePath: DIST,
-		});
-		expect(loaded.issues).toEqual([]);
-		expect(loaded.origins.get("dup")).toBe("project");
-		expect(loaded.workflows.get("dup")?.start).toBe("b");
-	});
+			});
+			expect(loaded.issues).toEqual([]);
+			expect(loaded.workflows.get("tb-wf")).toBeDefined();
+			expect(loaded.origins.get("tb-wf")).toBe("user");
+		},
+	);
 
 	it("sin dslBundlePath, los configs plain-data siguen cargando", () => {
 		const agent = agentWithConfig(`export const workflows = [
