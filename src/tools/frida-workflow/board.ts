@@ -81,6 +81,11 @@ export interface Board {
 	/** #163 — Workflow dueño (p. ej. "sdd-ship"): la UI lo usa para el comando
 	 *  de avance desde el tablero. Seteado por el runtime en cada transición. */
 	workflow?: string;
+	/** #166 — Boards de roadmap (unidades manuales, p. ej. filas de la tabla de
+	 *  vista general): NO sincronizar fases de los headers del plan — el sync
+	 * colaría duplicados cuando headers ≠ unidades (p. ej. ## F0..## F6–F8 vs
+	 * F01–F17). Los boards derivados de plan (splits #160) no lo marcan. */
+	disablePlanSync?: boolean;
 }
 
 // ── Defaults (Capa 1 genérica) ──────────────────────────────────────────────
@@ -181,13 +186,9 @@ export function deriveBoardSpec(wf: WorkflowLike): BoardSpec {
 
 	// validateRegress: targets del route de validate que no son el done ni stop.
 	let validateRegress: string | undefined;
-	const edge = wf.edges.validate as
-		| { targets?: readonly string[] }
-		| undefined;
+	const edge = wf.edges.validate as { targets?: readonly string[] } | undefined;
 	if (edge?.targets) {
-		validateRegress = edge.targets.find(
-			(t) => t !== "stop" && t !== doneColumn,
-		);
+		validateRegress = edge.targets.find((t) => t !== "stop" && t !== doneColumn);
 	}
 	return { columns, stageColumns, doneColumn, validateRegress };
 }
@@ -288,7 +289,7 @@ export function openBoard(
 	}
 	board.columns = columns;
 	board.doneColumn = doneColumn;
-	if (planContent) syncUnitsFromPlan(board, planContent);
+	if (planContent && !board.disablePlanSync) syncUnitsFromPlan(board, planContent);
 	return board;
 }
 
@@ -323,8 +324,7 @@ function remapUnitStatuses(
 			continue;
 		}
 		const ratio = oldCols.length > 1 ? oldIdx / (oldCols.length - 1) : 0;
-		u.status =
-			newColumns[Math.round(ratio * (newColumns.length - 1))] ?? newDone;
+		u.status = newColumns[Math.round(ratio * (newColumns.length - 1))] ?? newDone;
 	}
 }
 

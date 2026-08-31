@@ -409,3 +409,36 @@ describe("board — tablero-vivo (#163)", () => {
 		expect(isUnitDone(remapped, u)).toBe(true);
 	});
 });
+
+// ── #166 — Boards de roadmap: sync del plan desactivable ─────────────────────
+describe("board — disablePlanSync (#166)", () => {
+	it("un board de roadmap NO gana unidades del sync de headers del plan", () => {
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-nosync-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		// Plan maestro: headers AGRUPADOS (F0..F6–F8) ≠ unidades del roadmap (F01..F17).
+		const maestro = [
+			"# Plan maestro",
+			"## F0 — Cimientos",
+			"## F1 — Núcleo",
+			"## F6–F8 — Migración y salida",
+			"| F01 | … | F17 | tabla de vista general |",
+		].join("\n");
+		fs.writeFileSync(path.join(tmp2, PLAN), maestro);
+
+		// Board de roadmap con unidades manuales y sync desactivado.
+		const board = openBoard(tmp2, PLAN, maestro);
+		board.disablePlanSync = true;
+		board.units = [
+			{ id: "F01", title: "Fundación", origin: "plan", status: "backlog", transitions: [] },
+			{ id: "F17", title: "Cutover", origin: "plan", status: "backlog", transitions: [] },
+		];
+		saveBoard(tmp2, PLAN, board);
+
+		// Re-abrir CON planContent (lo que hacen /board y el bootstrap): los
+		// headers F0/F1/F6 NO deben colarse como unidades.
+		const reopened = openBoard(tmp2, PLAN, maestro);
+		expect(reopened.units.map((u) => u.id)).toEqual(["F01", "F17"]);
+	});
+});
