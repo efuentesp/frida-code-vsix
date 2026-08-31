@@ -72,9 +72,7 @@ export async function executeUnit(
 						error = res.message;
 						return;
 					}
-					const data = spec.parser
-						? spec.parser(res.artifacts, ctx)
-						: undefined;
+					const data = spec.parser ? spec.parser(res.artifacts, ctx) : undefined;
 					if (stage.outputSchema) {
 						const v = await validateSchema(stage.outputSchema, data);
 						if (!v.ok) {
@@ -82,8 +80,7 @@ export async function executeUnit(
 							// ilegible o sin match: nombrarlo hace el error accionable
 							// (antes: críptico "outputSchema rechazado: : must be object").
 							const primary0 =
-								res.artifacts.find((a) => a.role === "primary") ??
-								res.artifacts[0];
+								res.artifacts.find((a) => a.role === "primary") ?? res.artifacts[0];
 							const primaryPath =
 								primary0?.handle.kind === "fs" ? primary0.handle.path : undefined;
 							const detail = (() => {
@@ -95,16 +92,14 @@ export async function executeUnit(
 								return `parser devolvió undefined (artefacto ilegible o sin verdict)${at}`;
 							})();
 							const msg = `outputSchema rechazado: ${detail}`;
-							if (onInvalid === "halt" || attempt >= maxRetries - 1)
-								error = msg;
+							if (onInvalid === "halt" || attempt >= maxRetries - 1) error = msg;
 							else retryNeeded = true;
 							return;
 						}
 					}
 					const primary =
 						res.artifacts.find((a) => a.role === "primary") ?? res.artifacts[0];
-					if (primary?.handle.kind === "fs")
-						primaryHandle = primary.handle.path;
+					if (primary?.handle.kind === "fs") primaryHandle = primary.handle.path;
 					output = {
 						kind: spec.name ?? stageName,
 						data,

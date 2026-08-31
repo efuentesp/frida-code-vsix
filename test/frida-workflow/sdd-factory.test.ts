@@ -213,14 +213,15 @@ describe("defineSddWorkflow — parser resuelve contra ctx.cwd (#192)", () => {
 		// Antes del fix: readFileSync relativo → ENOENT → undefined →
 		// "outputSchema rechazado: : must be object".
 		const parser = wf.stages.validate?.outcome?.parser!;
-		const data = parser(
-			res.artifacts,
-			{ cwd: proj, messages: [], stage: "validate" } as unknown as CollectCtx,
-		);
+		const data = parser(res.artifacts, {
+			cwd: proj,
+			messages: [],
+			stage: "validate",
+		} as unknown as CollectCtx);
 		expect(data).toEqual({ passed: false });
 	});
 
-	it("tolera verdict con comillas — verdict: \"fail\"", () => {
+	it('tolera verdict con comillas — verdict: "fail"', () => {
 		const proj = mkdtempSync(join(tmpdir(), "sdd-factory-"));
 		dirs.push(proj);
 		const dir = join(proj, ".frida", "artifacts", "validation");
@@ -237,10 +238,11 @@ describe("defineSddWorkflow — parser resuelve contra ctx.cwd (#192)", () => {
 		} as unknown as CollectCtx);
 		if (res.kind !== "ok") throw new Error("collector fatal");
 		const parser = wf.stages.validate?.outcome?.parser!;
-		const data = parser(
-			res.artifacts,
-			{ cwd: proj, messages: [], stage: "validate" } as unknown as CollectCtx,
-		);
+		const data = parser(res.artifacts, {
+			cwd: proj,
+			messages: [],
+			stage: "validate",
+		} as unknown as CollectCtx);
 		expect(data).toEqual({ passed: false });
 	});
 });
