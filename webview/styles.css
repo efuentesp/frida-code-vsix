@@ -12554,3 +12554,27 @@ mark.hl {
 	color: var(--vscode-charts-red, #f14c4c);
 	user-select: none;
 }
+
+/* ── #175 — Ítem en ejecución: pulso de atención + ▶ deshabilitado en el resto ── */
+@keyframes kb-pulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 1px var(--vscode-focusBorder, #58a6ff);
+	}
+	50% {
+		box-shadow: 0 0 0 3px var(--vscode-focusBorder, #58a6ff);
+	}
+}
+.kb-card.kb-running {
+	animation: kb-pulse 1.6s ease-in-out infinite;
+	border-color: var(--vscode-focusBorder, #58a6ff);
+}
+.kb-sub.kb-sub-running {
+	animation: kb-pulse 1.6s ease-in-out infinite;
+	border-radius: 4px;
+}
+.kb-advance-disabled {
+	opacity: 0.35;
+	cursor: default;
+	pointer-events: none;
+}

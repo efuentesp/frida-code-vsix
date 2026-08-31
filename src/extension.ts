@@ -5149,9 +5149,12 @@ export async function activate(
 						},
 					}),
 				"footer", // #169 — panel colapsable del footer (como el WorkflowPanel)
-				);
+			);
 		};
 		mount(board);
+		// #175 — Orden de footers: kanban ARRIBA, workflow DEBAJO — re-montar el
+		// workflow tras cada montaje del board lo deja después en el apilado.
+		remountWorkflowPanel(sRef.webBridge);
 		// #163 — Overlay vivo: cada transición del board (validate FAIL incluido)
 		// re-monta el tablero con los datos frescos — la tarjeta se mueve en vivo.
 		boardUnsubscribe = subscribeBoardChanges(() => {

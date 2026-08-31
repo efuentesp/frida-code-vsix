@@ -13,7 +13,7 @@
 //
 // El estado colapsado vive a nivel módulo: el overlay vivo re-monta el panel en
 // cada transición (#163) y el usuario no debe perder su preferencia de vista.
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 import type { Board, BoardUnit } from "./board";
 import {
@@ -23,6 +23,8 @@ import {
 	validateFails,
 } from "./board";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
+import { getWorkflowRuns, subscribeWorkflowRuns } from "./store";
+import { extractPhaseId } from "./plan-utils";
 
 export interface BoardOverlayActions {
 	/** Abre un artefacto (elaboración/validación/sha) en el editor. */
@@ -70,6 +72,13 @@ function BoardPanel({
 		boardPanelCollapsed = !boardPanelCollapsed;
 		setCollapsed(boardPanelCollapsed);
 	};
+	// #175 — Fase EN EJECUCIÓN (reactivo): pulso en su tarjeta, sin ▶, y el resto
+	// del backlog con ▶ deshabilitado hasta que el run termine.
+	const runsState = useSyncExternalStore(subscribeWorkflowRuns, getWorkflowRuns);
+	const activeRun = runsState.runs.find((r) => r.status === "running");
+	const runningPhase = activeRun?.input
+		? extractPhaseId(activeRun.input)?.phaseId
+		: undefined;
 	const gap = firstRealGap(board);
 	const roots = board.units.filter((u) => u.parentId === undefined);
 	const doneCount = roots.filter((r) => isUnitDone(board, r)).length;
@@ -157,6 +166,7 @@ function BoardPanel({
 									key={u.id}
 									board={board}
 									unit={u}
+									runningPhase={runningPhase}
 									isGap={gap?.id === u.id}
 									expanded={expanded.has(u.id)}
 									onToggle={() => toggleUnit(u.id)}
@@ -174,6 +184,7 @@ function BoardPanel({
 function PhaseCard({
 	board,
 	unit,
+	runningPhase,
 	isGap,
 	expanded,
 	onToggle,
@@ -181,6 +192,8 @@ function PhaseCard({
 }: {
 	board: Board;
 	unit: BoardUnit;
+	/** #175 — id de la fase en ejecución (run activo), si hay. */
+	runningPhase?: string;
 	isGap: boolean;
 	expanded: boolean;
 	onToggle: () => void;
@@ -189,6 +202,8 @@ function PhaseCard({
 	const children = boardChildren(board, unit.id);
 	const doneChildren = children.filter((c) => isUnitDone(board, c)).length;
 	const isDone = isUnitDone(board, unit);
+	const isRunning = unit.id === runningPhase; // #175 — pulso + sin ▶
+	const othersBlocked = runningPhase !== undefined && !isRunning; // #175 — ▶ deshabilitado
 	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
 	const blocked = unit.transitions.at(-1)?.blocked === true; // #172 — breaker
 	const accent = isDone
@@ -196,7 +211,11 @@ function PhaseCard({
 		: (COL_ACCENT[unit.status] ?? "#888");
 
 	return (
-		<fbox flexDirection="column" gap={4} cls={`kb-card${isGap ? " kb-gap" : ""}`}>
+		<fbox
+			flexDirection="column"
+			gap={4}
+			cls={`kb-card${isGap ? " kb-gap" : ""}${isRunning ? " kb-running" : ""}`}
+		>
 			<fbox flexDirection="row" gap={6} alignItems="center">
 				<fbox cls="kb-card-bar" background={accent} />
 				<ftext size={11} bold>
@@ -267,7 +286,7 @@ function PhaseCard({
 							flexDirection="row"
 							gap={4}
 							alignItems="center"
-							cls={`kb-sub${isGap && gapIsChild(board, c) ? " kb-gap" : ""}`}
+							cls={`kb-sub${isGap && gapIsChild(board, c) ? " kb-gap" : ""}${c.id === runningPhase ? " kb-sub-running" : ""}`}
 						>
 							<ftext size={10} bold color={subColor(board, c)}>
 								{c.id}
@@ -282,18 +301,37 @@ function PhaseCard({
 
 			<UnitArtifacts unit={unit} actions={actions} />
 
-			{isDone ? null : (
+			{isRunning ? null : othersBlocked ? (
+				// #175 — Hay una fase en ejecución: ▶ deshabilitado hasta terminar.
+				<fbox
+					cls="kb-advance kb-advance-disabled"
+					title="Hay una fase en ejecución — disponible al terminar el run"
+				>
+					<ficon
+						name="play"
+						size={11}
+						color="var(--vscode-disabledForeground, #5a5a5a)"
+					/>
+				</fbox>
+			) : isDone ? null : isGap ? (
+				// #175 — Mismo look que el botón «Avanzar» del panel del workflow.
+				<fbutton
+					variant="primary"
+					onClick={() => actions.onAdvance(board.planPath, unit.id)}
+					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
+				>
+					<ficon name="play" size={11} />
+					<ftext size={11} bold>
+						Avanzar {unit.id}
+					</ftext>
+				</fbutton>
+			) : (
 				<fbox
 					onClick={() => actions.onAdvance(board.planPath, unit.id)}
-					cls={`kb-advance${isGap ? "" : " kb-advance-quiet"}`}
+					cls="kb-advance-quiet"
 					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
 				>
 					<ficon name="play" size={11} color="var(--vscode-foreground)" />
-					{isGap ? (
-						<ftext size={10} bold>
-							Avanzar {unit.id}
-						</ftext>
-					) : null}
 				</fbox>
 			)}
 		</fbox>
