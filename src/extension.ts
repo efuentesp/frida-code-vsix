@@ -112,6 +112,12 @@ import type {
 	WorkflowOrigin,
 } from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
+import {
+	getWorkflowRuns as getFridaWorkflowRuns,
+	registerCommandRunner,
+	registerRerunHandler,
+	subscribeWorkflowRuns as subscribeFridaWorkflowRuns,
+} from "./tools/frida-workflow/store";
 import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
 import {
 	findBuiltinPattern,
@@ -1654,6 +1660,8 @@ export async function activate(
 				// Widget de estado de frida-git-sync en el footer (sync en curso + botón
 				// Cancel). Idempotente; se actualiza vía syncWidgetStore.
 				wireGitSyncWidget(s.webBridge);
+				// WorkflowPanel de frida-workflow (/wf): panel de progreso de workflows por etapas.
+				wireWorkflowPanel(s.webBridge);
 				// WorkflowPanel de frida-extensible-workflows (issue #7): panel de progreso
 				// del tool `workflow`. Idempotente; se monta una vez por sesión para que
 				// cualquier workflow lanzado por el agente (no sólo vía /wf) sea visible.
@@ -4489,6 +4497,7 @@ export async function activate(
 			await session.prompt(
 				`Genera un título de máximo 5 palabras para una sesión que empieza con este mensaje del usuario:\n\n${snippet}`,
 			);
+			// SAFETY: session es AgentSession del SDK interno cuyos tipos no exponen state.messages en la interfaz pública
 			const messages = (
 				session as unknown as {
 					state?: {
@@ -4498,6 +4507,7 @@ export async function activate(
 			).state?.messages;
 			return cleanTitle(lastMessageText(messages, "assistant"));
 		} finally {
+			// SAFETY: AgentSession puede implementar dispose opcional en runtime
 			await (
 				session as unknown as { dispose?: () => Promise<void> | void }
 			).dispose?.();
@@ -4508,6 +4518,7 @@ export async function activate(
 	async function maybeAutoTitle(): Promise<void> {
 		try {
 			if (frida?.sessionManager?.getSessionName?.()) return; // ya tiene nombre
+			// SAFETY: frida.session contiene el estado interno de la sesión de agente activa
 			const messages = (
 				frida?.session as unknown as {
 					state?: {
@@ -5154,6 +5165,28 @@ export async function activate(
 			checkWorkflows,
 		});
 	}
+
+	// Registrar el handler para reanudar / continuar workflows desde el botón del panel
+	registerRerunHandler(async (runId) => {
+		const runsState = getFridaWorkflowRuns();
+		const run = runsState.runs.find((r) => r.runId === runId);
+		if (!run) return;
+		const inputArg = run.input
+			? run.input.startsWith('"')
+				? run.input
+				: `"${run.input}"`
+			: "";
+		await postWfCommand(`${run.workflow} ${inputArg}`.trim());
+	});
+
+	// #156 — Tarjeta «siguiente paso»: despacha el comando sugerido
+	// (/wf sdd-ship … / /skill:elaborate …) por el mismo pipeline que un submit
+	// del usuario: runPrompt intercepta los built-in (/wf) y el SDK enruta los
+	// comandos de extensión (/skill:…). Antes el handler nunca se registraba y
+	// runCustomCommand era un no-op silencioso (los botones no hacían nada).
+	registerCommandRunner((cmd) => {
+		void runPrompt(cmd);
+	});
 
 	// /wf sola → QuickPick agrupado (Patrones agénticos / Internos / Globales / Proyecto).
 	async function pickWorkflow(
@@ -6644,9 +6677,22 @@ export async function activate(
 			vscode.commands.executeCommand("frida.codeView.focus");
 		}),
 		vscode.commands.registerCommand("frida.showWorkflows", () => {
-			// #84: visibilidad forzada — pide el render (empty state «Sin runs» si
-			// hace falta) y enfoca el webview.
-			requestPanelShow();
+			const rs = getWorkflowRuns();
+			const actExtensible = rs.filter(
+				(r) => r.state === "running" || r.state === "awaiting",
+			);
+			const fridaWf = getFridaWorkflowRuns();
+			const actFrida = fridaWf.runs.filter((r) => r.status === "running");
+			const totalActive = actExtensible.length + actFrida.length;
+
+			if (totalActive === 0 && fridaWf.runs.length === 0) {
+				post({
+					type: "info",
+					text: "No hay workflows en ejecución. Usa /wf <nombre> para iniciar uno.",
+				});
+			} else {
+				if (actExtensible.length > 0) requestPanelShow();
+			}
 			void vscode.commands.executeCommand("frida.codeView.focus");
 		}),
 		// #84: ancla permanente — conteo vivo de runs; click = mostrar el panel.
@@ -6667,15 +6713,21 @@ export async function activate(
 					(n, r) => n + r.agents.filter((a) => a.state === "running").length,
 					0,
 				);
-				item.text = act.length
-					? `$(${running > 0 ? "sync~spin" : "play"}) wf ${act.length}`
-					: "$(circle-outline) wf";
+				const fridaWf = getFridaWorkflowRuns();
+				const actFrida = fridaWf.runs.filter((r) => r.status === "running");
+				const totalActive = act.length + actFrida.length;
+				item.text =
+					totalActive > 0
+						? `$(${running > 0 || actFrida.length > 0 ? "sync~spin" : "play"}) wf ${totalActive}`
+						: "$(circle-outline) wf";
 				item.show();
 			};
 			render();
-			const off = subscribeWorkflowRuns(render);
+			const off1 = subscribeWorkflowRuns(render);
+			const off2 = subscribeFridaWorkflowRuns(render);
 			return new vscode.Disposable(() => {
-				off();
+				off1();
+				off2();
 				item.dispose();
 			});
 		})(),
@@ -6913,7 +6965,7 @@ function extractText(m: any): string {
 /** Enriquece los args del tool `todo` con el subject resuelto del store, para que
  *  el ToolCard del webview muestre `→ #id Subject` (paridad renderTodoCall de
  *  rpiv-todo). El store del todo vive en el host; el webview no tiene acceso. */
-function enrichTodoArgs(args: unknown): unknown {
+function enrichTodoArgs(args: unknown): Record<string, unknown> | unknown {
 	if (args == null || typeof args !== "object") return args;
 	const a = args as Record<string, unknown>;
 	const action = String(a.action ?? "");
@@ -6930,7 +6982,7 @@ function enrichTodoArgs(args: unknown): unknown {
 	return args;
 }
 
-function compactArgs(args: unknown): unknown {
+function compactArgs(args: unknown): Record<string, unknown> | unknown {
 	if (args == null || typeof args !== "object") return args;
 	try {
 		const out: Record<string, unknown> = {};

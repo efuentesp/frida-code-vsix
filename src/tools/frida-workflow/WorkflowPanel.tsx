@@ -25,10 +25,7 @@ import {
 	type TranscriptEntry,
 	type UnitView,
 } from "./store";
-import {
-	countTrailingFailedValidates,
-	resolveNextStep,
-} from "./plan-utils";
+import { countTrailingFailedValidates, resolveNextStep } from "./plan-utils";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 const STAGE_COLOR: Record<StageViewStatus, string | undefined> = {
@@ -495,43 +492,83 @@ function RunBlock({
 						</fbox>
 					</fbox>
 
-					{!nextStep.isPlanComplete && nextStep.nextPhase ? (
-						<fbox flexDirection="column" gap={3}>
-							<ftext size={11} color="var(--vscode-foreground)" bold>
-								👉 Siguiente paso sugerido: {nextStep.nextPhase.fullName}
-							</ftext>
-							<fbox flexDirection="row" gap={6} alignItems="center">
-								{nextStep.shipCommand ? (
-									<fbutton
-										variant="primary"
-										onClick={() => {
-											if (nextStep.shipCommand) {
-												runCustomCommand(nextStep.shipCommand);
-											}
-										}}
-										title="Lanzar sdd-ship para la siguiente fase"
-									>
-										<ficon name="play" size={10} />
-										<ftext size={11}>Avanzar a {nextStep.nextPhase.id}</ftext>
-									</fbutton>
-								) : null}
-								{nextStep.elaborateCommand ? (
-									<fbutton
-										variant="secondary"
-										onClick={() => {
+				{!nextStep.isPlanComplete && nextStep.nextPhase ? (
+					<fbox flexDirection="column" gap={3}>
+						<ftext size={11} color="var(--vscode-foreground)" bold>
+							👉 Siguiente paso sugerido: {nextStep.nextPhase.fullName}
+						</ftext>
+						<fbox flexDirection="row" gap={6} alignItems="center">
+							{nextStep.shipCommand ? (
+								<fbutton
+									variant="primary"
+									onClick={() => {
+										if (nextStep.shipCommand) {
+											runCustomCommand(nextStep.shipCommand);
+										}
+									}}
+									title={`Workflow autónomo — ejecuta:\n${nextStep.shipCommand}`}
+								>
+									<ficon name="play" size={10} />
+									<ftext size={11}>Avanzar a {nextStep.nextPhase.id}</ftext>
+								</fbutton>
+							) : null}
+							{nextStep.elaborateCommand ? (
+								<fbutton
+									variant="secondary"
+									onClick={() => {
 											if (nextStep.elaborateCommand) {
 												runCustomCommand(nextStep.elaborateCommand);
 											}
-										}}
-										title="Elaborar la siguiente fase"
-									>
-										<ficon name="file-text" size={10} />
-										<ftext size={11}>Elaborar {nextStep.nextPhase.id}</ftext>
-									</fbutton>
-								) : null}
-							</fbox>
+									}}
+									title={`Skill de pasada única — ejecuta:\n${nextStep.elaborateCommand}`}
+								>
+									<ficon name="file-text" size={10} />
+									<ftext size={11}>Elaborar {nextStep.nextPhase.id}</ftext>
+								</fbutton>
+							) : null}
 						</fbox>
-					) : null}
+						{/* #156 — Comando exacto que despachará cada botón: el prefijo
+						 * (/wf… vs /skill:…) hace visible el tipo de acción antes del clic. */}
+						<fbox flexDirection="column" gap={2}>
+							{nextStep.shipCommand ? (
+								<fbox
+									flexDirection="row"
+									gap={4}
+									alignItems="center"
+									cls="wf-cmd-hint"
+									title={nextStep.shipCommand}
+								>
+									<ficon
+										name="zap"
+										size={9}
+										color="var(--vscode-descriptionForeground)"
+									/>
+									<ftext size={10}>
+										{truncate(nextStep.shipCommand, 80)}
+									</ftext>
+								</fbox>
+							) : null}
+							{nextStep.elaborateCommand ? (
+								<fbox
+									flexDirection="row"
+									gap={4}
+									alignItems="center"
+									cls="wf-cmd-hint"
+									title={nextStep.elaborateCommand}
+								>
+									<ficon
+										name="sparkle"
+										size={9}
+										color="var(--vscode-descriptionForeground)"
+									/>
+									<ftext size={10}>
+										{truncate(nextStep.elaborateCommand, 80)}
+									</ftext>
+								</fbox>
+							) : null}
+						</fbox>
+					</fbox>
+				) : null}
 				</fbox>
 			) : null}
 

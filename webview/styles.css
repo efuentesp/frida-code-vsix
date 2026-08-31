@@ -5342,13 +5342,92 @@ button.danger:hover {
 	color: var(--vscode-descriptionForeground);
 }
 
-/* Starter Cards Grid (Copilot Canvas) */
+/* Category Segment Tabs (Frida Studio) */
+.welcome-category-tabs {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 4px;
+	background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.15));
+	border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	border-radius: 18px;
+	width: 100%;
+	box-sizing: border-box;
+	margin: 2px 0 2px;
+}
+
+.welcome-cat-tab {
+	flex: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 6px 10px;
+	border-radius: 14px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--vscode-descriptionForeground);
+	font-size: 11.5px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	user-select: none;
+	white-space: nowrap;
+}
+
+.welcome-cat-tab:hover {
+	color: var(--vscode-foreground);
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.welcome-cat-tab.active {
+	background: var(--vscode-editor-background, #1e1e1e);
+	color: var(--vscode-foreground);
+	font-weight: 600;
+	border-color: var(--vscode-focusBorder, rgba(106, 90, 205, 0.45));
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.2),
+		0 0 10px rgba(106, 90, 205, 0.15);
+}
+
+.welcome-cat-icon {
+	color: var(--vscode-textLink-foreground, #4daafc);
+	transition: transform 0.15s ease;
+}
+
+.welcome-cat-tab.active .welcome-cat-icon {
+	transform: scale(1.1);
+}
+
+.welcome-cat-desc {
+	font-size: 11.5px;
+	color: var(--vscode-descriptionForeground);
+	margin: -2px 0 4px;
+	line-height: 1.35;
+	opacity: 0.9;
+	animation: welcomeFadeIn 0.2s ease-out;
+}
+
+@keyframes welcomeFadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(2px);
+	}
+	to {
+		opacity: 0.9;
+		transform: translateY(0);
+	}
+}
+
+/* Starter Cards Grid (Frida Studio) */
 .welcome-cards {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
 	gap: 8px;
 	width: 100%;
 	text-align: left;
+	animation: welcomeFadeIn 0.2s ease-out;
 }
 
 @media (max-width: 380px) {
@@ -5382,17 +5461,55 @@ button.danger:hover {
 .starter-card:hover {
 	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.14));
 	border-color: var(--vscode-textLink-foreground, #4daafc);
-	transform: translateY(-1px);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.starter-card.roadmap {
+	cursor: default;
+	opacity: 0.68;
+	border-style: dashed;
+	background: var(--vscode-sideBar-background, transparent);
+}
+
+.starter-card.roadmap:hover {
+	transform: none;
+	border-color: var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+	background: var(--vscode-sideBar-background, transparent);
+	box-shadow: none;
 }
 
 .starter-card-head {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	gap: 6px;
 	font-size: 12.5px;
 	font-weight: 600;
 	color: var(--vscode-foreground);
+}
+
+.starter-card-title-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.starter-card-badge {
+	font-size: 8.5px;
+	font-weight: 700;
+	letter-spacing: 0.4px;
+	text-transform: uppercase;
+	padding: 1px 5px;
+	border-radius: 8px;
+	background: rgba(106, 90, 205, 0.18);
+	color: #a78bfa;
+	border: 1px solid rgba(106, 90, 205, 0.35);
+	flex-shrink: 0;
 }
 
 .starter-card-icon {
@@ -6561,8 +6678,15 @@ kbd {
 	gap: 6px;
 	margin: 6px 12px;
 	/* overflow:auto para que haya scroll si los paneles superan max-height. */
-	overflow: auto;
-	max-height: 60vh;
+	overflow-y: auto;
+	overflow-x: hidden;
+	max-height: 45vh;
+	scrollbar-width: thin;
+	scrollbar-color: var(
+			--vscode-scrollbarSlider-background,
+			rgba(128, 128, 128, 0.4)
+		)
+		transparent;
 }
 /* Cada panel persistente del footer es su propia tarjeta (issue #17): separación
    visual clara cuando coexisten varios paneles (workflow + todo + subagentes). */
@@ -6575,6 +6699,132 @@ kbd {
 	border-radius: 8px;
 	background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
 	overflow: hidden;
+	flex-shrink: 0;
+}
+
+/* Árbol de tareas y cabeceras de workflows */
+.wf-run-header-clickable {
+	cursor: pointer;
+	user-select: none;
+	border-radius: 4px;
+	padding: 2px 4px;
+	transition: background-color 0.12s ease;
+}
+.wf-run-header-clickable:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+}
+
+.wf-stages-tree {
+	border-left: 2px solid
+		var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.25));
+	margin-left: 6px;
+	margin-top: 2px;
+	max-height: 30vh;
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-width: thin;
+}
+
+.wf-stage-row {
+	cursor: pointer;
+	border-radius: 4px;
+	transition: background-color 0.1s ease;
+}
+.wf-stage-row:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+
+.wf-transcript-container {
+	border-left: 1px dashed var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+	margin-left: 8px;
+	max-height: 18vh;
+	overflow-y: auto;
+	overflow-x: hidden;
+	scrollbar-width: thin;
+}
+
+.wf-stop-icon-btn {
+	padding: 2px 5px;
+	border-radius: 4px;
+	border: 1px solid rgba(241, 76, 76, 0.3);
+	background: rgba(241, 76, 76, 0.08);
+	cursor: pointer;
+	transition: all 0.12s ease;
+}
+.wf-stop-icon-btn:hover {
+	background: rgba(241, 76, 76, 0.22);
+	border-color: var(--vscode-charts-red, #f14c4c);
+}
+
+.wf-close-icon-only {
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px 4px;
+	border-radius: 4px;
+	opacity: 0.75;
+	transition: all 0.12s ease;
+	user-select: none;
+}
+.wf-close-icon-only:hover {
+	opacity: 1;
+	transform: scale(1.15);
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+
+.wf-confirm-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 4px;
+	border-radius: 4px;
+	background: rgba(241, 76, 76, 0.08);
+	border: 1px solid rgba(241, 76, 76, 0.25);
+}
+
+.wf-confirm-btn {
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: rgba(241, 76, 76, 0.2);
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+.wf-confirm-btn:hover {
+	background: rgba(241, 76, 76, 0.4);
+}
+
+/* #156 — Pista de comando exacto bajo los botones «Avanzar»/«Elaborar»:
+ * muestra qué se despachará (tipo /wf… vs /skill:…) antes del clic. */
+.wf-cmd-hint {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 10px;
+	color: var(--vscode-descriptionForeground);
+	opacity: 0.85;
+	max-width: 100%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.wf-cmd-hint:hover {
+	opacity: 1;
+}
+
+.wf-cancel-btn {
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 5px;
+	border-radius: 3px;
+	background: var(--vscode-sideBar-background, rgba(128, 128, 128, 0.15));
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+.wf-cancel-btn:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.25));
 }
 /* Divisor entre filas (fbox) del panel del todo dentro del footer: cualquier fbox
    con un hermano fbox previo (filas tras el header). */
