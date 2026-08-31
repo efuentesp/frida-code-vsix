@@ -8,7 +8,12 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import type { Board, BoardUnit } from "./board";
-import { firstRealGap, boardChildren, isUnitDone } from "./board";
+import {
+	boardChildren,
+	firstRealGap,
+	isUnitDone,
+	validateFails,
+} from "./board";
 
 export interface BoardOverlayActions {
 	/** Abre un artefacto (elaboración/validación/sha) en el editor. */
@@ -129,6 +134,7 @@ function PhaseCard({
 	const children = boardChildren(board, unit.id);
 	const doneChildren = children.filter((c) => isUnitDone(board, c)).length;
 	const isDone = isUnitDone(board, unit);
+	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
 	const accent = isDone
 		? (COL_ACCENT.commiteada ?? "#4ec9b0")
 		: (COL_ACCENT[unit.status] ?? "#888");
@@ -149,6 +155,18 @@ function PhaseCard({
 					<ftext size={10} color="var(--vscode-charts-blue, #58a6ff)">
 						{doneChildren}/{children.length}
 					</ftext>
+				) : null}
+				{fails > 0 ? (
+					<fbox
+						flexDirection="row"
+						gap={2}
+						alignItems="center"
+						cls="kb-cycles"
+						title={`${fails} ciclo(s) de reintento (validate FAIL)`}
+					>
+						<ficon name="sync" size={9} />
+						<ftext size={10}>{fails}</ftext>
+					</fbox>
 				) : null}
 			</fbox>
 
@@ -191,16 +209,18 @@ function PhaseCard({
 
 			<UnitArtifacts unit={unit} actions={actions} />
 
-			{isGap ? (
+			{!isDone ? (
 				<fbox
 					onClick={() => actions.onAdvance(board.planPath, unit.id)}
-					cls="kb-advance"
+					cls={`kb-advance${isGap ? "" : " kb-advance-quiet"}`}
 					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
 				>
 					<ficon name="play" size={10} />
-					<ftext size={10} bold>
-						Avanzar {unit.id}
-					</ftext>
+					{isGap ? (
+						<ftext size={10} bold>
+							Avanzar {unit.id}
+						</ftext>
+					) : null}
 				</fbox>
 			) : null}
 		</fbox>
@@ -221,15 +241,20 @@ function UnitArtifacts({
 			{links.map((a, i) => (
 				<fbox
 					key={`${a.path}-${i}`}
-					onClick={() => actions.onOpenArtifact(a.path)}
+					onClick={a.path ? () => actions.onOpenArtifact(a.path) : undefined}
 					cls="kb-art"
-					title={a.path}
+					title={a.path || a.label || a.kind}
 				>
 					<ficon
 						name={artifactIcon(a.kind)}
 						size={10}
 						color="var(--vscode-textLink-foreground, #4daafc)"
 					/>
+					{a.label && !a.path ? (
+						<ftext size={9} color="var(--vscode-descriptionForeground)">
+							{a.label}
+						</ftext>
+					) : null}
 				</fbox>
 			))}
 		</fbox>
@@ -237,14 +262,19 @@ function UnitArtifacts({
 }
 
 /** Último artefacto por kind (evita repetir 3× validation del mismo ciclo). */
-function lastArtifacts(unit: BoardUnit): { kind: string; path: string }[] {
-	const byKind = new Map<string, string>();
+function lastArtifacts(unit: BoardUnit): {
+	kind: string;
+	path: string;
+	label?: string;
+}[] {
+	const byKind = new Map<string, { kind: string; path: string; label?: string }>();
 	for (let i = unit.transitions.length - 1; i >= 0; i--) {
 		for (const a of unit.transitions[i]!.artifacts ?? []) {
-			if (!byKind.has(a.kind)) byKind.set(a.kind, a.path);
+			if (!byKind.has(a.kind))
+					byKind.set(a.kind, { kind: a.kind, path: a.path, label: a.label });
 		}
 	}
-	return [...byKind.entries()].map(([kind, path]) => ({ kind, path }));
+	return [...byKind.values()];
 }
 
 function artifactIcon(kind: string): string {

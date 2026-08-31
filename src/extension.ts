@@ -114,6 +114,7 @@ import {
 	loadBoard,
 	openBoard,
 	saveBoard,
+	subscribeBoardChanges,
 } from "./tools/frida-workflow";
 import type {
 	LoadedWorkflows,
@@ -5057,6 +5058,7 @@ export async function activate(
 	// del store > board más reciente por mtime. El botón «Avanzar» despacha el
 	// workflow autónomo sobre la hoja sugerida (firstRealGap del board).
 	let boardOverlayHandle: { unmount: () => void } | undefined;
+	let boardUnsubscribe: (() => void) | undefined;
 	async function mountBoardOverlay(arg: string): Promise<void> {
 		const s = await ensureSession();
 		const cwd = workspaceCwd();
@@ -5068,8 +5070,8 @@ export async function activate(
 				if (!r.input) continue;
 				const ex = extractPhaseId(r.input);
 				if (ex?.planPathToken) {
-						planToken = ex.planPathToken;
-						break;
+					planToken = ex.planPathToken;
+					break;
 				}
 			}
 		}
@@ -5082,12 +5084,7 @@ export async function activate(
 					.sort((a, b) => b.m - a.m);
 				if (files.length > 0) {
 					const slug = files[0]!.f.replace(/\.json$/, "");
-					planToken = path.join(
-						".frida",
-						"artifacts",
-						"plans",
-						`${slug}.md`,
-					);
+					planToken = path.join(".frida", "artifacts", "plans", `${slug}.md`);
 				}
 			}
 		}
@@ -5099,7 +5096,9 @@ export async function activate(
 			return;
 		}
 
-		const planAbs = path.isAbsolute(planToken) ? planToken : path.join(cwd, planToken);
+		const planAbs = path.isAbsolute(planToken)
+			? planToken
+			: path.join(cwd, planToken);
 		const planContent = existsSync(planAbs)
 			? readFileSync(planAbs, "utf8")
 			: undefined;
@@ -5114,23 +5113,41 @@ export async function activate(
 		}
 
 		boardOverlayHandle?.unmount();
-		const boardRef = board;
-		boardOverlayHandle = s.webBridge.mountPersistent(
-			() =>
-				createBoardOverlayElement(boardRef, {
-					onOpenArtifact: (p) => {
-						void vscode.window.showTextDocument(vscode.Uri.file(p), {
-							preview: true,
-						});
-					},
-					onAdvance: (planPath, phaseId) => {
-						boardOverlayHandle?.unmount();
-						runCustomCommand(`/wf sdd-ship "${planPath} Phase ${phaseId}"`);
-					},
-					onClose: () => boardOverlayHandle?.unmount(),
-				}),
-			"overlay",
-		);
+		boardUnsubscribe?.();
+		const sRef = s;
+		const mount = (data: typeof board): void => {
+			boardOverlayHandle?.unmount();
+			boardOverlayHandle = sRef.webBridge.mountPersistent(
+				() =>
+					createBoardOverlayElement(data, {
+						onOpenArtifact: (p) => {
+							void vscode.window.showTextDocument(vscode.Uri.file(p), {
+								preview: true,
+							});
+						},
+						onAdvance: (planPath, phaseId) => {
+							boardOverlayHandle?.unmount();
+							boardUnsubscribe?.();
+							// #163 — El workflow dueño del board arma el comando (p. ej. sdd-ship).
+							runCustomCommand(
+								`/wf ${data.workflow ?? "sdd-ship"} "${planPath} Phase ${phaseId}"`,
+							);
+						},
+						onClose: () => {
+							boardOverlayHandle?.unmount();
+							boardUnsubscribe?.();
+						},
+					}),
+				"overlay",
+			);
+		};
+		mount(board);
+		// #163 — Overlay vivo: cada transición del board (validate FAIL incluido)
+			// re-monta el tablero con los datos frescos — la tarjeta se mueve en vivo.
+		boardUnsubscribe = subscribeBoardChanges(() => {
+			const fresh = loadBoard(cwd, planToken);
+			if (fresh) mount(fresh);
+		});
 	}
 
 	// /context: reporte de uso del contexto como panel overlay (barra segmentada

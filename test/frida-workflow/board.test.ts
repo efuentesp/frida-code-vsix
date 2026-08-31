@@ -4,8 +4,10 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { defineRoute } from "../../src/tools/frida-workflow";
 import {
 	applyStageTransition,
+	deriveBoardSpec,
 	boardChildren,
 	boardFilePath,
 	bootstrapBoardFromRuns,
@@ -16,9 +18,14 @@ import {
 	saveBoard,
 	setSkillContracts,
 	syncUnitsFromPlan,
+	validateFails,
 	type Board,
 } from "../../src/tools/frida-workflow/board";
-import { appendPhaseProgress, normalizePhaseId, readCompletedPhases } from "../../src/tools/frida-workflow/plan-utils";
+import {
+	appendPhaseProgress,
+	normalizePhaseId,
+	readCompletedPhases,
+} from "../../src/tools/frida-workflow/plan-utils";
 import {
 	extractContractArtifactKind,
 	scanSkillContracts,
@@ -264,7 +271,13 @@ describe("board — bootstrap desde runs + blindaje multi-escritor (#161)", () =
 		});
 		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
 		// F10c.1 SÓLO en progress (su run JSONL ya no existe) — como SELE-DEV.
-		appendPhaseProgress(tmp2, PLAN, "F10c.1", "593930d-manual", "2026-08-30T16:05:00Z");
+		appendPhaseProgress(
+			tmp2,
+			PLAN,
+			"F10c.1",
+			"593930d-manual",
+			"2026-08-30T16:05:00Z",
+		);
 
 		bootstrapBoardFromRuns(path.join(tmp2, "runs-inexistentes"), tmp2);
 		// El bootstrap sin JSONLs no procesa nada: la migración vive en el loop de
@@ -301,5 +314,98 @@ describe("board — bootstrap desde runs + blindaje multi-escritor (#161)", () =
 		saveBoard(tmp, PLAN, board);
 		const dirFiles = fs.readdirSync(path.dirname(file));
 		expect(dirFiles.filter((f) => f.endsWith(".tmp"))).toEqual([]); // atómico limpio
+	});
+});
+
+// ── #163 — Tablero-vivo: columnas derivadas, zigzag y remap ──────────────────
+describe("board — tablero-vivo (#163)", () => {
+	const SDD_SHIP = {
+		name: "sdd-ship",
+		stages: {
+			elaborate: {},
+			implement: {},
+			validate: {},
+			commit: {},
+		},
+		edges: {
+			elaborate: "implement",
+			implement: "validate",
+			validate: defineRoute(["commit", "implement", "stop"], () => "stop"),
+			commit: "stop",
+		},
+	};
+
+	it("deriveBoardSpec: columnas = backlog + stages; validateRegress del route", () => {
+		const spec = deriveBoardSpec(SDD_SHIP);
+		expect(spec.columns).toEqual([
+			"backlog",
+			"elaborate",
+			"implement",
+			"validate",
+			"commit",
+		]);
+		expect(spec.doneColumn).toBe("commit");
+		expect(spec.stageColumns?.validate).toBe("validate"); // identidad
+		expect(spec.validateRegress).toBe("implement"); // targets: commit/stop fuera
+	});
+
+	it("zigzag: validate FAIL registra ciclo y REGRESA si estaba más adelante", () => {
+		const spec = deriveBoardSpec(SDD_SHIP);
+		let tmp2: string;
+		tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-zigzag-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		const board = openBoard(tmp2, PLAN, PLAN5, spec);
+		const t = (stage: string, passed?: boolean) =>
+			applyStageTransition(board, "F10c.1", {
+				stage,
+				runId: "r",
+				ts: "t",
+				passed,
+				spec,
+			});
+
+		t("elaborate");
+		t("implement");
+		t("validate", false); // 1er FAIL: estaba en implement → ciclo sin regreso
+		expect(board.units[0]!.status).toBe("implement");
+		expect(validateFails(board.units[0]!)).toBe(1);
+
+		t("implement");
+		t("validate", true); // PASS → validada
+		expect(board.units[0]!.status).toBe("validate");
+		t("validate", false); // re-validación fallida → REGRESA a implement
+		expect(board.units[0]!.status).toBe("implement");
+		expect(validateFails(board.units[0]!)).toBe(2);
+		const last = board.units[0]!.transitions.at(-1)!;
+		expect(last.failed).toBe(true);
+		expect(last.regress).toBe(true);
+
+		t("implement");
+		t("validate", true);
+		t("commit");
+		expect(board.units[0]!.status).toBe("commit"); // done
+	});
+
+	it("remap: board persistido con columnas default migra a las derivadas", () => {
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-remap-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		// Board con columnas default y una fase commiteada (estado pre-#163).
+		const old = openBoard(tmp2, PLAN, PLAN5);
+		applyStageTransition(old, "F10c.1", { stage: "commit", runId: "r", ts: "t" });
+		saveBoard(tmp2, PLAN, old);
+		expect(loadBoard(tmp2, PLAN)!.units[0]!.status).toBe("commiteada");
+
+		// Al abrir con el spec derivado de sdd-ship, el status remapea.
+		const spec = deriveBoardSpec(SDD_SHIP);
+		const remapped = openBoard(tmp2, PLAN, PLAN5, spec);
+		const u = remapped.units.find((x) => x.id === "F10c.1")!;
+		expect(u.status).toBe("commit"); // commiteada → commit
+		expect(isUnitDone(remapped, u)).toBe(true);
 	});
 });

@@ -7,7 +7,8 @@
 // → store → el panel se re-renderiza solo (useSyncExternalStore).
 
 import type { ReactElement } from "react";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import {
 	registerLifecycle,
@@ -16,7 +17,7 @@ import {
 	type StageRef,
 } from "./lifecycle";
 import { createWorkflowPanelElement } from "./WorkflowPanel";
-import { extractPhaseId } from "./plan-utils";
+import { extractPhaseId, normalizePhaseId } from "./plan-utils";
 import {
 	applyStageTransition,
 	openBoard,
@@ -49,6 +50,40 @@ export interface WorkflowWebBridge {
 /** #159/#160 — Transición de board en runtime: cada stage completado mueve la
  *  fase del run a su columna (validate sólo con passed). El spec llega por
  *  setBoardSpecResolver (config declarativa) y el artifactKind por contrato. */
+/** #163 — Vínculo de elaboración: acts() no reporta primaryHandle; el archivo
+ *  vive en .frida/artifacts/elaborations/ con la fase en el nombre. */
+function findElaborationArtifact(
+	cwd: string,
+	phaseId: string,
+): BoardArtifactLink[] {
+	try {
+		const dir = join(cwd, ".frida", "artifacts", "elaborations");
+		if (!existsSync(dir)) return [];
+		const key = normalizePhaseId(phaseId);
+		const files = readdirSync(dir)
+			.filter((f) => f.endsWith(".md") && normalizePhaseId(f).includes(key))
+			.map((f) => ({ f, m: statSync(join(dir, f)).mtimeMs }))
+			.sort((a, b) => b.m - a.m);
+		return files[0]
+			? [{ kind: "elaboration", path: join(dir, files[0].f) }]
+			: [];
+	} catch {
+		return [];
+	}
+}
+
+/** #163 — Sha corto del HEAD (link del commit en la tarjeta). */
+function gitShortSha(cwd: string): string | undefined {
+	try {
+		return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+			cwd,
+			encoding: "utf8",
+		}).trim();
+	} catch {
+		return undefined;
+	}
+}
+
 function applyRuntimeBoardTransition(
 	stage: StageRef,
 	output: StageOutput | undefined,
@@ -63,14 +98,22 @@ function applyRuntimeBoardTransition(
 			: undefined;
 		const spec = resolveBoardSpec(ctx.workflow);
 		const board = openBoard(ctx.cwd, extracted.planPathToken, planContent, spec);
-		const artifacts: BoardArtifactLink[] = output?.primaryHandle
-			? [
-					{
-						kind: resolveStageKind(stage.name, spec) ?? stage.name,
-						path: output.primaryHandle,
-					},
-				]
-			: [];
+		board.workflow = ctx.workflow; // #163 — la UI arma /wf <workflow> desde el tablero
+		let artifacts: BoardArtifactLink[] = [];
+		if (output?.primaryHandle) {
+			artifacts = [
+				{
+					kind: resolveStageKind(stage.name, spec) ?? stage.name,
+					path: output.primaryHandle,
+				},
+			];
+		} else if (stage.name === "elaborate") {
+			artifacts = findElaborationArtifact(ctx.cwd, extracted.phaseId);
+		}
+		if (stage.name === "commit") {
+			const sha = gitShortSha(ctx.cwd);
+			if (sha) artifacts.push({ kind: "git-commit", path: "", label: sha });
+		}
 		applyStageTransition(board, extracted.phaseId, {
 			stage: stage.name,
 			runId: ctx.runId,

@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 import { encodeCwd, readHeader, resolveRef } from "./audit";
-import { setBoardSpecResolver } from "./board";
+import { setBoardSpecResolver, deriveBoardSpec } from "./board";
 import {
 	loadWorkflows,
 	type LoadedWorkflows,
@@ -88,16 +88,15 @@ export async function handleWfSlash(
 	const wfs = loaded.workflows;
 	const wfNames = [...wfs.keys(), ...(deps.availablePatterns ?? [])];
 
-	// #159 — Registrar los BoardSpec declarativos cargados: el runtime del
-	// board (lifecycle) resuelve spec por nombre de workflow vía este mapa.
+	// #159/#163 — Registrar BoardSpec para el runtime: columnas DERIVADAS del
+	// grafo del workflow (el tablero es imagen del ciclo); el board declarativo
+	// del config (si existe) gana sobre el derivado.
 	{
 		const specs: Record<string, import("./types").BoardSpec> = {};
 		for (const [name, wf] of wfs) {
-			if (wf.board) specs[name] = wf.board;
+			specs[name] = wf.board ?? deriveBoardSpec(wf);
 		}
-		if (Object.keys(specs).length > 0) {
-			setBoardSpecResolver((n) => specs[n]);
-		}
+		setBoardSpecResolver((n) => specs[n]);
 	}
 
 	// /wf check — valida TODO y presenta los issues (abrir archivo:línea). Se sirve

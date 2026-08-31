@@ -51,6 +51,10 @@ export interface BoardTransition {
 	/** #161 — Quién escribió la transición (workflow, skill u otra extensión).
 	 *  Trazabilidad multi-escritor; los workflows ponen su nombre aquí. */
 	source?: string;
+	/** #163 — Zigzag: validate FAIL (transición de ciclo, con o sin regreso). */
+	failed?: boolean;
+	/** #163 — true si la transición MOVIO la tarjeta hacia atrás. */
+	regress?: boolean;
 	artifacts?: BoardArtifactLink[];
 }
 
@@ -74,6 +78,9 @@ export interface Board {
 	updatedAt: string;
 	/** #161 — Escritor principal del board (trazabilidad; no excluyente). */
 	source?: string;
+	/** #163 — Workflow dueño (p. ej. "sdd-ship"): la UI lo usa para el comando
+	 *  de avance desde el tablero. Seteado por el runtime en cada transición. */
+	workflow?: string;
 }
 
 // ── Defaults (Capa 1 genérica) ──────────────────────────────────────────────
@@ -150,6 +157,69 @@ export function resolveBoardSpec(
 	return workflowName ? boardSpecResolver?.(workflowName) : undefined;
 }
 
+// ── Derivación de columnas desde el grafo del workflow (#163) ───────────────
+
+/** Submínimo estructural de Workflow para derivar el spec (sin importar el
+ *  tipo completo: mantiene la función pura y testeable). */
+export interface WorkflowLike {
+	name: string;
+	stages: Record<string, unknown>;
+	edges: Record<string, unknown>;
+}
+
+/** #163 — Deriva el BoardSpec del propio workflow: las columnas SON las
+ *  stages en orden de declaración (sdd-ship → backlog, elaborate, implement,
+ *  validate, commit), stageColumns identidad y validateRegress leído de los
+ *  targets del route de validate (el destino de reintento que no es el
+ *  terminal ni stop). El tablero se vuelve imagen fiel del ciclo. */
+export function deriveBoardSpec(wf: WorkflowLike): BoardSpec {
+	const stageNames = Object.keys(wf.stages);
+	const columns = ["backlog", ...stageNames];
+	const stageColumns: Record<string, string> = {};
+	for (const s of stageNames) stageColumns[s] = s;
+	const doneColumn = stageNames[stageNames.length - 1] ?? "commiteada";
+
+	// validateRegress: targets del route de validate que no son el done ni stop.
+	let validateRegress: string | undefined;
+	const edge = wf.edges.validate as
+		| { targets?: readonly string[] }
+		| undefined;
+	if (edge?.targets) {
+		validateRegress = edge.targets.find(
+			(t) => t !== "stop" && t !== doneColumn,
+		);
+	}
+	return { columns, stageColumns, doneColumn, validateRegress };
+}
+
+/** #163 — Ciclos de validate fallidos de una unidad (badge del tablero). */
+export function validateFails(unit: BoardUnit): number {
+	return unit.transitions.filter((t) => t.stage === "validate" && t.failed)
+		.length;
+}
+
+// ── Overlay vivo: listeners de cambio del board (#163) ───────────────────────
+
+const boardListeners = new Set<() => void>();
+
+/** Suscripción para re-render del overlay /board cuando el board cambia. */
+export function subscribeBoardChanges(fn: () => void): () => void {
+	boardListeners.add(fn);
+	return () => {
+		boardListeners.delete(fn);
+	};
+}
+
+function emitBoardChange(): void {
+	for (const l of [...boardListeners]) {
+		try {
+			l();
+		} catch {
+			/* listener roto: no bloquear a los demás */
+		}
+	}
+}
+
 // ── Persistencia ─────────────────────────────────────────────────────────────
 
 /** `.frida/artifacts/board/<slug>.json` (estado máquina; los .md humanos viven aparte). */
@@ -184,6 +254,7 @@ export function saveBoard(
 	const tmp = `${file}.${process.pid}.tmp`;
 	writeFileSync(tmp, JSON.stringify(board, null, "\t") + "\n", "utf8");
 	renameSync(tmp, file);
+	emitBoardChange(); // #163 — overlay vivo: re-render de /board si está abierto
 }
 
 /** Board nuevo (o existente) sincronizado con el contenido actual del plan. */
@@ -195,7 +266,8 @@ export function openBoard(
 ): Board {
 	const columns = spec?.columns ?? [...DEFAULT_BOARD_COLUMNS];
 	const doneColumn = spec?.doneColumn ?? columns[columns.length - 1]!;
-	const board: Board = loadBoard(cwd, planPathToken) ?? {
+	const persisted = loadBoard(cwd, planPathToken);
+	const board: Board = persisted ?? {
 		v: 1,
 		planPath: planPathToken,
 		columns,
@@ -205,10 +277,55 @@ export function openBoard(
 		source: "frida-workflow",
 	};
 	// El spec manda sobre lo persistido (config cambió ⇒ board adopta columnas).
+	// #163 — Con columnas derivadas (nombres de stage), los status de boards
+	// previos ("elaborada"/"commiteada") se REMAPEAN para no romper el avance.
+	if (
+		persisted &&
+		(persisted.columns.join("\u0000") !== columns.join("\u0000") ||
+			persisted.doneColumn !== doneColumn)
+	) {
+		remapUnitStatuses(board, columns, doneColumn, spec);
+	}
 	board.columns = columns;
 	board.doneColumn = doneColumn;
 	if (planContent) syncUnitsFromPlan(board, planContent);
 	return board;
+}
+
+/** #163 — Traduce status de columnas viejas a las del spec nuevo: vía el
+ *  inverso de DEFAULT_STAGE_COLUMNS ("elaborada"→stage"elaborate"→columna
+ *  nueva) o posición proporcional como último recurso. */
+function remapUnitStatuses(
+	board: Board,
+	newColumns: string[],
+	newDone: string,
+	spec?: BoardSpec,
+): void {
+	const inverse: Record<string, string> = {};
+	for (const [stage, col] of Object.entries(DEFAULT_STAGE_COLUMNS)) {
+		inverse[col] = stage;
+	}
+	const oldCols = board.columns;
+	for (const u of board.units) {
+		if (newColumns.includes(u.status)) continue;
+		const stage = inverse[u.status] ?? u.status;
+		const mapped =
+			spec?.stageColumns?.[stage] ??
+			(newColumns.includes(stage) ? stage : undefined);
+		if (mapped) {
+			u.status = mapped;
+			continue;
+		}
+		// Fallback proporcional por índice (boards con columnas exóticas).
+		const oldIdx = oldCols.indexOf(u.status);
+		if (oldIdx < 0) {
+			u.status = newColumns[0]!;
+			continue;
+		}
+		const ratio = oldCols.length > 1 ? oldIdx / (oldCols.length - 1) : 0;
+		u.status =
+			newColumns[Math.round(ratio * (newColumns.length - 1))] ?? newDone;
+	}
 }
 
 // ── Sync desde el plan (con jerarquía de splits, #160) ─────────────────────
@@ -296,7 +413,32 @@ export function applyStageTransition(
 		input.spec?.stageColumns?.[input.stage] ?? DEFAULT_STAGE_COLUMNS[input.stage];
 	if (!target) return unit; // stage sin columna (p. ej. pre-flight): no toca el board
 
-	if (input.stage === "validate" && input.passed !== true) return unit; // FAIL no avanza
+	if (input.stage === "validate" && input.passed !== true) {
+		// #163 — Zigzag: validate FAIL registra el ciclo y, si la tarjeta estaba
+		// más adelante, REGRESA a la columna del stage de reintento (derivado del
+		// route del workflow). El tablero refleja el ciclo implement↔validate
+		// real: rebotes visibles + badge de ciclos (validateFails).
+		const regressCol =
+			input.spec?.validateRegress ?? DEFAULT_STAGE_COLUMNS.implement;
+		const dst2 = board.columns.indexOf(regressCol);
+		const cur2 = board.columns.indexOf(unit.status);
+		if (dst2 >= 0 && cur2 >= dst2) {
+			const moved = cur2 > dst2;
+			if (moved) unit.status = regressCol;
+			unit.transitions.push({
+				to: regressCol,
+				stage: input.stage,
+				artifactKind: resolveStageKind(input.stage, input.spec),
+				runId: input.runId,
+				ts: input.ts,
+				source: input.source,
+				failed: true,
+				regress: moved,
+				artifacts: input.artifacts?.length ? input.artifacts : undefined,
+			});
+		}
+		return unit;
+	}
 
 	const cur = board.columns.indexOf(unit.status);
 	const dst = board.columns.indexOf(target);
@@ -419,8 +561,7 @@ export function bootstrapBoardFromRuns(
 		// resolver al id canónico de la unidad existente para no crear duplicados.
 		for (const doneId of readCompletedPhases(cwd, planPathToken)) {
 			const canonical =
-				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ??
-				doneId;
+				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ?? doneId;
 			applyStageTransition(board, canonical, {
 				stage: "commit",
 				runId: "progress-158",

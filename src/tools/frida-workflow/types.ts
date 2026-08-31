@@ -357,6 +357,9 @@ export interface BoardSpec {
 	stageKinds?: Record<string, string>;
 	/** Override stage ⇒ columna destino (gana sobre el default por stage). */
 	stageColumns?: Record<string, string>;
+	/** #163 — Columna/stage de regreso cuando validate FALLA (zigzag del
+	 *  ciclo implement↔validate). Derivado del route del workflow si se omite. */
+	validateRegress?: string;
 }
 
 // ---------------------------------------------------------------------------

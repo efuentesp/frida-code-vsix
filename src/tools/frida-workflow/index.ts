@@ -241,6 +241,8 @@ export {
 	setBoardSpecResolver,
 	resolveBoardSpec,
 	resolveStageKind,
+	subscribeBoardChanges,
+	validateFails,
 	DEFAULT_BOARD_COLUMNS,
 	DEFAULT_DONE_COLUMN,
 	DEFAULT_STAGE_COLUMNS,
