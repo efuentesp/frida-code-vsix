@@ -6813,9 +6813,33 @@ kbd {
 	opacity: 1;
 }
 
-/* ── #160 — Tablero kanban del plan (/board, overlay) ───────────────────── */
-.kb-overlay {
-	max-width: 100%;
+/* ── #160/#169 — Tablero kanban del plan (/board, panel colapsable footer) ── */
+.kb-panel {
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+	border-radius: 6px;
+	background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.1));
+}
+/* Métricas numéricas alineadas (n/m, contadores) */
+.kb-metric {
+	font-variant-numeric: tabular-nums;
+}
+/* Barra de progreso segmentada: 1 celda por fase raíz (estilo context report). */
+.kb-progress {
+	min-width: 80px;
+}
+.kb-progress-cell {
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	background: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+	transition: background-color 0.2s ease;
+}
+.kb-progress-cell.done {
+	background: var(--vscode-charts-green, #4ec9b0);
+}
+.kb-progress-cell.gap {
+	background: var(--vscode-focusBorder, #58a6ff);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #58a6ff) inset;
 }
 .kb-board {
 	overflow-x: auto;
@@ -6839,6 +6863,13 @@ kbd {
 	border-radius: 6px;
 	background: var(--vscode-editor-background, #1e1e1e);
 	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+.kb-card:hover {
+	border-color: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.4));
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.06));
 }
 .kb-card-bar {
 	width: 3px;

@@ -5148,8 +5148,8 @@ export async function activate(
 							boardUnsubscribe?.();
 						},
 					}),
-				"overlay",
-			);
+				"footer", // #169 — panel colapsable del footer (como el WorkflowPanel)
+				);
 		};
 		mount(board);
 		// #163 — Overlay vivo: cada transición del board (validate FAIL incluido)

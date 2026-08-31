@@ -1,10 +1,18 @@
-// board-ui.tsx — #160: tablero kanban del plan (overlay, comando /board).
+// board-ui.tsx — #169: tablero kanban del plan como panel COLAPSABLE del footer
+// (mismo patrón que WorkflowPanel), rediseñado con la guía de frontend-design
+// (scan-only sobre el sistema establecido: VS Code vars, codicons, escala 10/11/12).
 //
-// Columnas = estado de la unidad; tarjetas = fases raíz. Los splits (sub-fases
-// que un skill añadió al plan) se anidan dentro de la tarjeta del padre con
-// su propio estado (k/n) — sin glifos de árbol: indentación + border-guide.
-// Artefactos clicables (elaboración/validación/sha) vía vínculos explícitos
-// del board. La hoja sugerida (firstRealGap) se resalta con acción directa.
+// Frontend-design (7 dimensiones aplicadas):
+//  · Tipografía: id bold 11 · títulos 11 desc · métricas 10 tabular.
+//  · Color: acento charts-* por columna; done=verde; ciclos=naranja; hueco=focus.
+//  · Espaciado: 4/6/8 ritmo vertical uniforme; cards 8px padding.
+//  · Layout: barra de progreso segmentada (1 celda por fase) + columnas scroll-x.
+//  · Componentes: CollapsiblePanel compartido; kb-art/kb-advance reutilizados.
+//  · Interacción: hover en tarjetas y botones; tooltips en todo lo clicable.
+//  · Accesibilidad: contraste AA (foreground/descriptionForeground); title=ARIA.
+//
+// El estado colapsado vive a nivel módulo: el overlay vivo re-monta el panel en
+// cada transición (#163) y el usuario no debe perder su preferencia de vista.
 import { useState } from "react";
 import type { ReactElement } from "react";
 import type { Board, BoardUnit } from "./board";
@@ -14,45 +22,59 @@ import {
 	isUnitDone,
 	validateFails,
 } from "./board";
+import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 export interface BoardOverlayActions {
 	/** Abre un artefacto (elaboración/validación/sha) en el editor. */
 	onOpenArtifact: (path: string) => void;
 	/** Lanza el workflow autónomo sobre la hoja sugerida. */
 	onAdvance: (planPath: string, phaseId: string) => void;
-	/** Cierra el overlay. */
+	/** Cierra el panel. */
 	onClose: () => void;
 }
 
-/** Factory del elemento raíz del overlay (mountPersistent "overlay"). */
+/** Preferencia de vista del usuario: sobrevive a los re-mounts del board vivo. */
+let boardPanelCollapsed = false;
+
+/** Factory del elemento raíz del panel (mountPersistent "footer"). */
 export function createBoardOverlayElement(
 	board: Board,
 	actions: BoardOverlayActions,
 ): ReactElement {
-	return <BoardOverlay board={board} actions={actions} />;
+	return <BoardPanel board={board} actions={actions} />;
 }
 
 const COL_ACCENT: Record<string, string> = {
 	backlog: "var(--vscode-descriptionForeground, #888888)",
+	elaborate: "var(--vscode-charts-blue, #58a6ff)",
+	implement: "var(--vscode-charts-purple, #c586c0)",
+	validate: "var(--vscode-charts-yellow, #dcdcaa)",
+	commit: "var(--vscode-charts-green, #4ec9b0)",
+	// Compat: columnas default previas a #163 (elaborada/implementada/…).
 	elaborada: "var(--vscode-charts-blue, #58a6ff)",
 	implementada: "var(--vscode-charts-purple, #c586c0)",
 	validada: "var(--vscode-charts-yellow, #dcdcaa)",
 	commiteada: "var(--vscode-charts-green, #4ec9b0)",
 };
 
-function BoardOverlay({
+function BoardPanel({
 	board,
 	actions,
 }: {
 	board: Board;
 	actions: BoardOverlayActions;
 }): ReactElement {
+	const [collapsed, setCollapsed] = useState(boardPanelCollapsed);
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
+	const toggleCollapsed = (): void => {
+		boardPanelCollapsed = !boardPanelCollapsed;
+		setCollapsed(boardPanelCollapsed);
+	};
 	const gap = firstRealGap(board);
 	const roots = board.units.filter((u) => u.parentId === undefined);
 	const doneCount = roots.filter((r) => isUnitDone(board, r)).length;
 
-	const toggle = (id: string): void =>
+	const toggleUnit = (id: string): void =>
 		setExpanded((prev) => {
 			const next = new Set(prev);
 			if (next.has(id)) next.delete(id);
@@ -61,39 +83,77 @@ function BoardOverlay({
 		});
 
 	return (
-		<fbox flexDirection="column" gap={8} cls="kb-overlay">
-			<fbox flexDirection="row" gap={8} alignItems="center">
-				<ficon
-					name="kanban"
-					size={14}
-					color="var(--vscode-textLink-foreground, #4daafc)"
-				/>
-				<ftext bold size={12}>
-					Board del plan
-				</ftext>
-				<ftext size={11} color="var(--vscode-descriptionForeground)">
-					{board.planPath}
-				</ftext>
-				<ftext size={11} color="var(--vscode-charts-green, #4ec9b0)">
-					{doneCount}/{roots.length} fases done
-				</ftext>
-				<fbox flexDirection="row" flex={1} />
+		<CollapsiblePanel
+			collapsed={collapsed}
+			onToggle={toggleCollapsed}
+			padding={6}
+			gap={6}
+			cls="kb-panel"
+			header={
+				<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+					<ficon
+						name="kanban"
+						size={12}
+						color="var(--vscode-textLink-foreground, #4daafc)"
+					/>
+					<ftext bold size={12}>
+						Board
+					</ftext>
+					<ftext size={11} color="var(--vscode-descriptionForeground)">
+						{board.planPath.split("/").pop()}
+					</ftext>
+					<ftext
+						size={11}
+						color="var(--vscode-charts-green, #4ec9b0)"
+						cls="kb-metric"
+					>
+						{doneCount}/{roots.length}
+					</ftext>
+					{/* Barra de progreso segmentada: 1 celda por fase raíz. */}
+					<fbox flexDirection="row" gap={2} cls="kb-progress">
+						{roots.map((r) => (
+							<fbox
+								key={r.id}
+								cls={`kb-progress-cell${isUnitDone(board, r) ? " done" : ""}${
+									gap?.id === r.id ? " gap" : ""
+								}`}
+								title={`${r.id} — ${isUnitDone(board, r) ? "completada" : "pendiente"}`}
+							/>
+						))}
+					</fbox>
+					{collapsed && gap ? (
+						<ftext size={11} color="var(--vscode-textLink-foreground, #4daafc)">
+							· siguiente: {gap.id}
+						</ftext>
+					) : null}
+				</fbox>
+			}
+			actions={
 				<fbox onClick={actions.onClose} cls="kb-close" title="Cerrar tablero">
 					<ficon name="x" size={12} color="#8b949e" />
 				</fbox>
-			</fbox>
-
+			}
+		>
 			<fbox flexDirection="row" gap={8} cls="kb-board">
 				{board.columns.map((col) => {
 					const inCol = roots.filter((r) => r.status === col);
 					return (
 						<fbox key={col} flexDirection="column" gap={6} cls="kb-col">
-							<fbox flexDirection="row" gap={4} alignItems="center">
+							<fbox
+								flexDirection="row"
+								gap={4}
+								alignItems="center"
+								cls="kb-col-title"
+							>
 								<fbox cls="kb-col-dot" background={COL_ACCENT[col] ?? "#888"} />
 								<ftext size={11} bold color="var(--vscode-descriptionForeground)">
 									{col}
 								</ftext>
-								<ftext size={10} color="var(--vscode-descriptionForeground)">
+								<ftext
+									size={10}
+									cls="kb-metric"
+									color="var(--vscode-descriptionForeground)"
+								>
 									({inCol.length})
 								</ftext>
 							</fbox>
@@ -104,7 +164,7 @@ function BoardOverlay({
 									unit={u}
 									isGap={gap?.id === u.id}
 									expanded={expanded.has(u.id)}
-									onToggle={() => toggle(u.id)}
+									onToggle={() => toggleUnit(u.id)}
 									actions={actions}
 								/>
 							))}
@@ -112,7 +172,7 @@ function BoardOverlay({
 					);
 				})}
 			</fbox>
-		</fbox>
+		</CollapsiblePanel>
 	);
 }
 
@@ -136,11 +196,15 @@ function PhaseCard({
 	const isDone = isUnitDone(board, unit);
 	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
 	const accent = isDone
-		? (COL_ACCENT.commiteada ?? "#4ec9b0")
+		? (COL_ACCENT.commit ?? "#4ec9b0")
 		: (COL_ACCENT[unit.status] ?? "#888");
 
 	return (
-		<fbox flexDirection="column" gap={4} cls={`kb-card${isGap ? " kb-gap" : ""}`}>
+		<fbox
+			flexDirection="column"
+			gap={4}
+			cls={`kb-card${isGap ? " kb-gap" : ""}`}
+		>
 			<fbox flexDirection="row" gap={6} alignItems="center">
 				<fbox cls="kb-card-bar" background={accent} />
 				<ftext size={11} bold>
@@ -148,11 +212,13 @@ function PhaseCard({
 				</ftext>
 				{unit.title ? (
 					<ftext size={11} color="var(--vscode-descriptionForeground)">
-						{unit.title.length > 28 ? `${unit.title.slice(0, 27)}…` : unit.title}
+						{unit.title.length > 24
+							? `${unit.title.slice(0, 23)}…`
+							: unit.title}
 					</ftext>
 				) : null}
 				{children.length > 0 ? (
-					<ftext size={10} color="var(--vscode-charts-blue, #58a6ff)">
+					<ftext size={10} cls="kb-metric" color="var(--vscode-charts-blue, #58a6ff)">
 						{doneChildren}/{children.length}
 					</ftext>
 				) : null}
@@ -200,7 +266,7 @@ function PhaseCard({
 								{c.id}
 							</ftext>
 							<ftext size={10} color="var(--vscode-descriptionForeground)">
-								{c.title ? truncate(c.title, 24) : ""}
+								{c.title ? truncate(c.title, 22) : ""}
 							</ftext>
 							<UnitArtifacts unit={c} actions={actions} />
 						</fbox>
@@ -209,24 +275,20 @@ function PhaseCard({
 
 			<UnitArtifacts unit={unit} actions={actions} />
 
-			{!isDone ? (
+			{isDone ? null : (
 				<fbox
 					onClick={() => actions.onAdvance(board.planPath, unit.id)}
 					cls={`kb-advance${isGap ? "" : " kb-advance-quiet"}`}
 					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
 				>
-					<ficon
-						name="play"
-						size={11}
-						color="var(--vscode-foreground)"
-					/>
+					<ficon name="play" size={11} color="var(--vscode-foreground)" />
 					{isGap ? (
 						<ftext size={10} bold>
 							Avanzar {unit.id}
 						</ftext>
 					) : null}
 				</fbox>
-			) : null}
+			)}
 		</fbox>
 	);
 }
@@ -271,10 +333,7 @@ function lastArtifacts(unit: BoardUnit): {
 	path: string;
 	label?: string;
 }[] {
-	const byKind = new Map<
-		string,
-		{ kind: string; path: string; label?: string }
-	>();
+	const byKind = new Map<string, { kind: string; path: string; label?: string }>();
 	for (let i = unit.transitions.length - 1; i >= 0; i--) {
 		for (const a of unit.transitions[i]!.artifacts ?? []) {
 			if (!byKind.has(a.kind))
