@@ -1063,6 +1063,9 @@ export interface State {
 	thinking?: string;
 	/** Versión instalada de la extensión (badge del sub-header + /version). */
 	version?: string;
+	/** FR#10 — URL del monitor del pipeline (servidor HTTP+SSE, D3): la
+	 *  Welcome la usa para el ancla «Abrir monitor ↗». undefined = sin monitor. */
+	monitorUrl?: string;
 	turns: Turn[];
 	approvals: ApprovalRequest[];
 	/** Confirmaciones de cambio de proveedor pendientes (red de seguridad). */
@@ -1302,6 +1305,9 @@ export type InMessage =
 	| { type: "mode"; mode: ApprovalMode }
 	| { type: "gate_stats"; stats: GateStats }
 	| { type: "version"; version: string }
+	// FR#10 — el host publica la URL del monitor al arrancar el servidor (D3)
+	// y la re-publica en webview_ready (arranque frío, molde lastGoalState).
+	| { type: "monitor_url"; url: string }
 	| { type: "goal_state"; goal: GoalState | null }
 	| { type: "model_info"; provider?: string; model: string; thinking: string }
 	| { type: "tool_toggles"; values: ToolToggles; defs: ToolToggleDescriptor[] }

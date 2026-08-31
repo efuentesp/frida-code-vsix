@@ -596,6 +596,11 @@ export function reduce(state: State, msg: InMessage): State {
 		case "version":
 			return { ...state, version: msg.version };
 
+		// FR#10 — URL del monitor del pipeline: persiste en el estado del host
+		// (NO se limpia con "cleared": el monitor vive mientras el host viva).
+		case "monitor_url":
+			return { ...state, monitorUrl: msg.url };
+
 		case "tool_toggles":
 			return {
 				...state,

@@ -120,7 +120,10 @@ Redistribuye las respuestas de la entrevista en las secciones del FRD:
 ### Paso 7: Escribir artefacto, presentar, encadenar
 
 1. **Filename**: `.frida/artifacts/discover/<slug>_<topic>.md` — `<slug>` del bloque Metadatos.
-2. **Escribe el FRD** con el Write tool. Frontmatter `status: ready`.
+2. **Escribe el FRD** con el Write tool. Frontmatter `status: ready` y
+   `parent:` vacío (el FRD es la raíz de la cadena: las skills downstream
+   enlazan contra esta ruta — el pipeline N1 de `/pipeline` encadena
+   artefactos por `parent` con fallback al topic del filename).
 3. **Presenta y encadena**:
 
    ```

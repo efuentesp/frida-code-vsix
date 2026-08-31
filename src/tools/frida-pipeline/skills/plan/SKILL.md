@@ -67,7 +67,11 @@ Por cada fase, define criterios observables:
 
 ### Paso 4: Escribir plan
 
-Filename: `.frida/artifacts/plans/<slug>_<topic>.md`. Frontmatter `status: ready`, `phase_count: N`.
+Filename: `.frida/artifacts/plans/<slug>_<topic>.md`. Frontmatter
+`status: ready`, `phase_count: N` y `parent: <ruta-relativa-del-design>` —
+el path del artefacto consumido en el Paso 1 (relativo al cwd, sin
+comillas): el reconciler del pipeline N1 encadena research → design → plan
+por `parent`.
 
 ```
 Plan completado:

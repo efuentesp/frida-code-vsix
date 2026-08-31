@@ -6,6 +6,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Welcome } from "../webview/components/Welcome";
 
 describe("Welcome component (Frida Studio — Agentic Software Factory)", () => {
+	// §10 (b) — cadena monitor_url (fix Step 4, precedente 32d874d): la Welcome
+	// renderiza el ancla «Abrir monitor ↗» con la URL publicada por el host.
+	it("renderiza el ancla al monitor cuando monitorUrl llegó por monitor_url", () => {
+		const html = renderToStaticMarkup(
+			React.createElement(Welcome, {
+				monitorUrl: "http://127.0.0.1:45678/",
+			}),
+		);
+		expect(html).toContain("http://127.0.0.1:45678/");
+		expect(html).toContain("Abrir monitor");
+	});
+
 	it("renderiza el wrapper centrado verticalmente, logo, título Frida Studio y subtítulo", () => {
 		const html = renderToStaticMarkup(React.createElement(Welcome, {}));
 		expect(html).toContain("welcome-wrapper");
@@ -35,7 +47,7 @@ describe("Welcome component (Frida Studio — Agentic Software Factory)", () => 
 		const html = renderToStaticMarkup(React.createElement(Welcome, {}));
 		expect(html).toContain("welcome-cards");
 		expect(html).toContain("Planificar con AiDD");
-		expect(html).toContain("Desarrollar Autónomo");
+		expect(html).toContain("Desarrollo Autónomo (SDD)");
 		expect(html).toContain("Diseñar Pruebas (TEA)");
 		expect(html).toContain("Packs de Equipo");
 		expect(html).toContain("ROADMAP");

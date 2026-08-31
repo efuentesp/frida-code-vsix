@@ -98,7 +98,12 @@ Compila los hallazgos de los agentes en un documento estructurado:
 ### Paso 5: Escribir artefacto
 
 1. **Filename**: `.frida/artifacts/research/<slug>_<topic>.md`.
-2. **Escribe** con el Write tool. Frontmatter `status: ready`.
+2. **Escribe** con el Write tool. Frontmatter `status: ready` y
+   `parent: <ruta-relativa-del-FRD>` — el path del input del Paso 1 bajo
+   `.frida/artifacts/discover/` (relativo al cwd, sin comillas).
+   `parent:` vacío si la investigación no viene de un FRD: el reconciler
+   del pipeline N1 enlaza por `parent` y cae al topic del filename como
+   fallback.
 3. **Presenta y encadena**:
 
    ```

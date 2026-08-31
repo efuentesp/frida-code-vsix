@@ -36,22 +36,23 @@ const CATEGORIES: CategoryConfig[] = [
 			"De la idea al software: planificación, arquitectura y desarrollo autónomo.",
 		cards: [
 			{
-				id: "aidd-plan",
-				title: "Planificar con AiDD",
+				id: "sdd-autonomous",
+				title: "Desarrollo Autónomo (SDD)",
 				desc:
-					"Crea el plan completo (brief, PRD, arquitectura y specs) para una nueva idea.",
-				iconName: "rocket",
-				prompt: "/wf aidd-plan ",
-				actionType: "insert",
+					"La fábrica: features avanzando discover → research → design → plan → 🚀 ready-to-ship, con su board de ejecución.",
+				iconName: "tools",
+				prompt: "/pipeline",
+				actionType: "submit",
 			},
 			{
-				id: "aidd-ship",
-				title: "Desarrollar Autónomo",
-				desc:
-					"Ciclos autónomos de implementación, validación de tests y commits estructurados.",
-				iconName: "tools",
-				prompt: "/wf aidd-ship ",
-				actionType: "insert",
+				id: "aidd-plan",
+				title: "Planificar con AiDD",
+				desc: "Brief, PRD, arquitectura y specs para una idea nueva.",
+				iconName: "rocket",
+				actionType: "roadmap",
+				badge: "PRÓXIMAMENTE",
+				badgeTitle:
+					"Entrará con el motor de paneles (FR#9) cuando el método exista — /wf aidd-plan sigue disponible hoy",
 			},
 			{
 				id: "tea-test",
@@ -368,11 +369,15 @@ export function Welcome({
 	onInsert,
 	onOpenSettings,
 	workspace,
+	monitorUrl,
 }: {
 	onPrompt?: (text: string) => void;
 	onInsert?: (text: string) => void;
 	onOpenSettings?: (tab: SettingsTab) => void;
 	workspace?: WorkspaceInfo;
+	/** FR#10 — URL del monitor del pipeline (mensaje monitor_url del host);
+	 *  habilita el ancla «Abrir monitor ↗» de la tarjeta SDD. */
+	monitorUrl?: string;
 }) {
 	// Auto-detección inteligente: si el workspace tiene diffs o rama activa → brownfield, sino greenfield.
 	// El mensaje "workspace" llega de forma asíncrona (git status + postMessage)
@@ -506,6 +511,33 @@ export function Welcome({
 									)}
 								</div>
 								<p className="starter-card-desc">{c.desc}</p>
+								{/* FR#10 — ancla al monitor del pipeline: la URL llega por el
+							 mensaje monitor_url (host → webview). Ancla nativa <a href>:
+							 abre en el navegador externo (patrón banner OAuth,
+							 App.tsx:494-510). stopPropagation: el click NO debe disparar
+							 el submit /pipeline de la tarjeta contenedora. Estilos inline:
+							 este slice no toca styles.css (sólo S5). */}
+								{c.id === "sdd-autonomous" && monitorUrl && (
+									<a
+										href={monitorUrl}
+										target="_blank"
+										rel="noreferrer"
+										title="Abrir el monitor del pipeline (N1 + N2) en el navegador"
+										onClick={(e) => e.stopPropagation()}
+										style={{
+											display: "inline-flex",
+											alignItems: "center",
+											gap: 4,
+											marginTop: 2,
+											width: "fit-content",
+											fontSize: 11,
+											color: "var(--vscode-textLink-foreground)",
+											textDecoration: "none",
+										}}
+									>
+										Abrir monitor ↗
+									</a>
+								)}
 							</div>
 						);
 					})}

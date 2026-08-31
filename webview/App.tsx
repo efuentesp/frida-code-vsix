@@ -553,6 +553,7 @@ export function App() {
 							setSettingsTab(tab);
 						}}
 						workspace={state.workspace}
+						monitorUrl={state.monitorUrl}
 					/>
 				)}
 				{state.compactions

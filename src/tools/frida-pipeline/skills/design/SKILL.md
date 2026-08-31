@@ -75,7 +75,10 @@ Lista cada archivo que se creará/modificará, agrupado por slice:
 
 ### Paso 5: Escribir artefacto
 
-Filename: `.frida/artifacts/designs/<slug>_<topic>.md`. Frontmatter `status: ready`.
+Filename: `.frida/artifacts/designs/<slug>_<topic>.md`. Frontmatter
+`status: ready` y `parent: <ruta-relativa-del-research>` — el path del
+artefacto consumido en el Paso 1 (relativo al cwd, sin comillas): el
+reconciler del pipeline N1 encadena research → design → plan por `parent`.
 
 ```
 Diseño completado:
