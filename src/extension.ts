@@ -10,6 +10,8 @@ import {
 	copyFileSync,
 	existsSync,
 	mkdirSync,
+	readFileSync,
+	readdirSync,
 	statSync,
 	writeFileSync,
 } from "node:fs";
@@ -106,6 +108,12 @@ import {
 	encodeCwd,
 	handleWfSlash,
 	validateWorkflow,
+	scanSkillContracts,
+	setSkillContracts,
+	bootstrapBoardFromRuns,
+	loadBoard,
+	openBoard,
+	saveBoard,
 } from "./tools/frida-workflow";
 import type {
 	LoadedWorkflows,
@@ -114,10 +122,13 @@ import type {
 } from "./tools/frida-workflow";
 import { wireWorkflowPanel } from "./tools/frida-workflow/panel";
 import { bootstrapPlanProgressFromRuns } from "./tools/frida-workflow/plan-utils";
+import { extractPhaseId } from "./tools/frida-workflow/plan-utils";
+import { createBoardOverlayElement } from "./tools/frida-workflow/board-ui";
 import {
 	getWorkflowRuns as getFridaWorkflowRuns,
 	registerCommandRunner,
 	registerRerunHandler,
+	runCustomCommand,
 	subscribeWorkflowRuns as subscribeFridaWorkflowRuns,
 } from "./tools/frida-workflow/store";
 import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
@@ -4204,6 +4215,11 @@ export async function activate(
 			description: "Estado del orquestador frida-pipeline",
 		},
 		{
+			name: "board",
+			description: "Tablero kanban del plan (fases, splits y artefactos)",
+			argumentHint: "[ruta-del-plan]",
+		},
+		{
 			name: "skills",
 			description: "Listar las skills disponibles con su sintaxis $name",
 		},
@@ -4311,6 +4327,9 @@ export async function activate(
 				break;
 			case "context":
 				postContextCommand(arg);
+				break;
+			case "board":
+				await mountBoardOverlay(arg);
 				break;
 			case "gates":
 				postGatesCommand();
@@ -5033,6 +5052,87 @@ export async function activate(
 		});
 	}
 
+	// /board — tablero kanban del plan (#160): overlay con columnas, splits y
+	// artefactos clicables. Resolución del plan: argumento > plan del último run
+	// del store > board más reciente por mtime. El botón «Avanzar» despacha el
+	// workflow autónomo sobre la hoja sugerida (firstRealGap del board).
+	let boardOverlayHandle: { unmount: () => void } | undefined;
+	async function mountBoardOverlay(arg: string): Promise<void> {
+		const s = await ensureSession();
+		const cwd = workspaceCwd();
+
+		let planToken = arg.trim();
+		if (!planToken) {
+			const runs = [...getFridaWorkflowRuns().runs].reverse();
+			for (const r of runs) {
+				if (!r.input) continue;
+				const ex = extractPhaseId(r.input);
+				if (ex?.planPathToken) {
+						planToken = ex.planPathToken;
+						break;
+				}
+			}
+		}
+		if (!planToken) {
+			const boardDir = path.join(cwd, ".frida", "artifacts", "board");
+			if (existsSync(boardDir)) {
+				const files = readdirSync(boardDir)
+					.filter((f) => f.endsWith(".json"))
+					.map((f) => ({ f, m: statSync(path.join(boardDir, f)).mtimeMs }))
+					.sort((a, b) => b.m - a.m);
+				if (files.length > 0) {
+					const slug = files[0]!.f.replace(/\.json$/, "");
+					planToken = path.join(
+						".frida",
+						"artifacts",
+						"plans",
+						`${slug}.md`,
+					);
+				}
+			}
+		}
+		if (!planToken) {
+			post({
+				type: "info",
+				text: "No hay plans con board todavía. Uso: /board <ruta-del-plan>",
+			});
+			return;
+		}
+
+		const planAbs = path.isAbsolute(planToken) ? planToken : path.join(cwd, planToken);
+		const planContent = existsSync(planAbs)
+			? readFileSync(planAbs, "utf8")
+			: undefined;
+		let board = loadBoard(cwd, planToken);
+		if (!board) {
+			if (!planContent) {
+				post({ type: "info", text: `Plan no encontrado: ${planToken}` });
+				return;
+			}
+			board = openBoard(cwd, planToken, planContent);
+			saveBoard(cwd, planToken, board);
+		}
+
+		boardOverlayHandle?.unmount();
+		const boardRef = board;
+		boardOverlayHandle = s.webBridge.mountPersistent(
+			() =>
+				createBoardOverlayElement(boardRef, {
+					onOpenArtifact: (p) => {
+						void vscode.window.showTextDocument(vscode.Uri.file(p), {
+							preview: true,
+						});
+					},
+					onAdvance: (planPath, phaseId) => {
+						boardOverlayHandle?.unmount();
+						runCustomCommand(`/wf sdd-ship "${planPath} Phase ${phaseId}"`);
+					},
+					onClose: () => boardOverlayHandle?.unmount(),
+				}),
+			"overlay",
+		);
+	}
+
 	// /context: reporte de uso del contexto como panel overlay (barra segmentada
 	// estilo Claude Code + leyenda + métricas). Porte de /supi-context (fase B,
 	// ADR-0015). Lee frida.session + el cache de before_agent_start (frida-context).
@@ -5193,12 +5293,14 @@ export async function activate(
 	// #158 — Bootstrap del progreso de planes desde el histórico de runs JSONL
 	// (idempotente: deduplica por fase). Cubre fases completadas antes de esta
 	// versión para que la tarjeta sugiera el primer hueco real desde el arranque.
+	// #159 — Además: vocabulario de artifactKind de los SKILL.md (contratos) y
+	// board jerárquico del histórico (con migración de progress a transiciones).
+	setSkillContracts(scanSkillContracts(defaultAgentDir()));
 	{
 		const runsDirBase = path.join(context.globalStorageUri.fsPath, "workflows");
-		const registered = bootstrapPlanProgressFromRuns(
-			path.join(runsDirBase, encodeCwd(workspaceCwd()), "runs"),
-			workspaceCwd(),
-		);
+		const runsDir = path.join(runsDirBase, encodeCwd(workspaceCwd()), "runs");
+		const registered = bootstrapPlanProgressFromRuns(runsDir, workspaceCwd());
+		bootstrapBoardFromRuns(runsDir, workspaceCwd());
 		if (registered > 0) {
 			post({
 				type: "info",

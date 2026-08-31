@@ -6813,6 +6813,101 @@ kbd {
 	opacity: 1;
 }
 
+/* ── #160 — Tablero kanban del plan (/board, overlay) ───────────────────── */
+.kb-overlay {
+	max-width: 100%;
+}
+.kb-board {
+	overflow-x: auto;
+	scrollbar-width: thin;
+	padding-bottom: 4px;
+}
+.kb-col {
+	min-width: 190px;
+	max-width: 260px;
+	flex: 1 1 190px;
+	gap: 6px;
+}
+.kb-col-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.kb-card {
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: var(--vscode-editor-background, #1e1e1e);
+	border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+}
+.kb-card-bar {
+	width: 3px;
+	align-self: stretch;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+.kb-gap {
+	border-color: var(--vscode-focusBorder, #58a6ff);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #58a6ff) inset;
+}
+.kb-sub-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	cursor: pointer;
+	user-select: none;
+	opacity: 0.85;
+}
+.kb-sub-toggle:hover {
+	opacity: 1;
+}
+/* Jerarquía de subtareas: indent + guide (sin glifos ├└). */
+.kb-sub {
+	margin-left: 8px;
+	padding-left: 8px;
+	border-left: 2px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
+}
+.kb-sub.kb-gap {
+	border-left-color: var(--vscode-focusBorder, #58a6ff);
+}
+.kb-art {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	padding: 2px;
+	border-radius: 4px;
+}
+.kb-art:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+.kb-advance {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+	user-select: none;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--vscode-button-background, #0e639c);
+	color: var(--vscode-button-foreground, #fff);
+	align-self: flex-start;
+}
+.kb-advance:hover {
+	background: var(--vscode-button-hoverBackground, #1177bb);
+}
+.kb-close {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	padding: 3px;
+	border-radius: 4px;
+	opacity: 0.7;
+}
+.kb-close:hover {
+	opacity: 1;
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+
 .wf-cancel-btn {
 	cursor: pointer;
 	display: inline-flex;
