@@ -243,6 +243,8 @@ export {
 	setBoardSpecResolver,
 	resolveBoardSpec,
 	resolveStageKind,
+	dedupeBoard,
+	hasIdenticalTransition,
 	subscribeBoardChanges,
 	validateFails,
 	sortArtifactsChronologically,

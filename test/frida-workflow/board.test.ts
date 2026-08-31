@@ -12,6 +12,7 @@ import {
 	boardChildren,
 	boardFilePath,
 	bootstrapBoardFromRuns,
+	dedupeBoard,
 	firstRealGap,
 	isUnitDone,
 	loadBoard,
@@ -685,5 +686,48 @@ describe("board — orden cronológico y migración (#181)", () => {
 		// El id normalizado ajeno (f09) NO debe aparecer como unidad.
 		expect(board.units.map((u) => u.id)).toEqual(["F01", "F02"]);
 		expect(board.units.some((u) => u.id === "f09")).toBe(false);
+	});
+});
+
+// ── #185 — Deduplicación de transiciones (replay del bootstrap) ───────────────
+describe("board — dedup de transiciones (#185)", () => {
+	it("applyStageTransition no duplica la misma transición (run+stage+ts)", () => {
+		const board = openBoard(tmp, PLAN, PLAN5);
+		const input = {
+			stage: "commit" as const,
+			runId: "r1",
+			ts: "t1",
+			source: "bootstrap",
+		};
+		applyStageTransition(board, "F01", input);
+		applyStageTransition(board, "F01", input); // replay
+		applyStageTransition(board, "F01", input); // replay
+		const u = board.units.find((x) => x.id === "F01")!;
+		expect(u.transitions.filter((t) => t.stage === "commit").length).toBe(1);
+	});
+
+	it("dedupeBoard conserva una sola aparición de cada (runId, stage, ts)", () => {
+		const board = openBoard(tmp, PLAN, PLAN5);
+		applyStageTransition(board, "F01", {
+			stage: "elaborate",
+			runId: "r0",
+			ts: "t0",
+		}); // crea la unidad on-demand
+		const u = board.units.find((x) => x.id === "F01")!;
+		for (let i = 0; i < 5; i++) {
+			u.transitions.push({
+				to: "commit",
+				stage: "validate",
+				artifactKind: "validation",
+				runId: "r1",
+				ts: "t1",
+			});
+		}
+		dedupeBoard(board);
+		expect(u.transitions.filter((t) => t.runId === "r1").length).toBe(1);
+		// La clave idéntica en OTRA unidad no se roba la transición
+		applyStageTransition(board, "F02", { stage: "commit", runId: "r1", ts: "t1" });
+		const u2 = board.units.find((x) => x.id === "F02")!;
+		expect(u2.transitions.filter((t) => t.runId === "r1").length).toBe(1);
 	});
 });

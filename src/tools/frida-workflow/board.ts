@@ -398,6 +398,35 @@ export interface StageTransitionInput {
 /** Aplica la transición de un stage sobre la unidad (id canónico de fase).
  *  Reglas: sólo avanza hacia adelante; validate sin passed NO avanza;
  *  idempotente (re-aplicar una columna ya alcanzada es no-op). */
+/** #185 — ¿Ya existe una transición idéntica (run+stage+ts) en la unidad? */
+export function hasIdenticalTransition(
+	unit: BoardUnit,
+	input: StageTransitionInput,
+): boolean {
+	return unit.transitions.some(
+		(t) => t.runId === input.runId && t.stage === input.stage && t.ts === input.ts,
+	);
+}
+
+/** #185 — Limpieza de un board ya inflado por replays del bootstrap:
+ *  conserva la PRIMERA aparición de cada (runId, stage, ts). */
+export function dedupeBoard(board: Board): Board {
+	for (const u of board.units) {
+		// Set POR UNIDAD: la clave (run+stage+ts) no colisiona entre fases
+		// distintas (p. ej. transiciones roadmap-sinc sin ts propias).
+		const seen = new Set<string>();
+		const kept = [];
+		for (const t of u.transitions) {
+			const key = `${t.runId ?? "?"}|${t.stage}|${t.ts ?? "?"}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			kept.push(t);
+		}
+		u.transitions = kept;
+	}
+	return board;
+}
+
 export function applyStageTransition(
 	board: Board,
 	unitId: string,
@@ -423,6 +452,12 @@ export function applyStageTransition(
 	const target =
 		input.spec?.stageColumns?.[input.stage] ?? DEFAULT_STAGE_COLUMNS[input.stage];
 	if (!target) return unit; // stage sin columna (p. ej. pre-flight): no toca el board
+
+	// #185 — Deduplicación SOLO del replay del bootstrap: el runtime vivo
+	// nunca repite un evento (ts real), pero el bootstrap relee JSONL
+	// completos en corridas sucesivas y duplicaba transiciones.
+	if (input.source === "bootstrap" && hasIdenticalTransition(unit, input))
+		return unit;
 
 	if (input.stage === "validate" && input.passed === false) {
 		// #163/#171 — Zigzag: validate FAIL (explícito, del verdict del onStageEnd)
@@ -628,8 +663,10 @@ export function bootstrapBoardFromRuns(
 		const board = openBoard(cwd, planPathToken, planContent, spec);
 		const runId = f.replace(/\.jsonl$/, "");
 
+		let evIdx = 0;
 		for (const r of rows) {
 			if (r.type !== "stage" || r.status !== "completed") continue;
+			evIdx++;
 			const artifacts: BoardArtifactLink[] = (r.output?.artifacts ?? [])
 				.map((a) => ({
 					// #181 — artifactKind del contrato (validation/elaboration/…),
@@ -642,7 +679,9 @@ export function bootstrapBoardFromRuns(
 			applyStageTransition(board, extracted.phaseId, {
 				stage: r.stage ?? "",
 				runId,
-				ts: wfRow.input ? f.slice(0, 10) : "",
+				// #185 — ts sintético ÚNICO por evento: fecha del archivo + índice.
+				ts: wfRow.input ? `${f.slice(0, 10)}#${evIdx}` : "",
+				source: "bootstrap",
 				artifacts,
 				passed,
 				spec,
@@ -661,8 +700,7 @@ export function bootstrapBoardFromRuns(
 					)?.id
 				: undefined;
 			const canonical =
-				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ??
-				planPhase;
+				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ?? planPhase;
 			if (!canonical) continue;
 			applyStageTransition(board, canonical, {
 				stage: "commit",
