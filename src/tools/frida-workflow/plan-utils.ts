@@ -112,9 +112,23 @@ export function resolveNextStep(
 		const phases = parsePlanPhases(content);
 		if (phases.length === 0) return null;
 
-		// Detectar fase actual del input (ej. "Phase F10c.2" o "F10c.2")
-		const phaseMatch = cleanInput.match(/(?:Phase\s+)?(F[\w.]+(?:\.\w+)?|\d+)/i);
-		const currentPhaseId = phaseMatch ? phaseMatch[1] : undefined;
+		// #157 — Detectar fase actual del input. Orden estricto:
+		// 1) "Phase F10c.2" explícito; 2) token de fase suelto DESPUÉS del path.
+		// Jamás un match suelto sobre el string completo: el path contiene
+		// ".frida" y "pdle2-f10c-wizard…" que matchean F[\w.]+ case-insensitive
+		// (el regex opcional anterior capturaba "frida" y la tarjeta proponía
+		// SIEMPRE "Avanzar a F10c.2" por caer en currentIndex = 0).
+		const explicit = cleanInput.match(
+			/Phase\s+(F[\w.]+(?:\.\w+)?|\d+)\b/i,
+		);
+		let currentPhaseId = explicit?.[1];
+		if (!currentPhaseId) {
+			const afterPath = cleanInput
+				.slice((tokens[0] ?? "").length)
+				.trim();
+			const bare = afterPath.match(/^(F[\w.]+(?:\.\w+)?|\d+)\b/i);
+			currentPhaseId = bare?.[1];
+		}
 
 		let currentIndex = 0;
 		if (currentPhaseId) {
