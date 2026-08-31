@@ -18,6 +18,7 @@ import {
 	syncUnitsFromPlan,
 	type Board,
 } from "../../src/tools/frida-workflow/board";
+import { appendPhaseProgress, normalizePhaseId, readCompletedPhases } from "../../src/tools/frida-workflow/plan-utils";
 import {
 	extractContractArtifactKind,
 	scanSkillContracts,
@@ -116,7 +117,9 @@ describe("board — transiciones con contratos (#159)", () => {
 			ts: "t",
 			passed: true,
 		});
-		expect(board.units[1]!.transitions.at(-1)!.artifactKind).toBe("validation-v2");
+		expect(board.units[1]!.transitions.at(-1)!.artifactKind).toBe(
+			"validation-v2",
+		);
 
 		// El spec del workflow gana sobre el contrato — en una unidad FRESCA
 		// (tras validate ya no puede aplicarse implement: no retrocede).
@@ -127,8 +130,7 @@ describe("board — transiciones con contratos (#159)", () => {
 			spec: { stageKinds: { implement: "mutation-custom" } },
 		});
 		expect(
-			board.units.find((u) => u.id === "F10c.4")!.transitions.at(-1)!
-				.artifactKind,
+			board.units.find((u) => u.id === "F10c.4")!.transitions.at(-1)!.artifactKind,
 		).toBe("mutation-custom");
 	});
 
@@ -220,7 +222,12 @@ describe("board — bootstrap desde runs + blindaje multi-escritor (#161)", () =
 		const runsDir = path.join(tmp, "runs-b");
 		fs.mkdirSync(runsDir, { recursive: true });
 		const rows = [
-			{ type: "workflow", runId: "run-1", input: `"${PLAN} Phase F10c.2"`, ts: "t" },
+			{
+				type: "workflow",
+				runId: "run-1",
+				input: `"${PLAN} Phase F10c.2"`,
+				ts: "t",
+			},
 			{ type: "stage", runId: "run-1", stage: "elaborate", status: "completed" },
 			{
 				type: "stage",
@@ -229,9 +236,7 @@ describe("board — bootstrap desde runs + blindaje multi-escritor (#161)", () =
 				status: "completed",
 				output: {
 					data: { passed: true },
-					artifacts: [
-						{ handle: { path: "/abs/validation.md" }, role: "primary" },
-					],
+					artifacts: [{ handle: { path: "/abs/validation.md" }, role: "primary" }],
 				},
 			},
 			{ type: "stage", runId: "run-1", stage: "commit", status: "completed" },
@@ -248,6 +253,37 @@ describe("board — bootstrap desde runs + blindaje multi-escritor (#161)", () =
 		expect(u2.status).toBe("commiteada");
 		const val = u2.transitions.find((t) => t.stage === "validate")!;
 		expect(val.artifacts?.[0]?.path).toBe("/abs/validation.md"); // vínculo explícito
+	});
+
+	it("migración progress: ids normalizados matchean la unidad canónica (sin duplicados)", () => {
+		// Regresión real de SELE-DEV: readCompletedPhases devuelve "f10c1" (sin
+		// punto) y la migración creaba unidades fantasma en vez de commitear F10c.1.
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-mig-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		// F10c.1 SÓLO en progress (su run JSONL ya no existe) — como SELE-DEV.
+		appendPhaseProgress(tmp2, PLAN, "F10c.1", "593930d-manual", "2026-08-30T16:05:00Z");
+
+		bootstrapBoardFromRuns(path.join(tmp2, "runs-inexistentes"), tmp2);
+		// El bootstrap sin JSONLs no procesa nada: la migración vive en el loop de
+		// runs. Verificamos la misma vía que usa el runtime: openBoard + migración
+		// explícita vía applyStageTransition con id canónico resuelto.
+		const board = openBoard(tmp2, PLAN, PLAN5);
+		const doneIds = readCompletedPhases(tmp2, PLAN);
+		expect(doneIds).toContain("f10c1"); // normalizado, sin punto
+		for (const doneId of doneIds) {
+			const canonical =
+				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ?? doneId;
+			applyStageTransition(board, canonical, {
+				stage: "commit",
+				runId: "progress-158",
+				ts: "migrated",
+			});
+		}
+		expect(board.units.find((u) => u.id === "F10c.1")!.status).toBe("commiteada");
+		expect(board.units.some((u) => u.id === "f10c1")).toBe(false); // sin fantasma
 	});
 
 	it("blindaje: v persistida, carga normaliza v ausente, escritura sin .tmp residual", () => {

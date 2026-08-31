@@ -23,6 +23,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import {
 	extractPhaseId,
+	normalizePhaseId,
 	parsePlanPhases,
 	readCompletedPhases,
 	resolveNextStep as resolveNextStepRel,
@@ -414,8 +415,13 @@ export function bootstrapBoardFromRuns(
 			});
 		}
 		// Migración #158: fases registradas en progress/*.md cuentan como commiteadas.
+		// readCompletedPhases devuelve ids NORMALIZADOS ("f10c1" sin punto):
+		// resolver al id canónico de la unidad existente para no crear duplicados.
 		for (const doneId of readCompletedPhases(cwd, planPathToken)) {
-			applyStageTransition(board, doneId, {
+			const canonical =
+				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ??
+				doneId;
+			applyStageTransition(board, canonical, {
 				stage: "commit",
 				runId: "progress-158",
 				ts: "migrated",
