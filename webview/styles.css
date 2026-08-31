@@ -6884,13 +6884,17 @@ kbd {
 .kb-sub-toggle {
 	display: inline-flex;
 	align-items: center;
-	gap: 3px;
 	cursor: pointer;
 	user-select: none;
 	opacity: 0.85;
+	transition:
+		opacity 0.1s ease,
+		transform 0.1s ease;
+}
 }
 .kb-sub-toggle:hover {
 	opacity: 1;
+	transform: scale(1.15);
 }
 /* Jerarquía de subtareas: indent + guide (sin glifos ├└). */
 .kb-sub {
@@ -6905,11 +6909,14 @@ kbd {
 	display: inline-flex;
 	align-items: center;
 	cursor: pointer;
-	padding: 2px;
-	border-radius: 4px;
+	opacity: 0.85;
+	transition:
+		opacity 0.1s ease,
+		transform 0.1s ease;
 }
 .kb-art:hover {
-	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
+	opacity: 1;
+	transform: scale(1.15);
 }
 .kb-advance {
 	display: inline-flex;
@@ -6928,15 +6935,16 @@ kbd {
 }
 /* #163 — Botón discreto en tarjetas ejecutables que NO son el hueco sugerido */
 .kb-advance-quiet {
-	background: transparent;
 	color: var(--vscode-foreground);
-	padding: 2px 5px;
-	border-radius: 4px;
 	opacity: 0.9;
+	cursor: pointer;
+	transition:
+		opacity 0.1s ease,
+		transform 0.1s ease;
 }
 .kb-advance-quiet:hover {
-	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15));
 	opacity: 1;
+	transform: scale(1.15);
 }
 /* #163 — Badge de ciclos de reintento (validate FAIL) */
 .kb-cycles {

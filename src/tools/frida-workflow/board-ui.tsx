@@ -270,12 +270,9 @@ function PhaseCard({
 				>
 					<ficon
 						name={expanded ? "chevron-down" : "chevron-right"}
-						size={10}
+						size={11}
 						color="var(--vscode-descriptionForeground)"
 					/>
-					<ftext size={10} color="var(--vscode-descriptionForeground)">
-						subtareas
-					</ftext>
 				</fbox>
 			) : null}
 
@@ -304,7 +301,7 @@ function PhaseCard({
 			{isRunning ? null : othersBlocked ? (
 				// #175 — Hay una fase en ejecución: ▶ deshabilitado hasta terminar.
 				<fbox
-					cls="kb-advance kb-advance-disabled"
+					cls="kb-advance-disabled"
 					title="Hay una fase en ejecución — disponible al terminar el run"
 				>
 					<ficon
