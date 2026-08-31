@@ -129,8 +129,13 @@ var __import_meta_resolve = function(specifier, parent) {
 // ADR-0020 Fase 4 — bundle DSL standalone para que los configs .ts importen el
 // DSL desde "frida-workflow" (jiti alias). CJS: jiti carga un bundle CJS vía alias
 // sin transformar (el ESM bundleado truena con "Cannot find module '.'"). typebox
-// se bundlea DENTRO (self-contained). En runtime: createJiti(configFile, {
-// alias: { "frida-workflow": <ext>/dist/frida-workflow.js }, interopDefault: true }).
+// se bundlea DENTRO (self-contained).
+//
+// #189 — MISMOS shims que los otros bundles: la jiti embebida hace
+// createRequire(import.meta.url)("../dist/babel.cjs") en su transform lazy; sin
+// el shim, import.meta.url es undefined en CJS → "The argument 'filename' must
+// be a file URL object…". Con el banner resuelve a dist/babel.cjs (que el final
+// del build ya copia para los tres bundles).
 /** @type {import('esbuild').BuildOptions} */
 const dslOptions = {
 	entryPoints: ["src/tools/frida-workflow/index.ts"],
@@ -142,6 +147,21 @@ const dslOptions = {
 	sourcemap: true,
 	external: [], // typebox DENTRO (self-contained para el alias en runtime)
 	logLevel: "info",
+	banner: {
+		js: `
+var __import_meta_url = require("url").pathToFileURL(__filename).href;
+var __import_meta_dirname = __dirname;
+var __import_meta_resolve = function(specifier, parent) {
+  try { return require("url").pathToFileURL(require.resolve(specifier)).href; }
+  catch { return __import_meta_url; }
+};
+`,
+	},
+	define: {
+		"import.meta.url": "__import_meta_url",
+		"import.meta.dirname": "__import_meta_dirname",
+		"import.meta.resolve": "__import_meta_resolve",
+	},
 };
 
 // SDK passthrough: re-exporta la API pública del SDK para que las extensiones

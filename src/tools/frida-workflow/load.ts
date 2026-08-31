@@ -7,7 +7,15 @@
 // (bundle CJS standalone, typebox dentro). skillAliases se aplica antes de
 // devolver (one-hop, no muta los built-ins fuente).
 
-import { existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
 import type { StageDef, Workflow } from "./types";
@@ -17,6 +25,20 @@ export interface LoadIssue {
 	path: string;
 	message: string;
 }
+
+/** Lo que un config/pack exporta tras desenvolver `.default`: un workflow, un
+ *  array, un envelope {workflows, default, skillAliases} o nada. La validación
+ *  fina la hacen los guards de addLayer (isWorkflow/envelope). */
+type WorkflowModule =
+	| Workflow
+	| Workflow[]
+	| Partial<{
+			workflows: unknown;
+			default: unknown;
+			skillAliases: Record<string, string>;
+	  }>
+	| null
+	| undefined;
 
 export interface LoadedWorkflows {
 	workflows: Map<string, Workflow>;
@@ -39,6 +61,35 @@ export interface LoadOptions {
 	dslBundlePath?: string;
 	/** Capa base programática (built-ins). */
 	builtIns?: Workflow[];
+}
+
+// ---------------------------------------------------------------------------
+// Alias DSL → wrapper CJS (#189)
+// ---------------------------------------------------------------------------
+
+/** #189 — Evaluar el bundle bajo jiti dispara un bug en la jiti embebida del
+ *  propio bundle al resolver `node:` imports ("filename undefined"); además
+ *  re-evalúa ~megabytes de DSL por config. Un wrapper CJS mínimo delega el
+ *  require a Node (cache de módulos): la jiti sólo transforma el wrapper.
+ *  Idempotente por hash del bundle (versiones distintas no colisionan).
+ *  Si tmpdir() no es escribible, cae al bundle directo (comportamiento previo). */
+export function dslAliasTarget(bundlePath: string): string {
+	const hash = createHash("sha1")
+		.update(bundlePath)
+		.digest("hex")
+		.slice(0, 12);
+	const wrapper = join(tmpdir(), `frida-dsl-${hash}.cjs`);
+	const content = `// Auto-generado por frida-workflow (#189) — no editar.\nmodule.exports = require(${JSON.stringify(bundlePath)});\n`;
+	try {
+		const prev = existsSync(wrapper) ? readFileSync(wrapper, "utf8") : null;
+		if (prev !== content) {
+			mkdirSync(tmpdir(), { recursive: true });
+			writeFileSync(wrapper, content, "utf8");
+		}
+		return wrapper;
+	} catch {
+		return bundlePath;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -66,12 +117,12 @@ function errMsg(e: unknown): string {
 /** jiti puede devolver el namespace {default: X} o X directamente. Desenvuelve
  *  `.default` SÓLO si es un objeto: así el envelope {workflows, default:"p"} no se
  *  desenvuelve a "p" (string), y el namespace {default: envelope} sí. */
-function unwrapDefault(mod: unknown): unknown {
+function unwrapDefault(mod: unknown): WorkflowModule {
 	if (mod && typeof mod === "object" && "default" in mod) {
 		const d = (mod as { default: unknown }).default;
-		if (d && typeof d === "object") return d;
+		if (d && typeof d === "object") return d as WorkflowModule;
 	}
-	return mod;
+	return mod as WorkflowModule;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,10 +144,10 @@ export function loadWorkflows(opts: LoadOptions): LoadedWorkflows {
 			sources.set(w.name, "(built-in)");
 		}
 
-	const loadFile = (file: string): unknown => {
+	const loadFile = (file: string): WorkflowModule => {
 		try {
 			const alias: Record<string, string> | undefined = opts.dslBundlePath
-				? { "frida-workflow": opts.dslBundlePath }
+				? { "frida-workflow": dslAliasTarget(opts.dslBundlePath) }
 				: undefined;
 			const jiti = createJiti(file, alias ? { alias } : {});
 			return unwrapDefault(jiti(file));
