@@ -105,6 +105,8 @@ import { getTodoState } from "./tools/todo-web/store";
 import { expandAskPrompt } from "./tools/ask-user-question-web";
 import {
 	createFridaWorkflowHost,
+	defineRoute,
+	deriveBoardSpec,
 	encodeCwd,
 	handleWfSlash,
 	validateWorkflow,
@@ -5330,7 +5332,23 @@ export async function activate(
 		const runsDirBase = path.join(context.globalStorageUri.fsPath, "workflows");
 		const runsDir = path.join(runsDirBase, encodeCwd(workspaceCwd()), "runs");
 		const registered = bootstrapPlanProgressFromRuns(runsDir, workspaceCwd());
-		bootstrapBoardFromRuns(runsDir, workspaceCwd());
+		// #181 — CON spec derivado de sdd-ship: sin él, el bootstrap era el último
+		// escritor con columnas default y el board bailaba commit/commiteada tras
+		// cada /reload. Los runs posteriores usan el spec real del config cargado.
+		bootstrapBoardFromRuns(
+			runsDir,
+			workspaceCwd(),
+			deriveBoardSpec({
+				name: "sdd-ship",
+				stages: { elaborate: {}, implement: {}, validate: {}, commit: {} },
+				edges: {
+					validate: defineRoute(
+						["commit", "implement", "stop"],
+						() => "stop",
+					),
+				},
+			}),
+		);
 		if (registered > 0) {
 			post({
 				type: "info",

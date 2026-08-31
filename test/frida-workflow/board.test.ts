@@ -19,6 +19,7 @@ import {
 	saveBoard,
 	setSkillContracts,
 	restartUnit,
+	sortArtifactsChronologically,
 	syncUnitsFromPlan,
 	validateFails,
 	pendingDeps,
@@ -635,5 +636,54 @@ describe("board — restart de ciclo (#179)", () => {
 		const u = restartUnit(board, "F10c.5", { runId: "r", ts: "t" });
 		expect(u?.status).toBe("backlog");
 		expect(u?.transitions.length).toBe(0); // sin transición restart espuria
+	});
+});
+
+// ── #181 — Orden cronológico de iconos + migración sin fantasmas ─────────────
+describe("board — orden cronológico y migración (#181)", () => {
+	it("sortArtifactsChronologically: elaboración → validación → commit", () => {
+		const links = [
+			{ kind: "git-commit", path: "" },
+			{ kind: "elaboration", path: "e.md" },
+			{ kind: "validation", path: "v.md" },
+			{ kind: "desconocido", path: "x" },
+		];
+		expect(sortArtifactsChronologically(links).map((l) => l.kind)).toEqual([
+			"elaboration",
+			"validation",
+			"git-commit",
+			"desconocido",
+		]);
+	});
+
+	it("migración: id normalizado sin unidad NI fase del plan → sin fantasma", () => {
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-fantasma-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), "# Plan\n## F01 — A\n## F02 — B\n");
+		appendPhaseProgress(tmp2, PLAN, "F09", "r", "t"); // progress con fase ajena
+		const runsDir = path.join(tmp2, "runs");
+		fs.mkdirSync(runsDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(runsDir, "run-x.jsonl"),
+			[
+				{
+					type: "workflow",
+					runId: "run-x",
+					input: `"${PLAN} Phase F01"`,
+					ts: "t",
+				},
+				{ type: "stage", runId: "run-x", stage: "commit", status: "completed" },
+			]
+				.map((r) => JSON.stringify(r))
+				.join("\n"),
+		);
+		bootstrapBoardFromRuns(runsDir, tmp2);
+		const board = loadBoard(tmp2, PLAN)!;
+		// Las fases del plan (F01, F02 headers) SÍ se sincronizan — no son fantasmas.
+		// El id normalizado ajeno (f09) NO debe aparecer como unidad.
+		expect(board.units.map((u) => u.id)).toEqual(["F01", "F02"]);
+		expect(board.units.some((u) => u.id === "f09")).toBe(false);
 	});
 });

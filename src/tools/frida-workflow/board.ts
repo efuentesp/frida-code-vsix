@@ -492,6 +492,23 @@ export function applyStageTransition(
 	return unit;
 }
 
+/** #181 — Orden cronológico de los iconos de artefactos: como se dieron las
+ *  tareas — elaboración → validación → commit. Kinds desconocidos al final. */
+export const ARTIFACT_KIND_ORDER: Record<string, number> = {
+	elaboration: 0,
+	validation: 1,
+	"git-commit": 2,
+};
+
+export function sortArtifactsChronologically<T extends { kind: string }>(
+	links: T[],
+): T[] {
+	return [...links].sort(
+		(a, b) =>
+			(ARTIFACT_KIND_ORDER[a.kind] ?? 99) - (ARTIFACT_KIND_ORDER[b.kind] ?? 99),
+	);
+}
+
 // ── Cierre y primer hueco (DFS) ─────────────────────────────────────────────
 
 /** #179 — Reinicio de ciclo: un NUEVO run sobre una fase que ya tenía
@@ -615,7 +632,9 @@ export function bootstrapBoardFromRuns(
 			if (r.type !== "stage" || r.status !== "completed") continue;
 			const artifacts: BoardArtifactLink[] = (r.output?.artifacts ?? [])
 				.map((a) => ({
-					kind: r.stage ?? "artifact",
+					// #181 — artifactKind del contrato (validation/elaboration/…),
+					// no el nombre de stage: evita el duplicado validate/validation.
+					kind: resolveStageKind(r.stage ?? "", spec) ?? r.stage ?? "artifact",
 					path: a.handle?.path ?? "",
 				}))
 				.filter((a) => a.path);
@@ -633,8 +652,18 @@ export function bootstrapBoardFromRuns(
 		// readCompletedPhases devuelve ids NORMALIZADOS ("f10c1" sin punto):
 		// resolver al id canónico de la unidad existente para no crear duplicados.
 		for (const doneId of readCompletedPhases(cwd, planPathToken)) {
+			// #181 — Resolver canónico contra unidades O fases del plan; si no se
+			// conoce (roadmap: ids que aún no aparecen en runs), SKIP: crear una
+			// unidad con el id normalizado dejaba fantasmas (f09/f11/f12).
+			const planPhase = planContent
+				? parsePlanPhases(planContent).find(
+						(ph) => normalizePhaseId(ph.id) === doneId,
+					)?.id
+				: undefined;
 			const canonical =
-				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ?? doneId;
+				board.units.find((u) => normalizePhaseId(u.id) === doneId)?.id ??
+				planPhase;
+			if (!canonical) continue;
 			applyStageTransition(board, canonical, {
 				stage: "commit",
 				runId: "progress-158",

@@ -245,6 +245,8 @@ export {
 	resolveStageKind,
 	subscribeBoardChanges,
 	validateFails,
+	sortArtifactsChronologically,
+	ARTIFACT_KIND_ORDER,
 	deriveBoardSpec,
 	DEFAULT_BOARD_COLUMNS,
 	DEFAULT_DONE_COLUMN,

@@ -18,6 +18,7 @@ import type { ReactElement } from "react";
 import type { Board, BoardUnit } from "./board";
 import {
 	boardChildren,
+	sortArtifactsChronologically,
 	depsSatisfied,
 	firstRealGap,
 	isUnitDone,
@@ -232,12 +233,7 @@ function PhaseCard({
 		>
 			{/* #180 — Renglón 1: id indivisible (nowrap) + título flexible (ellipsis).
 			 *  El tooltip del título completo va en el fbox (ftext no soporta title). */}
-			<fbox
-				flexDirection="row"
-				gap={6}
-				alignItems="center"
-				title={unit.title}
-			>
+			<fbox flexDirection="row" gap={6} alignItems="center" title={unit.title}>
 				<fbox cls="kb-card-bar" background={accent} />
 				<ftext size={11} bold cls="kb-card-id">
 					{unit.id}
@@ -256,63 +252,63 @@ function PhaseCard({
 			{/* #180 — Renglón 2: badges completos e indivisibles (wrap por badge). */}
 			{hasBadges ? (
 				<fbox flexDirection="row" gap={6} alignItems="center" cls="kb-badges">
-				{children.length > 0 ? (
-					<ftext
-						size={10}
-						cls="kb-metric"
-						color="var(--vscode-charts-blue, #58a6ff)"
-					>
-						{doneChildren}/{children.length}
-					</ftext>
-				) : null}
-				{blockedDeps.length > 0 ? (
-					<fbox
-						flexDirection="row"
-						gap={2}
-						alignItems="center"
-						cls="kb-deps kb-deps-pending"
-						title={`Depende de: ${blockedDeps.join(", ")} — el ▶ se habilita al completarlas`}
-					>
-						<ficon name="git-branch" size={9} />
-						<ftext size={10}>{blockedDeps.join(",")}</ftext>
-					</fbox>
-				) : unit.deps && unit.deps.length > 0 ? (
-					<fbox
-						flexDirection="row"
-						gap={2}
-						alignItems="center"
-						cls="kb-deps"
-						title={`Dependencias satisfechas: ${unit.deps.join(", ")}`}
-					>
-						<ficon name="check" size={9} />
-					</fbox>
-				) : null}
-				{fails > 0 ? (
-					<fbox
-						flexDirection="row"
-						gap={2}
-						alignItems="center"
-						cls="kb-cycles"
-						title={`${fails} ciclo(s) de reintento (validate FAIL)`}
-					>
-						<ficon name="sync" size={9} />
-						<ftext size={10}>{fails}</ftext>
-					</fbox>
-				) : null}
-				{blocked ? (
-					<fbox
-						flexDirection="row"
-						gap={2}
-						alignItems="center"
-						cls="kb-blocked"
-						title="Bloqueada por circuit breaker tras los ciclos FAIL — relanza para continuar"
-					>
-						<ficon name="error" size={10} />
-						<ftext size={10}>bloqueada</ftext>
-					</fbox>
-				) : null}
-				<UnitArtifacts unit={unit} actions={actions} />
-			</fbox>
+					{children.length > 0 ? (
+						<ftext
+							size={10}
+							cls="kb-metric"
+							color="var(--vscode-charts-blue, #58a6ff)"
+						>
+							{doneChildren}/{children.length}
+						</ftext>
+					) : null}
+					{blockedDeps.length > 0 ? (
+						<fbox
+							flexDirection="row"
+							gap={2}
+							alignItems="center"
+							cls="kb-deps kb-deps-pending"
+							title={`Depende de: ${blockedDeps.join(", ")} — el ▶ se habilita al completarlas`}
+						>
+							<ficon name="git-branch" size={9} />
+							<ftext size={10}>{blockedDeps.join(",")}</ftext>
+						</fbox>
+					) : unit.deps && unit.deps.length > 0 ? (
+						<fbox
+							flexDirection="row"
+							gap={2}
+							alignItems="center"
+							cls="kb-deps"
+							title={`Dependencias satisfechas: ${unit.deps.join(", ")}`}
+						>
+							<ficon name="check" size={9} />
+						</fbox>
+					) : null}
+					{fails > 0 ? (
+						<fbox
+							flexDirection="row"
+							gap={2}
+							alignItems="center"
+							cls="kb-cycles"
+							title={`${fails} ciclo(s) de reintento (validate FAIL)`}
+						>
+							<ficon name="sync" size={9} />
+							<ftext size={10}>{fails}</ftext>
+						</fbox>
+					) : null}
+					{blocked ? (
+						<fbox
+							flexDirection="row"
+							gap={2}
+							alignItems="center"
+							cls="kb-blocked"
+							title="Bloqueada por circuit breaker tras los ciclos FAIL — relanza para continuar"
+						>
+							<ficon name="error" size={10} />
+							<ftext size={10}>bloqueada</ftext>
+						</fbox>
+					) : null}
+					<UnitArtifacts unit={unit} actions={actions} />
+				</fbox>
 			) : null}
 
 			{children.length > 0 ? (
@@ -377,11 +373,7 @@ function PhaseCard({
 					cls="kb-advance-disabled"
 					title={`Depende de: ${blockedDeps.join(", ")} — disponible al completarlas`}
 				>
-					<ficon
-						name="lock"
-						size={10}
-						color="var(--vscode-descriptionForeground)"
-					/>
+					<ficon name="lock" size={10} color="var(--vscode-descriptionForeground)" />
 				</fbox>
 			)}
 		</fbox>
@@ -395,7 +387,7 @@ function UnitArtifacts({
 	unit: BoardUnit;
 	actions: BoardOverlayActions;
 }): ReactElement | null {
-	const links = lastArtifacts(unit);
+	const links = sortArtifactsChronologically(lastArtifacts(unit)); // #181 — cronológico
 	if (links.length === 0) return null;
 	return (
 		<fbox flexDirection="row" gap={6} alignItems="center">
