@@ -271,3 +271,23 @@ export {
 	scanSkillContracts,
 	extractContractArtifactKind,
 } from "./skill-contracts";
+
+// Pipeline N1 (features.json) — dominio de planeación espejo del board (#159).
+export {
+	PIPELINE_STAGES,
+	STAGE_BUCKET,
+	featuresFilePath,
+	findFeature,
+	loadFeatures,
+	saveFeatures,
+	stageIndex,
+	nextStage,
+	subscribeFeaturesChanges,
+} from "./features";
+export type {
+	PipelineFeature,
+	PipelineStage,
+	SkillStage,
+	FeatureTransition,
+	FeaturesFile,
+} from "./features";
