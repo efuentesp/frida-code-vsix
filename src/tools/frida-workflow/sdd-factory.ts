@@ -14,7 +14,7 @@
 // Flujo generado: [elaborate →] implement → validate → (pass: commit |
 // fail: implement … | N fails: stop) → [commit → stop | siguiente fase].
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import type {
 	Artifact,
 	CollectCtx,
@@ -79,6 +79,10 @@ function newestMdCollector(dir: string) {
 
 const dir2 = (cwd: string, dir: string) => join(cwd, dir);
 
+/** Regex de verdict — tolera comillas (`verdict: "fail"`) y case. */
+const verdictRe = (key: string) =>
+	new RegExp(`${key}:\\s*["']?(pass|fail)["']?`, "i");
+
 /** Verdict del frontmatter del .md más reciente, leído AHORA (el route corre
  *  tras collect+audit, con el flush ya landed — #174). */
 function readFreshVerdict(dir: string, verdictKey: string) {
@@ -91,7 +95,7 @@ function readFreshVerdict(dir: string, verdictKey: string) {
 			if (!newest) return undefined;
 			const head =
 				readFileSync(join(cwd, dir, newest.f), "utf8").split("---")[1] ?? "";
-			const m = head.match(new RegExp(`${verdictKey}:\\s*(pass|fail)`, "i"));
+			const m = head.match(verdictRe(verdictKey));
 			return m ? m[1]!.toLowerCase() === "pass" : undefined;
 		} catch {
 			return undefined;
@@ -99,14 +103,21 @@ function readFreshVerdict(dir: string, verdictKey: string) {
 	};
 }
 
-/** Parser: {passed} del frontmatter del artifact primario. */
+/** Parser: {passed} del frontmatter del artifact primario. El handle llega
+ *  RELATIVO (lo produce el collector); se resuelve contra ctx.cwd — nunca
+ *  contra process.cwd() del host (#192: extension host con cwd ≠ workspace
+ *  tiraba ENOENT → undefined → "outputSchema rechazado: : must be object").
+ *  Patrón de outcomes.ts (#handle relativo → join(ctx.cwd)). */
 function verdictParser(verdictKey: string) {
-	return (artifacts: Artifact[]) => {
+	return (artifacts: Artifact[], ctx: CollectCtx) => {
 		const a = artifacts[0];
 		if (!a || a.handle.kind !== "fs" || !a.handle.path) return undefined;
+		const p = isAbsolute(a.handle.path)
+			? a.handle.path
+			: resolve(ctx.cwd, a.handle.path);
 		try {
-			const head = readFileSync(a.handle.path, "utf8").slice(0, 800);
-			const m = head.match(new RegExp(`${verdictKey}:\\s*(pass|fail)`, "i"));
+			const head = readFileSync(p, "utf8").slice(0, 800);
+			const m = head.match(verdictRe(verdictKey));
 			return m ? { passed: m[1]!.toLowerCase() === "pass" } : undefined;
 		} catch {
 			return undefined;

@@ -193,3 +193,54 @@ describe("defineSddWorkflow — collector", () => {
 		expect(route(ctx(proj, { passed: false }))).toBe("commit");
 	});
 });
+
+describe("defineSddWorkflow — parser resuelve contra ctx.cwd (#192)", () => {
+	it("handle relativo legible aunque process.cwd() ≠ workspace", () => {
+		const proj = projectWithValidations({
+			name: "informe.md",
+			verdict: "fail",
+			mtime: t(5),
+		});
+		const wf = defineSddWorkflow({ name: "s" });
+		const res = wf.stages.validate?.outcome?.collector!({
+			cwd: proj,
+			messages: [],
+			stage: "validate",
+		} as unknown as CollectCtx);
+		if (res.kind !== "ok") throw new Error("collector fatal");
+		// El handle llega RELATIVO y el proceso de vitest corre con cwd = repo
+		// frida-code (≠ proj) — igual que el extension host con cwd ≠ workspace.
+		// Antes del fix: readFileSync relativo → ENOENT → undefined →
+		// "outputSchema rechazado: : must be object".
+		const parser = wf.stages.validate?.outcome?.parser!;
+		const data = parser(
+			res.artifacts,
+			{ cwd: proj, messages: [], stage: "validate" } as unknown as CollectCtx,
+		);
+		expect(data).toEqual({ passed: false });
+	});
+
+	it("tolera verdict con comillas — verdict: \"fail\"", () => {
+		const proj = mkdtempSync(join(tmpdir(), "sdd-factory-"));
+		dirs.push(proj);
+		const dir = join(proj, ".frida", "artifacts", "validation");
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			join(dir, "n.md"),
+			'---\nstatus: ready\nverdict: "fail"\n---\n',
+		);
+		const wf = defineSddWorkflow({ name: "s" });
+		const res = wf.stages.validate?.outcome?.collector!({
+			cwd: proj,
+			messages: [],
+			stage: "validate",
+		} as unknown as CollectCtx);
+		if (res.kind !== "ok") throw new Error("collector fatal");
+		const parser = wf.stages.validate?.outcome?.parser!;
+		const data = parser(
+			res.artifacts,
+			{ cwd: proj, messages: [], stage: "validate" } as unknown as CollectCtx,
+		);
+		expect(data).toEqual({ passed: false });
+	});
+});

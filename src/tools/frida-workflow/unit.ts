@@ -78,7 +78,23 @@ export async function executeUnit(
 					if (stage.outputSchema) {
 						const v = await validateSchema(stage.outputSchema, data);
 						if (!v.ok) {
-							const msg = `outputSchema rechazado: ${summarizeIssues(v.issues)}`;
+							// #192 — un undefined del parser casi siempre es un artefacto
+							// ilegible o sin match: nombrarlo hace el error accionable
+							// (antes: críptico "outputSchema rechazado: : must be object").
+							const primary0 =
+								res.artifacts.find((a) => a.role === "primary") ??
+								res.artifacts[0];
+							const primaryPath =
+								primary0?.handle.kind === "fs" ? primary0.handle.path : undefined;
+							const detail = (() => {
+								if (data !== undefined) return summarizeIssues(v.issues);
+								// #192 — undefined del parser ≈ artefacto ilegible o sin
+								// match; nombrarlo hace el error accionable (antes: críptico
+								// "outputSchema rechazado: : must be object").
+								const at = primaryPath ? ` — ${primaryPath}` : "";
+								return `parser devolvió undefined (artefacto ilegible o sin verdict)${at}`;
+							})();
+							const msg = `outputSchema rechazado: ${detail}`;
 							if (onInvalid === "halt" || attempt >= maxRetries - 1)
 								error = msg;
 							else retryNeeded = true;
