@@ -976,15 +976,15 @@ describe("reconciler — desync y relink (FR#12)", () => {
 
 #### Automated Verification
 
-- [ ] Tests del dominio + reconciler pasan: `npx vitest run test/frida-workflow/features.test.ts`
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] `grep -n "export function reconcileFeatures" src/tools/frida-workflow/features.ts` retorna una línea (pase con efectos, D4)
-- [ ] `grep -c "desync" src/tools/frida-workflow/features.ts` retorna >= 3 (FR#12: campo + cálculo + doc)
-- [ ] `grep -n "re-scan idéntico no duplica" test/frida-workflow/features.test.ts` retorna una línea (lección #1 de Verification Notes)
+- [x] Tests del dominio + reconciler pasan: `npx vitest run test/frida-workflow/features.test.ts`
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] `grep -n "export function reconcileFeatures" src/tools/frida-workflow/features.ts` retorna una línea (pase con efectos, D4)
+- [x] `grep -c "desync" src/tools/frida-workflow/features.ts` retorna >= 3 (FR#12: campo + cálculo + doc)
+- [x] `grep -n "re-scan idéntico no duplica" test/frida-workflow/features.test.ts` retorna una línea (lección #1 de Verification Notes)
 
 #### Manual Verification
 
-- [ ] En scratch contra este workspace real, `reconcileFeatures(cwd)` adopta los FRDs del seed `.rpiv/artifacts/discover/` sin duplicar en un segundo pase, y el FRD `2026-08-31_07-08-47_pipeline-panels-sdd-n1-n2-html.md` queda en etapa `design` (research por topic, design por `parent:`)
+- [x] En scratch contra este workspace real, `reconcileFeatures(cwd)` adopta los FRDs del seed `.rpiv/artifacts/discover/` sin duplicar en un segundo pase, y el FRD `2026-08-31_07-08-47_pipeline-panels-sdd-n1-n2-html.md` queda en etapa `design` (research por topic, design por `parent:`)
 
 ---
 
@@ -1419,15 +1419,15 @@ describe("badge — shipBadge (FR#6)", () => {
 
 #### Automated Verification
 
-- [ ] Tests del dominio + reconciler + acciones pasan: `npx vitest run test/frida-workflow/features.test.ts`
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] `grep -n "export function advanceFeature" src/tools/frida-workflow/features.ts` retorna una línea (movimiento temprano FR#4)
-- [ ] `grep -n "export function shipFeature" src/tools/frida-workflow/features.ts` retorna una línea (FR#5)
-- [ ] `grep -c "openBoard" src/tools/frida-workflow/features.ts` retorna >= 1 (ship espeja el flujo /board: openBoard → saveBoard)
+- [x] Tests del dominio + reconciler + acciones pasan: `npx vitest run test/frida-workflow/features.test.ts`
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] `grep -n "export function advanceFeature" src/tools/frida-workflow/features.ts` retorna una línea (movimiento temprano FR#4)
+- [x] `grep -n "export function shipFeature" src/tools/frida-workflow/features.ts` retorna una línea (FR#5)
+- [x] `grep -c "openBoard" src/tools/frida-workflow/features.ts` retorna >= 1 (ship espeja el flujo /board: openBoard → saveBoard)
 
 #### Manual Verification
 
-- [ ] En un scratch tmp con FRD→research→design→plan (parent) y un plan de 3 fases `## FN`, `shipFeature` crea `.frida/artifacts/board/<slug>.json` con las 3 unidades en `backlog` y `transitions: []` (cero ejecución), y la feature queda `ready-to-ship` con `planPath`+`shippedAt`
+- [x] En un scratch tmp con FRD→research→design→plan (parent) y un plan de 3 fases `## FN`, `shipFeature` crea `.frida/artifacts/board/<slug>.json` con las 3 unidades en `backlog` y `transitions: []` (cero ejecución), y la feature queda `ready-to-ship` con `planPath`+`shippedAt`
 
 ---
 
@@ -2006,16 +2006,16 @@ export type {
 
 #### Automated Verification
 
-- [ ] Tests del motor pasan: `npx vitest run test/frida-workflow/panel-spec.test.ts`
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] `grep -n "export function registerPanelSpec" src/tools/frida-workflow/panel-spec.ts` retorna una línea (registro idempotente consumidor→motor, espejo builtin-patterns.ts:481)
-- [ ] `grep -n "export const SDD_PANEL_SPEC" src/tools/frida-workflow/panel-spec.ts` retorna una línea y `grep -c "SDD_PANEL_SPEC" src/tools/frida-workflow/index.ts` retorna >= 1 (fixture expuesta al host)
-- [ ] `grep -ci "aidd" src/tools/frida-workflow/panel-spec.ts` retorna 0 y `grep -ci "aidd" test/frida-workflow/panel-spec.test.ts` retorna >= 2 (FR#9: la configuración ajena vive en el test, no en el motor)
+- [x] Tests del motor pasan: `npx vitest run test/frida-workflow/panel-spec.test.ts`
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] `grep -n "export function registerPanelSpec" src/tools/frida-workflow/panel-spec.ts` retorna una línea (registro idempotente consumidor→motor, espejo builtin-patterns.ts:481)
+- [x] `grep -n "export const SDD_PANEL_SPEC" src/tools/frida-workflow/panel-spec.ts` retorna una línea y `grep -c "SDD_PANEL_SPEC" src/tools/frida-workflow/index.ts` retorna >= 1 (fixture expuesta al host)
+- [x] `grep -ci "aidd" src/tools/frida-workflow/panel-spec.ts` retorna 0 y `grep -ci "aidd" test/frida-workflow/panel-spec.test.ts` retorna >= 2 (FR#9: la configuración ajena vive en el test, no en el motor)
 
 #### Manual Verification
 
-- [ ] La fixture aidd del test registra/resuelve vía `registerPanelSpec`/`resolvePanelSpec` con cero cambios en panel-spec.ts (AC del FRD: «Definir un panel nuevo… NO requiere modificar el motor»)
-- [ ] `SDD_PANEL_SPEC` lee `discover | research | design | plan | 🚀 ready-to-ship` con `plan.advanceKind: "ship"` y botón «Ship → fases a ejecución» (FR#1/FR#9/FR#13 — inspección del objeto o del test del spec)
+- [x] La fixture aidd del test registra/resuelve vía `registerPanelSpec`/`resolvePanelSpec` con cero cambios en panel-spec.ts (AC del FRD: «Definir un panel nuevo… NO requiere modificar el motor»)
+- [x] `SDD_PANEL_SPEC` lee `discover | research | design | plan | 🚀 ready-to-ship` con `plan.advanceKind: "ship"` y botón «Ship → fases a ejecución» (FR#1/FR#9/FR#13 — inspección del objeto o del test del spec)
 
 ---
 
@@ -3083,15 +3083,15 @@ describe("wiring — el comando exacto que onAdvance reenvía (FR#4)", () => {
 
 #### Automated Verification
 
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] Suites del ecosistema afectado pasan: `npx vitest run test/frida-workflow test/frida-pipeline`
-- [ ] Test de cableado del overlay N1 pasa (contrato que monta `case "pipeline"`): `npx vitest run test/frida-workflow/pipeline-wiring.test.ts`
-- [ ] `grep -n "await mountPipelineOverlay();" src/extension.ts` retorna una línea (case pipeline absorbido — nunca ambos wiring vivos)
-- [ ] `grep -c "wirePipelinePanel\|postPipelineCommand\|formatPipelineStatus" src/extension.ts` retorna 0 (baja atómica del banner en el host)
-- [ ] `test ! -f src/tools/frida-pipeline/banner.tsx && test ! -f src/tools/frida-pipeline/panel.ts` pasa (archivos eliminados)
-- [ ] `grep -n "export function createPipelineOverlayElement" src/tools/frida-workflow/features-ui.tsx` retorna una línea (contrato espejo board-ui.tsx:37)
-- [ ] `grep -c "\.pl-" webview/styles.css` retorna >= 12 (CSS del overlay N1)
-- [ ] `grep -n "pipelineRemount?.();" src/extension.ts` retorna una línea (re-montaje webview_ready, lección ba40da0)
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] Suites del ecosistema afectado pasan: `npx vitest run test/frida-workflow test/frida-pipeline`
+- [x] Test de cableado del overlay N1 pasa (contrato que monta `case "pipeline"`): `npx vitest run test/frida-workflow/pipeline-wiring.test.ts`
+- [x] `grep -n "await mountPipelineOverlay();" src/extension.ts` retorna una línea (case pipeline absorbido — nunca ambos wiring vivos)
+- [x] `grep -c "wirePipelinePanel\|postPipelineCommand\|formatPipelineStatus" src/extension.ts` retorna 0 (baja atómica del banner en el host)
+- [x] `test ! -f src/tools/frida-pipeline/banner.tsx && test ! -f src/tools/frida-pipeline/panel.ts` pasa (archivos eliminados)
+- [x] `grep -n "export function createPipelineOverlayElement" src/tools/frida-workflow/features-ui.tsx` retorna una línea (contrato espejo board-ui.tsx:37)
+- [x] `grep -c "\.pl-" webview/styles.css` retorna >= 12 (CSS del overlay N1)
+- [x] `grep -n "pipelineRemount?.();" src/extension.ts` retorna una línea (re-montaje webview_ready, lección ba40da0)
 
 #### Manual Verification
 
@@ -4401,14 +4401,14 @@ export type {
 
 #### Automated Verification
 
-- [ ] Tests del servidor pasan: `npx vitest run test/frida-workflow/monitor-server.test.ts`
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] `grep -n "export async function startPipelineMonitor" src/tools/frida-workflow/monitor-server.ts` retorna una línea (D3: Disposable desde activate)
-- [ ] `grep -c "127.0.0.1" src/tools/frida-workflow/monitor-server.ts` retorna >= 2 (bind loopback + URL — NFR)
-- [ ] `grep -n "randomUUID()" src/tools/frida-workflow/monitor-server.ts` retorna una línea (token por proceso, plantilla ui-server.ts)
-- [ ] `grep -c "watch(" src/tools/frida-workflow/monitor-server.ts` retorna >= 3 (recursivo + fallback plano por bucket, D2)
-- [ ] `grep -n "401" src/tools/frida-workflow/monitor-server.ts` retorna >= 1 (FR#8: delta consciente vs 403 de la plantilla)
-- [ ] `grep -n "startPipelineMonitor" src/extension.ts` retorna >= 2 (import + wiring en subscriptions, D3)
+- [x] Tests del servidor pasan: `npx vitest run test/frida-workflow/monitor-server.test.ts`
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] `grep -n "export async function startPipelineMonitor" src/tools/frida-workflow/monitor-server.ts` retorna una línea (D3: Disposable desde activate)
+- [x] `grep -c "127.0.0.1" src/tools/frida-workflow/monitor-server.ts` retorna >= 2 (bind loopback + URL — NFR)
+- [x] `grep -n "randomUUID()" src/tools/frida-workflow/monitor-server.ts` retorna una línea (token por proceso, plantilla ui-server.ts)
+- [x] `grep -c "watch(" src/tools/frida-workflow/monitor-server.ts` retorna >= 3 (recursivo + fallback plano por bucket, D2)
+- [x] `grep -n "401" src/tools/frida-workflow/monitor-server.ts` retorna >= 1 (FR#8: delta consciente vs 403 de la plantilla)
+- [x] `grep -n "startPipelineMonitor" src/extension.ts` retorna >= 2 (import + wiring en subscriptions, D3)
 
 #### Manual Verification
 
@@ -5227,16 +5227,16 @@ describe("/sdd — fallback y detalle FR#16 (degradación sin host)", () => {
 
 #### Automated Verification
 
-- [ ] Tests de las páginas pasan: `npx vitest run test/frida-workflow/monitor-html.test.ts`
-- [ ] Suite del servidor sigue verde con las páginas reales: `npx vitest run test/frida-workflow/monitor-server.test.ts`
-- [ ] Typecheck del proyecto verde: `npm run typecheck`
-- [ ] `grep -n "export function renderMonitorHubPage" src/tools/frida-workflow/monitor-html.ts` retorna una línea (hub D7)
-- [ ] `grep -n "export function renderSddPage" src/tools/frida-workflow/monitor-html.ts` retorna una línea (FR#7)
-- [ ] `grep -c "monitorBootstrapPage" src/tools/frida-workflow/monitor-server.ts` retorna 0 (página mínima retirada por S7 — reemplazo documentado en el comentario S6)
-- [ ] `grep -c "renderSddPage" src/tools/frida-workflow/monitor-server.ts` retorna >= 2 (import + ruta /sdd con token)
-- [ ] `grep -n "monitor-html" src/tools/frida-workflow/index.ts` retorna >= 1 (reexport anticipado por el fence)
-- [ ] `grep -c "x-frida-monitor-token" src/tools/frida-workflow/monitor-html.ts` retorna >= 1 (POST autenticado FR#8)
-- [ ] `grep -c "data-fid" src/tools/frida-workflow/monitor-html.ts` retorna >= 2 (detalle FR#16: markup + reapertura tras SSE)
+- [x] Tests de las páginas pasan: `npx vitest run test/frida-workflow/monitor-html.test.ts`
+- [x] Suite del servidor sigue verde con las páginas reales: `npx vitest run test/frida-workflow/monitor-server.test.ts`
+- [x] Typecheck del proyecto verde: `npm run typecheck`
+- [x] `grep -n "export function renderMonitorHubPage" src/tools/frida-workflow/monitor-html.ts` retorna una línea (hub D7)
+- [x] `grep -n "export function renderSddPage" src/tools/frida-workflow/monitor-html.ts` retorna una línea (FR#7)
+- [x] `grep -c "monitorBootstrapPage" src/tools/frida-workflow/monitor-server.ts` retorna 0 (página mínima retirada por S7 — reemplazo documentado en el comentario S6)
+- [x] `grep -c "renderSddPage" src/tools/frida-workflow/monitor-server.ts` retorna >= 2 (import + ruta /sdd con token)
+- [x] `grep -n "monitor-html" src/tools/frida-workflow/index.ts` retorna >= 1 (reexport anticipado por el fence)
+- [x] `grep -c "x-frida-monitor-token" src/tools/frida-workflow/monitor-html.ts` retorna >= 1 (POST autenticado FR#8)
+- [x] `grep -c "data-fid" src/tools/frida-workflow/monitor-html.ts` retorna >= 2 (detalle FR#16: markup + reapertura tras SSE)
 
 #### Manual Verification
 
@@ -5521,19 +5521,19 @@ it("renderiza el ancla al monitor cuando monitorUrl llegó por monitor_url", () 
 
 #### Automated Verification
 
-- [ ] Typecheck del proyecto (host + webview) verde: `npm run typecheck`
-- [ ] Build del webview verde: `npm run build:webview`
-- [ ] Baseline completa del proyecto (slice terminal): `npm test` verde
-- [ ] Cadena monitor_url ejercida por test (Welcome renderiza el ancla con la URL del host): `npx vitest run test/welcome.test.ts`
-- [ ] Suites del ecosistema afectado pasan: `npx vitest run test/frida-workflow test/frida-pipeline`
-- [ ] `grep -c "monitor_url" webview/types.ts` retorna >= 1 (InMessage FR#10)
-- [ ] `grep -n 'case "monitor_url"' webview/store.ts` retorna una línea (reducer)
-- [ ] `grep -c "monitorUrl" webview/components/Welcome.tsx` retorna >= 3 (prop + condición + href)
-- [ ] `grep -c "monitorUrl" webview/App.tsx` retorna >= 1 (prop)
-- [ ] `grep -n 'prompt: "/pipeline"' webview/components/Welcome.tsx` retorna una línea (submit SDD, FR#10)
-- [ ] `grep -c "PRÓXIMAMENTE" webview/components/Welcome.tsx` retorna >= 1 (AiDD, FR#10)
-- [ ] `grep -c "monitor_url" src/extension.ts` retorna >= 2 (post al resolver + re-post webview_ready)
-- [ ] `grep -l "parent:" src/tools/frida-pipeline/skills/discover/SKILL.md src/tools/frida-pipeline/skills/research/SKILL.md src/tools/frida-pipeline/skills/design/SKILL.md src/tools/frida-pipeline/skills/plan/SKILL.md` retorna las 4 rutas (D6)
+- [x] Typecheck del proyecto (host + webview) verde: `npm run typecheck`
+- [x] Build del webview verde: `npm run build:webview`
+- [x] Baseline completa del proyecto (slice terminal): `npm test` verde
+- [x] Cadena monitor_url ejercida por test (Welcome renderiza el ancla con la URL del host): `npx vitest run test/welcome.test.ts`
+- [x] Suites del ecosistema afectado pasan: `npx vitest run test/frida-workflow test/frida-pipeline`
+- [x] `grep -c "monitor_url" webview/types.ts` retorna >= 1 (InMessage FR#10)
+- [x] `grep -n 'case "monitor_url"' webview/store.ts` retorna una línea (reducer)
+- [x] `grep -c "monitorUrl" webview/components/Welcome.tsx` retorna >= 3 (prop + condición + href)
+- [x] `grep -c "monitorUrl" webview/App.tsx` retorna >= 1 (prop)
+- [x] `grep -n 'prompt: "/pipeline"' webview/components/Welcome.tsx` retorna una línea (submit SDD, FR#10)
+- [x] `grep -c "PRÓXIMAMENTE" webview/components/Welcome.tsx` retorna >= 1 (AiDD, FR#10)
+- [x] `grep -c "monitor_url" src/extension.ts` retorna >= 2 (post al resolver + re-post webview_ready)
+- [x] `grep -l "parent:" src/tools/frida-pipeline/skills/discover/SKILL.md src/tools/frida-pipeline/skills/research/SKILL.md src/tools/frida-pipeline/skills/design/SKILL.md src/tools/frida-pipeline/skills/plan/SKILL.md` retorna las 4 rutas (D6)
 
 #### Manual Verification
 
