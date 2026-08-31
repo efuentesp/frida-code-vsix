@@ -79,6 +79,9 @@ describe("lifecycle → store", () => {
 		const run = runs[0]!;
 		expect(run.workflow).toBe("lin");
 		expect(run.status).toBe("completed");
+		// #153 — el cwd del host (workspace) viaja en el RunView para que el panel
+		// resuelva planes .md relativos (resolveNextStep(run.input, run.cwd)).
+		expect(run.cwd).toBe("/tmp");
 		expect(run.stages.map((s) => s.name)).toEqual(["a", "b"]);
 		expect(run.stages.every((s) => s.status === "completed")).toBe(true);
 		expect(run.stages[0]!.primaryHandle).toBe("/tmp/a.md");

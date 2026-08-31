@@ -10,6 +10,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
 	defineWorkflow,
+	defineRoute,
 	produces,
 	acts,
 	terminal,
@@ -296,5 +297,72 @@ describe("handleWfSlash — registry + preview/lista (Fase 1)", () => {
 		await new Promise((r) => setImmediate(r));
 		expect(notes.some((n) => n.includes("iniciado"))).toBe(true);
 		expect(notes.some((n) => n.includes("completado"))).toBe(true);
+	});
+});
+
+// ── #152 — semántica del circuit breaker de sdd-ship (elaborate + 3 ciclos) ──
+
+/** Workflow con la forma real de sdd-ship: elaborate → (implement → validate)ⁿ → commit.
+ * `validate` siempre produce verdict FAIL; el umbral del breaker es parametrizable. */
+function sddShipLike(breakerAt: number) {
+	const artifacts = [
+		{ handle: { kind: "fs" as const, path: "/tmp/validation.md" }, role: "primary" as const },
+	];
+	return defineWorkflow({
+		name: `sdd-ship-like-${breakerAt}`,
+		start: "elaborate",
+		stages: {
+			elaborate: acts(),
+			implement: acts(),
+			validate: produces({
+				outcome: {
+					collector: () => ({ kind: "ok", artifacts }),
+					parser: () => ({ passed: false }),
+				},
+			}),
+			commit: acts(),
+		},
+		edges: {
+			elaborate: "implement",
+			implement: "validate",
+			validate: defineRoute(["commit", "implement", "stop"], (ctx) => {
+				const passed =
+					(ctx.output.data as { passed?: boolean })?.passed === true;
+				if (passed) return "commit";
+				if (ctx.state.stagesCompleted >= breakerAt) return "stop";
+				return "implement";
+			}),
+			commit: "stop",
+		},
+	});
+}
+
+describe("circuit breaker de sdd-ship (umbral vs ciclos)", () => {
+	it("umbral 7 corta tras exactamente 3 ciclos implement→validate (7 etapas)", async () => {
+		const { host } = stubHost({});
+		const r = await runWorkflow({
+			workflow: sddShipLike(7),
+			input: "plan.md Phase F1",
+			runsDir,
+			host,
+		});
+		expect(r.stagesCompleted).toBe(7); // 1 elaborate + 3×(implement+validate)
+		expect(r.success).toBe(true); // stop → completed (pausa controlada, no error)
+		const rows = readRun(runsDir, r.runId);
+		const stageRows = rows.filter((x: { type: string }) => x.type === "stage");
+		expect(stageRows).toHaveLength(7);
+		expect(stageRows[6]!.stage).toBe("validate"); // última etapa: validate FAIL
+	});
+
+	it("umbral 8 (regresión del #152) permite un 4º ciclo → 9 etapas", async () => {
+		const { host } = stubHost({});
+		const r = await runWorkflow({
+			workflow: sddShipLike(8),
+			input: "plan.md Phase F1",
+			runsDir,
+			host,
+		});
+		// 3er FAIL llega con stagesCompleted=7 < 8 → 4º ciclo; su FAIL (9) corta.
+		expect(r.stagesCompleted).toBe(9);
 	});
 });

@@ -45,7 +45,9 @@ export interface StageView {
 	name: string;
 	skill: string;
 	status: StageViewStatus;
+	input?: string;
 	primaryHandle?: string;
+	data?: unknown;
 	error?: string;
 	retries?: number;
 	/** Unidades de loop (Fase 6) bajo esta etapa. */
@@ -64,6 +66,9 @@ export interface RunView {
 	input: string;
 	status: RunStatus;
 	stages: StageView[];
+	/** #153 — cwd del workspace donde corre el run (ctx.cwd del lifecycle):
+	 * lo usa el panel para resolver paths relativos del input (planes .md). */
+	cwd?: string;
 	error?: string;
 }
 
@@ -84,6 +89,24 @@ export function registerAbort(runId: string, abort: () => void): void {
 /** Dispara el abort de un run (botón Detener del panel). No-op si ya terminó. */
 export function abortRun(runId: string): void {
 	aborts.get(runId)?.();
+}
+
+/** Handler para reanudar / continuar un workflow (botón Continuar en el panel). */
+let rerunHandler: ((runId: string) => void) | undefined;
+export function registerRerunHandler(fn: (runId: string) => void): void {
+	rerunHandler = fn;
+}
+export function rerunWorkflow(runId: string): void {
+	rerunHandler?.(runId);
+}
+
+/** Handler para ejecutar comandos custom (p.ej. Siguiente paso / elaborate). */
+let commandRunner: ((cmd: string) => void) | undefined;
+export function registerCommandRunner(fn: (cmd: string) => void): void {
+	commandRunner = fn;
+}
+export function runCustomCommand(cmd: string): void {
+	commandRunner?.(cmd);
 }
 
 function emit(): void {
@@ -133,6 +156,7 @@ export function startRun(ctx: LifecycleContext): void {
 				runId: ctx.runId,
 				workflow: ctx.workflow,
 				input: ctx.input,
+				cwd: ctx.cwd,
 				status: "running",
 				stages: [],
 			},
@@ -146,7 +170,12 @@ export function stageStart(stage: StageRef, ctx: LifecycleContext): void {
 			...r,
 			stages: [
 				...r.stages,
-				{ name: stage.name, skill: stage.skill, status: "running" },
+				{
+					name: stage.name,
+					skill: stage.skill,
+					status: "running",
+					input: ctx.input,
+				},
 			],
 		})),
 	);
@@ -164,6 +193,7 @@ export function stageEnd(
 				...s,
 				status: "completed",
 				primaryHandle: output?.primaryHandle,
+				data: output?.data,
 			})),
 		})),
 	);
