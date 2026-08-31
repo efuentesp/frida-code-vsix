@@ -5133,13 +5133,11 @@ export async function activate(
 							});
 						},
 						onAdvance: (planPath, phaseId) => {
-							boardOverlayHandle?.unmount();
-							boardUnsubscribe?.();
-							// #165 — Enfocar el chat: el panel del workflow vive en el footer
-							// de la vista; al lanzar desde el tablero lo traemos a la vista.
-							void vscode.commands.executeCommand(
-								"frida.codeView.focus",
-							);
+							// #167 — El tablero PERMANECE ABIERTO: la suscripción de
+							// subscribeBoardChanges re-monta con datos frescos en cada
+							// transición del run — la tarjeta se mueve en vivo. El panel del
+							// workflow se abre con el focus del chat (footer de la vista).
+							void vscode.commands.executeCommand("frida.codeView.focus");
 							// #163 — El workflow dueño del board arma el comando (p. ej. sdd-ship).
 							runCustomCommand(
 								`/wf ${data.workflow ?? "sdd-ship"} "${planPath} Phase ${phaseId}"`,
