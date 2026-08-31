@@ -12598,3 +12598,24 @@ mark.hl {
 .kb-deps-pending {
 	color: var(--vscode-charts-orange, #d18616);
 }
+
+/* ── #180 — Tarjeta dos renglones: id/métricas indivisibles ── */
+.kb-card-id {
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+.kb-card-title {
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.kb-badges {
+	flex-wrap: wrap;
+	row-gap: 2px;
+}
+.kb-badges > * {
+	flex-shrink: 0;
+	white-space: nowrap;
+}

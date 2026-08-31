@@ -213,6 +213,13 @@ function PhaseCard({
 	const depsOk = depsSatisfied(board, unit);
 	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
 	const blocked = unit.transitions.at(-1)?.blocked === true; // #172 — breaker
+	const hasBadges =
+		children.length > 0 ||
+		blockedDeps.length > 0 ||
+		!!(unit.deps && unit.deps.length > 0) ||
+		fails > 0 ||
+		blocked ||
+		lastArtifacts(unit).length > 0; // #180 — renglón 2 sólo si hay contenido
 	const accent = isDone
 		? (COL_ACCENT.commit ?? "#4ec9b0")
 		: (COL_ACCENT[unit.status] ?? "#888");
@@ -223,16 +230,32 @@ function PhaseCard({
 			gap={4}
 			cls={`kb-card${isGap ? " kb-gap" : ""}${isRunning ? " kb-running" : ""}`}
 		>
-			<fbox flexDirection="row" gap={6} alignItems="center">
+			{/* #180 — Renglón 1: id indivisible (nowrap) + título flexible (ellipsis).
+			 *  El tooltip del título completo va en el fbox (ftext no soporta title). */}
+			<fbox
+				flexDirection="row"
+				gap={6}
+				alignItems="center"
+				title={unit.title}
+			>
 				<fbox cls="kb-card-bar" background={accent} />
-				<ftext size={11} bold>
+				<ftext size={11} bold cls="kb-card-id">
 					{unit.id}
 				</ftext>
 				{unit.title ? (
-					<ftext size={11} color="var(--vscode-descriptionForeground)">
-						{unit.title.length > 24 ? `${unit.title.slice(0, 23)}…` : unit.title}
+					<ftext
+						size={11}
+						color="var(--vscode-descriptionForeground)"
+						cls="kb-card-title"
+					>
+						{unit.title}
 					</ftext>
 				) : null}
+			</fbox>
+
+			{/* #180 — Renglón 2: badges completos e indivisibles (wrap por badge). */}
+			{hasBadges ? (
+				<fbox flexDirection="row" gap={6} alignItems="center" cls="kb-badges">
 				{children.length > 0 ? (
 					<ftext
 						size={10}
@@ -276,19 +299,20 @@ function PhaseCard({
 						<ftext size={10}>{fails}</ftext>
 					</fbox>
 				) : null}
+				{blocked ? (
+					<fbox
+						flexDirection="row"
+						gap={2}
+						alignItems="center"
+						cls="kb-blocked"
+						title="Bloqueada por circuit breaker tras los ciclos FAIL — relanza para continuar"
+					>
+						<ficon name="error" size={10} />
+						<ftext size={10}>bloqueada</ftext>
+					</fbox>
+				) : null}
+				<UnitArtifacts unit={unit} actions={actions} />
 			</fbox>
-
-			{blocked ? (
-				<fbox
-					flexDirection="row"
-					gap={2}
-					alignItems="center"
-					cls="kb-blocked"
-					title="Bloqueada por circuit breaker tras los ciclos FAIL — relanza para continuar"
-				>
-					<ficon name="error" size={10} />
-					<ftext size={10}>bloqueada</ftext>
-				</fbox>
 			) : null}
 
 			{children.length > 0 ? (
@@ -325,28 +349,28 @@ function PhaseCard({
 					))
 				: null}
 
-			<UnitArtifacts unit={unit} actions={actions} />
-
-			{isRunning ? null : depsOk ? isDone ? null : isGap ? (
-				// #175 — Mismo look que el botón «Avanzar» del panel del workflow.
-				<fbutton
-					variant="primary"
-					onClick={() => actions.onAdvance(board.planPath, unit.id)}
-					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
-				>
-					<ficon name="play" size={11} />
-					<ftext size={11} bold>
-						Avanzar {unit.id}
-					</ftext>
-				</fbutton>
-			) : (
-				<fbox
-					onClick={() => actions.onAdvance(board.planPath, unit.id)}
-					cls="kb-advance-quiet"
-					title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
-				>
-					<ficon name="play" size={11} color="var(--vscode-foreground)" />
-				</fbox>
+			{isRunning ? null : depsOk ? (
+				isDone ? null : isGap ? (
+					// #175 — Mismo look que el botón «Avanzar» del panel del workflow.
+					<fbutton
+						variant="primary"
+						onClick={() => actions.onAdvance(board.planPath, unit.id)}
+						title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
+					>
+						<ficon name="play" size={11} />
+						<ftext size={11} bold>
+							Avanzar {unit.id}
+						</ftext>
+					</fbutton>
+				) : (
+					<fbox
+						onClick={() => actions.onAdvance(board.planPath, unit.id)}
+						cls="kb-advance-quiet"
+						title={`Ejecutar la fase ${unit.id} con el workflow autónomo`}
+					>
+						<ficon name="play" size={11} color="var(--vscode-foreground)" />
+					</fbox>
+				)
 			) : (
 				// #178 — Bloqueado por dependencias: icono puro (candado, sin caja).
 				<fbox
