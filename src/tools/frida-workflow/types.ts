@@ -360,6 +360,9 @@ export interface BoardSpec {
 	/** #163 — Columna/stage de regreso cuando validate FALLA (zigzag del
 	 *  ciclo implement↔validate). Derivado del route del workflow si se omite. */
 	validateRegress?: string;
+	/** #172 — Umbral de ciclos FAIL para considerar el breaker cortado
+	 *  (la tarjeta se queda en validate con marca blocked). Default 3. */
+	breakerFails?: number;
 }
 
 // ---------------------------------------------------------------------------

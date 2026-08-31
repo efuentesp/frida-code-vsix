@@ -55,6 +55,8 @@ export interface BoardTransition {
 	failed?: boolean;
 	/** #163 — true si la transición MOVIO la tarjeta hacia atrás. */
 	regress?: boolean;
+	/** #172 — Corte del circuit breaker en esta columna (fase bloqueada). */
+	blocked?: boolean;
 	artifacts?: BoardArtifactLink[];
 }
 
@@ -289,7 +291,8 @@ export function openBoard(
 	}
 	board.columns = columns;
 	board.doneColumn = doneColumn;
-	if (planContent && !board.disablePlanSync) syncUnitsFromPlan(board, planContent);
+	if (planContent && !board.disablePlanSync)
+		syncUnitsFromPlan(board, planContent);
 	return board;
 }
 
@@ -377,8 +380,12 @@ export interface StageTransitionInput {
 	runId: string;
 	ts: string;
 	artifacts?: BoardArtifactLink[];
-	/** Para validate: verdict del output (sólo avanza con true). */
+	/** Para validate: verdict del output. false = FAIL (zigzag/breaker);
+	 *  undefined = inicio de etapa (#171, avanza temprano). */
 	passed?: boolean;
+	/** #172 — El circuit breaker cortó tras N ciclos FAIL: la tarjeta se
+	 *  queda en la columna de validate con marca `blocked`. */
+	breakerTrip?: boolean;
 	spec?: BoardSpec;
 	/** #161 — Escritor de la transición (workflow, skill u otra extensión). */
 	source?: string;
@@ -413,11 +420,34 @@ export function applyStageTransition(
 		input.spec?.stageColumns?.[input.stage] ?? DEFAULT_STAGE_COLUMNS[input.stage];
 	if (!target) return unit; // stage sin columna (p. ej. pre-flight): no toca el board
 
-	if (input.stage === "validate" && input.passed !== true) {
-		// #163 — Zigzag: validate FAIL registra el ciclo y, si la tarjeta estaba
+	if (input.stage === "validate" && input.passed === false) {
+		// #163/#171 — Zigzag: validate FAIL (explícito, del verdict del onStageEnd)
+		// registra el ciclo y, si la tarjeta estaba
 		// más adelante, REGRESA a la columna del stage de reintento (derivado del
 		// route del workflow). El tablero refleja el ciclo implement↔validate
 		// real: rebotes visibles + badge de ciclos (validateFails).
+		// #172 — breakerTrip (el circuit breaker cortó tras los N ciclos): la
+		// tarjeta se queda en VALIDATE — donde falló — con marca `blocked`, en
+		// vez de rebotar una última vez a implement: el estado final refleja
+		// dónde se bloqueó la fase.
+		if (input.breakerTrip) {
+			const dstV = board.columns.indexOf(target);
+			if (dstV >= 0) {
+				unit.status = target;
+				unit.transitions.push({
+					to: target,
+					stage: input.stage,
+					artifactKind: resolveStageKind(input.stage, input.spec),
+					runId: input.runId,
+					ts: input.ts,
+					source: input.source,
+					failed: true,
+					blocked: true,
+					artifacts: input.artifacts?.length ? input.artifacts : undefined,
+				});
+			}
+			return unit;
+		}
 		const regressCol =
 			input.spec?.validateRegress ?? DEFAULT_STAGE_COLUMNS.implement;
 		const dst2 = board.columns.indexOf(regressCol);

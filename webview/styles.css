@@ -12549,3 +12549,8 @@ mark.hl {
 .sn-badge-deg {
 	color: var(--vscode-editorWarning-foreground, #cca700);
 }
+/* #172 — Tarjeta bloqueada por circuit breaker (validate, N ciclos FAIL) */
+.kb-blocked {
+	color: var(--vscode-charts-red, #f14c4c);
+	user-select: none;
+}

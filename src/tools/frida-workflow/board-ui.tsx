@@ -139,12 +139,7 @@ function BoardPanel({
 					const inCol = roots.filter((r) => r.status === col);
 					return (
 						<fbox key={col} flexDirection="column" gap={6} cls="kb-col">
-							<fbox
-								flexDirection="row"
-								gap={4}
-								alignItems="center"
-								cls="kb-col-title"
-							>
+							<fbox flexDirection="row" gap={4} alignItems="center" cls="kb-col-title">
 								<fbox cls="kb-col-dot" background={COL_ACCENT[col] ?? "#888"} />
 								<ftext size={11} bold color="var(--vscode-descriptionForeground)">
 									{col}
@@ -195,16 +190,13 @@ function PhaseCard({
 	const doneChildren = children.filter((c) => isUnitDone(board, c)).length;
 	const isDone = isUnitDone(board, unit);
 	const fails = validateFails(unit); // #163 — ciclos de reintentos visibles
+	const blocked = unit.transitions.at(-1)?.blocked === true; // #172 — breaker
 	const accent = isDone
 		? (COL_ACCENT.commit ?? "#4ec9b0")
 		: (COL_ACCENT[unit.status] ?? "#888");
 
 	return (
-		<fbox
-			flexDirection="column"
-			gap={4}
-			cls={`kb-card${isGap ? " kb-gap" : ""}`}
-		>
+		<fbox flexDirection="column" gap={4} cls={`kb-card${isGap ? " kb-gap" : ""}`}>
 			<fbox flexDirection="row" gap={6} alignItems="center">
 				<fbox cls="kb-card-bar" background={accent} />
 				<ftext size={11} bold>
@@ -212,13 +204,15 @@ function PhaseCard({
 				</ftext>
 				{unit.title ? (
 					<ftext size={11} color="var(--vscode-descriptionForeground)">
-						{unit.title.length > 24
-							? `${unit.title.slice(0, 23)}…`
-							: unit.title}
+						{unit.title.length > 24 ? `${unit.title.slice(0, 23)}…` : unit.title}
 					</ftext>
 				) : null}
 				{children.length > 0 ? (
-					<ftext size={10} cls="kb-metric" color="var(--vscode-charts-blue, #58a6ff)">
+					<ftext
+						size={10}
+						cls="kb-metric"
+						color="var(--vscode-charts-blue, #58a6ff)"
+					>
 						{doneChildren}/{children.length}
 					</ftext>
 				) : null}
@@ -235,6 +229,19 @@ function PhaseCard({
 					</fbox>
 				) : null}
 			</fbox>
+
+			{blocked ? (
+				<fbox
+					flexDirection="row"
+					gap={2}
+					alignItems="center"
+					cls="kb-blocked"
+					title="Bloqueada por circuit breaker tras los ciclos FAIL — relanza para continuar"
+				>
+					<ficon name="error" size={10} />
+					<ftext size={10}>bloqueada</ftext>
+				</fbox>
+			) : null}
 
 			{children.length > 0 ? (
 				<fbox
@@ -333,7 +340,10 @@ function lastArtifacts(unit: BoardUnit): {
 	path: string;
 	label?: string;
 }[] {
-	const byKind = new Map<string, { kind: string; path: string; label?: string }>();
+	const byKind = new Map<
+		string,
+		{ kind: string; path: string; label?: string }
+	>();
 	for (let i = unit.transitions.length - 1; i >= 0; i--) {
 		for (const a of unit.transitions[i]!.artifacts ?? []) {
 			if (!byKind.has(a.kind))

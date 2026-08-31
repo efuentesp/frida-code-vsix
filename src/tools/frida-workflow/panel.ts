@@ -17,7 +17,11 @@ import {
 	type StageRef,
 } from "./lifecycle";
 import { createWorkflowPanelElement } from "./WorkflowPanel";
-import { extractPhaseId, normalizePhaseId } from "./plan-utils";
+import {
+	countTrailingFailedValidates,
+	extractPhaseId,
+	normalizePhaseId,
+} from "./plan-utils";
 import {
 	applyStageTransition,
 	openBoard,
@@ -112,15 +116,44 @@ function applyRuntimeBoardTransition(
 			const sha = gitShortSha(ctx.cwd);
 			if (sha) artifacts.push({ kind: "git-commit", path: "", label: sha });
 		}
-		applyStageTransition(board, extracted.phaseId, {
+		const passed = (output?.data as { passed?: boolean } | undefined)?.passed;
+		// #172 — ¿Cortó el circuit breaker? N ciclos FAIL consecutivos al final
+		// del run (threshold del spec, default 3): la tarjeta se queda en validate.
+		let breakerTrip = false;
+		if (stage.name === "validate" && passed === false) {
+			const run = getWorkflowRuns().runs.find((r) => r.runId === ctx.runId);
+			const threshold = spec?.breakerFails ?? 3;
+			if (run && countTrailingFailedValidates(run.stages) >= threshold) {
+				breakerTrip = true;
+			}
+		}
+		const unit = applyStageTransition(board, extracted.phaseId, {
 			stage: stage.name,
 			runId: ctx.runId,
 			ts: new Date().toISOString(),
 			artifacts: artifacts.length ? artifacts : undefined,
-			passed: (output?.data as { passed?: boolean } | undefined)?.passed,
+			passed,
+			breakerTrip,
 			spec,
 			source: ctx.workflow, // #161 — trazabilidad multi-escritor
 		});
+		// #171 — El start ya movió la tarjeta (transición creada SIN artefactos):
+		// si el end trae artefactos y la transición reciente no los tiene, se los
+		// adjuntamos en vez de crear una duplicada (re-aplicar la misma columna es
+		// no-op de status).
+		if (unit && artifacts.length > 0) {
+			let last: (typeof unit.transitions)[number] | undefined;
+			for (let i = unit.transitions.length - 1; i >= 0; i--) {
+				const t = unit.transitions[i]!;
+				if (t.stage === stage.name && !t.failed) {
+					last = t;
+					break;
+				}
+			}
+			if (last && !last.artifacts?.length) {
+				last.artifacts = artifacts;
+			}
+		}
 		saveBoard(ctx.cwd, extracted.planPathToken, board);
 	} catch {
 		/* best-effort: sin board, la tarjeta degrada a la escalera de plan-utils */
@@ -131,7 +164,13 @@ function applyRuntimeBoardTransition(
 export function createWorkflowLifecycle(): LifecycleListeners {
 	return {
 		onWorkflowStart: (ctx) => startRun(ctx),
-		onStageStart: (stage, ctx) => stageStart(stage, ctx),
+		onStageStart: (stage, ctx) => {
+			stageStart(stage, ctx);
+			// #171 — Movimiento TEMPRANO: la tarjeta pasa a la columna de la etapa
+			// que ARRANCA — sincronía con el panel del workflow (que muestra la
+			// etapa en curso). El onStageEnd aporta artefactos y veredictos.
+			applyRuntimeBoardTransition(stage, undefined, ctx);
+		},
 		onStageEnd: (stage, output, ctx) => {
 			stageEnd(stage, output, ctx); // store primero: la UI viva no espera al board
 			applyRuntimeBoardTransition(stage, output, ctx);

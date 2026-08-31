@@ -97,12 +97,14 @@ describe("board — transiciones con contratos (#159)", () => {
 			});
 
 		expect(t("elaborate")?.status).toBe("elaborada");
-		expect(t("validate")).toBeDefined();
-		expect(board.units[0]!.status).toBe("elaborada"); // validate sin passed: sin cambio
 		t("implement");
 		expect(board.units[0]!.status).toBe("implementada");
-		t("validate", false);
-		expect(board.units[0]!.status).toBe("implementada"); // FAIL no avanza
+		// #171 — validate SIN verdict (inicio de etapa): avanza temprano a validada
+		// (sincronía con el panel que muestra la etapa en curso).
+		t("validate");
+		expect(board.units[0]!.status).toBe("validada");
+		t("validate", false); // FAIL explícito: rebota a implementada
+		expect(board.units[0]!.status).toBe("implementada");
 		t("validate", true);
 		expect(board.units[0]!.status).toBe("validada");
 		t("commit");
@@ -431,8 +433,20 @@ describe("board — disablePlanSync (#166)", () => {
 		const board = openBoard(tmp2, PLAN, maestro);
 		board.disablePlanSync = true;
 		board.units = [
-			{ id: "F01", title: "Fundación", origin: "plan", status: "backlog", transitions: [] },
-			{ id: "F17", title: "Cutover", origin: "plan", status: "backlog", transitions: [] },
+			{
+				id: "F01",
+				title: "Fundación",
+				origin: "plan",
+				status: "backlog",
+				transitions: [],
+			},
+			{
+				id: "F17",
+				title: "Cutover",
+				origin: "plan",
+				status: "backlog",
+				transitions: [],
+			},
 		];
 		saveBoard(tmp2, PLAN, board);
 
@@ -440,5 +454,87 @@ describe("board — disablePlanSync (#166)", () => {
 		// headers F0/F1/F6 NO deben colarse como unidades.
 		const reopened = openBoard(tmp2, PLAN, maestro);
 		expect(reopened.units.map((u) => u.id)).toEqual(["F01", "F17"]);
+	});
+});
+
+// ── #171 — Sincronía tablero↔panel: movimiento TEMPRANO al iniciar etapa ─────
+describe("board — desfase tablero/panel (#171)", () => {
+	it("el inicio de una etapa mueve la tarjeta aunque no haya terminado (passed undefined)", () => {
+		const spec = {
+			columns: ["backlog", "elaborate", "implement", "validate", "commit"],
+			stageColumns: {
+				elaborate: "elaborate",
+				implement: "implement",
+				validate: "validate",
+				commit: "commit",
+			},
+			doneColumn: "commit",
+			validateRegress: "implement",
+		};
+		// tmp FRESCO: el board compartido de `tmp` arrastra estados de tests
+		// previos (F10c.2 commiteada) y el movimiento temprano sería no-op.
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-desfase-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		const board = openBoard(tmp2, PLAN, PLAN5, spec);
+		// El workflow muestra "ejecutando implement" (onStageStart, sin output):
+		const unit = applyStageTransition(board, "F10c.2", {
+			stage: "implement",
+			runId: "r",
+			ts: "t",
+			spec,
+		});
+		expect(unit?.status).toBe("implement"); // la tarjeta YA está en implement
+	});
+});
+
+// ── #172 — Breaker trip: la tarjeta se queda en validate con marca blocked ───
+describe("board — breaker trip (#172)", () => {
+	it("3er FAIL con breakerTrip deja la tarjeta en VALIDATE + blocked (no rebota)", () => {
+		const spec = {
+			columns: ["backlog", "elaborate", "implement", "validate", "commit"],
+			stageColumns: {
+				elaborate: "elaborate",
+				implement: "implement",
+				validate: "validate",
+				commit: "commit",
+			},
+			doneColumn: "commit",
+			validateRegress: "implement",
+		};
+		const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "board-breaker-"));
+		fs.mkdirSync(path.join(tmp2, ".frida", "artifacts", "plans"), {
+			recursive: true,
+		});
+		fs.writeFileSync(path.join(tmp2, PLAN), PLAN5);
+		const board = openBoard(tmp2, PLAN, PLAN5, spec);
+		const t = (stage: string, passed?: boolean, breakerTrip?: boolean) =>
+			applyStageTransition(board, "F10c.1", {
+				stage,
+				runId: "r",
+				ts: "t",
+				passed,
+				breakerTrip,
+				spec,
+			});
+
+		t("elaborate");
+		t("implement");
+		// Ciclos 1 y 2: rebote implement↔validate (zigzag normal).
+		t("validate", false);
+		expect(board.units[0]!.status).toBe("implement");
+		t("implement");
+		t("validate", false);
+		expect(board.units[0]!.status).toBe("implement");
+		// Ciclo 3 (breaker): la tarjeta SE QUEDA en validate, donde falló.
+		t("validate", false, true);
+		expect(board.units[0]!.status).toBe("validate");
+		const last = board.units[0]!.transitions.at(-1)!;
+		expect(last.failed).toBe(true);
+		expect(last.blocked).toBe(true);
+		expect(last.regress).toBeUndefined();
+		expect(validateFails(board.units[0]!)).toBe(3); // badge de ciclos
 	});
 });
