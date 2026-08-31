@@ -25,7 +25,8 @@ import {
 	type TranscriptEntry,
 	type UnitView,
 } from "./store";
-import { countTrailingFailedValidates, resolveNextStep } from "./plan-utils";
+import { countTrailingFailedValidates } from "./plan-utils";
+import { resolveNextStepWithBoard } from "./board";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
 
 const STAGE_COLOR: Record<StageViewStatus, string | undefined> = {
@@ -316,10 +317,11 @@ function RunBlock({
 	const isCompleted =
 		!running &&
 		(lastValidatePassed || run.stages.some((s) => s.name === "commit"));
-	// #153 — run.cwd (del lifecycle ctx) resuelve el plan relativo al workspace;
-	// sin él, process.cwd() del extension host apunta a "/" y existsSync falla.
+	// #153/#158/#159 — Escalera: board jerárquico (primer hueco real, soporta
+	// splits) > progress #158 > fase relativa al run. run.cwd resuelve el plan
+	// al workspace; sin él, process.cwd() del extension host apunta a "/".
 	const nextStep = isCompleted
-		? resolveNextStep(run.input, run.cwd ?? process.cwd())
+		? resolveNextStepWithBoard(run.input, run.cwd ?? process.cwd()).effective
 		: null;
 
 	return (
@@ -492,83 +494,79 @@ function RunBlock({
 						</fbox>
 					</fbox>
 
-				{!nextStep.isPlanComplete && nextStep.nextPhase ? (
-					<fbox flexDirection="column" gap={3}>
-						<ftext size={11} color="var(--vscode-foreground)" bold>
-							👉 Siguiente paso sugerido: {nextStep.nextPhase.fullName}
-						</ftext>
-						<fbox flexDirection="row" gap={6} alignItems="center">
-							{nextStep.shipCommand ? (
-								<fbutton
-									variant="primary"
-									onClick={() => {
-										if (nextStep.shipCommand) {
-											runCustomCommand(nextStep.shipCommand);
-										}
-									}}
-									title={`Workflow autónomo — ejecuta:\n${nextStep.shipCommand}`}
-								>
-									<ficon name="play" size={10} />
-									<ftext size={11}>Avanzar a {nextStep.nextPhase.id}</ftext>
-								</fbutton>
-							) : null}
-							{nextStep.elaborateCommand ? (
-								<fbutton
-									variant="secondary"
-									onClick={() => {
+					{!nextStep.isPlanComplete && nextStep.nextPhase ? (
+						<fbox flexDirection="column" gap={3}>
+							<ftext size={11} color="var(--vscode-foreground)" bold>
+								👉 Siguiente paso sugerido: {nextStep.nextPhase.fullName}
+							</ftext>
+							<fbox flexDirection="row" gap={6} alignItems="center">
+								{nextStep.shipCommand ? (
+									<fbutton
+										variant="primary"
+										onClick={() => {
+											if (nextStep.shipCommand) {
+												runCustomCommand(nextStep.shipCommand);
+											}
+										}}
+										title={`Workflow autónomo — ejecuta:\n${nextStep.shipCommand}`}
+									>
+										<ficon name="play" size={10} />
+										<ftext size={11}>Avanzar a {nextStep.nextPhase.id}</ftext>
+									</fbutton>
+								) : null}
+								{nextStep.elaborateCommand ? (
+									<fbutton
+										variant="secondary"
+										onClick={() => {
 											if (nextStep.elaborateCommand) {
 												runCustomCommand(nextStep.elaborateCommand);
 											}
-									}}
-									title={`Skill de pasada única — ejecuta:\n${nextStep.elaborateCommand}`}
-								>
-									<ficon name="file-text" size={10} />
-									<ftext size={11}>Elaborar {nextStep.nextPhase.id}</ftext>
-								</fbutton>
-							) : null}
+										}}
+										title={`Skill de pasada única — ejecuta:\n${nextStep.elaborateCommand}`}
+									>
+										<ficon name="file-text" size={10} />
+										<ftext size={11}>Elaborar {nextStep.nextPhase.id}</ftext>
+									</fbutton>
+								) : null}
+							</fbox>
+							{/* #156 — Comando exacto que despachará cada botón: el prefijo
+							 * (/wf… vs /skill:…) hace visible el tipo de acción antes del clic. */}
+							<fbox flexDirection="column" gap={2}>
+								{nextStep.shipCommand ? (
+									<fbox
+										flexDirection="row"
+										gap={4}
+										alignItems="center"
+										cls="wf-cmd-hint"
+										title={nextStep.shipCommand}
+									>
+										<ficon
+											name="zap"
+											size={9}
+											color="var(--vscode-descriptionForeground)"
+										/>
+										<ftext size={10}>{truncate(nextStep.shipCommand, 80)}</ftext>
+									</fbox>
+								) : null}
+								{nextStep.elaborateCommand ? (
+									<fbox
+										flexDirection="row"
+										gap={4}
+										alignItems="center"
+										cls="wf-cmd-hint"
+										title={nextStep.elaborateCommand}
+									>
+										<ficon
+											name="sparkle"
+											size={9}
+											color="var(--vscode-descriptionForeground)"
+										/>
+										<ftext size={10}>{truncate(nextStep.elaborateCommand, 80)}</ftext>
+									</fbox>
+								) : null}
+							</fbox>
 						</fbox>
-						{/* #156 — Comando exacto que despachará cada botón: el prefijo
-						 * (/wf… vs /skill:…) hace visible el tipo de acción antes del clic. */}
-						<fbox flexDirection="column" gap={2}>
-							{nextStep.shipCommand ? (
-								<fbox
-									flexDirection="row"
-									gap={4}
-									alignItems="center"
-									cls="wf-cmd-hint"
-									title={nextStep.shipCommand}
-								>
-									<ficon
-										name="zap"
-										size={9}
-										color="var(--vscode-descriptionForeground)"
-									/>
-									<ftext size={10}>
-										{truncate(nextStep.shipCommand, 80)}
-									</ftext>
-								</fbox>
-							) : null}
-							{nextStep.elaborateCommand ? (
-								<fbox
-									flexDirection="row"
-									gap={4}
-									alignItems="center"
-									cls="wf-cmd-hint"
-									title={nextStep.elaborateCommand}
-								>
-									<ficon
-										name="sparkle"
-										size={9}
-										color="var(--vscode-descriptionForeground)"
-									/>
-									<ftext size={10}>
-										{truncate(nextStep.elaborateCommand, 80)}
-									</ftext>
-								</fbox>
-							) : null}
-						</fbox>
-					</fbox>
-				) : null}
+					) : null}
 				</fbox>
 			) : null}
 

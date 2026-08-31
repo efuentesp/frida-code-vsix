@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { encodeCwd, readHeader, resolveRef } from "./audit";
+import { setBoardSpecResolver } from "./board";
 import {
 	loadWorkflows,
 	type LoadedWorkflows,
@@ -14,7 +15,7 @@ import {
 	type WorkflowOrigin,
 } from "./load";
 import { resumeWorkflow, runWorkflow } from "./runner";
-import { validateWorkflow, hasErrors } from "./validate";
+import { validateWorkflow } from "./validate";
 import type { WorkflowHost, Workflow } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,18 @@ export async function handleWfSlash(
 	});
 	const wfs = loaded.workflows;
 	const wfNames = [...wfs.keys(), ...(deps.availablePatterns ?? [])];
+
+	// #159 — Registrar los BoardSpec declarativos cargados: el runtime del
+	// board (lifecycle) resuelve spec por nombre de workflow vía este mapa.
+	{
+		const specs: Record<string, import("./types").BoardSpec> = {};
+		for (const [name, wf] of wfs) {
+			if (wf.board) specs[name] = wf.board;
+		}
+		if (Object.keys(specs).length > 0) {
+			setBoardSpecResolver((n) => specs[n]);
+		}
+	}
 
 	// /wf check — valida TODO y presenta los issues (abrir archivo:línea). Se sirve
 	// ANTES del abort por errores de carga: justamente los muestra.

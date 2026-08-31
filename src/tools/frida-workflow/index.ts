@@ -220,4 +220,40 @@ export type {
 	ScriptResult,
 	PromptFn,
 	SkillContract,
+	BoardSpec,
 } from "./types";
+
+// Board / kanban interno (#159/#160) — núcleo del motor + sugerencia.
+export {
+	openBoard,
+	loadBoard,
+	saveBoard,
+	boardFilePath,
+	syncUnitsFromPlan,
+	applyStageTransition,
+	boardChildren,
+	isUnitDone,
+	firstRealGap,
+	bootstrapBoardFromRuns,
+	resolveNextStepWithBoard,
+	setSkillContracts,
+	getSkillContracts,
+	setBoardSpecResolver,
+	resolveBoardSpec,
+	resolveStageKind,
+	DEFAULT_BOARD_COLUMNS,
+	DEFAULT_DONE_COLUMN,
+	DEFAULT_STAGE_COLUMNS,
+	DEFAULT_STAGE_KINDS,
+} from "./board";
+export type {
+	Board,
+	BoardUnit,
+	BoardTransition,
+	BoardArtifactLink,
+	StageTransitionInput,
+} from "./board";
+export {
+	scanSkillContracts,
+	extractContractArtifactKind,
+} from "./skill-contracts";

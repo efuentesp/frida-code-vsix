@@ -342,6 +342,24 @@ export type EdgeTarget = string | EdgeFn;
 export type EdgeTable = Record<string, EdgeTarget>;
 
 // ---------------------------------------------------------------------------
+// Board (kanban interno, #159)
+// ---------------------------------------------------------------------------
+
+/** Config declarativa por workflow (Capa 2). Todo opcional: defaults genéricos. */
+export interface BoardSpec {
+	/** Unidad de trabajo. Por ahora sólo "phase" (extensible: story, epic…). */
+	unit?: "phase";
+	/** Columnas en orden de avance. */
+	columns?: string[];
+	/** Columna terminal (una unidad está done al alcanzarla, o si todas sus hojas lo están). */
+	doneColumn?: string;
+	/** Override stage ⇒ artifactKind (gana sobre SKILL.md y defaults). */
+	stageKinds?: Record<string, string>;
+	/** Override stage ⇒ columna destino (gana sobre el default por stage). */
+	stageColumns?: Record<string, string>;
+}
+
+// ---------------------------------------------------------------------------
 // Workflow
 // ---------------------------------------------------------------------------
 
@@ -351,6 +369,9 @@ export interface Workflow {
 	start: string;
 	stages: Record<string, StageDef>;
 	edges: EdgeTable;
+	/** #159 — kanban interno declarativo (Capa 2): columnas/mapas custom.
+	 *  Opcional: sin esto el board usa los defaults genéricos del motor. */
+	board?: BoardSpec;
 }
 
 // ---------------------------------------------------------------------------

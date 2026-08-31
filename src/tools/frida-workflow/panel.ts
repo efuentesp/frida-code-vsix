@@ -7,9 +7,25 @@
 // → store → el panel se re-renderiza solo (useSyncExternalStore).
 
 import type { ReactElement } from "react";
-import { registerLifecycle, type LifecycleListeners } from "./lifecycle";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+	registerLifecycle,
+	type LifecycleListeners,
+	type StageOutput,
+	type StageRef,
+} from "./lifecycle";
 import { createWorkflowPanelElement } from "./WorkflowPanel";
-import { appendPhaseProgress, extractPhaseId } from "./plan-utils";
+import { extractPhaseId } from "./plan-utils";
+import {
+	applyStageTransition,
+	openBoard,
+	resolveBoardSpec,
+	resolveStageKind,
+	saveBoard,
+	type BoardArtifactLink,
+} from "./board";
+import { appendPhaseProgress } from "./plan-utils";
 import {
 	endRun,
 	getWorkflowRuns,
@@ -30,12 +46,55 @@ export interface WorkflowWebBridge {
 	) => { unmount: () => void };
 }
 
+/** #159/#160 — Transición de board en runtime: cada stage completado mueve la
+ *  fase del run a su columna (validate sólo con passed). El spec llega por
+ *  setBoardSpecResolver (config declarativa) y el artifactKind por contrato. */
+function applyRuntimeBoardTransition(
+	stage: StageRef,
+	output: StageOutput | undefined,
+	ctx: { runId: string; workflow: string; input: string; cwd: string },
+): void {
+	const extracted = extractPhaseId(ctx.input);
+	if (!extracted?.phaseId) return;
+	try {
+		const planAbs = join(ctx.cwd, extracted.planPathToken);
+		const planContent = existsSync(planAbs)
+			? readFileSync(planAbs, "utf8")
+			: undefined;
+		const spec = resolveBoardSpec(ctx.workflow);
+		const board = openBoard(ctx.cwd, extracted.planPathToken, planContent, spec);
+		const artifacts: BoardArtifactLink[] = output?.primaryHandle
+			? [
+					{
+						kind: resolveStageKind(stage.name, spec) ?? stage.name,
+						path: output.primaryHandle,
+					},
+				]
+			: [];
+		applyStageTransition(board, extracted.phaseId, {
+			stage: stage.name,
+			runId: ctx.runId,
+			ts: new Date().toISOString(),
+			artifacts: artifacts.length ? artifacts : undefined,
+			passed: (output?.data as { passed?: boolean } | undefined)?.passed,
+			spec,
+			source: ctx.workflow, // #161 — trazabilidad multi-escritor
+		});
+		saveBoard(ctx.cwd, extracted.planPathToken, board);
+	} catch {
+		/* best-effort: sin board, la tarjeta degrada a la escalera de plan-utils */
+	}
+}
+
 /** Listener que traduce eventos de lifecycle a mutaciones del store. */
 export function createWorkflowLifecycle(): LifecycleListeners {
 	return {
 		onWorkflowStart: (ctx) => startRun(ctx),
 		onStageStart: (stage, ctx) => stageStart(stage, ctx),
-		onStageEnd: (stage, output, ctx) => stageEnd(stage, output, ctx),
+		onStageEnd: (stage, output, ctx) => {
+			stageEnd(stage, output, ctx); // store primero: la UI viva no espera al board
+			applyRuntimeBoardTransition(stage, output, ctx);
+		},
 		onStageRetry: (stage, attempt, ctx) => stageRetry(stage, attempt, ctx),
 		onStageError: (stage, error, ctx) => stageError(stage, error, ctx),
 		onLoopStart: () => {},
@@ -82,10 +141,7 @@ export function mountWorkflowPanel(webBridge: WorkflowWebBridge): {
 	unmount: () => void;
 } {
 	if (panelMounted) return panelMounted;
-	panelMounted = webBridge.mountPersistent(
-		createWorkflowPanelElement,
-		"footer",
-	);
+	panelMounted = webBridge.mountPersistent(createWorkflowPanelElement, "footer");
 	return panelMounted;
 }
 
