@@ -117,4 +117,50 @@ describe("Welcome component (Frida Studio — Agentic Software Factory)", () => 
 			root.unmount();
 		});
 	});
+
+	// #195 — click del «Abrir monitor»: el webview NO puede navegar a URLs
+	// externas (ancla nativa muerta en webviews de VS Code): el click se
+	// intercepta (preventDefault + stopPropagation) y delega al host vía
+	// onOpenMonitor (que postea open_external → vscode.env.openExternal).
+	it("click en «Abrir monitor» delega al host (onOpenMonitor) y NO navega", () => {
+		const container = document.createElement("div");
+		const root: Root = createRoot(container);
+		let opened = 0;
+		let cardClicked = false; // simula el submit /pipeline de la tarjeta
+
+		act(() => {
+			root.render(
+				React.createElement(
+					"div",
+					{
+						onClick: () => {
+							cardClicked = true;
+						},
+					},
+					React.createElement(Welcome, {
+						monitorUrl: "http://127.0.0.1:45678/",
+						onOpenMonitor: () => {
+							opened++;
+						},
+					}),
+				),
+			);
+		});
+
+		const anchor = Array.from(container.querySelectorAll("a")).find((a) =>
+			a.textContent?.includes("Abrir monitor"),
+		);
+		expect(anchor).toBeDefined();
+		const ev = new MouseEvent("click", { bubbles: true, cancelable: true });
+		act(() => {
+			anchor!.dispatchEvent(ev);
+		});
+		expect(ev.defaultPrevented).toBe(true); // NO navega dentro del webview
+		expect(opened).toBe(1); // delegó al host
+		expect(cardClicked).toBe(false); // stopPropagation: sin submit /pipeline
+
+		act(() => {
+			root.unmount();
+		});
+	});
 });

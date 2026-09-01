@@ -552,6 +552,11 @@ export function App() {
 							setConfigOpen(true);
 							setSettingsTab(tab);
 						}}
+						// #195 — el click del «Abrir monitor» viaja al host (openExternal):
+						// el webview no puede navegar a URLs externas.
+						onOpenMonitor={() =>
+							post({ type: "open_external", url: state.monitorUrl ?? "" })
+						}
 						workspace={state.workspace}
 						monitorUrl={state.monitorUrl}
 					/>

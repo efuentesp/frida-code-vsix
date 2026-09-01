@@ -368,12 +368,17 @@ export function Welcome({
 	onPrompt,
 	onInsert,
 	onOpenSettings,
+	onOpenMonitor,
 	workspace,
 	monitorUrl,
 }: {
 	onPrompt?: (text: string) => void;
 	onInsert?: (text: string) => void;
 	onOpenSettings?: (tab: SettingsTab) => void;
+	/** #195 — Apertura del monitor en el navegador externo: los webviews no
+	 *  pueden navegar a URLs externas (ancla muerta); el click lo delega el
+	 *  host con vscode.env.openExternal. */
+	onOpenMonitor?: () => void;
 	workspace?: WorkspaceInfo;
 	/** FR#10 — URL del monitor del pipeline (mensaje monitor_url del host);
 	 *  habilita el ancla «Abrir monitor ↗» de la tarjeta SDD. */
@@ -511,19 +516,23 @@ export function Welcome({
 									)}
 								</div>
 								<p className="starter-card-desc">{c.desc}</p>
-								{/* FR#10 — ancla al monitor del pipeline: la URL llega por el
-							 mensaje monitor_url (host → webview). Ancla nativa <a href>:
-							 abre en el navegador externo (patrón banner OAuth,
-							 App.tsx:494-510). stopPropagation: el click NO debe disparar
-							 el submit /pipeline de la tarjeta contenedora. Estilos inline:
-							 este slice no toca styles.css (sólo S5). */}
-								{c.id === "sdd-autonomous" && monitorUrl && (
-									<a
-										href={monitorUrl}
-										target="_blank"
-										rel="noreferrer"
-										title="Abrir el monitor del pipeline (N1 + N2) en el navegador"
-										onClick={(e) => e.stopPropagation()}
+									{/* FR#10 — ancla al monitor del pipeline: la URL llega por el
+									 mensaje monitor_url (host → webview). #195 — el webview NO puede
+									 navegar a URLs externas: interceptar el click y delegar al host
+									 (openExternal). href queda como respaldo visual/accesibilidad.
+									 stopPropagation: el click NO debe disparar el submit /pipeline de
+									 la tarjeta contenedora. */}
+									{c.id === "sdd-autonomous" && monitorUrl && (
+										<a
+											href={monitorUrl}
+											target="_blank"
+											rel="noreferrer"
+											title="Abrir el monitor del pipeline (N1 + N2) en el navegador"
+											onClick={(e) => {
+												e.stopPropagation();
+												e.preventDefault();
+												onOpenMonitor?.();
+											}}
 										style={{
 											display: "inline-flex",
 											alignItems: "center",

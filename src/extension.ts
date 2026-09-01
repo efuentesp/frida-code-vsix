@@ -3032,6 +3032,26 @@ export async function activate(
 
 	async function handleWebviewMessage(msg: any): Promise<void> {
 		switch (msg?.type) {
+			// #195 — «Abrir monitor»: los webviews no pueden navegar a URLs
+			// externas (ancla nativa muerta); el host abre el navegador con
+			// openExternal. Allowlist estricta: el monitor del pipeline es
+			// loopback http — nada más se abre.
+			case "open_external": {
+				const raw = (msg as { url?: unknown }).url;
+				if (typeof raw !== "string") break;
+				try {
+					const u = new URL(raw);
+					if (
+						u.protocol === "http:" &&
+						(u.hostname === "127.0.0.1" || u.hostname === "localhost")
+					) {
+						void vscode.env.openExternal(vscode.Uri.parse(raw));
+					}
+				} catch {
+					/* URL inválida: ignorar — el webview nunca debería mandarla */
+				}
+				break;
+			}
 			case "webview_ready":
 				webviewReady = true;
 				post({ type: "mode", mode: approvalMode });

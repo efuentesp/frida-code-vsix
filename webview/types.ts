@@ -1363,6 +1363,7 @@ export type InMessage =
 // webview → host
 export type OutMessage =
 	| { type: "webview_ready" }
+	| { type: "open_external"; url: string }
 	| {
 			type: "ccplugins_panel_action";
 			id: string;
