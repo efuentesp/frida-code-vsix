@@ -153,6 +153,8 @@ color:var(--vscode-descriptionForeground)}
 .empty{padding:8px;border:1px dashed var(--vscode-widget-border);border-radius:6px;
 color:var(--vscode-descriptionForeground);font-size:11px;max-width:640px}
 .cmdrow{display:flex;align-items:center;gap:8px;margin-top:6px}
+.newfeat{display:flex;gap:8px;margin:0 0 12px}
+.newfeat .idea{flex:1;background:var(--vscode-input-background,transparent);color:var(--vscode-input-foreground,inherit);border:1px solid var(--vscode-input-border,rgba(128,128,128,.35));border-radius:4px;padding:6px 8px;font:inherit}
 .cmd{font-size:10px;color:var(--vscode-descriptionForeground);opacity:.9}
 /* Board N2 (espejo kb-*). */
 .board{margin-bottom:14px}
@@ -281,6 +283,9 @@ var snapshot = null;
 var conn = "connecting";
 var warnings = {}; /* key → texto (memoria de sesión en JS, FR#14) */
 var openDetails = {}; /* fid → true: <details> abiertos que sobreviven SSE */
+var pendingDiscover = false; /* #194 — guard: botón «+ Nueva feature» ocupado */
+var discoverTimer = null; /* timeout de seguridad (la skill puede tardar) */
+var lastFeatureCount = -1; /* para detectar la llegada de la tarjeta nueva */
 var toast = null;
 var toastTimer = null;
 
@@ -421,18 +426,32 @@ function cardHtml(f, sp) {
   detailHtml(f, sp) +
   "</div>";
 }
+/* #194 — «+ Nueva feature»: captura la idea EN el navegador y la convierte
+ * en /skill:discover <idea> en el chat del host (mismo canal del ▶). El FRD
+ * que genera la skill lo adopta el reconciler → tarjeta en discover, en
+ * vivo por SSE. Guard: deshabilitado hasta que llegue la tarjeta (o 90 s). */
+function newFeatHtml() {
+ var busy = pendingDiscover;
+ return '<form class="newfeat" id="newfeat">' +
+  '<input name="idea" class="idea" type="text" maxlength="300" placeholder="Idea de la nueva feature — /skill:discover la correrá en el host"' +
+  (busy ? " disabled" : "") + ">" +
+  '<button class="btn primary" type="submit"' + (busy ? " disabled" : "") +
+  ' title="Arranca /skill:discover con esta idea en el chat de Frida">' +
+  (busy ? "⏳ esperando tarjeta…" : "＋ Nueva feature") + "</button></form>";
+}
 function n1Html() {
  if (!snapshot) return '<p class="empty">cargando estado…</p>';
  var sp = spec();
  var feats = snapshot.features || [];
  var desyncCount = 0;
  for (var i = 0; i < feats.length; i++) if (feats[i].desync) desyncCount++;
+ var form = newFeatHtml();
  var head = '<h2 class="sec">N1 · Planeación <span class="metric">(' + feats.length + ")</span>" +
   (desyncCount ? ' <span class="badge warn" title="el FS va por delante de la tarjeta — usa ▶ para alcanzarla">desinc ' + desyncCount + "</span>" : "") +
   "</h2>";
  if (!feats.length) {
   /* FR#15: el comando que llena el vacío, con botón accionable (copiar). */
-  return head + '<div class="empty"><p>' + esc(sp.emptyState.hint || "") + "</p>" +
+  return head + form + '<div class="empty"><p>' + esc(sp.emptyState.hint || "") + "</p>" +
    '<div class="cmdrow"><code class="cmd">' + esc(sp.emptyState.command) + "</code>" +
    '<button class="btn sm" data-action="copy" data-copy="' + esc(sp.emptyState.command) +
    '" title="Copiar el comando al portapapeles y pegarlo en el chat de Frida">Copiar</button></div></div>';
@@ -448,7 +467,7 @@ function n1Html() {
    accentOf(col.id) + '"></span>' + esc(col.label) + ' <span class="metric">(' + inCol.length +
    ")</span></div>" + cards + "</div>";
  }
- return head + '<div class="cols">' + cols + "</div>";
+ return head + form + '<div class="cols">' + cols + "</div>";
 }
 function unitHtml(u, kidsBy) {
  var kids = kidsBy[u.id] || [];
@@ -530,6 +549,13 @@ function reopenDetails() {
 
 function render() {
  syncOpen();
+ /* #194 — la tarjeta nueva del discover llegó por SSE: liberar el botón. */
+ var count = snapshot && snapshot.features ? snapshot.features.length : -1;
+ if (pendingDiscover && lastFeatureCount >= 0 && count > lastFeatureCount) {
+  pendingDiscover = false;
+  if (discoverTimer) { clearTimeout(discoverTimer); discoverTimer = null; }
+ }
+ lastFeatureCount = count;
  var connEl = document.getElementById("conn");
  connEl.className = "conn " + conn;
  connEl.textContent = connLabel();
@@ -621,6 +647,37 @@ document.addEventListener("click", function (ev) {
  else if (a === "pause") doPause(id);
  else if (a === "copy") doCopy(el.getAttribute("data-copy"));
  else if (a === "dismiss") { delete warnings[id]; render(); }
+});
+
+/* #194 — submit del form «+ Nueva feature» (delegación global: sobrevive el
+ * re-render por SSE). La idea viaja como /skill:discover <idea> al host. */
+document.addEventListener("submit", function (ev) {
+ var form = ev.target.closest("form#newfeat");
+ if (!form) return;
+ ev.preventDefault();
+ if (pendingDiscover) return;
+ var input = form.elements.idea;
+ var idea = input ? String(input.value || "").trim() : "";
+ if (!idea) { setToast("Escribe la idea primero", "warn"); return; }
+ pendingDiscover = true;
+ render();
+ discoverTimer = setTimeout(function () {
+  if (pendingDiscover) { pendingDiscover = false; render(); }
+ }, 90000);
+ post("/api/discover", { idea: idea }).then(function (res) {
+  if (res && res.injected) {
+   setToast("Comando enviado al chat de Frida: " + res.command +
+    " — la tarjeta aparece aquí al terminar la skill");
+  } else {
+   pendingDiscover = false;
+   if (discoverTimer) { clearTimeout(discoverTimer); discoverTimer = null; }
+   render();
+  }
+ }).catch(function () {
+  pendingDiscover = false;
+  if (discoverTimer) { clearTimeout(discoverTimer); discoverTimer = null; }
+  setToast("POST /api/discover falló — ¿host vivo?", "warn");
+ });
 });
 
 var es = new EventSource("/events");

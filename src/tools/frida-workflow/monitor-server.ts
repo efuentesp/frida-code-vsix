@@ -528,6 +528,23 @@ export async function startPipelineMonitor(
 			sendJson(res, 400, { error: "cuerpo JSON inválido" });
 			return;
 		}
+
+		// #194 — Arrancar un discover desde el monitor web: la idea viaja como
+		// texto del comando (saltos colapsados, longitud acotada); el resto del
+		// pipeline (FRD → reconciler → tarjeta) es el mismo canal del ▶.
+		if (url.pathname === "/api/discover") {
+			const idea = (body as { idea?: unknown }).idea;
+			if (typeof idea !== "string" || !idea.trim()) {
+				sendJson(res, 400, { error: "idea requerida (texto no vacío)" });
+				return;
+			}
+			const clean = idea.replace(/\s+/g, " ").trim().slice(0, 300);
+			const command = `/skill:discover ${clean}`;
+			options.onCommand?.(command);
+			sendJson(res, 200, { injected: true, command });
+			return;
+		}
+
 		const id = (body as { id?: unknown }).id;
 		if (typeof id !== "string" || !id.trim()) {
 			sendJson(res, 400, { error: "id requerido (ruta relativa del FRD)" });

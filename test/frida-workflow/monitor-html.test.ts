@@ -89,3 +89,22 @@ describe("/sdd — fallback y detalle FR#16 (degradación sin host)", () => {
 		expect(html).toContain("&amp;"); // tabla de escape en esc()
 	});
 });
+
+// ── #194 — «+ Nueva feature»: capturar la idea en el navegador ─────────────
+describe("/sdd — «+ Nueva feature» (#194)", () => {
+	it("form con input de idea y botón submit junto a N1", () => {
+		const html = renderSddPage(TOKEN);
+		expect(html).toContain('id="newfeat"');
+		expect(html).toContain('name="idea"');
+		expect(html).toContain('maxlength="300"');
+		expect(html).toContain("＋ Nueva feature");
+	});
+
+	it("POST /api/discover con guard y timeout de seguridad", () => {
+		const html = renderSddPage(TOKEN);
+		expect(html).toContain('"/api/discover"');
+		expect(html).toContain("pendingDiscover");
+		expect(html).toContain("form#newfeat"); // delegación global de submit
+		expect(html).toContain("90000"); // timeout: la skill puede tardar
+	});
+});

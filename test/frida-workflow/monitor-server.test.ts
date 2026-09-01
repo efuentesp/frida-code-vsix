@@ -489,3 +489,38 @@ describe("workspace limpio — adopción diferida (NFR reliability)", () => {
 		expect(adopted.features[0].id).toBe(FRD);
 	});
 });
+
+// ── #194 — Arrancar /skill:discover desde el monitor web ────────────────────
+describe("api/discover (#194)", () => {
+	it("inyecta /skill:discover con la idea sanitizada (saltos colapsados, trim)", async () => {
+		const commands: string[] = [];
+		const h = await startMonitor((c) => commands.push(c));
+		const res = await postJson(
+			h,
+			"api/discover",
+			{ idea: "  exportar\n\nPDF   del monitor  " },
+			h.token,
+		);
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { injected: boolean; command: string };
+		expect(data.injected).toBe(true);
+		expect(data.command).toBe("/skill:discover exportar PDF del monitor");
+		expect(commands).toEqual(["/skill:discover exportar PDF del monitor"]);
+	});
+
+	it("idea larga se trunca a 300 caracteres (coincide con el maxlength del input)", async () => {
+		const h = await startMonitor();
+		const res = await postJson(h, "api/discover", { idea: "x".repeat(350) }, h.token);
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as { command: string };
+		expect(data.command).toBe(`/skill:discover ${"x".repeat(300)}`);
+	});
+
+	it("400 sin idea o vacía; 401 sin token", async () => {
+		const h = await startMonitor();
+		expect((await postJson(h, "api/discover", { idea: "algo" })).status).toBe(401);
+		expect((await postJson(h, "api/discover", { idea: "   " }, h.token)).status).toBe(400);
+		expect((await postJson(h, "api/discover", {}, h.token)).status).toBe(400);
+		expect((await postJson(h, "api/discover", { idea: 42 }, h.token)).status).toBe(400);
+	});
+});
