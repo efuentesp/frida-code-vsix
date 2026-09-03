@@ -516,23 +516,23 @@ export function Welcome({
 									)}
 								</div>
 								<p className="starter-card-desc">{c.desc}</p>
-									{/* FR#10 — ancla al monitor del pipeline: la URL llega por el
+								{/* FR#10 — ancla al monitor del pipeline: la URL llega por el
 									 mensaje monitor_url (host → webview). #195 — el webview NO puede
 									 navegar a URLs externas: interceptar el click y delegar al host
 									 (openExternal). href queda como respaldo visual/accesibilidad.
 									 stopPropagation: el click NO debe disparar el submit /pipeline de
 									 la tarjeta contenedora. */}
-									{c.id === "sdd-autonomous" && monitorUrl && (
-										<a
-											href={monitorUrl}
-											target="_blank"
-											rel="noreferrer"
-											title="Abrir el monitor del pipeline (N1 + N2) en el navegador"
-											onClick={(e) => {
-												e.stopPropagation();
-												e.preventDefault();
-												onOpenMonitor?.();
-											}}
+								{c.id === "sdd-autonomous" && monitorUrl && (
+									<a
+										href={monitorUrl}
+										target="_blank"
+										rel="noreferrer"
+										title="Abrir el monitor del pipeline (N1 + N2) en el navegador"
+										onClick={(e) => {
+											e.stopPropagation();
+											e.preventDefault();
+											onOpenMonitor?.();
+										}}
 										style={{
 											display: "inline-flex",
 											alignItems: "center",

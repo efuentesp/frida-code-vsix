@@ -510,7 +510,12 @@ describe("api/discover (#194)", () => {
 
 	it("idea larga se trunca a 300 caracteres (coincide con el maxlength del input)", async () => {
 		const h = await startMonitor();
-		const res = await postJson(h, "api/discover", { idea: "x".repeat(350) }, h.token);
+		const res = await postJson(
+			h,
+			"api/discover",
+			{ idea: "x".repeat(350) },
+			h.token,
+		);
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as { command: string };
 		expect(data.command).toBe(`/skill:discover ${"x".repeat(300)}`);
@@ -518,9 +523,15 @@ describe("api/discover (#194)", () => {
 
 	it("400 sin idea o vacía; 401 sin token", async () => {
 		const h = await startMonitor();
-		expect((await postJson(h, "api/discover", { idea: "algo" })).status).toBe(401);
-		expect((await postJson(h, "api/discover", { idea: "   " }, h.token)).status).toBe(400);
+		expect((await postJson(h, "api/discover", { idea: "algo" })).status).toBe(
+			401,
+		);
+		expect(
+			(await postJson(h, "api/discover", { idea: "   " }, h.token)).status,
+		).toBe(400);
 		expect((await postJson(h, "api/discover", {}, h.token)).status).toBe(400);
-		expect((await postJson(h, "api/discover", { idea: 42 }, h.token)).status).toBe(400);
+		expect(
+			(await postJson(h, "api/discover", { idea: 42 }, h.token)).status,
+		).toBe(400);
 	});
 });
