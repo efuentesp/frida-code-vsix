@@ -25,6 +25,8 @@ type EventBus = { emit?: (name: string, payload: unknown) => unknown };
  * resultado y puede continuar. No-op si el runtime no expone sendMessage.
  */
 export function deliverFollowUp(pi: ExtensionAPI, content: string): void {
+	// SAFETY: el SDK no tipa sendMessage en ExtensionAPI (existe en runtime);
+	// el cast estructural sólo declara la firma conocida y se valida con typeof.
 	const send = (
 		pi as unknown as {
 			sendMessage?: (
@@ -34,10 +36,17 @@ export function deliverFollowUp(pi: ExtensionAPI, content: string): void {
 		}
 	).sendMessage;
 	if (typeof send !== "function") return;
-	send(
-		{ customType: WORKFLOW_MSG_TYPE, content, display: true },
-		{ deliverAs: "followUp", triggerTurn: true },
-	);
+	try {
+		send(
+			{ customType: WORKFLOW_MSG_TYPE, content, display: true },
+			{ deliverAs: "followUp", triggerTurn: true },
+		);
+	} catch {
+		/* Best-effort: si la sesión que lanzó la run ya no existe (newSession/
+		 * switchSession/reload), el follow-up no tiene destino. La run YA
+		 * completó — no debe marcarse failed por una entrega imposible. El
+		 * resultado persiste en el RunStore y el panel/store lo refleja. */
+	}
 }
 
 /**
@@ -51,6 +60,8 @@ export function emitWorkflowEvent(
 	payload: JsonValue,
 ): void {
 	try {
+		// SAFETY: el bus de eventos es opcional según el runtime (algunos hosts
+		// no lo exponen); el cast declara la forma defensiva y todo va con ?.
 		const events = (pi as unknown as { events?: EventBus }).events;
 		events?.emit?.(name, payload);
 	} catch {
@@ -83,6 +94,14 @@ export function unregisterBackgroundRun(runId: string): void {
 
 export function listBackgroundRunIds(): string[] {
 	return [...backgroundRuns.keys()];
+}
+
+/** Cancela una run en background activa por su runId desde la UI (#85). */
+export function stopWorkflowRun(runId: string): boolean {
+	const run = getBackgroundRun(runId);
+	if (!run) return false;
+	run.controller.abort();
+	return true;
 }
 
 /** Sólo tests. */

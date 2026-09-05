@@ -154,7 +154,10 @@ import {
 	runCustomCommand,
 	subscribeWorkflowRuns as subscribeFridaWorkflowRuns,
 } from "./tools/frida-workflow/store";
-import { wireExtensibleWorkflowPanel } from "./tools/frida-extensible-workflows/panel";
+import {
+	wireExtensibleWorkflowPanel,
+	remountExtensibleWorkflowPanel,
+} from "./tools/frida-extensible-workflows/panel";
 import {
 	findBuiltinPattern,
 	builtinPatternsCatalog,
@@ -3102,6 +3105,10 @@ export async function activate(
 					// workflows se pierde al recrearse la webview — re-montarlo para que
 					// el panel reaparezca (con los runs que el store ya conserva).
 					remountWorkflowPanel(s.webBridge);
+					// Issue #7 (reapertura) — idem para el panel del tool `workflow`
+					// (frida-extensible-workflows): sin este re-montaje, el panel sólo
+					// vivía en la primera sesión/webview del host.
+					remountExtensibleWorkflowPanel(s.webBridge);
 					// Pipeline N1 (lección ba40da0): re-montaje idempotente si estaba
 					// abierto; su cascada re-ordena board/workflow debajo (D8).
 					pipelineRemount?.();

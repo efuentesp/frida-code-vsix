@@ -68,6 +68,23 @@ function defaultChildAuditAppender(): ForensicAppender {
 	return childAuditAppender;
 }
 
+/** Regresión portal-remesas/SIV 2026-09-04: hijas del workflow (refiner) que
+ *  terminan SIN texto bajo gpt-5.6-sol. El nullDiagnostic ya se computaba en
+ *  el spawner pero createWorkflowBridge lo descartaba → el journal sólo
+ *  registraba null y el fallo era indiagnosticable (stopReason/bloques del
+ *  último mensaje se perdían). Una línea por evento, best-effort. */
+let nullAgentAppender: ForensicAppender | undefined;
+function nullAgentLog(line: string): void {
+	try {
+		nullAgentAppender ??= createForensicAppender({
+			file: forensicLogPath("workflow-null-agents.log"),
+		});
+		nullAgentAppender.append(line);
+	} catch {
+		/* forense best-effort: nunca rompe el spawn */
+	}
+}
+
 /** #91 E2: extensionFactories para las sesiones HIJAS del workflow. Antes el
  *  DefaultResourceLoader del spawner iba SIN factories → cero hooks → los
  *  REQUESTs/HTTP de los agentes del workflow eran invisibles al provider-audit
@@ -304,6 +321,8 @@ export function createWorkflowBridge(
 type AnyMessage = { role?: string; stopReason?: string; content?: unknown };
 
 function sessionMessages(session: AgentSession): AnyMessage[] {
+	// SAFETY: AgentSession no expone state.messages en su tipo público; el
+	// cast declara la forma interna estable del SDK y todo va con ?/??.
 	return (
 		(
 			session as unknown as {
@@ -385,6 +404,7 @@ export function summarizeLastAssistant(
 
 /** Extrae el valor (texto) del último mensaje asistente de la sesión. */
 function lastAssistantValue(session: AgentSession): JsonValue {
+	// SAFETY: idem sessionMessages — forma interna no tipada por el SDK.
 	const messages =
 		(
 			session as unknown as {
@@ -408,19 +428,34 @@ export function createFridaAgentSpawner(
 ): SpawnAgentFn {
 	const roles =
 		opts?.roles ?? loadAgentDefinitions(ctx.cwd, fridaDefaultAgentDir(), true);
+	// STALE-CTX (repro: conteo COSMIC SIV 2026-09-04 16:34 — AGENT_FAILED
+	// "This extension ctx is stale after session replacement or reload"):
+	// las runs en BACKGROUND viven más que la sesión que las lanzó. Tras
+	// newSession()/switchSession()/reload() del host, TODO acceso al ctx
+	// capturado (ctx.cwd, ctx.modelRegistry, ctx.model) lanza. Se capturan los
+	// valores UNA vez aquí — con el ctx aún vivo, en pleno execute del tool — y
+	// el spawn sólo usa la copia (strings y referencias a objetos que no pasan
+	// por el proxy de staleness del SDK).
+	const capturedCwd: string = ctx.cwd;
+	// SAFETY: ModelRegistry no declara runtime en el tipo público del SDK;
+	// el cast declara la forma conocida (existe en runtime) y ?? tolera su ausencia.
+	const parentModelRuntime: ModelRuntime | undefined = (
+		ctx.modelRegistry as unknown as { runtime?: ModelRuntime }
+	).runtime;
+	const parentModel = ctx.model;
 	return async (prompt, options, signal) => {
 		const agentDir = fridaDefaultAgentDir();
-		const sessionManager = SessionManager.inMemory(ctx.cwd);
-		const settingsManager = SettingsManager.create(ctx.cwd, agentDir);
+		const sessionManager = SessionManager.inMemory(capturedCwd);
+		const settingsManager = SettingsManager.create(capturedCwd, agentDir);
 		const resourceLoader = new DefaultResourceLoader({
-			cwd: ctx.cwd,
+			cwd: capturedCwd,
 			agentDir,
 			settingsManager,
 			// #91 E2: sin factories las hijas corrían CERO hooks — los REQUESTs/HTTP
 			// de los agentes del workflow eran invisibles al provider-audit y las
 			// llamadas a frida-enterprise salían sin user_id/email (422 del gateway).
 			extensionFactories:
-				opts?.extensionFactories ?? createWorkflowChildFactories(ctx.cwd),
+				opts?.extensionFactories ?? createWorkflowChildFactories(capturedCwd),
 		});
 		// CRÍTICO: DefaultResourceLoader DEBE recargarse explícitamente cuando se
 		// pasa como parámetro propio a createAgentSession (el SDK sólo llama reload
@@ -429,14 +464,11 @@ export function createFridaAgentSpawner(
 		await resourceLoader.reload();
 		// ADR-0010/0022: las API keys de providers con SecretStorage viven en el
 		// runtime del padre; sin propagar modelRuntime, la hija falla con
-		// "No API key found".
-		const parentModelRuntime = (
-			ctx.modelRegistry as unknown as { runtime?: ModelRuntime }
-		).runtime;
+		// "No API key found". (Valor capturado al crear el spawner — ver STALE-CTX.)
 		// #19 Lote 2: aliases efectivos de settings (tier → modelo). Se leen por
 		// spawn (lectura barata de settings resueltos) para que un cambio en el
 		// archivo aplique sin recargar la sesión.
-		const modelAliases = resolveWorkflowSettings(ctx.cwd, true).effective
+		const modelAliases = resolveWorkflowSettings(capturedCwd, true).effective
 			.modelAliases;
 		const overrides = resolveRoleOverrides(options, roles, modelAliases);
 		// #97: overrides.model llega como STRING (alias/id de role/tier/model en
@@ -444,8 +476,8 @@ export function createFridaAgentSpawner(
 		// any (pi-ai no resolvía) y un string habría crasheado al primer uso de
 		// model.provider. Resolvemos vía el ModelRuntime del padre (formato
 		// "provider/model-id" o id pelado); si no resuelve, se omite y el SDK
-		// aplica su selección inicial.
-		const rawModel = (overrides.model as string | undefined) ?? ctx.model;
+		// aplica su selección inicial. (Valor capturado — ver STALE-CTX.)
+		const rawModel = (overrides.model as string | undefined) ?? parentModel;
 		let sessionModel: Model<import("@earendil-works/pi-ai").Api> | undefined;
 		if (typeof rawModel === "string") {
 			const slash = rawModel.indexOf("/");
@@ -457,7 +489,7 @@ export function createFridaAgentSpawner(
 		}
 
 		const { session } = await createAgentSession({
-			cwd: ctx.cwd,
+			cwd: capturedCwd,
 			agentDir,
 			sessionManager,
 			settingsManager,
@@ -476,6 +508,8 @@ export function createFridaAgentSpawner(
 		await (session as any).bindExtensions?.({ mode: "print" });
 
 		// Abort del workflow (señal del tool padre) → abort de la sesión hija.
+		// SAFETY: abort/dispose existen en runtime pero no en el tipo público de
+		// AgentSession; el cast declara la forma defensiva (todo opcional).
 		const sessionAbort = session as unknown as {
 			abort(): Promise<void> | void;
 			dispose?(): Promise<void> | void;
@@ -495,6 +529,22 @@ export function createFridaAgentSpawner(
 			// `usage`. getSessionStats() agrega TODAS las entries (incluida historia
 			// compactada) → refleja lo realmente facturado. Se lee antes del dispose.
 			const accounting = sessionStatsToAccounting(session.getSessionStats());
+			// #91 + regresión 2026-09-04: evidencia forense del hijo sin texto ANTES
+			// de que el bridge descarte el nullDiagnostic (stopReason, bloques y
+			// slice del thinking del último assistant — la pista de si fue un stream
+			// muerto a mitad de generación, thinking-only, o error del proveedor).
+			if (value === null) {
+				const diag = summarizeLastAssistant(sessionMessages(session));
+				// SAFETY: rawModel es string (alias) o Model ({id}) según el override;
+				// el cast declara la forma mínima para el log y ?? cubre ambos casos.
+				const modelId =
+					typeof rawModel === "string"
+						? rawModel
+						: ((rawModel as { id?: string } | undefined)?.id ?? "heredado");
+				nullAgentLog(
+					`[${new Date().toISOString()}] label=${options.label ?? "(sin label)"} model=${modelId} → HIJO SIN TEXTO — ${diag}`,
+				);
+			}
 			return spawnResult(value, {
 				accounting,
 				durationMs: Date.now() - startedAt,

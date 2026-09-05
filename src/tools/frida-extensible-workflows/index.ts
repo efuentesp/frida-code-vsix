@@ -340,9 +340,16 @@ export function createFridaExtensibleWorkflows(
 					// con moat undefined la composición ES la base — idéntico al
 					// comportamiento previo.
 					const spawnAgent = buildSpawner(ctx, moat);
+					// STALE-CTX (ver frida-agent-execution.ts): createSpawnerForCwd se
+					// invoca DENTRO de la run (withWorktree) y el spread {...ctx} sobre
+					// un ctx ya caducado lanzaría. Se congela un snapshot plano con el ctx
+					// aún vivo (los getters se evalúan AQUÍ) y los re-spawns usan la copia.
+					// SAFETY: el snapshot sólo alimenta a buildSpawner, que lee
+					// cwd/modelRegistry/model (capturados eager en createFridaAgentSpawner).
+					const ctxSnapshot = { ...ctx } as typeof ctx;
 					// Fase 6: permite que los agentes de un withWorktree corran en el path del worktree.
 					const createSpawnerForCwd = (worktreeCwd: string) =>
-						buildSpawner({ ...ctx, cwd: worktreeCwd }, moat);
+						buildSpawner({ ...ctxSnapshot, cwd: worktreeCwd }, moat);
 
 					// Fase 5: notificador de checkpoints (entrega follow-up pidiendo aprobación).
 					const onCheckpoint: CheckpointNotifier = (cp) => {
