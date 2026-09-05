@@ -11213,6 +11213,69 @@ mark.hl {
 	word-break: break-all;
 }
 
+/* ── WorkflowPanel: Tree View nativo Copilot / VS Code ── */
+.wf-tree-container {
+	margin-top: 4px;
+}
+
+.wf-tree-row {
+	cursor: pointer;
+	border-radius: 4px;
+	user-select: none;
+	transition: background-color 0.1s ease;
+}
+
+.wf-tree-row:hover {
+	background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+
+.wf-tree-row.non-clickable {
+	cursor: default;
+}
+
+.wf-tree-row.non-clickable:hover {
+	background: transparent;
+}
+
+.wf-tree-children {
+	border-inline-start: 1px solid var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.25));
+	margin-left: 10px;
+	padding-left: 8px;
+}
+
+.wf-metric-text {
+	color: var(--vscode-descriptionForeground, #8b949e);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.wf-badge-chip {
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 10px;
+	line-height: 14px;
+	color: var(--vscode-badge-foreground, var(--vscode-foreground));
+	background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+	border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+	font-variant-numeric: tabular-nums;
+}
+
+.wf-stop-icon-only {
+	cursor: pointer;
+	opacity: 0.7;
+	padding: 2px 4px;
+	border-radius: 3px;
+	display: inline-flex;
+	align-items: center;
+	transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+
+.wf-stop-icon-only:hover {
+	opacity: 1;
+	background: rgba(241, 76, 76, 0.15);
+}
+
 /* ── Web-Friendly Tree & Chip Foundations ────────────────────────────── */
 .ui-chip {
 	display: inline-flex;

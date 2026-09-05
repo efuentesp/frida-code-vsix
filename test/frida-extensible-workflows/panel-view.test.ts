@@ -22,6 +22,10 @@ import {
 	recentFailed,
 	hasPanelContent,
 	pipelineGraph,
+	formatTime,
+	formatCost,
+	agentBadge,
+	buildWorkflowTree,
 } from "../../src/tools/frida-extensible-workflows/panel-view";
 import {
 	applyWorkflowProgress,
@@ -754,5 +758,156 @@ describe("frida-extensible-workflows · pipelineGraph (Propuesta 1)", () => {
 			state: "pending",
 			isLast: true,
 		});
+	});
+});
+
+describe("frida-extensible-workflows · Tree View helpers (formatTime, formatCost, agentBadge, buildWorkflowTree)", () => {
+	it("formatTime formatea mm:ss y hh:mm:ss consistentemente", () => {
+		expect(formatTime(undefined)).toBe("--:--");
+		expect(formatTime(0)).toBe("00:00");
+		expect(formatTime(3_000)).toBe("00:03");
+		expect(formatTime(143_000)).toBe("02:23");
+		expect(formatTime(358_000)).toBe("05:58");
+		expect(formatTime(647_000)).toBe("10:47");
+		expect(formatTime(3665_000)).toBe("01:01:05");
+	});
+
+	it("formatCost formatea montos en dólares o string vacío si es 0", () => {
+		expect(formatCost(undefined)).toBe("");
+		expect(formatCost(0)).toBe("");
+		expect(formatCost(0.004)).toBe("$0.004");
+		expect(formatCost(0.007)).toBe("$0.007");
+		expect(formatCost(0.02)).toBe("$0.02");
+		expect(formatCost(0.05)).toBe("$0.05");
+	});
+
+	it("agentBadge prioriza model:effort, luego tier:effort, luego role", () => {
+		expect(
+			agentBadge({
+				model: "softtek-devengine/glm-5.3-flash",
+				effort: "low",
+			}),
+		).toBe("glm-5.3-flash:low");
+		expect(
+			agentBadge({
+				tier: "small",
+				effort: "high",
+			}),
+		).toBe("small:high");
+		expect(
+			agentBadge({
+				role: "refiner",
+			}),
+		).toBe("refiner");
+		expect(agentBadge({})).toBeUndefined();
+	});
+
+	it("buildWorkflowTree construye jerarquía limpia con fases y agregados de tokens/costo", () => {
+		const tree = buildWorkflowTree(
+			{
+				runId: "run-cosmic",
+				workflowName: "cosmic-sizing",
+				state: "running",
+				phase: "Ronda 1/3 — conteo (selectivo)",
+				phases: [
+					"Cargando método (skills)",
+					"Modo A — escribiendo requirements",
+					"Ronda 1/3 — conteo (selectivo)",
+				],
+				phaseTimes: {
+					"Cargando método (skills)": { startedAt: 0, endedAt: 3_000 },
+					"Modo A — escribiendo requirements": {
+						startedAt: 3_000,
+						endedAt: 361_000,
+					},
+					"Ronda 1/3 — conteo (selectivo)": { startedAt: 361_000 },
+				},
+				agents: [
+					{
+						agentId: "a1",
+						structuralPath: ["root"],
+						label: "refinar-A-escritura",
+						phase: "Modo A — escribiendo requirements",
+						state: "completed",
+						startedAt: 4_000,
+						endedAt: 360_000,
+						tokens: 140_000,
+						cost: 0.02,
+						model: "glm-5.3-flash",
+						effort: "low",
+					},
+					{
+						agentId: "a2",
+						structuralPath: ["root", "conteo", "c1"],
+						label: "conteo-r1-1",
+						phase: "Ronda 1/3 — conteo (selectivo)",
+						state: "completed",
+						startedAt: 362_000,
+						endedAt: 505_000,
+						tokens: 60_000,
+						cost: 0.007,
+						model: "glm-5.3-flash",
+						effort: "low",
+					},
+					{
+						agentId: "a3",
+						structuralPath: ["root", "conteo", "c2"],
+						label: "conteo-r1-2",
+						phase: "Ronda 1/3 — conteo (selectivo)",
+						state: "running",
+						startedAt: 362_000,
+						model: "glm-5.3-flash",
+						effort: "low",
+					},
+				],
+				groups: [],
+				tokens: 200_000,
+				costUsd: 0.027,
+				startedAt: 0,
+				lastActivityAt: 520_000,
+			},
+			520_000,
+		);
+
+		expect(tree.phases).toHaveLength(3);
+		// Fase 0: sin agentes
+		expect(tree.phases[0]).toMatchObject({
+			name: "Cargando método (skills)",
+			state: "done",
+			durationMs: 3_000,
+			tokens: 0,
+			costUsd: 0,
+			agents: [],
+		});
+		// Fase 1: 1 agente completado
+		expect(tree.phases[1]).toMatchObject({
+			name: "Modo A — escribiendo requirements",
+			state: "done",
+			durationMs: 358_000,
+			tokens: 140_000,
+			costUsd: 0.02,
+		});
+		expect(tree.phases[1].agents).toHaveLength(1);
+		expect(tree.phases[1].agents[0]).toMatchObject({
+			label: "refinar-A-escritura",
+			badge: "glm-5.3-flash:low",
+			state: "completed",
+			durationMs: 356_000,
+		});
+		// Fase 2: 2 agentes (1 completed, 1 running) -> fase en running
+		expect(tree.phases[2]).toMatchObject({
+			name: "Ronda 1/3 — conteo (selectivo)",
+			state: "current",
+			tokens: 60_000,
+			costUsd: 0.007,
+		});
+		expect(tree.phases[2].agents).toHaveLength(2);
+		expect(tree.phases[2].agents[0].label).toBe("conteo-r1-1");
+		expect(tree.phases[2].agents[1].label).toBe("conteo-r1-2");
+		expect(tree.phases[2].agents[1].state).toBe("running");
+
+		// Totales
+		expect(tree.totalTokens).toBe(200_000);
+		expect(tree.totalCostUsd).toBe(0.027);
 	});
 });

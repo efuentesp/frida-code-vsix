@@ -396,3 +396,158 @@ export function orphanStatusPill(
 	}
 	return runPill(orphan.state as WorkflowRunState);
 }
+
+// ── Tree View nativo Copilot / VS Code ───────────────────────────────────────
+
+/** Extrae el badge para un agente: modelo:thinking (ej. "glm-5.3-flash:low"),
+ * tier:thinking (ej. "small:low") o role (ej. "refiner"). */
+export function agentBadge(
+	agent: Pick<AgentProgressView, "model" | "tier" | "role" | "effort">,
+): string | undefined {
+	const effort = agent.effort ? `:${agent.effort}` : "";
+	if (agent.model) {
+		const name = agent.model.includes("/")
+			? (agent.model.split("/").pop() ?? agent.model)
+			: agent.model;
+		return `${name}${effort}`;
+	}
+	if (agent.tier) {
+		return `${agent.tier}${effort}`;
+	}
+	if (agent.role) {
+		return agent.role;
+	}
+	return undefined;
+}
+
+/** Formatea milisegundos a mm:ss o hh:mm:ss ("00:03", "02:23", "05:58", "10:47"). */
+export function formatTime(ms: number | undefined): string {
+	if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "--:--";
+	const totalSec = Math.floor(ms / 1000);
+	const sec = totalSec % 60;
+	const min = Math.floor(totalSec / 60) % 60;
+	const hr = Math.floor(totalSec / 3600);
+	const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
+	if (hr > 0) return `${pad(hr)}:${pad(min)}:${pad(sec)}`;
+	return `${pad(min)}:${pad(sec)}`;
+}
+
+/** Formatea costo USD a string corto ("$0.05", "$0.007", "$0.02"). */
+export function formatCost(usd: number | undefined): string {
+	if (usd === undefined || !Number.isFinite(usd) || usd <= 0) return "";
+	if (usd < 0.01) return `$${usd.toFixed(3)}`;
+	return `$${usd.toFixed(2)}`;
+}
+
+export interface WorkflowTreeAgentNode {
+	agentId: string;
+	label: string;
+	state: AgentProgressState;
+	startedAt: number;
+	endedAt?: number;
+	durationMs: number;
+	badge?: string;
+	tokens?: number;
+	cost?: number;
+}
+
+export interface WorkflowTreePhaseNode {
+	name: string;
+	state: "done" | "current" | "pending";
+	durationMs: number;
+	tokens: number;
+	costUsd: number;
+	agents: readonly WorkflowTreeAgentNode[];
+}
+
+export interface WorkflowTreeData {
+	phases: readonly WorkflowTreePhaseNode[];
+	rootAgents: readonly WorkflowTreeAgentNode[];
+	totalTokens: number;
+	totalCostUsd: number;
+	totalDurationMs: number;
+}
+
+/** Construye la estructura de árbol jerárquico nativo estilo Copilot/VS Code:
+ * Workflow -> Fases (con métricas agregadas) -> Agentes (con chips de modelo y métricas). */
+export function buildWorkflowTree(
+	run: WorkflowRunView,
+	now: number,
+): WorkflowTreeData {
+	const phasesSeen = new Set<string>();
+	const phaseNodes: WorkflowTreePhaseNode[] = run.phases.map((name) => {
+		phasesSeen.add(name);
+		const timing = run.phaseTimes[name];
+		const isCurrent = run.phase === name;
+		const startedAt = timing?.startedAt;
+		const endedAt = timing?.endedAt;
+
+		const phaseAgents = run.agents
+			.filter((a) => a.phase === name)
+			.sort((x, y) => x.startedAt - y.startedAt);
+
+		const agents: WorkflowTreeAgentNode[] = phaseAgents.map((a) => ({
+			agentId: a.agentId,
+			label: agentDisplayName(a),
+			state: a.state,
+			startedAt: a.startedAt,
+			endedAt: a.endedAt,
+			durationMs: Math.max(0, (a.endedAt ?? now) - a.startedAt),
+			badge: agentBadge(a),
+			tokens: a.tokens,
+			cost: a.cost,
+		}));
+
+		const tokens = agents.reduce((sum, a) => sum + (a.tokens ?? 0), 0);
+		const costUsd = agents.reduce((sum, a) => sum + (a.cost ?? 0), 0);
+		const durationMs =
+			startedAt === undefined ? 0 : Math.max(0, (endedAt ?? now) - startedAt);
+
+		let state: WorkflowTreePhaseNode["state"] = "pending";
+		if (
+			agents.some((a) => a.state === "running") ||
+			(isCurrent && run.state === "running")
+		) {
+			state = "current";
+		} else if (startedAt !== undefined || agents.length > 0) {
+			state = "done";
+		}
+
+		return {
+			name,
+			state,
+			durationMs,
+			tokens,
+			costUsd,
+			agents,
+		};
+	});
+
+	const rootAgents: WorkflowTreeAgentNode[] = run.agents
+		.filter((a) => !a.phase || !phasesSeen.has(a.phase))
+		.sort((x, y) => x.startedAt - y.startedAt)
+		.map((a) => ({
+			agentId: a.agentId,
+			label: agentDisplayName(a),
+			state: a.state,
+			startedAt: a.startedAt,
+			endedAt: a.endedAt,
+			durationMs: Math.max(0, (a.endedAt ?? now) - a.startedAt),
+			badge: agentBadge(a),
+			tokens: a.tokens,
+			cost: a.cost,
+		}));
+
+	const totalTokens = run.tokens;
+	const totalCostUsd = run.costUsd;
+	const start = run.startedAt ?? now;
+	const totalDurationMs = Math.max(0, (run.lastActivityAt ?? now) - start);
+
+	return {
+		phases: phaseNodes,
+		rootAgents,
+		totalTokens,
+		totalCostUsd,
+		totalDurationMs,
+	};
+}

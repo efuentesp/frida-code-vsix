@@ -13,7 +13,7 @@
 import { useSyncExternalStore, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { CollapsiblePanel } from "../../frida-webview/CollapsiblePanel";
-import { resolveCheckpointFromUi } from "./frida-delivery";
+import { resolveCheckpointFromUi, stopWorkflowRun } from "./frida-delivery";
 import {
 	purgeOrphans,
 	readOrphanJournal,
@@ -24,7 +24,6 @@ import { wfLog } from "./telemetry";
 import {
 	getOrphanRuns,
 	getWorkflowRuns,
-	pathKey,
 	rehydrateRuns,
 	removeWorkflowRun,
 	setOrphanRuns,
@@ -32,25 +31,20 @@ import {
 	subscribeOrphanRuns,
 	subscribeWorkflowRuns,
 	consumePanelShowRequest,
-	type AgentProgressState,
-	type AgentProgressView,
-	type GroupProgressView,
 	type OrphanRunView,
 	type WorkflowRunView,
 } from "./store";
 import {
-	groupBar,
-	runPill,
-	orphanStatusPill,
-	timelineRows,
-	agentDisplayName,
-	collapsedHeader,
+	buildWorkflowTree,
+	formatCost,
+	formatTime,
 	formatTokens,
-	runStats,
+	orphanStatusPill,
 	recentFailed,
-	pipelineGraph,
-	AGENT_ICON,
-	SEGMENT_BG,
+	runPill,
+	runStats,
+	collapsedHeader,
+	agentDisplayName,
 } from "./panel-view";
 
 /** Factory del elemento raíz (para webBridge.mountPersistent). */
@@ -344,89 +338,8 @@ function OrphansSection(props: {
 	);
 }
 
-const STATE_COLOR: Record<AgentProgressState, string | undefined> = {
-	running: undefined, // foreground (destacado por defecto)
-	completed: "#3fb950", // verde
-	failed: "#f85149", // rojo
-};
-
-interface AgentCounts {
-	completed: number;
-	failed: number;
-	running: number;
-}
-
-function countAgents(agents: readonly AgentProgressView[]): AgentCounts {
-	let completed = 0;
-	let failed = 0;
-	let running = 0;
-	for (const a of agents) {
-		if (a.state === "completed") completed += 1;
-		else if (a.state === "failed") failed += 1;
-		else running += 1;
-	}
-	return { completed, failed, running };
-}
-
-/** ms legible: "…", "12s", "1.4m". */
-function formatDuration(ms: number): string {
-	if (!Number.isFinite(ms) || ms < 0) return "…";
-	if (ms < 1000) return "…";
-	if (ms < 60000) return `${Math.round(ms / 1000)}s`;
-	return `${(ms / 60000).toFixed(1)}m`;
-}
-
-/** ¿El agente cuelga de un grupo (su structuralPath extiende el del grupo)? */
-function belongsTo(
-	agent: AgentProgressView,
-	group: GroupProgressView,
-): boolean {
-	const gp = group.structuralPath;
-	const ap = agent.structuralPath;
-	if (ap.length < gp.length) return false;
-	for (let i = 0; i < gp.length; i += 1) {
-		if (ap[i] !== gp[i]) return false;
-	}
-	return true;
-}
-
-/** Label legible de un agente (último tramo del path, o role, o "agent"). */
-/** Contadores de agentes como iconos lucide + número (#79: sin glifos). */
-function CountsRow({
-	counts,
-}: {
-	counts: { completed: number; failed: number; running: number };
-}): ReactElement {
-	return (
-		<fbox flexDirection="row" gap={6} alignItems="center">
-			{counts.completed > 0 ? (
-				<fbox flexDirection="row" gap={2} alignItems="center">
-					<ficon name="check" size={10} color={STATE_COLOR.completed} />
-					<ftext size={11} color={STATE_COLOR.completed}>
-						{counts.completed}
-					</ftext>
-				</fbox>
-			) : null}
-			{counts.failed > 0 ? (
-				<fbox flexDirection="row" gap={2} alignItems="center">
-					<ficon name="x" size={10} color={STATE_COLOR.failed} />
-					<ftext size={11} color={STATE_COLOR.failed}>
-						{counts.failed}
-					</ftext>
-				</fbox>
-			) : null}
-			{counts.running > 0 ? (
-				<fbox flexDirection="row" gap={2} alignItems="center">
-					<ficon name="loader-circle" size={10} cls="spinner" />
-					<ftext size={11}>{counts.running}</ftext>
-				</fbox>
-			) : null}
-		</fbox>
-	);
-}
-
-/** Header del panel (#80): contraído muestra progreso — barra de fases
- * segmentada + fase activa + ⟳N; expandido, título a secas. */
+/** Header del panel (#80): contraído muestra un ticker en vivo con el workflow activo,
+ * fase actual, agente activo y métricas; expandido, título a secas + conteo de activos. */
 function HeaderSummary({
 	runs,
 	collapsed,
@@ -435,50 +348,83 @@ function HeaderSummary({
 	collapsed: boolean;
 }): ReactElement {
 	const h = collapsedHeader(runs);
-	const p = collapsed ? h.progress : undefined;
-	return (
-		<fbox flexDirection="row" gap={6} alignItems="center">
-			<ftext bold>{h.title}</ftext>
-			{p && p.total > 0 ? (
-				<>
-					<fbox
-						flexDirection="row"
-						gap={1}
-						cls="wf-bar"
-						height={6}
-						overflow="hidden"
-					>
-						{Array.from({ length: p.total }, (_, i) => (
-							<fbox
-								key={i}
-								flex={1}
-								height={6}
-								background={
-									i < p.done
-										? SEGMENT_BG.completed
-										: i === p.done
-											? SEGMENT_BG.running
-											: SEGMENT_BG.queued
-								}
-							/>
-						))}
-					</fbox>
-					<ftext size={11} color="#8b949e">
-						{p.done}/{p.total}
-					</ftext>
-					{h.phase ? (
-						<ftext size={11} color="#58a6ff">
-							{h.phase}
+	const activeRuns = runs.filter(
+		(r) => r.state === "running" || r.state === "awaiting",
+	);
+	const singleActive = activeRuns.length === 1 ? activeRuns[0] : undefined;
+
+	if (!collapsed || !singleActive) {
+		return (
+			<fbox flexDirection="row" gap={6} alignItems="center">
+				<ftext bold size={12}>
+					{h.title}
+				</ftext>
+				{h.running > 0 ? (
+					<fbox cls="ui-chip info">
+						<ftext size={10}>
+							{h.running} activo{h.running > 1 ? "s" : ""}
 						</ftext>
-					) : null}
+					</fbox>
+				) : null}
+			</fbox>
+		);
+	}
+
+	// Ticker en vivo cuando está contraído (preferencia de usuario de Frida Studio)
+	const now = Date.now();
+	const stats = runStats(singleActive, now);
+	const activeAgent = singleActive.agents.find((a) => a.state === "running");
+	const pill = runPill(singleActive.state);
+
+	return (
+		<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+			<ficon
+				name={pill.icon}
+				size={12}
+				color={pill.color}
+				cls={singleActive.state === "running" ? "spinner" : undefined}
+			/>
+			<ftext bold size={11}>
+				{singleActive.workflowName}
+			</ftext>
+			{singleActive.phase ? (
+				<>
+					<ftext color="#8b949e" size={11}>
+						·
+					</ftext>
+					<ftext size={11} color="var(--vscode-charts-blue, #58a6ff)">
+						{singleActive.phase}
+					</ftext>
 				</>
 			) : null}
-			{collapsed && h.running > 0 ? (
-				<fbox flexDirection="row" gap={2} alignItems="center">
-					<ficon name="loader-circle" size={10} cls="spinner" />
-					<ftext size={11}>{h.running}</ftext>
-				</fbox>
+			{activeAgent ? (
+				<>
+					<ftext color="#8b949e" size={11}>
+						&gt;
+					</ftext>
+					<ftext size={11} color="#8b949e">
+						{agentDisplayName(activeAgent)}
+					</ftext>
+				</>
 			) : null}
+			<fbox
+				flexDirection="row"
+				gap={8}
+				alignItems="center"
+				flex={1}
+				justifyContent="flex-end"
+			>
+				{stats.tokens > 0 ? (
+					<ftext size={10} color="#8b949e" cls="wf-mono">
+						{formatTokens(stats.tokens)} tok
+					</ftext>
+				) : null}
+				{stats.elapsedMs > 0 ? (
+					<ftext size={10} color="#8b949e" cls="wf-mono">
+						{formatTime(stats.elapsedMs)}
+					</ftext>
+				) : null}
+			</fbox>
 		</fbox>
 	);
 }
@@ -493,38 +439,48 @@ function RunView({
 	onToggleCollapse?: () => void;
 }): ReactElement {
 	const pill = runPill(run.state);
-	const counts = countAgents(run.agents);
 	const now = Date.now();
-	// #79: timeline vertical — una fila por fase vista, la activa con agentes.
-	const timeline = timelineRows(run, now);
-	const activeGroups = run.groups.filter((g) => g.state === "running");
-	const groupedIds = new Set<string>();
-	for (const g of activeGroups) {
-		for (const a of run.agents) {
-			if (belongsTo(a, g)) groupedIds.add(a.agentId);
-		}
-	}
-	// Agentes ya anidados en el timeline → no se repiten como libres.
-	const timelineIds = new Set<string>();
-	for (const row of timeline) {
-		for (const a of row.agents) timelineIds.add(a.agentId);
-	}
-	const freeAgents = run.agents.filter(
-		(a) => !groupedIds.has(a.agentId) && !timelineIds.has(a.agentId),
-	);
-	const hasCounts =
-		counts.completed > 0 || counts.failed > 0 || counts.running > 0;
-	// #81: stats del run — ⏱ desde el inicio a la última interacción + ∑ tokens.
-	const stats = runStats(run, now);
+	const tree = buildWorkflowTree(run, now);
+	const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set());
+	const [confirmingStop, setConfirmingStop] = useState(false);
+
+	const togglePhase = (phaseName: string) => {
+		setCollapsedPhases((prev) => {
+			const next = new Set(prev);
+			if (next.has(phaseName)) next.delete(phaseName);
+			else next.add(phaseName);
+			return next;
+		});
+	};
+
+	const canStop = run.state === "running" || run.state === "awaiting";
+
+	const statusColor =
+		run.state === "running"
+			? "var(--vscode-charts-blue, #58a6ff)"
+			: run.state === "completed"
+				? "var(--vscode-testing-iconPassed, #3fb950)"
+				: run.state === "failed"
+					? "var(--vscode-testing-iconFailed, #f85149)"
+					: pill.color;
+
+	const statusIcon =
+		run.state === "running"
+			? "sync"
+			: run.state === "completed"
+				? "pass-filled"
+				: run.state === "failed"
+					? "error"
+					: pill.icon;
 
 	return (
-		<fbox bordered flexDirection="column" gap={8} padding={10} cls="wf-card">
-			{/* Header de la card: glifo+nombre+id · pill de estado (#71) */}
+		<fbox bordered flexDirection="column" gap={6} padding={8} cls="wf-card">
+			{/* Header de la card: chevron + icono + nombre + id + pill · métricas a la derecha + stop */}
 			<fbox
 				flexDirection="row"
-				gap={8}
 				alignItems="center"
 				justifyContent="space-between"
+				gap={8}
 			>
 				<fbox
 					flexDirection="row"
@@ -535,223 +491,298 @@ function RunView({
 				>
 					<ficon
 						name={isCollapsed ? "chevron-right" : "chevron-down"}
-						size={12}
+						size={11}
 						color="#8b949e"
 					/>
 					<ficon
-						name={pill.icon}
-						size={14}
-						color={pill.color}
+						name={statusIcon}
+						size={13}
+						color={statusColor}
 						cls={run.state === "running" ? "spinner" : undefined}
 					/>
-					<ftext bold size={13}>
+					<ftext bold size={12}>
 						{run.workflowName}
 					</ftext>
-					<ftext color="#8b949e" size={11}>
+					<ftext color="#8b949e" size={10} cls="wf-mono">
 						{run.runId.slice(0, 8)}
 					</ftext>
+					<fbox cls="wf-pill" background={`${pill.color}22`} padding={2}>
+						<ftext color={pill.color} size={9} bold>
+							{pill.label}
+						</ftext>
+					</fbox>
 				</fbox>
-				<fbox
-					cls="wf-pill"
-					background={`${pill.color}26`}
-					flexDirection="row"
-					gap={4}
-					alignItems="center"
-					padding={3}
-				>
-					<ftext color={pill.color} size={11} bold>
-						{pill.label}
-					</ftext>
+
+				{/* Métricas a la derecha + botón Stop */}
+				<fbox flexDirection="row" gap={8} alignItems="center">
+					{tree.totalTokens > 0 ? (
+						<ftext cls="wf-metric-text">{formatTokens(tree.totalTokens)} tok</ftext>
+					) : null}
+					{tree.totalCostUsd > 0 ? (
+						<ftext cls="wf-metric-text">{formatCost(tree.totalCostUsd)}</ftext>
+					) : null}
+					{tree.totalDurationMs > 0 ? (
+						<ftext cls="wf-metric-text">{formatTime(tree.totalDurationMs)}</ftext>
+					) : null}
+
+					{/* Botón detener con confirmación en 2 pasos */}
+					{canStop ? (
+						confirmingStop ? (
+							<fbox
+								cls="wf-confirm-inline"
+								flexDirection="row"
+								gap={4}
+								alignItems="center"
+							>
+								<ftext size={10} color="var(--vscode-charts-red, #f14c4c)">
+									¿Detener?
+								</ftext>
+								<fbox
+									onClick={() => {
+										stopWorkflowRun(run.runId);
+										setConfirmingStop(false);
+									}}
+									cls="wf-confirm-btn"
+									title="Sí, detener"
+								>
+									<ftext size={10} color="var(--vscode-charts-red, #f14c4c)" bold>
+										Sí
+									</ftext>
+								</fbox>
+								<fbox
+									onClick={() => setConfirmingStop(false)}
+									cls="wf-cancel-btn"
+									title="Cancelar"
+								>
+									<ftext size={10} color="var(--vscode-descriptionForeground)">
+										No
+									</ftext>
+								</fbox>
+							</fbox>
+						) : (
+							<fbox
+								onClick={() => setConfirmingStop(true)}
+								cls="wf-stop-icon-only"
+								title="Detener workflow"
+							>
+								<ficon
+									name="circle-stop"
+									size={13}
+									color="var(--vscode-charts-red, #f14c4c)"
+								/>
+							</fbox>
+						)
+					) : null}
 				</fbox>
 			</fbox>
 
 			{isCollapsed ? null : (
 				<>
-					{/* #81: ⏱ elapsed + ∑ tokens/costo del run */}
-					{run.startedAt === undefined ? null : (
-						<fbox flexDirection="row" gap={6} alignItems="center">
-							<ficon name="clock" size={10} color="#8b949e" />
-							<ftext size={11} color="#8b949e">
-								{formatDuration(stats.elapsedMs)}
-							</ftext>
-							{stats.tokens > 0 ? (
-								<>
-									<ficon name="coins" size={10} color="#8b949e" />
-									<ftext size={11} color="#8b949e">
-										∑ {formatTokens(stats.tokens)}
-										{stats.costUsd > 0 ? ` ($${stats.costUsd.toFixed(2)})` : ""}
-									</ftext>
-								</>
-							) : null}
-						</fbox>
-					)}
+					{/* Árbol Jerárquico: Fases -> Agentes */}
+					<fbox flexDirection="column" gap={3} cls="wf-tree-container">
+						{tree.phases.map((phase) => {
+							const isExpanded = !collapsedPhases.has(phase.name);
+							const hasAgents = phase.agents.length > 0;
+							const isCurrent = phase.state === "current";
+							const isDone = phase.state === "done";
+							const phaseColor = isCurrent
+								? "var(--vscode-charts-blue, #58a6ff)"
+								: isDone
+									? "var(--vscode-testing-iconPassed, #3fb950)"
+									: "var(--vscode-descriptionForeground, #8b949e)";
+							const phaseIcon = isCurrent ? "sync" : isDone ? "check" : "circle";
 
-					{/* Contadores agregados de agentes (iconos lucide, no glifos) */}
-					{hasCounts ? <CountsRow counts={counts} /> : null}
-
-					{/* Propuesta 1: Stepper horizontal unificado de fases */}
-					{run.phases.length > 1 ? (
-						<fbox
-							cls="wf-stepper-container"
-							flexDirection="row"
-							gap={4}
-							alignItems="center"
-							padding={4}
-						>
-							{pipelineGraph(run, now).map((node) => {
-								const isCurrent = node.state === "current";
-								const isDone = node.state === "done";
-								const color = isCurrent
-									? "var(--vscode-charts-blue, #58a6ff)"
-									: isDone
-										? STATE_COLOR.completed
-										: "var(--vscode-descriptionForeground, #8b949e)";
-								const bg = isCurrent
-									? "rgba(88, 166, 255, 0.15)"
-									: isDone
-										? "rgba(63, 185, 80, 0.1)"
-										: "transparent";
-								return (
-									<fbox key={node.name} flexDirection="row" gap={4} alignItems="center">
-										<fbox
-											cls={`wf-step-pill ${node.state}`}
-											flexDirection="row"
-											gap={4}
-											alignItems="center"
-											padding={3}
-											background={bg}
-											bordered
-										>
+							return (
+								<fbox key={phase.name} flexDirection="column" gap={2}>
+									{/* Fila de la Fase */}
+									<fbox
+										flexDirection="row"
+										alignItems="center"
+										justifyContent="space-between"
+										cls={`wf-tree-row${hasAgents ? "" : " non-clickable"}`}
+										onClick={hasAgents ? () => togglePhase(phase.name) : undefined}
+									>
+										{/* Izquierda: Chevron + Icono + Nombre de la Fase */}
+										<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+											{hasAgents ? (
+												<ficon
+													name={isExpanded ? "chevron-down" : "chevron-right"}
+													size={10}
+													color="#8b949e"
+												/>
+											) : (
+												<fbox paddingLeft={10} />
+											)}
 											<ficon
-												name={isDone ? "check" : isCurrent ? "sync" : "circle"}
-												size={10}
-												color={color}
+												name={phaseIcon}
+												size={11}
+												color={phaseColor}
 												cls={isCurrent ? "spinner" : undefined}
 											/>
-											<ftext size={11} bold={isCurrent} color={color}>
-												{node.name}
-											</ftext>
-											{node.agentCount && node.agentCount > 0 ? (
-												<ftext size={10} color={color}>
-													({node.agentCount})
-												</ftext>
-											) : null}
-										</fbox>
-										{node.isLast ? null : (
-											<ficon
-												name="arrow-right"
-												size={10}
-												color="var(--vscode-descriptionForeground, #8b949e)"
-											/>
-										)}
-									</fbox>
-								);
-							})}
-						</fbox>
-					) : null}
-
-					{/* Timeline vertical estructurado con guías CSS nativas (En curso vs Restante) */}
-					{timeline.length > 0 ? (
-						<fbox flexDirection="column" gap={4} cls="wf-timeline-box">
-							{timeline.map((row) => {
-								const isCurrent = row.state === "current";
-								const isDone = row.state === "done";
-								const color = isCurrent
-									? "var(--vscode-charts-blue, #58a6ff)"
-									: isDone
-										? STATE_COLOR.completed
-										: "var(--vscode-descriptionForeground, #8b949e)";
-								return (
-									<fbox
-										key={row.name}
-										flexDirection="column"
-										gap={2}
-										cls="wf-tree-section"
-									>
-										<fbox flexDirection="row" gap={6} alignItems="center">
-											<ficon
-												name={isCurrent ? "circle-dot" : isDone ? "circle-check" : "circle"}
-												size={11}
-												color={color}
-											/>
-											<ftext size={11} bold={isCurrent} color={color}>
-												{isCurrent ? `FASE ACTUAL: ${row.name}` : row.name}
-											</ftext>
-											{isCurrent && counts.running > 0 ? (
-												<fbox cls="ui-chip info">
-													<ftext size={10}>{counts.running} en paralelo</ftext>
-												</fbox>
-											) : null}
 											<ftext
 												size={11}
-												color="var(--vscode-descriptionForeground, #8b949e)"
-												cls="tabular-nums"
+												bold={isCurrent}
+												color={isCurrent ? "var(--vscode-charts-blue, #58a6ff)" : undefined}
 											>
-												{formatDuration(row.durationMs)}
+												{phase.name}
 											</ftext>
 										</fbox>
-										{isCurrent && row.agents.length > 0 ? (
-											<fbox flexDirection="column" gap={2} cls="wf-tree-children">
-												{row.agents.map((a) => (
+
+										{/* Derecha: Métricas agregadas de la Fase */}
+										<fbox flexDirection="row" gap={8} alignItems="center">
+											{phase.tokens > 0 ? (
+												<ftext cls="wf-metric-text">{formatTokens(phase.tokens)} tok</ftext>
+											) : null}
+											{phase.costUsd > 0 ? (
+												<ftext cls="wf-metric-text">{formatCost(phase.costUsd)}</ftext>
+											) : null}
+											{phase.durationMs > 0 ? (
+												<ftext cls="wf-metric-text">{formatTime(phase.durationMs)}</ftext>
+											) : null}
+										</fbox>
+									</fbox>
+
+									{/* Hijos de la Fase (Agentes) */}
+									{hasAgents && isExpanded ? (
+										<fbox flexDirection="column" gap={2} cls="wf-tree-children">
+											{phase.agents.map((agent) => {
+												const agentColor =
+													agent.state === "completed"
+														? "var(--vscode-testing-iconPassed, #3fb950)"
+														: agent.state === "failed"
+															? "var(--vscode-testing-iconFailed, #f85149)"
+															: "var(--vscode-charts-blue, #58a6ff)";
+												const agentIcon =
+													agent.state === "completed"
+														? "check"
+														: agent.state === "failed"
+															? "x"
+															: "sync";
+
+												return (
 													<fbox
-														key={a.agentId}
-														cls="wf-agent-card"
+														key={agent.agentId}
 														flexDirection="row"
-														gap={6}
 														alignItems="center"
-														paddingLeft={12}
-														padding={3}
-														bordered
+														justifyContent="space-between"
+														cls="wf-tree-row non-clickable"
 													>
-														<ficon
-															name={AGENT_ICON[a.state]}
-															size={10}
-															color={STATE_COLOR[a.state]}
-															cls={a.state === "running" ? "spinner" : undefined}
-														/>
-														<ftext size={11} bold color={STATE_COLOR[a.state]}>
-															{a.label}
-														</ftext>
-														{a.role ? (
-															<fbox cls="ui-chip role">
-																<ftext size={10} bold>
-																	{a.role}
-																</ftext>
-															</fbox>
-														) : null}
-														{a.tokens !== undefined && a.tokens > 0 ? (
-															<ftext
+														{/* Izquierda: Icono + Label + Badge */}
+														<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+															<ficon
+																name={agentIcon}
 																size={10}
-																color="var(--vscode-descriptionForeground, #8b949e)"
-																cls="tabular-nums"
+																color={agentColor}
+																cls={agent.state === "running" ? "spinner" : undefined}
+															/>
+															<ftext
+																size={11}
+																color={
+																	agent.state === "failed"
+																		? "var(--vscode-testing-iconFailed, #f85149)"
+																		: undefined
+																}
 															>
-																∑ {formatTokens(a.tokens)}
+																{agent.label}
 															</ftext>
-														) : null}
-														<ftext
-															size={10}
-															color="var(--vscode-descriptionForeground, #8b949e)"
-															cls="tabular-nums"
-														>
-															⏱ {formatDuration(a.durationMs)}
+															{agent.badge ? (
+																<fbox cls="wf-badge-chip">
+																	<ftext size={9} color="var(--vscode-descriptionForeground)">
+																		{agent.badge}
+																	</ftext>
+																</fbox>
+															) : null}
+														</fbox>
+
+														{/* Derecha: Métricas del Agente */}
+														<fbox flexDirection="row" gap={8} alignItems="center">
+															{agent.tokens !== undefined && agent.tokens > 0 ? (
+																<ftext cls="wf-metric-text">
+																	{formatTokens(agent.tokens)} tok
+																</ftext>
+															) : null}
+															{agent.cost !== undefined && agent.cost > 0 ? (
+																<ftext cls="wf-metric-text">{formatCost(agent.cost)}</ftext>
+															) : null}
+															{agent.durationMs > 0 ? (
+																<ftext cls="wf-metric-text">
+																	{formatTime(agent.durationMs)}
+																</ftext>
+															) : null}
+														</fbox>
+													</fbox>
+												);
+											})}
+										</fbox>
+									) : null}
+								</fbox>
+							);
+						})}
+
+						{/* Agentes raíz (sin fase) */}
+						{tree.rootAgents.length > 0 ? (
+							<fbox flexDirection="column" gap={2} cls="wf-tree-children">
+								{tree.rootAgents.map((agent) => {
+									const agentColor =
+										agent.state === "completed"
+											? "var(--vscode-testing-iconPassed, #3fb950)"
+											: agent.state === "failed"
+												? "var(--vscode-testing-iconFailed, #f85149)"
+												: "var(--vscode-charts-blue, #58a6ff)";
+									const agentIcon =
+										agent.state === "completed"
+											? "check"
+											: agent.state === "failed"
+												? "x"
+												: "sync";
+
+									return (
+										<fbox
+											key={agent.agentId}
+											flexDirection="row"
+											alignItems="center"
+											justifyContent="space-between"
+											cls="wf-tree-row non-clickable"
+										>
+											<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
+												<ficon
+													name={agentIcon}
+													size={10}
+													color={agentColor}
+													cls={agent.state === "running" ? "spinner" : undefined}
+												/>
+												<ftext size={11}>{agent.label}</ftext>
+												{agent.badge ? (
+													<fbox cls="wf-badge-chip">
+														<ftext size={9} color="var(--vscode-descriptionForeground)">
+															{agent.badge}
 														</ftext>
 													</fbox>
-												))}
+												) : null}
 											</fbox>
-										) : null}
-									</fbox>
-								);
-							})}
-						</fbox>
-					) : run.phase ? (
-						<ftext size={11} color="#8b949e">
-							Fase <ftext bold>{run.phase}</ftext>
-						</ftext>
-					) : null}
+											<fbox flexDirection="row" gap={8} alignItems="center">
+												{agent.tokens !== undefined && agent.tokens > 0 ? (
+													<ftext cls="wf-metric-text">
+														{formatTokens(agent.tokens)} tok
+													</ftext>
+												) : null}
+												{agent.cost !== undefined && agent.cost > 0 ? (
+													<ftext cls="wf-metric-text">{formatCost(agent.cost)}</ftext>
+												) : null}
+												{agent.durationMs > 0 ? (
+													<ftext cls="wf-metric-text">{formatTime(agent.durationMs)}</ftext>
+												) : null}
+											</fbox>
+										</fbox>
+									);
+								})}
+							</fbox>
+						) : null}
+					</fbox>
 
-					{/* Error del run (si falló) — antes no se pintaba */}
+					{/* Error del run (si falló) */}
 					{run.error ? (
-						<ftext size={11} color="#f85149" wrap>
+						<ftext size={11} color="var(--vscode-testing-iconFailed, #f85149)" wrap>
 							{run.error}
 						</ftext>
 					) : null}
@@ -803,100 +834,6 @@ function RunView({
 							</fbox>
 						</fbox>
 					) : null}
-
-					{/* Grupos: barra segmentada (#71) + detalle por tarea */}
-					{activeGroups.map((g) => {
-						const bar = groupBar(g, run.agents);
-						return (
-							<fbox key={pathKey(g.structuralPath)} flexDirection="column" gap={3}>
-								<fbox flexDirection="row" gap={4} alignItems="center">
-									<ftext color="#8b949e" size={11}>
-										{g.name}
-									</ftext>
-									<ftext size={11}>
-										{bar.done}/{bar.total}
-									</ftext>
-									{bar.failed > 0 ? (
-										<fbox flexDirection="row" gap={2} alignItems="center">
-											<ficon name="x" size={10} color={STATE_COLOR.failed} />
-											<ftext size={11} color={STATE_COLOR.failed}>
-												{bar.failed}
-											</ftext>
-										</fbox>
-									) : null}
-									{bar.running > 0 ? (
-										<fbox flexDirection="row" gap={2} alignItems="center">
-											<ficon name="loader-circle" size={10} cls="spinner" />
-											<ftext size={11}>{bar.running}</ftext>
-										</fbox>
-									) : null}
-								</fbox>
-								<fbox
-									flexDirection="row"
-									gap={1}
-									cls="wf-bar"
-									height={6}
-									overflow="hidden"
-								>
-									{bar.segments.map((s, i) => (
-										<fbox
-											key={String(i)}
-											flex={1}
-											height={6}
-											background={SEGMENT_BG[s.state]}
-										/>
-									))}
-								</fbox>
-								<fbox flexDirection="row" gap={6} alignItems="center" flex={1}>
-									{g.taskNames.map((t, i) => {
-										const s = bar.segments[i]?.state;
-										const color =
-											s === "completed"
-												? STATE_COLOR.completed
-												: s === "failed"
-													? STATE_COLOR.failed
-													: s === "running"
-														? "#58a6ff"
-														: "#8b949e";
-										return (
-											<fbox key={t} flexDirection="row" gap={2} alignItems="center">
-												<ficon
-													name={AGENT_ICON[s ?? "queued"]}
-													size={10}
-													color={color}
-													cls={s === "running" ? "spinner" : undefined}
-												/>
-												<ftext size={11} color={color}>
-													{t}
-												</ftext>
-											</fbox>
-										);
-									})}
-								</fbox>
-							</fbox>
-						);
-					})}
-
-					{/* Agentes libres (sin grupo) con duración */}
-					{freeAgents.map((a) => (
-						<fbox key={a.agentId} flexDirection="row" gap={6} alignItems="center">
-							<ficon
-								name={AGENT_ICON[a.state]}
-								size={11}
-								color={STATE_COLOR[a.state]}
-								cls={a.state === "running" ? "spinner" : undefined}
-							/>
-							<ftext size={11}>{agentDisplayName(a)}</ftext>
-							{a.tokens !== undefined && a.tokens > 0 ? (
-								<ftext size={11} color="#8b949e">
-									{formatTokens(a.tokens)}
-								</ftext>
-							) : null}
-							<ftext color="#8b949e" size={11}>
-								{formatDuration((a.endedAt ?? now) - a.startedAt)}
-							</ftext>
-						</fbox>
-					))}
 				</>
 			)}
 		</fbox>

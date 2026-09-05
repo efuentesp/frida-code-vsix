@@ -151,8 +151,22 @@ const internalAgent = (...values) => {
   const worktreeOwner = worktreeOwners.getStore();
   const identity = { structuralPath: [...inherited], callSite, occurrence, ...(worktreeOwner ? { worktreeOwner } : {}) };
   const wfRole = typeof options.role === "string" ? options.role : (options.role && typeof options.role === "object" && typeof options.role.role === "string" ? options.role.role : undefined);
+  const wfModel = typeof options.model === "string" && options.model.trim() ? options.model.trim() : (options.role && typeof options.role === "object" && typeof options.role.model === "string" && options.role.model.trim() ? options.role.model.trim() : undefined);
+  const wfTier = typeof options.tier === "string" && options.tier.trim() ? options.tier.trim() : undefined;
+  const wfEffort = typeof options.effort === "string" && options.effort.trim() ? options.effort.trim() : (typeof options.thinking === "string" && options.thinking.trim() ? options.thinking.trim() : undefined);
   const agentId = "a" + (++agentSeq);
-  send({ type: "progress", kind: "agent_start", agentId: agentId, structuralPath: identity.structuralPath, occurrence: occurrence, ...(wfRole ? { role: wfRole } : {}), ...(typeof options.label === "string" && options.label.trim() ? { label: options.label } : {}) });
+  send({
+    type: "progress",
+    kind: "agent_start",
+    agentId: agentId,
+    structuralPath: identity.structuralPath,
+    occurrence: occurrence,
+    ...(wfRole ? { role: wfRole } : {}),
+    ...(typeof options.label === "string" && options.label.trim() ? { label: options.label } : {}),
+    ...(wfModel ? { model: wfModel } : {}),
+    ...(wfTier ? { tier: wfTier } : {}),
+    ...(wfEffort ? { effort: wfEffort } : {}),
+  });
   let result;
   try {
     result = rpc("agent", [values[0], options, identity]).then((v) => { const acct = (v && typeof v === "object" && v.accounting && typeof v.accounting === "object") ? v.accounting : undefined; const tk = acct ? ((acct.input || 0) + (acct.output || 0)) : undefined; send({ type: "progress", kind: "agent_end", agentId: agentId, ok: true, ...(tk !== undefined ? { tokens: tk } : {}), ...(acct && typeof acct.cost === "number" ? { cost: acct.cost } : {}) }); const value = unwrap(v); return value; }, (e) => { send({ type: "progress", kind: "agent_end", agentId: agentId, ok: false, ...(errorCode(e) ? { code: errorCode(e) } : {}) }); throw e; });
@@ -351,8 +365,7 @@ function readAgentIdentity(value: unknown): AgentIdentity {
 	if (
 		!Array.isArray(structuralPath) ||
 		!structuralPath.every(
-			(part): part is string =>
-				typeof part === "string" && Boolean(part.trim()),
+			(part): part is string => typeof part === "string" && Boolean(part.trim()),
 		) ||
 		typeof callSite !== "string" ||
 		!callSite ||
@@ -377,9 +390,7 @@ function readShellIdentity(value: unknown): ShellIdentity {
 		structuralPath: identity.structuralPath,
 		callSite: identity.callSite,
 		occurrence: identity.occurrence,
-		...(identity.worktreeOwner
-			? { worktreeOwner: identity.worktreeOwner }
-			: {}),
+		...(identity.worktreeOwner ? { worktreeOwner: identity.worktreeOwner } : {}),
 	};
 }
 export function agentIdentityPath(identity: AgentIdentity): string {
@@ -416,9 +427,7 @@ export function readShellResult(value: unknown): ShellResult {
 export function agentWorktree(identity: AgentIdentity): {
 	worktreeOwner?: string;
 } {
-	return identity.worktreeOwner
-		? { worktreeOwner: identity.worktreeOwner }
-		: {};
+	return identity.worktreeOwner ? { worktreeOwner: identity.worktreeOwner } : {};
 }
 function shellProcessKill(child: ChildProcess): void {
 	let forceKill: ReturnType<typeof setTimeout> | undefined;
@@ -427,11 +436,10 @@ function shellProcessKill(child: ChildProcess): void {
 			if (child.pid && process.platform !== "win32")
 				process.kill(-child.pid, signal);
 			else if (child.pid && process.platform === "win32") {
-				const killer = spawn(
-					"taskkill",
-					["/pid", String(child.pid), "/t", "/f"],
-					{ stdio: "ignore", windowsHide: true },
-				);
+				const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+					stdio: "ignore",
+					windowsHide: true,
+				});
 				killer.unref();
 			} else child.kill(signal);
 		} catch {
@@ -610,8 +618,7 @@ function captureChildBootContext(opts: {
 		let guard = 32;
 		while (d && d !== "/" && guard-- > 0) {
 			try {
-				if (lstatSync(d).isSymbolicLink())
-					syms.push(`${d} -> ${readlinkSync(d)}`);
+				if (lstatSync(d).isSymbolicLink()) syms.push(`${d} -> ${readlinkSync(d)}`);
 			} catch {
 				/* componente inaccesible */
 			}
@@ -741,10 +748,7 @@ export function runWorkflow(
 		child.on("message", (raw: unknown) => {
 			try {
 				if (typeof raw !== "string" || Buffer.byteLength(raw) > RPC_LIMIT_BYTES)
-					fail(
-						"RPC_LIMIT_EXCEEDED",
-						"RPC value exceeds the 10 MB JSON boundary",
-					);
+					fail("RPC_LIMIT_EXCEEDED", "RPC value exceeds the 10 MB JSON boundary");
 				const message = JSON.parse(raw) as {
 					type?: string;
 					id?: number;
@@ -765,6 +769,7 @@ export function runWorkflow(
 				}
 				if (message.type === "progress") {
 					try {
+						// SAFETY: message proviene del child worker y su shape cumple WorkflowProgressEvent.
 						onProgress?.(message as unknown as WorkflowProgressEvent);
 					} catch {
 						// El progreso es best-effort: nunca debe romper la ejecución.
@@ -875,6 +880,7 @@ export function runWorkflow(
 				const command = validateShellCommand(values[0]);
 				const options = validateShellOptions(values[1]);
 				const identity = readShellIdentity(values[2]);
+				// SAFETY: ShellResult serializado a JSON es un JsonValue válido por construcción.
 				value = readShellResult(
 					await bridge.shell(command, options, controller.signal, identity),
 				) as unknown as JsonValue;

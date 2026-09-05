@@ -39,6 +39,12 @@ export interface AgentProgressView {
 	tokens?: number;
 	/** Costo USD facturado del agente (#81). */
 	cost?: number;
+	/** Modelo especificado para el agente (ej. "glm-5.3-flash"). */
+	model?: string;
+	/** Tier especificado para el agente (ej. "small", "big"). */
+	tier?: string;
+	/** Nivel de pensamiento o esfuerzo (ej. "low", "medium"). */
+	effort?: string;
 }
 
 /** Grupo (parallel/pipeline) con sus tareas esperadas (taskNames se conocen al inicio). */
@@ -67,6 +73,9 @@ export interface WorkflowProgressEvent {
 	cost?: number;
 	name?: string;
 	taskNames?: string[];
+	model?: string;
+	tier?: string;
+	effort?: string;
 }
 
 /** Tiempo abierto/cerrado de una fase (#79) — duración del timeline vertical. */
@@ -201,9 +210,7 @@ export function rehydrateRuns(runs: readonly RehydratedRun[]): void {
 				runId: r.runId,
 				workflowName: r.workflowName,
 				state: r.state,
-				...(r.checkpointName
-					? { checkpointName: r.checkpointName }
-					: {}),
+				...(r.checkpointName ? { checkpointName: r.checkpointName } : {}),
 				phases: [],
 				phaseTimes: {},
 				agents: [],
@@ -408,6 +415,9 @@ export function applyWorkflowProgress(opts: {
 				structuralPath: structuralPath ?? [],
 				...(role ? { role } : {}),
 				...(label ? { label } : {}),
+				...(progress.model ? { model: progress.model } : {}),
+				...(progress.tier ? { tier: progress.tier } : {}),
+				...(progress.effort ? { effort: progress.effort } : {}),
 				// #79: fase activa al nacer — anida en el timeline vertical.
 				...(phase ? { phase } : {}),
 				...(occurrence === undefined ? {} : { occurrence }),
