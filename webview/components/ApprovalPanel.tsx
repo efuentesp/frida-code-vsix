@@ -38,6 +38,12 @@ const MODES: {
 	badge?: string;
 }[] = [
 	{
+		id: "plan",
+		title: "Solo lectura",
+		desc: "Explorar/planear: leer y buscar sin tocar. Crear/editar archivos desactivado; bash pide confirmación.",
+		icon: "eye",
+	},
+	{
 		id: "manual",
 		title: "Manual",
 		desc: "Estricto: pregunta antes de cada acción relevante.",
@@ -51,9 +57,15 @@ const MODES: {
 		badge: "Recomendado",
 	},
 	{
+		id: "auto-guarded",
+		title: "Autónomo",
+		desc: "Larga distancia: bash simple y ediciones sin diálogo; comandos compuestos y rutas externas piden confirmación.",
+		icon: "rocket",
+	},
+	{
 		id: "auto",
-		title: "Auto",
-		desc: "Autónomo: todo corre sin diálogo salvo reglas de bloqueo.",
+		title: "YOLO",
+		desc: "Sin interrupciones: todo corre sin diálogo, salvo el candado de reglas de bloqueo.",
 		icon: "zap",
 	},
 ];

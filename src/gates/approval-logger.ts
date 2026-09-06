@@ -22,7 +22,7 @@ export type GateDecision = "allow" | "block";
 
 /** Origen de la decisión (trazabilidad de POR QUÉ se allow/block). */
 export type DecisionSource =
-	| "mode" // modo auto/auto-edit dejó pasar sin preguntar
+	| "mode" // modo auto/auto-edit/auto-guarded dejó pasar sin preguntar
 	| "sensitive_path" // path sensible bloqueado por policy
 	| "dangerous_command" // comando destructivo bloqueado por policy
 	| "user_approved" // el usuario aceptó el diálogo
@@ -30,6 +30,7 @@ export type DecisionSource =
 	| "session_pattern" // matcheó un patrón aprobado esta sesión (Fase 4)
 	| "policy_path" // deny por patrón declarativo de path (Fase 5b)
 	| "policy_bash" // deny por patrón declarativo de bash (Fase 5b)
+	| "mode_deny" // deny por el modo: edit/write en plan (#197)
 	| "gate_error"; // excepción → fail-closed
 
 export interface ApprovalLogEntry {

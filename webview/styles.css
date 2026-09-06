@@ -2811,6 +2811,12 @@ button.sec:hover {
 	border-color: var(--vscode-testing-iconFailed, #f85149) !important;
 }
 
+/* Modo Autónomo (auto-guarded, #197): borde ámbar — autonomía con red de
+   seguridad (force-ask sigue vivo); menos alarmante que YOLO. */
+.chat-input-stack.guarded-mode {
+	border-color: var(--vscode-editorWarning-foreground, #d29922) !important;
+}
+
 .chat-input-stack.working::before {
 	content: "";
 	position: absolute;
@@ -5873,6 +5879,15 @@ button.danger:hover {
 	box-shadow: 0 0 0 1px var(--vscode-errorForeground, #f85149);
 }
 
+/* Modo Autónomo (auto-guarded): acento ámbar en el textbox (#197). */
+.bar.guarded-mode .input,
+.bar.guarded-mode .input:focus {
+	border-color: var(--vscode-editorWarning-foreground, #d29922);
+}
+.bar.guarded-mode .input:focus {
+	box-shadow: 0 0 0 1px var(--vscode-editorWarning-foreground, #d29922);
+}
+
 /* Autocompletado de comandos (/) — reutiliza .file-popup/.file-item */
 .cmd-item {
 	display: flex;
@@ -8751,12 +8766,19 @@ mark.hl {
 	color: var(--vscode-button-background);
 }
 /* Acento según el modo de aprobación (sólo ícono, sin texto).
-   Degradado de peligro: Normal (neutro) → Auto-edit (ámbar) → YOLO (rojo). */
+   Degradado de peligro (#197): Solo lectura (azul) → Normal (neutro) →
+   Auto-edit (ámbar) → Autónomo (naranja) → YOLO (rojo). */
+.bar-ico.mode-plan {
+	color: var(--vscode-charts-blue, #4daafc);
+}
 .bar-ico.mode-auto {
 	color: var(--vscode-testing-iconFailed, #f85149);
 }
 .bar-ico.mode-auto-edit {
 	color: var(--vscode-editorWarning-foreground, #d29922);
+}
+.bar-ico.mode-auto-guarded {
+	color: var(--vscode-charts-orange, #e2820d);
 }
 
 /* Botón Circular Submit / Abort Copilot (.chat-submit-btn) */

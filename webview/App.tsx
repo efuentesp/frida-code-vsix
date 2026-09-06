@@ -66,8 +66,18 @@ function providerLabel(id: string): string {
 	}
 }
 
+/** Escalera de niveles de seguridad (#197): Solo lectura → Normal → Auto-edit → Autónomo → YOLO. */
+const MODE_LADDER: ApprovalMode[] = [
+	"plan",
+	"manual",
+	"auto-edit",
+	"auto-guarded",
+	"auto",
+];
+
 function nextMode(m: ApprovalMode): ApprovalMode {
-	return m === "manual" ? "auto" : "manual";
+	const i = MODE_LADDER.indexOf(m);
+	return MODE_LADDER[(i + 1) % MODE_LADDER.length] ?? "manual";
 }
 
 export function App() {
@@ -509,10 +519,23 @@ export function App() {
 				</div>
 			)}
 
+			{state.mode === "plan" && (
+				<div className="info-bar">
+					<Codicon name="eye" size={12} /> Solo lectura: el agente no puede
+					crear ni editar archivos (bash pide confirmación).
+				</div>
+			)}
 			{state.mode === "auto-edit" && (
 				<div className="info-bar warn">
 					<Codicon name="warning" size={12} /> Edición automática: crear/editar
 					archivos sin confirmación (bash sí pide).
+				</div>
+			)}
+			{state.mode === "auto-guarded" && (
+				<div className="info-bar warn">
+					<Codicon name="rocket" size={12} /> Autónomo: bash simple y ediciones
+					corren sin diálogo; comandos compuestos y rutas fuera del workspace piden
+					confirmación.
 				</div>
 			)}
 			{state.mode === "auto" && (

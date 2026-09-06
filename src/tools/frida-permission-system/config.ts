@@ -109,7 +109,13 @@ export function savePermissionConfig(
 
 /** ¿Es un modo válido? (defensivo ante JSON corrupto). */
 export function isValidMode(m: unknown): m is PermissionMode {
-	return m === "manual" || m === "auto-edit" || m === "auto";
+	return (
+		m === "plan" ||
+		m === "manual" ||
+		m === "auto-edit" ||
+		m === "auto-guarded" ||
+		m === "auto"
+	);
 }
 
 /** Mergea una config parcial sobre el default (rellena huecos, valida modo). */

@@ -487,7 +487,13 @@ export interface ModelRolesUi {
 	fallbackEnabled: boolean;
 }
 
-export type ApprovalMode = "manual" | "auto-edit" | "auto";
+/** Modo de aprobación (escala de seguridad #197: plan → manual → auto-edit → auto-guarded → auto). */
+export type ApprovalMode =
+	| "plan"
+	| "manual"
+	| "auto-edit"
+	| "auto-guarded"
+	| "auto";
 
 /** Stats footer (Fase 3): contadores del gate de la sesión actual. */
 export interface GateStats {

@@ -16,6 +16,7 @@ const NO_PATTERNS = {
 	sensitiveBasenames: [],
 	sensitiveAllowBasenames: [],
 	dangerousCommandSubstrings: [],
+	dangerousCommandPatterns: [],
 };
 
 function ev(tool: string, input: Record<string, unknown> = {}) {

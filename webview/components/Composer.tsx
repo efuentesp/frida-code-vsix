@@ -166,7 +166,15 @@ export function Composer({
 	const activeProvider = provs.find((p) => p.id === active?.provider);
 	const modelOptions = activeProvider?.models ?? [];
 	const modeLabel =
-		mode === "manual" ? "Normal" : mode === "auto-edit" ? "Auto-edit" : "YOLO";
+		mode === "plan"
+			? "Solo lectura"
+			: mode === "manual"
+				? "Normal"
+				: mode === "auto-edit"
+					? "Auto-edit"
+					: mode === "auto-guarded"
+						? "Autónomo"
+						: "YOLO";
 
 	useEffect(() => {
 		ref.current?.focus();
@@ -680,7 +688,10 @@ export function Composer({
 	return (
 		<div
 			className={
-				"bar" + (bashMode ? " bash-mode" : "") + (yolo ? " yolo-mode" : "")
+				"bar" +
+				(bashMode ? " bash-mode" : "") +
+				(yolo ? " yolo-mode" : "") +
+				(mode === "auto-guarded" ? " guarded-mode" : "")
 			}
 		>
 			{fileOpen && (
@@ -771,6 +782,7 @@ export function Composer({
 					(busy ? " working" : "") +
 					(expanded ? " expanded" : "") +
 					(yolo ? " yolo-mode" : "") +
+					(mode === "auto-guarded" ? " guarded-mode" : "") +
 					(bashMode ? " bash-mode" : "")
 				}
 			>

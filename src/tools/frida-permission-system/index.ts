@@ -2,13 +2,14 @@
 //
 // Reemplaza a src/gates/approval-gates.ts. La lógica de política (deny por
 // sensitive-path/dangerous-command, force-ask, superficie tool declarativa) vive
-// en policy.ts:evaluate(). Aquí queda el override del modo (manual/auto-edit/auto)
-// + el toggle acceptAllEdits + el diálogo + el logging.
+// en policy.ts:evaluate(). Aquí queda el override del modo (plan/manual/auto-edit/
+// auto-guarded/auto, #197) + el toggle acceptAllEdits + el diálogo + el logging.
 //
 // Invariantes preservados del diseño original:
 //  - FAIL-CLOSED: el handler entero va en try/catch. Ante error, bloquea.
-//  - deny SIEMPRE gana (incluso en auto), como yoloMode de gotgenes.
-//  - force-ask sobrevive al modo auto (bash compuesto / path externo).
+//  - deny SIEMPRE gana (incluso en auto/yolo), como yoloMode de gotgenes.
+//  - force-ask sobrevive a auto-edit y auto-guarded (bash compuesto / path
+//    externo); sólo auto (YOLO) lo suelta (semántica histórica).
 //  - FREE_TOOLS (policy.tool=allow) que pasan no se loguean; los allow por modo
 //    sí (source "mode"); deny siempre se loguea.
 
@@ -66,18 +67,27 @@ export function createPermissionSystem(
 			}
 		});
 
-		// Fase 7 — hide-tools deny: oculta del catálogo del LLM los tools con `deny`
-		// explícito en la política. Doble defensa: si el agente alucina un tool oculto,
-		// el gate `tool_call` lo bloquea igual. Se re-aplica cada turno
-		// (before_agent_start) así los cambios del panel de Auto-Aprobación aplican
-		// al instante.
+		// Fase 7 — hide-tools deny + modo plan (#197): oculta del catálogo del LLM
+		// los tools con `deny` explícito en la política, y edit/write en modo plan.
+		// Doble defensa: si el agente alucina un tool oculto, el gate `tool_call`
+		// lo bloquea igual. Se re-aplica cada turno (before_agent_start) desde el
+		// catálogo COMPLETO (getAllTools) — así un cambio de política en sentido
+		// allow (o salir de plan) RESTAURA el tool; antes filtrábamos del conjunto
+		// activo y el tool oculto nunca volvía.
 		pi.on("before_agent_start", () => {
 			try {
 				const denied = computeDeniedTools(getPermissionPolicy());
-				if (denied.size === 0) return;
-				const active = pi.getActiveTools();
-				const allowed = active.filter((t) => !denied.has(t));
-				if (allowed.length !== active.length) {
+				if (getMode() === "plan") {
+					denied.add("edit");
+				denied.add("write");
+			}
+				const catalog = pi.getAllTools().map((t) => t.name);
+				const allowed = catalog.filter((t) => !denied.has(t));
+				const current = new Set(pi.getActiveTools());
+				const changed =
+					allowed.length !== current.size ||
+					allowed.some((t) => !current.has(t));
+				if (changed) {
 					pi.setActiveTools(allowed);
 				}
 			} catch {
@@ -96,6 +106,20 @@ export function createPermissionSystem(
 		const tool = String(event.toolName);
 		const patterns = getPatterns();
 		const policy = getPermissionPolicy();
+
+		// Modo plan (#197): solo lectura. edit/write normalmente ni llegan aquí
+		// (before_agent_start los oculta del catálogo); este deny es la última
+		// línea si el agente alucina el tool o llega por otra vía.
+		if (mode === "plan" && (tool === "edit" || tool === "write")) {
+			const reason =
+				"Modo Solo lectura (plan): crear/editar archivos está desactivado. " +
+				"Preséntale al usuario los cambios propuestos (plan, archivos, diffs) y " +
+				"que él los aplique o cambie de modo.";
+			record(
+				makeEntry(event, sessionId, "block", "mode_deny", { kind, reason }),
+			);
+			return { block: true as const, reason };
+		}
 
 		const decision = evaluate({
 			tool,
@@ -125,6 +149,13 @@ export function createPermissionSystem(
 		const isDiff = kind === "diff";
 		const forceAsk = decision.forceAsk;
 
+		// Autónomo (auto-guarded, #197): igual que auto PERO force-ask SOBREVIVE —
+		// bash compuesto y paths fuera del workspace siguen pidiendo diálogo.
+		// Es el "yolo seguro" para tareas desatendidas.
+		if (mode === "auto-guarded" && !forceAsk) {
+			record(makeEntry(event, sessionId, "allow", "mode", { kind }));
+			return;
+		}
 		// Override del modo: YOLO (auto) suelta TODO ask, incl. force-ask
 		// (bash compuesto / path externo). auto-edit respeta force-ask (más abajo).
 		if (mode === "auto") {

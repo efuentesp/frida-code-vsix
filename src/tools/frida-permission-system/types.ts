@@ -17,13 +17,29 @@ export type Surface = "tool" | "path" | "bash" | "external_directory";
 /**
  * Modo de operación (override rápido sobre la política declarativa).
  *
- * - `manual`: respeta la policy tal cual (ask pide, allow pasa).
- * - `auto-edit`: edit/write con `ask` → `allow` (salvo force-ask).
- * - `auto`: TODO `ask` (sin force-ask) → `allow`.
+ * Escalera de niveles orientados a tarea (#197). Cada nivel quita fricción de
+ * aprobación, pero las capas `deny` (comandos catastróficos #196, paths
+ * sensibles, policy declarativa, hide-tools) son INMUNES al modo: bloquean
+ * incluso en `auto`. El candado nunca se quita — los niveles difieren en
+ * fricción, no en daño potencial.
  *
- * `deny` SIEMPRE gana, incluso en `auto` (como el yoloMode de gotgenes).
+ * - `plan` (Solo lectura): edit/write se OCULTAN del catálogo del LLM (y el
+ *   gate los bloquea si se alucinan); bash pide. Entender/auditar/planear.
+ * - `manual` (Normal): respeta la policy tal cual (ask pide, allow pasa).
+ * - `auto-edit`: edit/write con `ask` → `allow` (salvo force-ask). Refactor
+ *   confiado del día a día.
+ * - `auto-guarded` (Autónomo): TODO `ask` SIN force-ask → `allow`; force-ask
+ *   SOBREVIVE (bash compuesto / path externo piden diálogo). Tareas largas
+ *   desatendidas — el "yolo seguro".
+ * - `auto` (YOLO): TODO `ask` → `allow`, INCLUIDO force-ask (semántica
+ *   histórica, paridad yoloMode de gotgenes). Sandbox / experimentos.
  */
-export type PermissionMode = "manual" | "auto-edit" | "auto";
+export type PermissionMode =
+	| "plan"
+	| "manual"
+	| "auto-edit"
+	| "auto-guarded"
+	| "auto";
 
 /** Mapa de patrones → estado (last-match-wins dentro de la superficie). */
 export type PatternMap = Record<string, PermissionState>;
@@ -65,10 +81,11 @@ export interface PermissionConfig {
 /**
  * Decisión resultado de `evaluate()`.
  *
- * El flag `forceAsk` es la clave que preserva el disuasivo heredado del diseño
- * actual: un bash compuesto/wrapper o un path fuera del workspace marca la
- * decisión como `ask` que **sobrevive al modo `auto`** (en auto el usuario no
- * mira, y un sub-comando peligroso no debe colarse).
+ * El flag `forceAsk` marca el disuasivo heredado del diseño actual: un bash
+ * compuesto/wrapper o un path fuera del workspace. En `auto-guarded` ese ask
+ * SOBREVIVE al override del modo (en auto el usuario no mira y un sub-comando
+ * peligroso no debe colarse); en `auto` (YOLO) se suelta todo — semántica
+ * histórica documentada en PermissionMode.
  */
 export interface PermissionDecision {
 	/** Estado terminal (después de policy + force-ask, ANTES del modo). */
