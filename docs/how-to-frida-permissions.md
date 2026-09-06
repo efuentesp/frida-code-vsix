@@ -31,32 +31,70 @@ Y **dentro** de una superficie, si varios patrones matchean, también gana el m�
 restrictivo — `*.env: ✓` + `*.env.example: ✕` → el `.env.example` queda negado.
 (Esto difiere de pi-permission-system, donde gana el último patrón listado.)
 
-Sobre esas capas vive el **modo global** (el interruptor grande): `manual`
-respeta la política tal cual; `auto-edit` deja pasar ediciones `●`; `auto`
-deja pasar TODO `●`. Dos cosas sobreviven incluso a `auto`:
+Sobre esas capas vive el **modo global** (el interruptor grande, escala de 5
+niveles #197): decide qué hace con los `●`. Una cosa **NUNCA** se quita:
 
-- `✕` **niega siempre** (deny gana, sin excepciones).
-- El **force-ask**: bash compuesto (`&&`, `|`, `sudo`, `bash -c`, …) y acceso
-  fuera del workspace **siempre** abren el diálogo.
+- `✕` **niega siempre** (deny gana, sin excepciones — el «candado» es inmune
+  al modo: bloquea incluso en YOLO).
+
+Y el **force-ask** — bash compuesto (`&&`, `|`, `sudo`, `bash -c`, …) y acceso
+fuera del workspace — sobrevive a `auto-edit` y `auto-guarded`; sólo `auto`
+(YOLO) lo suelta (semántica histórica, ver los niveles abajo).
 
 Además hay **deny hardcodeados** que no se pueden apagar desde el panel:
 secretos (`.env`, `~/.ssh`, credentials, …) y comandos destructivos
-(`rm -rf /`, `chmod -R 777 /`, …). Por eso un `path: ✓` sobre `*.env` no
-sufre: la capa hardcodeada lo niega igual. Ajusta esos sets con los settings
-`frida.gates.*` (ver [Configuración](tools/frida-permission-system.md#configuración)).
+(`rm -rf /`, `chmod -R 777 /`, `sudo rm`, `gh repo delete`, gestores de
+contraseñas, … — ver [El candado](#el-candado-de-comandos-196)). Por eso un
+`path: ✓` sobre `*.env` no sufre: la capa hardcodeada lo niega igual. Ajusta
+esos sets con los settings `frida.gates.*`
+(ver [Configuración](tools/frida-permission-system.md#configuración)).
 
-## Los tres modos
+## Los cinco niveles (#197)
 
-| Modo | Qué pasa con los `●` | Úsalo para |
-| --- | --- | --- |
-| **manual** | abren el diálogo | default — tú decides cada acción |
-| **auto-edit** | edit/write pasan; bash y force-ask siguen preguntando | revisar diffs tú, dejarlo escribir |
-| **auto** | TODO pasa (salvo `✕` y force-ask) | tareas desechables / sanboxing |
+El candado (`✕` + deny hardcodeados) está activo en TODOS; los niveles difieren
+en fricción de aprobación, no en daño potencial. Elígelo por la TAREA:
 
-Cambias el modo desde el **footer** de la conversación o desde el dropdown del
-panel — los dos mandan al mismo lugar y al salir de `manual` Frida pide
-confirmación (no quieres activar `auto` por accidente). Desde #55 el modo
-**persiste** en `permission.json`: sobrevive recargas de ventana.
+| Nivel | Modo | Qué pasa con los `●` | Tarea típica |
+| --- | --- | --- | --- |
+| 🔍 **Solo lectura** | `plan` | edit/write **imposibles** (ocultos del catálogo del LLM + deny del gate); bash pregunta | entender un repo ajeno, auditoría, research |
+| ✅ **Normal** | `manual` | abren el diálogo | default — feature diaria en repos que importan |
+| ✏️ **Auto-edit** | `auto-edit` | edit/write pasan; bash y force-ask siguen preguntando | refactor confiado, formato masivo |
+| 🚀 **Autónomo** | `auto-guarded` | TODO pasa **salvo force-ask**: bash compuesto y rutas externas siguen preguntando | migraciones largas, tareas desatendidas — el «yolo seguro» |
+| ⚡ **YOLO** | `auto` | TODO pasa (incl. force-ask) — sólo el candado protege | sandbox, experimentos desechables |
+
+Cambias el nivel desde el **footer** de la conversación (clic en el ícono de
+escudo cicla la escalera) o desde el panel — y al salir de `manual` hacia un
+modo autónomo Frida pide confirmación (no quieres activar YOLO por accidente;
+`plan` no la pide: es MÁS restrictivo). El **borde rojo** del composer indica
+YOLO; el **ámbar**, Autónomo. Desde #55 el modo **persiste** en
+`permission.json`: sobrevive recargas de ventana.
+
+## El candado de comandos (#196)
+
+Capas de deny de bash, en orden de evaluación — todas inmunes al modo:
+
+1. **Substrings tuyos** — `frida.gates.dangerousCommandSubstrings` (literal).
+2. **Regex ERE tuyas** — `frida.gates.dangerousCommandPatterns` (POSIX-ERE con
+   clases `[[:space:]]` auto-convertidas; anclas `^` por línea). Un patrón
+   inválido se ignora (fail-open): jamás rompe el gate.
+3. **Denylist compartido multi-agente** — `frida.gates.dangerousCommandDenylistPath`
+   apunta a un archivo de regex ERE (p. ej.
+   `~/.agents/hooks/dangerous-patterns.txt`, el formato de
+   [davidondrej/skills](https://github.com/davidondrej/skills/tree/main/hooks))
+   compartible con Claude Code, Cursor, Codex y Pi. Re-lectura automática al
+   cambiar el archivo; inexistente/ilegible → se ignora.
+4. **RULES hardcodeadas** — `src/gates/dangerous-commands.ts`: rm raíz/home,
+   fork bomb, mkfs, dd a dispositivo, `chmod 777 /`, `sudo rm`, `diskutil
+   erase*`, `gh repo delete`, `gh auth token`, destruir reflog, CLIs de
+   gestores de contraseñas, volcado de keychain, exportar llaves GPG privadas.
+
+**Deliberadamente fuera del default** (opt-in vía settings o denylist):
+`git push --force` (uso diario; `--force-with-lease` siempre libre) y
+`curl | sh` (subjetivo). Los patrones listos para copiar están en la skill
+global `global-agent-guardrails` (`~/.frida/skills/`).
+
+Todo bloqueo llega al modelo con el patrón que lo disparó y la instrucción de
+no reintentar; se registra en auditoría con source `dangerous_command`.
 
 ## El panel: Configuración → Auto-Aprobación
 
@@ -130,7 +168,11 @@ Bash:  npm * ✕  (con los deny hardcodeados cubriendo lo destructivo)
 El modelo recibe «negado» y un mensaje: puede pedirte cambiar a pnpm en vez de
 fracasar en silencio.
 
-### Modo "sólo lectura" (el agente analiza, no toca)
+### Modo "sólo lectura" (nivel plan)
+
+El nivel 🔍 **Solo lectura** (#197) ya lo trae de fábrica: edit/write se
+ocultan del catálogo del LLM y el gate los bloquea con explicación. Para una
+versión a la carta (p. ej. permitir un subcomando de bash), usa el panel:
 
 ```
 Tools:  edit ✕  ·  write ✕  ·  bash ✕   (read/grep/find/ls quedan ✓)
@@ -149,9 +191,11 @@ Mata el 80% de los diálogos rutinarios sin abrir la granja.
 
 ### Tarea desechable de confianza
 
-Modo **auto** + Fuera del workspace **✓**, corre la tarea, y de vuelta a
-manual. El force-ask sigue protegiendo bash compuesto. (Sólo en carpetas que
-puedes romper sin llorar.)
+Nivel **⚡ YOLO** + Fuera del workspace **✓**, corre la tarea, y de vuelta a
+manual. Ojo: en YOLO el force-ask TAMBIÉN se suelta — sólo el candado protege.
+Si quieres la versión con red de seguridad, usa **🚀 Autónomo**: corre todo
+salvo bash compuesto y rutas externas. (Sólo en carpetas que puedes romper
+sin llorar.)
 
 ## El diálogo de aprobación (lo que el agente ve cuando pregunta)
 
@@ -170,7 +214,7 @@ con permisos 0600). Si prefieres el editor:
 ```jsonc
 {
   "version": 1,
-  "mode": "manual",          // manual | auto-edit | auto
+  "mode": "manual",          // plan | manual | auto-edit | auto-guarded | auto
   "auditLog": true,          // toggle del panel (#55)
   "policy": {
     "tool": { "read": "allow", "edit": "ask", "write": "ask", "bash": "ask", "*": "ask" },
@@ -201,7 +245,8 @@ sigue. El botón **Restablecer defaults** del panel regenera este contenido.
 ## Buenos hábitos
 
 - Arranca en **manual**; sube a `auto-edit` cuando confíes en la tarea;
-  `auto` para terrenos desechables.
+  `auto-guarded` para correr desatendido; `auto` (YOLO) para terrenos
+  desechables; `plan` cuando el día es de leer y no de tocar.
 - Niega por **patrón** (`npm *`), no por tool completo, cuando el problema es
   un subcomando.
 - Revisa «Aprobado en esta sesión» después de sesiones intensas — es donde se
