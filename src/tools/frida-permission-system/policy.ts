@@ -132,6 +132,8 @@ export function evaluate(input: EvaluateInput): PermissionDecision {
 	if (tool === "bash") {
 		const cmdCheck = isDangerousBash(command, {
 			extraSubstrings: patterns.dangerousCommandSubstrings,
+			// #196: regex ERE del setting + denylist compartido multi-agente.
+			extraPatterns: patterns.dangerousCommandPatterns,
 		});
 		if (cmdCheck.denied) {
 			return {

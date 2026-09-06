@@ -227,6 +227,19 @@
           "default": [],
           "markdownDescription": "Substrings adicionales que bloquean un comando `bash` sin preguntar (búsqueda literal, sensible a mayúsculas, sobre el comando normalizado). Ej.: `[dropdb, truncate table]`. Se suman a los patrones destructivos por defecto (`rm -rf /`, `mkfs`, …). Aplica en vivo."
         },
+        "frida.gates.dangerousCommandPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Regex POSIX-ERE adicionales que bloquean un comando `bash` sin preguntar (se evalúan sobre el comando crudo, anclas `^` por línea, con flag multilínea). Ej.: `git\\s+push\\s+[^;&|]*\\s+(-f|--force)(\\s|$)`. Soporta clases POSIX (`[[:space:]]`, `[[:alpha:]]`, …). Un patrón inválido se ignora (fail-open). Se suman a las reglas destructivas por defecto. Aplica en vivo."
+        },
+        "frida.gates.dangerousCommandDenylistPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Ruta a un denylist compartido multi-agente (una regex POSIX-ERE por línea, `#` comentarios): frida lo lee y lo suma a `frida.gates.dangerousCommandPatterns`. Diseñado para `~/.agents/hooks/dangerous-patterns.txt` (compartido con Claude Code, Cursor, Codex, Pi, …). Vacío = desactivado. Re-lectura automática al cambiar el archivo (cache por mtime). Archivo inexistente o ilegible = fail-open."
+        },
         "frida.sonar.maxWarnings": {
           "type": "number",
           "default": 0,
@@ -236,7 +249,13 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["warnings", "complejidad", "dup", "ciclos", "dead-code"]
+            "enum": [
+              "warnings",
+              "complejidad",
+              "dup",
+              "ciclos",
+              "dead-code"
+            ]
           },
           "default": [],
           "markdownDescription": "Familias de warnings excluidas del conteo del gate, del diff por turno y del desglose del tab Sonar (best-effort: knip/jscpd/madge sólo aportan totales en el gate completo). Las familias bloqueantes (errores, secrets, cve) no se pueden deshabilitar."

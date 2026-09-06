@@ -7,6 +7,7 @@
 // (re-ejecuta las factories, que re-leen estos settings) sin perder historial.
 
 import * as vscode from "vscode";
+import { readSharedDenylist } from "./gates/shared-denylist";
 import { TOOL_TOGGLE_BY_KEY, TOOL_TOGGLES } from "./tool-toggles";
 import type { UserRole } from "./usage/report-schema";
 import type { EmbeddingsProviderSetting } from "./tools/frida-codebase-index/host-setup";
@@ -113,10 +114,20 @@ export interface GatePatterns {
 	sensitiveAllowBasenames: string[];
 	/** Substrings a bloquear en bash (sensibles a mayúsculas). */
 	dangerousCommandSubstrings: string[];
+	/**
+	 * Regex POSIX-ERE a bloquear en bash (#196): setting
+	 * `gates.dangerousCommandPatterns` + líneas del denylist compartido
+	 * (`gates.dangerousCommandDenylistPath`, p. ej.
+	 * `~/.agents/hooks/dangerous-patterns.txt`). Fail-open por patrón.
+	 */
+	dangerousCommandPatterns: string[];
 }
 
 /** Snapshot en vivo de los patrones de gates desde la config de VS Code. */
 export function readGatePatterns(): GatePatterns {
+	const denylistPath = vscode.workspace
+		.getConfiguration(CONFIG_SECTION)
+		.get<string>("gates.dangerousCommandDenylistPath", "");
 	return {
 		sensitiveExtensions: readStringArray("gates.sensitiveExtensions"),
 		sensitiveBasenames: readStringArray("gates.sensitiveBasenames"),
@@ -124,6 +135,10 @@ export function readGatePatterns(): GatePatterns {
 		dangerousCommandSubstrings: readStringArray(
 			"gates.dangerousCommandSubstrings",
 		),
+		dangerousCommandPatterns: [
+			...readStringArray("gates.dangerousCommandPatterns"),
+			...readSharedDenylist(denylistPath),
+		],
 	};
 }
 
@@ -133,6 +148,7 @@ export const EMPTY_GATE_PATTERNS: GatePatterns = {
 	sensitiveBasenames: [],
 	sensitiveAllowBasenames: [],
 	dangerousCommandSubstrings: [],
+	dangerousCommandPatterns: [],
 };
 
 /** Persiste un toggle (global, recuerda entre sesiones) del registro central.
