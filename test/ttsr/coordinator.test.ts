@@ -83,10 +83,7 @@ describe("TTSR coordinator: intervención completa", () => {
 	it("violación refs-not-closes en TOOLARGS (commit) también dispara", async () => {
 		const s = fakeSession();
 		const { ttsr } = makeTtsr();
-		ttsr.handleEvent(
-			deltaRefs('{"message": "feat: x\\n\\nCloses #123"}'),
-			s,
-		);
+		ttsr.handleEvent(deltaRefs('{"message": "feat: x\\n\\nCloses #123"}'), s);
 		await vi.waitFor(() => expect(s.orden.length).toBe(3));
 		expect(s.orden[2]).toBe("continue");
 	});

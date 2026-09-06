@@ -16,8 +16,9 @@ const byId = (id: string): TtsrRule => {
 describe("TTSR rules: builtin es-mx", () => {
 	const rule = byId("es-mx");
 	it("matchea conjugaciones de España en texto", () => {
-		expect(matchRule(rule, "text", "Como vosotros veis, el ordenador"))?.not
-			.toBe(null);
+		expect(matchRule(rule, "text", "Como vosotros veis, el ordenador"))?.not.toBe(
+			null,
+		);
 		expect(matchRule(rule, "text", "si tenéis dudas"))?.not.toBe(null);
 		expect(matchRule(rule, "text", "el vídeo está listo"))?.not.toBe(null);
 	});
@@ -36,13 +37,12 @@ describe("TTSR rules: builtin es-mx", () => {
 describe("TTSR rules: builtin refs-not-closes", () => {
 	const rule = byId("refs-not-closes");
 	it("matchea cierres automáticos en texto y toolargs", () => {
-		expect(matchRule(rule, "text", "feat: algo\n\nCloses #123"))?.not.toBe(
-			null,
-		);
+		expect(matchRule(rule, "text", "feat: algo\n\nCloses #123"))?.not.toBe(null);
 		expect(matchRule(rule, "text", "fixes: #45"))?.not.toBe(null);
 		expect(matchRule(rule, "text", "Resolves #9"))?.not.toBe(null);
-		expect(matchRule(rule, "toolargs", "commit({message: 'fix x Fixes #7'})"))?.not
-			.toBe(null);
+		expect(
+			matchRule(rule, "toolargs", "commit({message: 'fix x Fixes #7'})"),
+		)?.not.toBe(null);
 	});
 	it("NO matchea Refs #N (la política del repo)", () => {
 		expect(matchRule(rule, "text", "feat: algo\n\nRefs #123")).toBe(null);
@@ -61,14 +61,22 @@ describe("TTSR rules: builtin vscode-tokens-ui", () => {
 		)?.not.toBe(null);
 	});
 	it("NO matchea color sin path de UI (un .ts normal puede llevar hashes)", () => {
-		expect(matchRule(rule, "toolargs", 'write({path: "src/hash.ts", content: "#f85149"}))')).toBe(
-			null,
-		);
+		expect(
+			matchRule(
+				rule,
+				"toolargs",
+				'write({path: "src/hash.ts", content: "#f85149"}))',
+			),
+		).toBe(null);
 	});
 	it("NO matchea path de UI sin color", () => {
-		expect(matchRule(rule, "toolargs", 'write({path: "webview/x.css", content: ".btn {}"})')).toBe(
-			null,
-		);
+		expect(
+			matchRule(
+				rule,
+				"toolargs",
+				'write({path: "webview/x.css", content: ".btn {}"})',
+			),
+		).toBe(null);
 	});
 	it("sólo inspecciona toolargs", () => {
 		expect(matchRule(rule, "text", "webview con #f85149")).toBe(null);

@@ -79,7 +79,9 @@ export function createTtsr(deps: TtsrCoordinatorDeps) {
 			await s.abort?.();
 			deps.diag(`[ttsr] abort() OK`);
 		} catch (e: any) {
-			deps.diag(`[ttsr] abort() falló: ${String(e?.message ?? e)} — no se reinyecta`);
+			deps.diag(
+				`[ttsr] abort() falló: ${String(e?.message ?? e)} — no se reinyecta`,
+			);
 			return; // sin abort limpio no hay reintento confiable (lección de #2)
 		}
 		try {

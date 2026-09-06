@@ -47,7 +47,10 @@ export interface TtsrManager {
 	/** agent_start del SDK: fin de la ventana `intervening` (nuevo run). */
 	onAgentStart(): void;
 	/** ¿Esta violación debe convertirse en intervención? (guards 1-4). */
-	shouldIntervene(rule: TtsrRule, violation: Omit<TtsrViolation, "reminder">): boolean;
+	shouldIntervene(
+		rule: TtsrRule,
+		violation: Omit<TtsrViolation, "reminder">,
+	): boolean;
 	/** Marca la intervención como disparada (actualiza contadores). */
 	onIntervention(rule: TtsrRule): void;
 	/** ¿Hay una intervención en vuelo (deltas del stream moribundo se ignoran)? */
@@ -88,7 +91,8 @@ export function createTtsrManager(deps: TtsrManagerDeps = {}): TtsrManager {
 			if (intervening) return false; // stream moribundo tras el abort
 			if (total >= maxTotal) return false; // tope duro de cadena
 			const s = stateOf(v.ruleId);
-			const cap = rule.maxPerChain ?? (rule.repeatMode === "once" ? 1 : defaultMax);
+			const cap =
+				rule.maxPerChain ?? (rule.repeatMode === "once" ? 1 : defaultMax);
 			if (s.interventions >= cap) return false;
 			if (
 				rule.repeatMode === "cooldown" &&

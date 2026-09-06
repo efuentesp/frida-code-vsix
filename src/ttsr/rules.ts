@@ -61,7 +61,8 @@ export const BUILTIN_TTSR_RULES: readonly TtsrRule[] = [
 	},
 	{
 		id: "refs-not-closes",
-		description: "Commits con Refs #N (no Closes/Fixes/Resolves — política del repo)",
+		description:
+			"Commits con Refs #N (no Closes/Fixes/Resolves — política del repo)",
 		reminder:
 			"(Recordatorio automático TTSR) La política de este repo exige " +
 			"referenciar issues con 'Refs #N' en el cuerpo del commit — NUNCA con " +
@@ -161,9 +162,11 @@ export function matchRule(
  * (el `partial` del AssistantMessageEvent). Los toolCall se serializan
  * (nombre + arguments) para que las regex operen sobre texto plano.
  */
-export function extractScopes(
-	partial: any,
-): { text: string; thinking: string; toolargs: string } {
+export function extractScopes(partial: any): {
+	text: string;
+	thinking: string;
+	toolargs: string;
+} {
 	const out = { text: "", thinking: "", toolargs: "" };
 	const content = partial?.content;
 	if (!Array.isArray(content)) return out;
