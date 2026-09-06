@@ -88,6 +88,31 @@ describe("abortRun (#96): abort sobre la sesión real del SDK", () => {
 		const gate = { requestAbort: vi.fn() };
 		const { deps } = makeDeps(agent, { abortGate: gate });
 		await abortRun(deps);
-		expect(gate.requestAbort).toHaveBeenCalledTimes(1);
+		// #2: marca al INICIO (cobertura del relanzamiento 14ms después) + refresh
+		// al final (ventana desde el fin del abortRun).
+		expect(gate.requestAbort).toHaveBeenCalledTimes(2);
+	});
+
+	it("#2 marca el gate ANTES de tocar la sesión (el retry relanzado 14ms después cae en la ventana)", async () => {
+		const orden: string[] = [];
+		const agent = fakeAgentSession({
+			abortRetry: vi.fn(async () => {
+				orden.push("abortRetry");
+			}),
+			abort: vi.fn(async () => {
+				orden.push("abort");
+			}),
+		});
+		const gate = {
+			requestAbort: vi.fn(() => orden.push("gate")),
+		};
+		const { deps } = makeDeps(agent, { abortGate: gate });
+		deps.isInRetry = () => true; // camino abortRetry de la traza SELE-DEV-756a
+		await abortRun(deps);
+		// El gate se marca PRIMERO: cualquier agent_start relanzado durante el
+		// abortRetry/abort ya está cubierto por el re-abort del host.
+		expect(orden[0]).toBe("gate");
+		expect(orden.indexOf("abortRetry")).toBeGreaterThan(orden.indexOf("gate"));
+		expect(orden.indexOf("abort")).toBeGreaterThan(orden.indexOf("gate"));
 	});
 });

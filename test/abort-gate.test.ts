@@ -67,4 +67,47 @@ describe("createAbortGate (#90: re-abort del run escapado)", () => {
 		g.onAgentSettled({ isIdle: true });
 		expect(g.isPending()).toBe(false);
 	});
+
+	// --- #2 (abort.log 2026-08-29 19:16, SELE-DEV-756a): TTL DESLIZANTE ---
+	// El run escapado colgado 85s (provider timeout) outlive un TTL fijo desde
+	// el request; su retry (2s tras su agent_end) revivió el ciclo. El TTL debe
+	// correr desde el ÚLTIMO evento del ciclo, no desde el request.
+
+	it("#2 ciclo con eventos sigue armado más allá del TTL fijo (hang 85s + retry)", () => {
+		let now = 1_000;
+		const g = createAbortGate(() => now);
+		now = 19_16_55_910; // request del abort
+		g.requestAbort();
+		now += 80_000; // el run escapado cuelga 80s (silencio del gate, pero...)
+		g.onAgentSettled({ isIdle: false }); // ...agent_end del escapado (willRetry) — EVENTO
+		now += 2_000; // el retry arranca 2s después
+		expect(g.onAgentStart({ isIdle: false })).toBe(true); // aún armado → re-aborta
+	});
+
+	it("#2 cada agent_start rearma la ventana (cadena de re-aborts)", () => {
+		let now = 1_000;
+		const g = createAbortGate(() => now);
+		g.requestAbort();
+		now += 20_000;
+		expect(g.onAgentStart({ isIdle: false })).toBe(true); // t+20
+		now += 25_000; // 25s desde el ÚLTIMO evento (< TTL), aunque t+45 > TTL fijo
+		expect(g.onAgentStart({ isIdle: false })).toBe(true);
+	});
+
+	it("#2 expira tras 30s de SILENCIO absoluto (anti-zombi)", () => {
+		let now = 1_000;
+		const g = createAbortGate(() => now);
+		g.requestAbort();
+		now += ABORT_GATE_TTL_MS + 1;
+		expect(g.onAgentStart({ isIdle: false })).toBe(false);
+		expect(g.isPending()).toBe(false);
+	});
+
+	it("#2 isPending también expira por silencio (no sólo por settle/prompt)", () => {
+		let now = 1_000;
+		const g = createAbortGate(() => now);
+		g.requestAbort();
+		now += ABORT_GATE_TTL_MS + 1;
+		expect(g.isPending()).toBe(false);
+	});
 });

@@ -45,6 +45,15 @@ export async function abortRun(deps: AbortRunDeps): Promise<void> {
 	);
 	const t0 = Date.now();
 	try {
+		// #2 (abort.log 2026-08-29 19:16, SELE-DEV-756a): marcar el gate AL
+		// PRINCIPIO, no tras la carrera de 8s. En esa traza, abortRetry() mató el
+		// intento en curso pero el ciclo de retry del SDK relanzó al agente 14ms
+		// después (agent_end .950 → agent_start .964) — ANTES de que el gate se
+		// marcara al final → nadie re-abortó ese run, que colgó 85s hasta el
+		// timeout del provider y revivió un turno completo vía retry. Con la marca
+		// temprana, ese agent_start relanzado cae dentro de la ventana del gate y
+		// el host lo re-aborta de inmediato.
+		deps.abortGate.requestAbort();
 		const { session } = await deps.ensureSession();
 		// #96: session YA es el AgentSession (desestructurado de FridaSession).
 		// El histórico `const s = session.session` buscaba una propiedad .session
@@ -121,13 +130,14 @@ export async function abortRun(deps: AbortRunDeps): Promise<void> {
 				`abort() TIMEOUT 8000ms — SIGUE isStreaming=${!!s?.isStreaming} isIdle=${s?.isIdle ?? "?"} isRetrying=${!!s?.isRetrying} retryAttempt=${s?.retryAttempt ?? "?"} agentSignalAborted=${!!s?.agent?.signal?.aborted} (probable tool/MCP/subagente que ignora la señal de abort)`,
 			);
 		}
-		// #90: marcar el gate — si el abort cayó en el GAP entre runs (no-op) o el
-		// ciclo tool→LLM sigue vivo, el PRÓXIMO agent_start se re-aborta (ahí el
-		// abort del SDK sí mata el run con isStreaming=true). El gate se limpia con
-		// agent_settled real (isIdle) o un prompt nuevo del usuario.
+		// #90: re-marcar el gate (refresh de la ventana) — si el abort cayó en el
+		// GAP entre runs (no-op) o el ciclo tool→LLM sigue vivo, el PRÓXIMO
+		// agent_start se re-aborta (ahí el abort del SDK sí mata el run con
+		// isStreaming=true). El gate se limpia con agent_settled real (isIdle),
+		// 30s de silencio (TTL deslizante, #2) o un prompt nuevo del usuario.
 		deps.abortGate.requestAbort();
 		abortDiag(
-			`abortGate SET (re-abortará agent_start si el ciclo sigue vivo; TTL ${ttlMs / 1000}s)`,
+			`abortGate SET (re-abortará agent_start si el ciclo sigue vivo; TTL de silencio ${ttlMs / 1000}s)`,
 		);
 		abortDiag(`abortRun END tras ${Date.now() - t0}ms`);
 	} catch (e: any) {
