@@ -66,8 +66,10 @@ Cambias el nivel desde el **footer** de la conversación (clic en el ícono de
 escudo cicla la escalera) o desde el panel — y al salir de `manual` hacia un
 modo autónomo Frida pide confirmación (no quieres activar YOLO por accidente;
 `plan` no la pide: es MÁS restrictivo). El **borde rojo** del composer indica
-YOLO; el **ámbar**, Autónomo. Desde #55 el modo **persiste** en
-`permission.json`: sobrevive recargas de ventana.
+YOLO; el **ámbar**, Autónomo. El modo vive **sólo durante la sesión** (#199):
+toda sesión nueva o reabierta arranca siempre en ✅ Normal — nunca heredas
+autonomía de la sesión anterior. La POLÍTICA (superficies) sí persiste en
+`permission.json` (#55).
 
 ## El candado de comandos (#196)
 

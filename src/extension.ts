@@ -1042,9 +1042,28 @@ export async function activate(
 		if (typeof t === "string") return t.split("\n").slice(0, 12).join("\n");
 		return JSON.stringify(res).slice(0, 400);
 	}
-	// Modo vivo del gate. Se inicializa del permission.json persistido (#55): el
-	// modo configurado en Configuración > Auto-aprobación sobrevive recargas.
-	let approvalMode: PermissionMode = getConfig().mode;
+	// Modo vivo del gate. #199: toda sesión nueva/reabierta arranca SIEMPRE en
+	// manual — ningún arranque hereda autonomía de la sesión anterior. El modo
+	// elegido vive sólo durante la sesión (set_mode / footer / panel); la
+	// persistencia de #55 queda para la política (superficies), no para el modo.
+	// write-through inmediato: un "auto" viejo en permission.json nunca resucita
+	// ni siquiera en la ventana de tiempo antes del primer set_mode.
+	let approvalMode: PermissionMode = "manual";
+	setStoredMode("manual");
+	saveConfig();
+	/** #199: reset a Normal en cada frontera de sesión (nueva / reabierta). */
+	function resetApprovalMode(): void {
+		if (approvalMode === "manual") {
+			// Panel/webview ya coherentes: sólo asegurar el disco (barato, sync).
+			saveConfig();
+			return;
+		}
+		approvalMode = "manual";
+		setStoredMode("manual");
+		saveConfig();
+		post({ type: "mode", mode: approvalMode });
+		postPermissionsConfig();
+	}
 	let frida: FridaSession | undefined;
 	// Anti-race: si ensureSession() se llama concurrentemente (ej. webview_ready +
 	// onboarding al arrancar), sin esto ambas ven `!frida` y crean sesiones
@@ -6368,6 +6387,8 @@ export async function activate(
 		sonarState = { status: "no-data", settings: readSonarConfig() };
 		postSonarState();
 		resetQueue();
+		// #199: frontera de sesión → siempre Normal.
+		resetApprovalMode();
 		post({ type: "info", text: "Nueva sesión iniciada." });
 		if (Object.keys(keyCaches).length > 0) bootstrapSession(); // recrea la sesión para mostrar recursos
 	}
@@ -6528,6 +6549,8 @@ export async function activate(
 			postUsage(frida.session);
 			void postWorkspace();
 			postToolToggles();
+			// #199: frontera de sesión (reabierta) → siempre Normal.
+			resetApprovalMode();
 		} catch (e: any) {
 			post({
 				type: "info",
