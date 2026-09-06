@@ -17,6 +17,21 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.35.0] - 2026-09-06
+### Añadido
+
+- **ttsr** — F12 — reglas de stream (abort acotado + reinyección + reintento)
+
+### Corregido
+
+- **abort** — gate marcado al inicio + TTL deslizante por eventos del ciclo
+
+### Interno
+
+- formato pi-lens post-#201
+- formato pi-lens post-#2
+- **roadmap** — refresh de estado — P1 completo, P2/Pista M avanzados
+
 ## [0.34.0] - 2026-09-06
 ### Añadido
 
