@@ -17,6 +17,106 @@ Frida usa `/version` (qué tienes) y `/update` (¿hay una nueva?).
 
 ### Corregido
 
+## [0.34.0] - 2026-09-06
+### Añadido
+
+- **frida-permission-system** — toda sesión nueva/reabierta arranca en Normal
+- **frida-permission-system** — niveles de seguridad plan y auto-guarded
+- **frida-permission-system** — candado de comandos — regex ERE + denylist compartido multi-agente
+- **frida-extensible-workflows** — rediseño de panel a tree view nativo estilo copilot
+- **frida-workflow** — arrancar /skill:discover desde el monitor web (#194)
+- **frida-workflow** — welcome SDD + URL del monitor + parent en skills
+- **frida-workflow** — overlay /pipeline y monitor HTTP+SSE con paginas HTML
+- **frida-workflow** — reconciler y acciones del pipeline N1 + motor PanelSpec
+- **frida-workflow** — dominio del pipeline N1 — features.json espejo del board
+- **frida-workflow** — superficie frida.board.* en el extensionApi
+- **frida-workflow** — factory defineSddWorkflow — config SDD declarativo
+- **frida-workflow** — kanban con dependencias del plan — gating, paralelismo y candado
+- **frida-workflow** — kanban — estilo del botón, orden de footers, pulso del ítem activo y backlog bloqueado
+- **frida-workflow** — panel del workflow bloqueado durante runs (candado)
+- **frida-workflow** — tablero kanban como panel colapsable del footer (frontend-design)
+- **frida-workflow** — el tablero permanece abierto y vivo al lanzar desde ▶
+- **frida-workflow** — tablero-vivo — imagen fiel del ciclo del workflow
+- **frida-workflow** — tablero kanban visual del plan — comando /board
+- **frida-workflow** — board (kanban interno) jerarquico con contratos de skills
+- **frida-workflow** — la tarjeta sugiere el primer hueco REAL del plan via progreso persistente
+- **sonar** — snapshot por turno, tab Sonar, badge de gate y gate completo (fases 3-6 de M3)
+- **sonar** — lib pura del gate de calidad + seam punta a punta (fases 1-2 de M3)
+- **webview** — detección y sugerencia automática de skills propuestos en followups
+- **workflows** — rediseño de la sección de huérfanos con tarjetas compactas (Propuesta 1)
+- **ui** — tarjetas de proveedores colapsables estilo acordeón clásico VS Code
+- **ui** — rediseño web-friendly de paneles y eliminación de glifos unicode
+- **mapa** — export HTML autónomo del mapa del proyecto
+- **mapa** — cruce técnico↔funcional con matriz m9 (fase 4)
+- **mapa** — vista técnica (pi-lens) + re-poll (fase 3)
+- **mapa** — grafo SVG funcional + evidencia (fase 2)
+- **mapa** — contrato del tab + mapa funcional host + lista honesta (fase 1)
+- **workflows** — Pista M slash commands — fase 6: alineación de textos de validadores y how-tos
+- **workflows** — Pista M slash commands — fase 5: cards de inicio en el Welcome
+- **workflows** — Pista M slash commands — fases 1-4: /walkthrough · /understand · /size + fix de descripciones
+
+### Corregido
+
+- **frida-extensible-workflows** — re-montar panel tras nueva sesión y de-ctx-ificar spawner
+- **webview** — «Abrir monitor» abre el navegador via openExternal del host (#195)
+- **frida-workflow** — plan completo sin «Avanzar a F0» — parser h3/grupos + escalera board (#193)
+- **frida-workflow** — verdictParser resuelve el handle contra ctx.cwd (#192)
+- **frida-workflow** — cablear alias jiti de typebox prometido en index.ts
+- **frida-workflow** — shim import.meta en el bundle DSL — causa raiz #189
+- **frida-workflow** — dedup de transiciones del board + ts unico por evento
+- **frida-workflow** — nota del #182 como comentario JSX — dejaba de ser texto renderizado
+- **frida-workflow** — iconos del kanban uniformes y en orden cronologico
+- **frida-workflow** — tarjeta del kanban a dos renglones — id/métricas indivisibles
+- **frida-workflow** — reset de ciclo al iniciar run — la tarjeta relanzada vuelve a backlog
+- **frida-pipeline** — implement corrige los errores del informe de validacion previo
+- **frida-workflow** — breaker trip deja la tarjeta en validate con marca blocked
+- **frida-workflow** — botón ▶ visible en todas las tarjetas ejecutables del tablero
+- **frida-workflow** — boards de roadmap con sync del plan desactivable (disablePlanSync)
+- **frida-workflow** — panel del workflow reaparece al (re)montarse la webview y el tablero enfoca el chat al lanzar
+- **frida-workflow** — runtime sin re-sync del plan por etapa + panel reaparece con run nuevo
+- **frida-workflow** — exportar deriveBoardSpec en el index (sincronización de boards de roadmap)
+- **frida-workflow** — migracion progress->board resuelve el id canonico (sin duplicados)
+- **frida-workflow** — la fase del input se detecta tras "Phase" explicito o suelta tras el path, nunca dentro del path
+- **frida-workflow** — cablear el command runner de la tarjeta de siguiente paso + visibilidad del tipo de accion
+- **frida-workflow** — cwd en RunView, pausa por validates fallidos y semantica del breaker
+- **webview** — Welcome autocorrige la categoria detectada cuando el workspace llega tarde
+- **auth** — publicar catálogo de modelos y estado authed al guardar API key
+- **welcome** — ejecutar /understand y /size como submit en vez de insert
+
+### Interno
+
+- ignorar dumps devengine-suite locales
+- formato pi-lens post-#196/#197
+- **webview** — rebuild dist-webview con niveles de seguridad
+- **frida-permission-system** — escalera de 5 niveles + sección del candado
+- **webview** — rebuild dist-webview con open_external (#195)
+- formato pi-lens post-#195
+- **frida-workflow** — formato pi-lens post-#192
+- **rpiv** — validacion pass de las fases 2-8 del plan de paneles
+- **rpiv** — pipeline paneles SDD N1-N2 — FRD, research, design, plan y validaciones (f1)
+- **style** — formato de extension-api (#161)
+- **style** — aplicar formato consistente a src/test/webview
+- **frida-workflow** — kanban sin check de deps satisfechas — el ▶ activo ya lo dice
+- **frida-workflow** — controles internos del kanban como iconos puros
+- separadores de tabla markdownlint (autofix)
+- **devengine** — aclarar credenciales para el equipo del gateway
+- **devengine** — reflow de formato (md tables + prettier ts)
+- **devengine** — repro del incidente de streaming 29-30/ago + gate de regresión del reporte 1
+- **rpiv** — validación M3 frida-sonar (pass) — 6 fases verificadas (cierre)
+- **rpiv** — pipeline M3 frida-sonar — discover, research, design, plan y validación (f1-2)
+- **sonar** — reformateo Prettier del código de las fases 1-2
+- configurar pi-lens para ignorar dist-webview
+- **rpiv** — validación M2 panel Mapa (pass) — fases 1-5 verificadas (cierre)
+- **mapa** — reformateo Prettier del código de las fases 1-5
+- **rpiv** — validación M2 panel Mapa (pass) — fases 1-3 verificadas en 3 runs incrementales
+- **rpiv** — validación M2 panel Mapa (pass) — fases 1-2 verificadas en 2 runs incrementales
+- **rpiv** — pipeline M2 panel Mapa del proyecto — FRD, research, design y plan
+- **webview** — aterrizar guarda de integridad del bundle + rebuild
+- **rpiv** — validación Pista M slash commands (pass) — cierre: fases 1-6 verificadas
+- **rpiv** — validación Pista M slash commands (pass) — fase 5 verificada; fase 6 pendiente
+- **rpiv** — validación Pista M slash commands (pass) — fases 1-4 verificadas en 3 runs incrementales
+- **rpiv** — pipeline Pista M slash commands — FRD, research, design y plan
+
 ## [0.33.0] - 2026-08-28
 ### Añadido
 
