@@ -240,6 +240,19 @@
           "default": "",
           "markdownDescription": "Ruta a un denylist compartido multi-agente (una regex POSIX-ERE por línea, `#` comentarios): frida lo lee y lo suma a `frida.gates.dangerousCommandPatterns`. Diseñado para `~/.agents/hooks/dangerous-patterns.txt` (compartido con Claude Code, Cursor, Codex, Pi, …). Vacío = desactivado. Re-lectura automática al cambiar el archivo (cache por mtime). Archivo inexistente o ilegible = fail-open."
         },
+        "frida.ttsr.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "TTSR — reglas de stream (F12): monitorea el stream del asistente en vivo y, si el modelo viola una regla del proyecto (es-MX, `Refs #N` en commits, tokens `--vscode-*` en UI), interrumpe la emisión, inyecta el recordatorio y reintenta desde el mismo punto. Cero impuesto de contexto por turno. Aplica en vivo."
+        },
+        "frida.ttsr.disabledRules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Ids de reglas builtin de TTSR a desactivar: `es-mx`, `refs-not-closes`, `vscode-tokens-ui`. Ej.: `[\"vscode-tokens-ui\"]`. Con `frida.ttsr.enabled: false` se apaga todo."
+        },
         "frida.sonar.maxWarnings": {
           "type": "number",
           "default": 0,

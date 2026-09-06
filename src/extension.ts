@@ -260,9 +260,11 @@ import {
 	readGatePatterns,
 	readSonarConfig,
 	readToolToggles,
+	readTtsrConfig,
 	setTelemetryOptIn,
 	writeToolToggle,
 } from "./settings";
+import { createTtsr } from "./ttsr/coordinator";
 import {
 	TOOL_TOGGLES,
 	TOOL_TOGGLE_BASES,
@@ -1168,6 +1170,17 @@ export async function activate(
 		appendAbortLog(line);
 		console.log("[frida-abort]", msg);
 	}
+
+	// TTSR (#201, F12): reglas de stream — monitorea message_update y, ante una
+	// violación, aborta el parcial + inyecta el recordatorio (steer) + reintenta
+	// (continue). Diagnóstico al MISMO canal que la forense de abort (prefijo
+	// [ttsr]): una sola línea de tiempo al depurar aborts de usuario ↔ TTSR.
+	const ttsr = createTtsr({
+		diag: abortDiag,
+		notify: (text) => post({ type: "info", text }),
+		isEnabled: () => readTtsrConfig().enabled,
+		disabledRules: () => readTtsrConfig().disabledRules,
+	});
 
 	function workspaceCwd(): string {
 		return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
@@ -2598,6 +2611,10 @@ export async function activate(
 
 	function wireSession(session: any): void {
 		session.subscribe((event: any) => {
+			// TTSR (#201): todos los eventos pasan por el coordinator (message_update
+			// es el hook; agent_start cierra la ventana intervening). Barato si está
+			// desactivado (early-return en armed()).
+			ttsr.handleEvent(event, session);
 			switch (event?.type) {
 				case "agent_settled":
 					// issue #2: el SDK asentó el run (_isAgentRunActive=false). Si esto llega
@@ -3142,6 +3159,8 @@ export async function activate(
 				// #90: trabajo nuevo INTENCIONAL del usuario → limpia el gate de re-abort
 				// (no queremos re-abortar el run que el usuario acaba de pedir).
 				abortGate.onUserPrompt();
+				// TTSR (#201): cadena nueva — resetea contadores/cooldowns de reglas.
+				ttsr.onUserPrompt();
 				await runPrompt(
 					String(msg.text ?? ""),
 					msg.mode === "followUp" ? "followUp" : "steer",

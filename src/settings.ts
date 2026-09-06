@@ -164,6 +164,26 @@ export async function writeToolToggle(
 		.update(def.setting, enabled, vscode.ConfigurationTarget.Global);
 }
 
+// === TTSR (#201): reglas de stream (F12) — toggle + reglas desactivadas ===
+
+/** Config en vivo de TTSR (frida.ttsr.*): se relee en cada evento de stream. */
+export interface TtsrConfig {
+	/** Master switch. Default: true. */
+	enabled: boolean;
+	/** Ids de reglas builtin desactivadas (frida.ttsr.disabledRules). */
+	disabledRules: string[];
+}
+
+/** Snapshot en vivo de la config de TTSR (molde readGatePatterns). */
+export function readTtsrConfig(): TtsrConfig {
+	return {
+		enabled: vscode.workspace
+			.getConfiguration(CONFIG_SECTION)
+			.get<boolean>("ttsr.enabled", true),
+		disabledRules: readStringArray("ttsr.disabledRules"),
+	};
+}
+
 // === Toggles Fase 2 (issue #53): gates nuevos de módulos conmutables ===
 
 /** ¿Está activo frida-subagents? Default: true. */
