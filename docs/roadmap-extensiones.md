@@ -15,6 +15,8 @@
 > [roadmap UI/UX](../.rpiv/artifacts/plans/2026-08-19_ui-ux-copilot-roadmap.md)
 > con el detalle por fase). Las referencias F7–F13 apuntan a ese documento.
 >
+> **Actualizado 2026-09-06:** refresh de estado tras 0.33.0/0.34.0 — **P1 queda 100% completo** (M8 #133 y M1 #134 cerrados: `/walkthrough` · `/understand` · `/size` en producción); en P2 cerraron **#35 sandboxes, #26 better-subagents, #16 plugins** (desbloquea la cadena P3 #34/#38/#40) y **M9/M2/M3/M10** (M3 #144 cerrado con evidencia). 0.34.0 además trajo pipeline N1 + monitor HTTP+SSE + kanban de frida-workflow, lo que **sube el peso de #39** (consolidación). Alta de **#191** (kanban de tareas del usuario) como continuación natural.
+>
 > **Actualizado 2026-08-24:** integración de la pista de **entendimiento,
 > mantenimiento y modernización de apps desconocidas** — items **M1–M10** —
 > derivada de la investigación de [docs/modernization-apps.md](modernization-apps.md)
@@ -42,11 +44,11 @@
 
 | Prioridad | Foco | Issues | Estado |
 | --- | --- | --- | --- |
-| **P0** | Correctness del core (auditoría/facturación + UX de la feature bandera) | #18, #7 | ✅ **Completo** — #18 cerrado (`eb30dbc`); #7 resuelto por el panel de workflows (progreso vivo + live view, v0.29.x) |
-| **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21 ✅, #29 ✅, F7 ✅ (#121), **M8 (#133), M1 (#134)** | Tríada del moat + F7 completos; **solo restan M8 y M1** (Pista M): entendimiento funcional+técnico de apps desconocidas, sin blockers |
-| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | #35, #13→#14, #26, #16, **F8, F9, F10**, **M9, M2, M3, M10 (#139)** | F8 depende de F7; M9 (puente funcional↔técnico) y M2 (mapa) dependen de M8; M3 suma calidad/auditoría (Sonar); **M10 dimensiona el esfuerzo** (cuantitativo, hermano de M1✅) |
-| **P3** | Ecosistema de skills/packs (dependen de #16 y/o #19) | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, **F12**, **M6** | **F12 bloqueada por el clúster de abort**; M6 libre (fase modernización) |
-| **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39, **#2↗, F11, F13b, M7, M4↘, M5** | **#2 re-evaluado: ver P2↗**; M4/M5 re-escalados por solape con #25✅ + pi-lens |
+| **P0** | Correctness del core (auditoría/facturación + UX de la feature bandera) | #18, #7 | ✅ **Completo** — #18 cerrado (`eb30dbc`); #7 resuelto por el panel de workflows (v0.29.x) |
+| **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21 ✅, #29 ✅, F7 ✅ (#121), M8 (#133) ✅, M1 (#134) ✅ | ✅ **Completo** (0.34.0) — tríada + F7 + Pista M P1 (`/walkthrough` · `/understand` · `/size`) |
+| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | ✅ #35, ✅ #26, ✅ #13; restan **#14, #2↗, F8, F9, F10** | Sandboxes/detached/worktrees/plugins listos; queda el clúster de abort (#2↗, bloqueador de F12), sesiones paralelas y las F de UX |
+| **P3** | Ecosistema de skills/packs | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, F12, M6 | **Desbloqueado por #16 ✅** (cc-plugins en producción); F12 sigue bloqueada por el clúster de abort |
+| **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39↗, F11, F13b, M7, M4↘, M5, #191 | #39 cobra peso tras 0.34.0 (frida-workflow creció con pipeline N1/monitor/kanban); #191 kanban de tareas listo para arrancar |
 | **Blocked** | Plataforma | #42 | requiere refactor del bus Remote React |
 
 **Principio rector:** los pilares de Frida (CONTEXT §1-2) son *UX tipo Claude
@@ -72,8 +74,9 @@ y la **UX de la feature bandera**.
 
 Ninguno por sí solo distingue a Frida; **la tríada sí**. Juntos forman la barrera
 de entrada más alta para un competidor y el núcleo del pilar de *contexto*.
-✅ **Los tres módulos y F7 ya están completos**; lo único pendiente de P1 son
-M8/M1 (Pista M, sin blockers): arrancar ya.
+✅ **P1 100% completo**: la tríada (#25/#21/#29), F7 (#121) y los dos items de
+Pista M (M8 #133 `app-walkthrough` y M1 #134 `understand-app`) — todos en
+producción (`/walkthrough` · `/understand` · `/size`, CHANGELOG 0.34.0).
 
 | Issue | Qué | Rol en el moat | Desbloquea |
 | --- | --- | --- | --- |
@@ -82,9 +85,9 @@ M8/M1 (Pista M, sin blockers): arrancar ya.
 | **#29** `frida-knowledge-base` | KB OKF (capa agente) + Foam (capa humana) | **Conocimiento** — base estructurada que aprende y donde el humano inyecta criterios | ✅ **Completo — issue cerrado**; vault OKF v0.2 en `<proyecto>/.llm-wiki/` (`docs/tools/frida-knowledge-base.md`) — destraba #30, #41 |
 | **F7** Roles de modelo y routing (#121) | `default`/`smol`/`commit` + fallback chains Enterprise→Ollama | **Habilitador transversal del moat** — memoria, subagents y extracciones al Ollama local (costo 0); resiliencia ante 429/quota | ✅ **Completo (#121)** — resolvedor puro (`src/model-roles.ts`) + sección Roles en el tab Modelos — destraba F8, F13a |
 
-**Orden sugerido:** ~~tríada + F7~~ (✅ todo hecho). **Solo restan M8 (#133) y
-M1 (#134)** — ver [Pista M](#pista-m--entendimiento-de-aplicaciones-funcional--técnico)
-abajo: todo lo que consumen ya está listo.
+**Orden sugerido:** ~~tríada + F7~~ (✅ todo hecho). ~~Solo restan M8 (#133) y
+M1 (#134)~~ ✅ **también completos** — ver
+[Pista M](#pista-m--entendimiento-de-aplicaciones-funcional--técnico) abajo.
 
 ---
 
@@ -99,12 +102,12 @@ abajo: todo lo que consumen ya está listo.
 
 | Orden | Item | Capacidad que agrega | Valor para el objetivo | Depende de | Esfuerzo | Prioridad |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | **M8** workflow `app-walkthrough` (#133) | El agente **usa la app como usuario nuevo**: navega, prueba acciones/validaciones, y produce el catálogo funcional (pantallas, journeys, reglas de negocio observadas, roles) | **La capacidad que hoy no existe y abre la pista**: Frida entiende código, no funcionalidad. El snapshot semántico de D34 (a11y tree) ya es un inventario funcional de pantalla — solo falta orquestarlo y documentarlo | `frida-agent-browser` ✅ (D34), `frida-subagents` ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
-| 2 | **M1** workflow `understand-app` (#134) | Contraparte **técnica**: overview + hotspots + riesgos → `docs/entendimiento.md` + modelo LikeC4 semilla | Junto con M8 cubre el entendimiento completo (funcional × técnico); además valida M4/M5 vía el piloto | #25 ✅, pi-lens ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** |
+| 1 | **M8** workflow `app-walkthrough` (#133) | El agente **usa la app como usuario nuevo**: navega, prueba acciones/validaciones, y produce el catálogo funcional (pantallas, journeys, reglas de negocio observadas, roles) | **La capacidad que hoy no existe y abre la pista**: Frida entiende código, no funcionalidad. El snapshot semántico de D34 (a11y tree) ya es un inventario funcional de pantalla — solo falta orquestarlo y documentarlo | `frida-agent-browser` ✅ (D34), `frida-subagents` ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** ✅ cerrado (0.34.0) |
+| 2 | **M1** workflow `understand-app` (#134) | Contraparte **técnica**: overview + hotspots + riesgos → `docs/entendimiento.md` + modelo LikeC4 semilla | Junto con M8 cubre el entendimiento completo (funcional × técnico); además valida M4/M5 vía el piloto | #25 ✅, pi-lens ✅, `frida-workflow` ✅ — **todo listo** | S–M | **P1** ✅ cerrado (0.34.0) |
 | 3 | **M9** `frida-traffic2api` (#135) | Del tráfico capturado durante la exploración (HAR/mitmproxy) → **spec OpenAPI** + matriz funcionalidad↔endpoint↔módulo (cruce M8×M1) | **Puente funcional↔técnico**: convierte dos documentos aislados en un mapa accionable para mantenimiento quirúrgico y para detectar endpoints huérfanos | M8 ✅ (modo walk), o HAR externo (devtools/mitmproxy) | M | **P2** ✅ |
 | 4 | **M10** workflow `size-app` (#139) | **Dimensionamiento cuantitativo**: NCLOC/ULOC+DRYness, CCN p50/p90/p99 por función, duplicación, acoplamiento, churn/hotspots, bus factor → **COCOMO±rango + olas de migración** en `docs/dimensionamiento/` | El insumo del **negocio**: "app tomada → cuánto cuesta mantenerla/modernizarla". Hermano cuantitativo de M1✅; `scc` cubre ~80% en un binario polyglota (270+ lenguajes) | Motor ✅, pi-lens ✅, `scc` ✅ (pin v4.0.0 al agentDir) | S–M | **P2** ✅ |
-| 5 | **M2** panel "Mapa del proyecto" | Visualizar en producto el mapa técnico (`/lens-map` de pi-lens) **y** el funcional (grafo de journeys de M8); clic → abrir archivo | Comunicar y compartir el entendimiento (equipo, stakeholders, demo comercial) | M8 (mapa funcional), pi-lens ✅ (mapa técnico) | S–M | **P2** |
-| 6 | **M3** `frida-sonar` | Quality gate en el loop: issues por severidad/rama, verificación post-fix, panel de tendencia | Cierra el ciclo entender → diagnosticar → corregir → **verificar**; refuerza el pilar de auditoría | Libre (requiere SonarQube operativo en la empresa) | M | **P2** |
+| 5 | **M2** panel "Mapa del proyecto" | Visualizar en producto el mapa técnico (`/lens-map` de pi-lens) **y** el funcional (grafo de journeys de M8); clic → abrir archivo | Comunicar y compartir el entendimiento (equipo, stakeholders, demo comercial) | M8 (mapa funcional), pi-lens ✅ (mapa técnico) | S–M | **P2** ✅ cerrado — fases 1–4 (grafo SVG, cruce m9, export HTML) en 0.34.0 |
+| 6 | **M3** `frida-sonar` | Quality gate en el loop: issues por severidad/rama, verificación post-fix, panel de tendencia | Cierra el ciclo entender → diagnosticar → corregir → **verificar**; refuerza el pilar de auditoría | Libre (requiere SonarQube operativo en la empresa) | M | **P2** ✅ cerrado (#144) — fases 1–6 en 0.34.0 (snapshot por turno, tab Sonar, badge, gate) |
 | 7 | **M6** `frida-openrewrite` | Migraciones mecánicas deterministas: dry-run + diff en VS Code + verificación post-receta | Fase modernización: lo mecánico con recetas type-aware; el criterio queda con el agente (guiado por M1) | M1 (contexto de lo no-mecánico); opcional M3 (verificación) | M–L | **P3** |
 | 8 | **M7** embeddings vía router | Semántica de #25 con el modelo autorizado por la empresa | Micro-tarea de configuración sobre #25 ✅ | Router con endpoint de embeddings compatible OpenAI | XS | P4 |
 | — | **M4↘** porte parcial pi-shazam | (condicional) solo el gap en hotspots/lookup/rename | Solape casi total con pi-lens + #25✅; evaluar tras el piloto | Piloto (modernization-apps §8) | M | P4 — evaluar/cancelar |
@@ -136,18 +139,17 @@ sesiones) sin riesgo de daño colateral.
 
 | Issue | Qué | Notas |
 | --- | --- | --- |
-| **#35** `frida-sandboxes` (ADR-0047) | Aislamiento por container Docker/devcontainer por agente | Libre, sin blockers |
-| **#13** `frida-worktree` → **#14** sesiones paralelas | Worktrees de git para sesiones paralelas + switcher | #13 ✅ cerrado (0.18.0, src/worktree/ + docs); #14 sigue abierto — depende de la base #13 ya lista |
-| **#26** `frida-better-subagents` | Subagentes detached/sandboxed | Refuerza el aislamiento |
-| **#16** `frida-plugins` | Sistema de plugins estilo Claude Code (comandos/skills/MCP/hooks empaquetados) | **Mayor palanca del roadmap** pero **ambiguo** (investigación aún abierta). Bloquea #34, #38, #40, #41. **Investigar antes de implementar** |
-| **#2↗ Detener/abort** | El clúster de abort (#2 → hoy #85/#90/#96: `abortRun` sobre undefined, run escapado durante tool) | **Subido de P4**: era "bug UX libre"; el análisis TTSR (F12) lo reveló **bloqueador estructural** — sin abort limpio no hay reglas de stream ni control confiable de workflows/subagents. Corregir ANTES de F12 |
-| **F8** Advisor + WATCHDOG.md | Revisor por turno (rol smol/Ollama), severidades nit/concern/blocker, emission guard | Depende de F7. Refuerza el pilar de auditoría turno a turno |
+| **#35** `frida-sandboxes` (ADR-0047) | Aislamiento por container Docker/devcontainer por agente | ✅ **Cerrado** — container Docker local por agente (CHANGELOG, [how-to-frida-sandboxes](how-to-frida-sandboxes.md)) |
+| **#13** `frida-worktree` → **#14** sesiones paralelas | Worktrees de git para sesiones paralelas + switcher | #13 ✅ cerrado (0.18.0, src/worktree/ + docs); **#14 sigue abierto** — la base ya está lista |
+| **#26** `frida-better-subagents` | Subagentes detached/sandboxed | ✅ **Cerrado** — modo detached (proceso propio que sobrevive al padre) + how-to |
+| **#16** `frida-plugins` | Sistema de plugins estilo Claude Code (comandos/skills/MCP/hooks empaquetados) | ✅ **Cerrado (2026-08-17)** — `frida-cc-plugins` en producción — **desbloquea #34, #38, #40, #41** |
+| **#2↗ Detener/abort** | El clúster de abort (#2 → hoy #85/#90/#96: `abortRun` sobre undefined, run escapado durante tool) | **Siguiente candidato** — dolor UX diario Y prerrequisito de F12; sin abort limpio no hay reglas de stream ni control confiable de workflows/subagents. Corregir ANTES de F12 |
+| **F8** Advisor + WATCHDOG.md | Revisor por turno (rol smol/Ollama), severidades nit/concern/blocker, emission guard | F7 ✅ lo destrabó. Refuerza el pilar de auditoría turno a turno |
 | **F9** web_search keyless | Cadena de backends con piso sin API key (duckduckgo/startpage) | Autonomía de investigación del agente — dolor real (sesión 2026-08-22 coja sin keys) |
 | **F10** Edición hashline | Anclas por hash de contenido; rechaza ediciones rancias; −61% tokens de salida | Pilar facturación (tokens por turno) + calidad del loop de edición |
 
-> **#16 es especial:** es el que más desbloquea (4 skill packs cuelgan de él),
-> pero su diseño no está cerrado. Tratarlo como *investigación* antes de
-> comprometer implementación.
+> ~~**#16 es especial**~~ — resuelto: cc-plugins (instalados/mercados/toggles)
+> ya cumple el rol y la cadena P3 (#34 → #38 → #40) quedó desbloqueada.
 
 ---
 
@@ -163,15 +165,14 @@ de dynamic-workflows). No arrancar hasta tener sus dependencias.
 | **#28** `frida-relay` | Corrección gobernada de creencias sobre hermes | #21 |
 | **#32** | Curaduría de skills sobre hermes | #21 |
 | **#30** `frida-doc-converter` | Ingest Office↔markdown con provenance | #29 |
-| **#34** `frida-advise-project-approach` | Skill de metodología de estrategia de proyecto | #16 |
-| **#38** `frida-aidd` (ADR-0050) | Metodología AiDD (BMAD) como skill pack + meta-workflow | #16 |
-| **#40** `frida-cis` | Creative Intelligence Suite (skill pack) | #38, #16 |
+| **#34** `frida-advise-project-approach` | Skill de metodología de estrategia de proyecto | ~~#16~~ ✅ desbloqueado |
+| **#38** `frida-aidd` (ADR-0050) | Metodología AiDD (BMAD) como skill pack + meta-workflow | ~~#16~~ ✅ desbloqueado |
+| **#40** `frida-cis` | Creative Intelligence Suite (skill pack) | #38 (~~#16~~ ✅) |
 | **#41** `frida-tea` | Test Engineering Architect (skill pack, materializa patrones de #19) | #19, #29, #16 |
 | **F12** TTSR — reglas de stream | Regex/AST sobre el stream → abort + inyecta recordatorio + reintento. Reglas builtin: es-MX, `Refs #N`, tokens `--vscode-*` | **Clúster de abort #85/#90/#96 (= #2↗ en P2)**. Al desbloquearse sube de facto a P2 |
 
-**Cadena crítica:** #18✅/#7✅ destrabaron a **#19** → #41 (TEA); falta #16 →
-
-# 38 → #40 (CIS) y #2↗ → F12 (TTSR)
+**Cadena crítica:** #18✅/#7✅ destrabaron a **#19** → #41 (TEA); **#16✅ ya
+destrabó** #34 → #38 → #40 (CIS); falta **#2↗ → F12 (TTSR)**
 
 ---
 
@@ -188,8 +189,8 @@ Valor real pero **menor prioridad estratégica** que el moat (P1). Varios están
 | **#24** `frida-background-tasks` | Shell durable + watchers | Libre |
 | **#27** `frida-plan-mode` | Modo /plan read-only colaborativo | Libre |
 | **#33** `frida-neuroarxiv` | Prior-art vía workflow diverge/converge aislado | Libre, nicho |
-| **#36** `frida-kanban` (ADR-0048) | Panel Kanban de observabilidad | Libre |
-| **#39** | Consolidación frida-workflow → frida-extensible-workflows (deuda) | Migrar frida-pipeline + /wf |
+| **#36** `frida-kanban` (ADR-0048) | Panel Kanban de observabilidad | Libre — notar el solape con el kanban de workflow (0.34.0) y con **#191** (tareas del usuario): evaluar fusión de alcance |
+| **#39** | Consolidación frida-workflow → frida-extensible-workflows (deuda) | **Peso creciente**: 0.34.0 añadió pipeline N1 + monitor HTTP+SSE + kanban a frida-workflow; la consolidación (D9, ADR-0028) debería venir antes de seguir construyendo sobre frida-workflow |
 | **F11** Agent Hub | Tab de supervisión de subagents: roster vivo (costo/tokens/actividad), transcript en vivo, steer/revive/kill | Observabilidad pura — buen valor, menor palanca que F7–F10 |
 | **F13b** Menores | `conflict://` en worktrees, dictado 🎤 (#95), magic keywords (`ultrathink`/`orchestrate`/`workflowz`) | Nicho/UX; la memoria 2-fase (F13a) quedó en P1 junto a #21 |
 
@@ -216,31 +217,29 @@ dependencias, valor y orden de implementación por item.
 P0:  #18 ✅ ─┐
        #7 ✅ ─┴─→ #19 ──→ #41 (TEA)
                          ↑
-#21 (hermes) ←── F7 (roles/smol)
+#21 (hermes ✅) ←── F7 (roles/smol ✅)
    └─→ #28, #32           │
-#29 (KB) ─────→ #30 ─────┤
+#29 (KB ✅) ───→ #30 ────┤
                          │
-#16 (plugins) ─→ #34, #38 ─→ #40 (CIS) ──┘
-#20 (goal) ────→ #22 (refine)
-#13 (worktree) → #14 (sesiones paralelas)
-F7 (roles) ─→ F8 (advisor), F13a (memoria 2-fase)
-#2↗ (abort: #85/#90/#96) ─→ F12 (TTSR)
+#16 (plugins ✅) ─→ #34, #38 ─→ #40 (CIS) ──┘
+#20 (goal ✅) ───→ #22 (refine)
+#13 (worktree ✅) → #14 (sesiones paralelas) ← ABIERTO
+F7 (roles ✅) ─→ F8 (advisor), F13a (memoria 2-fase ✅)
+#2↗ (abort: #85/#90/#96) ─→ F12 (TTSR)      ← SIGUIENTE CANDIDATO
 Pista M (entendimiento de apps):
-  M8 (app-walkthrough) ←─ agent-browser ✅ (D34) + subagents ✅ + workflow ✅
-  M1 (understand-app)  ←─ #25 ✅ + pi-lens ✅ ──valida→ M4, M5
-  M9 (traffic2api)     ←─ M8 ──cruza con→ M1 (matriz función↔endpoint↔módulo)
-  M2 (panel mapa)      ←─ M8 (mapa funcional) + pi-lens ✅ (mapa técnico)
-  M3 (sonar, libre) ─────────────────────────────refuerza→ M6 (verificación)
+  M8 (app-walkthrough ✅ 0.34.0) ←─ agent-browser ✅ + subagents ✅ + workflow ✅
+  M1 (understand-app ✅ 0.34.0)  ←─ #25 ✅ + pi-lens ✅ ──valida→ M4, M5
+  M9 (traffic2api ✅ 0.33.0)     ←─ M8 ──cruza con→ M1 (matriz función↔endpoint↔módulo)
+  M2 (panel mapa ✅ 0.34.0)      ←─ M8 (mapa funcional) + pi-lens ✅ (mapa técnico)
+  M3 (sonar ✅ 0.34.0, #144 cerrado) ──────refuerza→ M6 (verificación)
   M6 · M7 — libres
 ```
 
-**Lectura:** los nodos de mayor palanca hoy son **F7** (habilitador del moat
-con costo mínimo), **#16** (cadenas de skills) y **#2↗** (abort — destraba F12
-y devuelve control confiable a workflows/subagents). #18✅ y #7✅ ya
-destrabaron la base de la pista de workflows; #25✅ completó el grounding.
-En la pista M, **M8 y M1 tienen el mejor ratio valor/esfuerzo** (todo lo que
-consumen ya existe) y **M8 agrega la única capacidad que hoy no existe**:
-entendimiento funcional de la app a nivel de usuario.
+**Lectura:** P0/P1 y la Pista M P1-P2 están completos. Los nodos de mayor
+palanca hoy son **#2↗** (abort — destraba F12 y devuelve control confiable a
+workflows/subagents), **#14** (sesiones paralelas, base #13 lista) y **#39**
+(la deuda de consolidación crece con cada feature sobre frida-workflow). La
+cadena P3 (#34 → #38 → #40) ya está desbloqueada por #16✅.
 
 ---
 
@@ -248,24 +247,22 @@ entendimiento funcional de la app a nivel de usuario.
 
 1. ~~**Sprint P0**~~ ✅ Completo (#18 cerrado, #7 resuelto por el panel de
    workflows).
-2. **Sprint P1 (moat)** — ✅ tríada (#25/#21/#29) y F7 (#121) completos. **Restan
-   M8 (#133) y M1 (#134)**: todo lo que consumen (D34, subagents, #25✅, pi-lens,
-   `frida-workflow`) ya está listo — correr junto con el **piloto medible**
-   ([modernization-apps §8 y §10](modernization-apps.md)) que valida M4/M5. En
-   paralelo: cerrar issues #79–#84 del panel si hay holgura.
-3. **En paralelo al P1** — **#2↗ clúster de abort** (#85/#90/#96): es dolor UX
-   diario Y prerrequisito de F12; y **investigar #16** (plugins) sin
-   comprometer implementación.
-4. **Sprint P2** — F8 (advisor, tras F7) + F9 (web_search keyless) + F10
-   (hashline); #35 (sandboxes) + cerrar #13→#14 + #26; **M9
-   (`frida-traffic2api`, #135) y M2 (panel mapa) al cerrar M8; M3 (`frida-sonar`)**
-   si la empresa confirma SonarQube operativo.
-5. **Sprint P3** — Desbloquear la cadena #19 → #41 y #16 → #38 → #40; **F12**
-   (TTSR) una vez resuelto el abort; **M6 (`frida-openrewrite`)** cuando el
-   piloto madure hacia la fase de modernización.
-6. **P4 a demanda** — F11 (Agent Hub), F13b (menores), **M7 (embeddings del
-   router)**, #17/#23/#24/#27/#31/#33/#36/#39 según holgura. **M4/M5 solo si
-   el piloto demuestra el gap.**
+2. ~~**Sprint P1 (moat)**~~ ✅ **Completo** — tríada (#25/#21/#29), F7 (#121),
+   M8 (#133) y M1 (#134), todos en producción (0.34.0).
+3. ~~**En paralelo al P1**~~ — #16✅ cerrado (cc-plugins). **QUEDA: #2↗ clúster
+   de abort (#85/#90/#96)** — dolor UX diario y prerrequisito de F12: **el
+   siguiente sprint natural**.
+4. **Sprint P2** — **#14 (sesiones paralelas**, base #13 lista) + F8 (advisor,
+   F7 listo) + F9 (web_search keyless) + F10 (hashline). ~~#35, #26, M9, M2,
+   M3, M10~~ ✅ todos cerrados.
+5. **Sprint P3** — cadena #19 → #41 (TEA) y #34 → #38 → #40 (CIS, desbloqueada
+   por #16✅); **F12 (TTSR)** una vez resuelto el abort; **M6
+   (`frida-openrewrite`)** cuando el piloto madure hacia modernización.
+6. **P4 a demanda** — **#191 (kanban de tareas, diseñado)**, **#39↗
+   (consolidación workflow — antes de seguir construyendo sobre
+   frida-workflow)**, F11 (Agent Hub), F13b (menores), M7 (embeddings del
+   router), #17/#23/#24/#27/#31/#33/#36 según holgura. **M4/M5 solo si el
+   piloto demuestra el gap.**
 
 ---
 
