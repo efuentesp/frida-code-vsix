@@ -5,10 +5,7 @@
 // siguió 18s más). Contrato del estado PURO aquí; el host lo wiring.
 
 import { describe, expect, it } from "vitest";
-import {
-	createAbortGate,
-	ABORT_GATE_TTL_MS,
-} from "../src/abort-gate";
+import { createAbortGate, ABORT_GATE_TTL_MS } from "../src/abort-gate";
 
 describe("createAbortGate (#90: re-abort del run escapado)", () => {
 	it("sin request: agent_start NO re-aborta", () => {
