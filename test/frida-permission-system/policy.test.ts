@@ -48,14 +48,7 @@ function evp(
 
 describe("evaluate — superficie tool (baseline declarativa)", () => {
 	it("FREE_TOOLS pasan (allow): read/grep/find/ls/todo/ask_user_question", () => {
-		for (const t of [
-			"read",
-			"grep",
-			"find",
-			"ls",
-			"todo",
-			"ask_user_question",
-		]) {
+		for (const t of ["read", "grep", "find", "ls", "todo", "ask_user_question"]) {
 			const d = ev(t, { path: "src/app.ts" });
 			expect(d.state, `${t} debería ser allow`).toBe("allow");
 			expect(d.forceAsk).toBe(false);

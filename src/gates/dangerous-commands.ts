@@ -80,13 +80,15 @@ const RULES: Rule[] = [
     id: "mkfs",
     // mkfs, mkfs.ext4, mkfs -t xfs /dev/...
     test: /\bmkfs(?:\.\w+)?\b/,
-    description: "formatear un sistema de archivos (destruye el contenido del dispositivo)",
+    description:
+      "formatear un sistema de archivos (destruye el contenido del dispositivo)",
   },
   {
     id: "dd-to-device",
     // dd if=... of=/dev/sdX  |  of=/dev/nvme  |  of=/dev/disk
     test: /\bdd\b.*\bof=\/dev\/(?:sd|nvme|disk|hd|vd)/,
-    description: "escribir directamente a un dispositivo de bloque (disco crudo)",
+    description:
+      "escribir directamente a un dispositivo de bloque (disco crudo)",
   },
   {
     id: "truncate-device",
@@ -131,9 +133,9 @@ const RULES: Rule[] = [
     id: "git-reflog-destroy",
     // git reflog expire --expire=now | git gc --prune=now|all
     // (destruye la red de seguridad del historial local)
-    test:
-      /(?:^|[;&|])\s*git\s+(?:reflog\s+expire[^;&|]*--expire(?:-unreachable)?(?:=|\s+)(?:now|all)|gc[^;&|]*--prune(?:=|\s+)(?:now|all))/,
-    description: "destruir el reflog / poda total (historial local irrecuperable)",
+    test: /(?:^|[;&|])\s*git\s+(?:reflog\s+expire[^;&|]*--expire(?:-unreachable)?(?:=|\s+)(?:now|all)|gc[^;&|]*--prune(?:=|\s+)(?:now|all))/,
+    description:
+      "destruir el reflog / poda total (historial local irrecuperable)",
   },
   {
     id: "password-manager-cli",
@@ -277,13 +279,11 @@ function motivoPatron(pattern: string): string {
  * denylist upstream; POSIX completo no hace falta.
  */
 export function ereToJs(pattern: string): string {
-  return (
-    pattern
-      .replace(/\[\[:space:\]\]/g, "\\s")
-      .replace(/\[\[:alpha:\]\]/g, "[A-Za-z]")
-      .replace(/\[\[:digit:\]\]/g, "\\d")
-      .replace(/\[\[:alnum:\]\]/g, "[A-Za-z0-9]")
-      .replace(/\[\[:upper:\]\]/g, "[A-Z]")
-      .replace(/\[\[:lower:\]\]/g, "[a-z]")
-  );
+  return pattern
+    .replace(/\[\[:space:\]\]/g, "\\s")
+    .replace(/\[\[:alpha:\]\]/g, "[A-Za-z]")
+    .replace(/\[\[:digit:\]\]/g, "\\d")
+    .replace(/\[\[:alnum:\]\]/g, "[A-Za-z0-9]")
+    .replace(/\[\[:upper:\]\]/g, "[A-Z]")
+    .replace(/\[\[:lower:\]\]/g, "[a-z]");
 }

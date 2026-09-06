@@ -521,8 +521,8 @@ export function App() {
 
 			{state.mode === "plan" && (
 				<div className="info-bar">
-					<Codicon name="eye" size={12} /> Solo lectura: el agente no puede
-					crear ni editar archivos (bash pide confirmación).
+					<Codicon name="eye" size={12} /> Solo lectura: el agente no puede crear ni
+					editar archivos (bash pide confirmación).
 				</div>
 			)}
 			{state.mode === "auto-edit" && (

@@ -40,7 +40,8 @@ const MODES: {
 	{
 		id: "plan",
 		title: "Solo lectura",
-		desc: "Explorar/planear: leer y buscar sin tocar. Crear/editar archivos desactivado; bash pide confirmación.",
+		desc:
+			"Explorar/planear: leer y buscar sin tocar. Crear/editar archivos desactivado; bash pide confirmación.",
 		icon: "eye",
 	},
 	{
@@ -59,13 +60,15 @@ const MODES: {
 	{
 		id: "auto-guarded",
 		title: "Autónomo",
-		desc: "Larga distancia: bash simple y ediciones sin diálogo; comandos compuestos y rutas externas piden confirmación.",
+		desc:
+			"Larga distancia: bash simple y ediciones sin diálogo; comandos compuestos y rutas externas piden confirmación.",
 		icon: "rocket",
 	},
 	{
 		id: "auto",
 		title: "YOLO",
-		desc: "Sin interrupciones: todo corre sin diálogo, salvo el candado de reglas de bloqueo.",
+		desc:
+			"Sin interrupciones: todo corre sin diálogo, salvo el candado de reglas de bloqueo.",
 		icon: "zap",
 	},
 ];

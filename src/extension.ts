@@ -3602,17 +3602,15 @@ export async function activate(
 			case "set_mode": {
 				const next: PermissionMode =
 					msg.mode === "plan" ||
-						msg.mode === "auto-edit" ||
-						msg.mode === "auto-guarded" ||
-						msg.mode === "auto"
+					msg.mode === "auto-edit" ||
+					msg.mode === "auto-guarded" ||
+					msg.mode === "auto"
 						? msg.mode
 						: "manual";
 				// Gate YOLO: confirmación al entrar a un modo autónomo desde manual.
 				// plan NO pide gate: es MÁS restrictivo que manual (solo lectura).
 				if (
-					(next === "auto-edit" ||
-						next === "auto-guarded" ||
-						next === "auto") &&
+					(next === "auto-edit" || next === "auto-guarded" || next === "auto") &&
 					approvalMode === "manual"
 				) {
 					const ok = await requestYoloGate();
@@ -7217,9 +7215,7 @@ export async function activate(
 			const idx = LADDER.indexOf(approvalMode);
 			const next = LADDER[(idx + 1) % LADDER.length] ?? "manual";
 			if (
-				(next === "auto-edit" ||
-					next === "auto-guarded" ||
-					next === "auto") &&
+				(next === "auto-edit" || next === "auto-guarded" || next === "auto") &&
 				approvalMode === "manual"
 			) {
 				const ok = await requestYoloGate();

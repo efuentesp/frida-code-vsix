@@ -79,14 +79,13 @@ export function createPermissionSystem(
 				const denied = computeDeniedTools(getPermissionPolicy());
 				if (getMode() === "plan") {
 					denied.add("edit");
-				denied.add("write");
-			}
+					denied.add("write");
+				}
 				const catalog = pi.getAllTools().map((t) => t.name);
 				const allowed = catalog.filter((t) => !denied.has(t));
 				const current = new Set(pi.getActiveTools());
 				const changed =
-					allowed.length !== current.size ||
-					allowed.some((t) => !current.has(t));
+					allowed.length !== current.size || allowed.some((t) => !current.has(t));
 				if (changed) {
 					pi.setActiveTools(allowed);
 				}
@@ -115,9 +114,7 @@ export function createPermissionSystem(
 				"Modo Solo lectura (plan): crear/editar archivos está desactivado. " +
 				"Preséntale al usuario los cambios propuestos (plan, archivos, diffs) y " +
 				"que él los aplique o cambie de modo.";
-			record(
-				makeEntry(event, sessionId, "block", "mode_deny", { kind, reason }),
-			);
+			record(makeEntry(event, sessionId, "block", "mode_deny", { kind, reason }));
 			return { block: true as const, reason };
 		}
 
@@ -184,9 +181,7 @@ export function createPermissionSystem(
 						? (event.input?.path as string | undefined)
 						: undefined;
 			if (matchValue && sessionApprovals.matches(kind, matchValue)) {
-				record(
-					makeEntry(event, sessionId, "allow", "session_pattern", { kind }),
-				);
+				record(makeEntry(event, sessionId, "allow", "session_pattern", { kind }));
 				return;
 			}
 		}
@@ -267,9 +262,7 @@ function makeEntry(
 		source,
 		path: typeof event?.input?.path === "string" ? event.input.path : undefined,
 		command:
-			typeof event?.input?.command === "string"
-				? event.input.command
-				: undefined,
+			typeof event?.input?.command === "string" ? event.input.command : undefined,
 		reason: opts.reason,
 		flags: opts.flags,
 	};
@@ -296,8 +289,7 @@ function renderDiff(input: any): string {
 	}
 	if (typeof input.content === "string") {
 		return (
-			`write ${input.path ?? ""}:\n+ ` +
-			indent(input.content, "+ ").slice(0, 2000)
+			`write ${input.path ?? ""}:\n+ ` + indent(input.content, "+ ").slice(0, 2000)
 		);
 	}
 	return JSON.stringify(input, null, 2).slice(0, 2000);

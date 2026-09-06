@@ -80,8 +80,16 @@ const bashEvent = (command: string) => ({
 	toolCallId: "t1",
 	input: { command },
 });
-const editEvent = { toolName: "edit", toolCallId: "t2", input: { path: join(CWD, "src", "x.ts"), edits: [] } };
-const readEvent = { toolName: "read", toolCallId: "t3", input: { path: join(CWD, "src", "x.ts") } };
+const editEvent = {
+	toolName: "edit",
+	toolCallId: "t2",
+	input: { path: join(CWD, "src", "x.ts"), edits: [] },
+};
+const readEvent = {
+	toolName: "read",
+	toolCallId: "t3",
+	input: { path: join(CWD, "src", "x.ts") },
+};
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -91,7 +99,10 @@ describe("modo plan (Solo lectura, #197)", () => {
 	it("bloquea edit con source mode_deny y motivo que explica el modo", async () => {
 		const { handlers, rec } = makeSystem("plan");
 		const res = await handlers["tool_call"](editEvent, { session: { id: "s" } });
-		expect(res).toEqual({ block: true, reason: expect.stringContaining("Solo lectura") });
+		expect(res).toEqual({
+			block: true,
+			reason: expect.stringContaining("Solo lectura"),
+		});
 		expect(rec.entries.at(-1)).toMatchObject({
 			decision: "block",
 			source: "mode_deny",
@@ -101,7 +112,11 @@ describe("modo plan (Solo lectura, #197)", () => {
 	it("bloquea write igual que edit", async () => {
 		const { handlers } = makeSystem("plan");
 		const res = await handlers["tool_call"](
-			{ toolName: "write", toolCallId: "t4", input: { path: join(CWD, "y.ts"), content: "x" } },
+			{
+				toolName: "write",
+				toolCallId: "t4",
+				input: { path: join(CWD, "y.ts"), content: "x" },
+			},
 			{},
 		);
 		expect(res?.block).toBe(true);
@@ -148,7 +163,10 @@ describe("modo auto-guarded (Autónomo, #197)", () => {
 		const res = await handlers["tool_call"](bashEvent("npm test"), {});
 		expect(res).toBeUndefined();
 		expect(rec.bridgeCalls).toHaveLength(0);
-		expect(rec.entries.at(-1)).toMatchObject({ decision: "allow", source: "mode" });
+		expect(rec.entries.at(-1)).toMatchObject({
+			decision: "allow",
+			source: "mode",
+		});
 	});
 
 	it("edit en workspace pasa sin diálogo", async () => {
@@ -193,7 +211,10 @@ describe("modo auto (YOLO): regresión de semántica histórica (#197)", () => {
 		);
 		expect(res).toBeUndefined();
 		expect(rec.bridgeCalls).toHaveLength(0);
-		expect(rec.entries.at(-1)).toMatchObject({ decision: "allow", source: "mode" });
+		expect(rec.entries.at(-1)).toMatchObject({
+			decision: "allow",
+			source: "mode",
+		});
 	});
 
 	it("edit pasa sin diálogo", async () => {

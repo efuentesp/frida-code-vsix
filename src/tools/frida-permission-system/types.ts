@@ -35,11 +35,11 @@ export type Surface = "tool" | "path" | "bash" | "external_directory";
  *   histórica, paridad yoloMode de gotgenes). Sandbox / experimentos.
  */
 export type PermissionMode =
-	| "plan"
-	| "manual"
-	| "auto-edit"
-	| "auto-guarded"
-	| "auto";
+ | "plan"
+ | "manual"
+ | "auto-edit"
+ | "auto-guarded"
+ | "auto";
 
 /** Mapa de patrones → estado (last-match-wins dentro de la superficie). */
 export type PatternMap = Record<string, PermissionState>;
@@ -56,26 +56,26 @@ export type PatternMap = Record<string, PermissionState>;
  * overrides declarativos puros en fases posteriores.
  */
 export interface PermissionPolicy {
-	/** Per-tool: nombre de tool (o "*" default) → estado. */
-	tool: PatternMap;
-	/** Cross-cutting: patrón de path → estado. */
-	path: PatternMap;
-	/** Wildcard sobre comando bash normalizado → estado. */
-	bash: PatternMap;
-	/** CWD boundary: allow/ask/deny. (Map de dirs externos: fase posterior.) */
-	external_directory: PermissionState;
+ /** Per-tool: nombre de tool (o "*" default) → estado. */
+ tool: PatternMap;
+ /** Cross-cutting: patrón de path → estado. */
+ path: PatternMap;
+ /** Wildcard sobre comando bash normalizado → estado. */
+ bash: PatternMap;
+ /** CWD boundary: allow/ask/deny. (Map de dirs externos: fase posterior.) */
+ external_directory: PermissionState;
 }
 
 /** Configuración completa (archivo `~/.frida/permission.json`). */
 export interface PermissionConfig {
-	version: number;
-	mode: PermissionMode;
-	policy: PermissionPolicy;
-	/**
-	 * Log de auditoría `approvals.jsonl` (paridad permissionReviewLog de
-	 * pi-permission-system). Default `true` = behavior actual. Ausente → true.
-	 */
-	auditLog?: boolean;
+ version: number;
+ mode: PermissionMode;
+ policy: PermissionPolicy;
+ /**
+  * Log de auditoría `approvals.jsonl` (paridad permissionReviewLog de
+  * pi-permission-system). Default `true` = behavior actual. Ausente → true.
+  */
+ auditLog?: boolean;
 }
 
 /**
@@ -88,16 +88,16 @@ export interface PermissionConfig {
  * histórica documentada en PermissionMode.
  */
 export interface PermissionDecision {
-	/** Estado terminal (después de policy + force-ask, ANTES del modo). */
-	state: PermissionState;
-	/** true si `ask` y debe sobrevivir al modo auto (bash compuesto / path externo). */
-	forceAsk: boolean;
-	/** Motivo legible (para el modelo en deny; para el warning en force-ask). */
-	reason?: string;
-	/** Source de auditoría (sensitive_path / dangerous_command / …). Subset de DecisionSource. */
-	source?: DecisionSource;
-	/** Flags de disuasivo (compound_command / external_path) para el log. */
-	flags?: string[];
+ /** Estado terminal (después de policy + force-ask, ANTES del modo). */
+ state: PermissionState;
+ /** true si `ask` y debe sobrevivir al modo auto (bash compuesto / path externo). */
+ forceAsk: boolean;
+ /** Motivo legible (para el modelo en deny; para el warning en force-ask). */
+ reason?: string;
+ /** Source de auditoría (sensitive_path / dangerous_command / …). Subset de DecisionSource. */
+ source?: DecisionSource;
+ /** Flags de disuasivo (compound_command / external_path) para el log. */
+ flags?: string[];
 }
 
 /** Clasificación de la vista del tool (igual que ApprovalRequest.kind). */
@@ -108,10 +108,10 @@ export type ToolKind = "diff" | "bash" | "tool";
  * Se resetean al iniciar una sesión nueva (/new).
  */
 export interface GateStats {
-	/** Aprobadas por el usuario en el diálogo (source `user_approved`). */
-	allow: number;
-	/** Bloqueadas: deny por policy, rechazadas, o error del gate. */
-	block: number;
-	/** Dejadas pasar por el modo auto/auto-edit sin preguntar (source `mode`). */
-	autoAllow: number;
+ /** Aprobadas por el usuario en el diálogo (source `user_approved`). */
+ allow: number;
+ /** Bloqueadas: deny por policy, rechazadas, o error del gate. */
+ block: number;
+ /** Dejadas pasar por el modo auto/auto-edit sin preguntar (source `mode`). */
+ autoAllow: number;
 }

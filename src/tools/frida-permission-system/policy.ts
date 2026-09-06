@@ -115,9 +115,7 @@ export function evaluate(input: EvaluateInput): PermissionDecision {
 		};
 	}
 	// 1b) path surface — patrones declarativos (Fase 5b): deny → bloquea.
-	const pathMatch = inputPath
-		? matchPattern(policy.path, inputPath)
-		: undefined;
+	const pathMatch = inputPath ? matchPattern(policy.path, inputPath) : undefined;
 	if (pathMatch === "deny") {
 		return {
 			state: "deny",
