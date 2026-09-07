@@ -15,6 +15,8 @@
 > [roadmap UI/UX](../.rpiv/artifacts/plans/2026-08-19_ui-ux-copilot-roadmap.md)
 > con el detalle por fase). Las referencias F7–F13 apuntan a ese documento.
 >
+> **Actualizado 2026-09-06 (2):** alta de **#202 frida-shunt** (delegación de I/O a modelos baratos, patrón Spotify Portal — 82–94% de ahorro reportado en lecturas masivas; research en [docs/research/2026-09-06-shunt-portal-spotify.md](research/2026-09-06-shunt-portal-spotify.md)). Repriorización por valor: **#202 + F10 forman la "dupla de facturación" y toman la cima del P2** — shunt optimiza el *input* (lecturas) con infraestructura ya existente (rol smol de F7 + subagents + gate #196 + pi-lens), F10 el *output* (edición). La secuencia recomendada pasa a: #202 → F10 → #191 → F9 → F8.
+>
 > **Actualizado 2026-09-06:** refresh de estado tras 0.33.0/0.34.0 — **P1 queda 100% completo** (M8 #133 y M1 #134 cerrados: `/walkthrough` · `/understand` · `/size` en producción); en P2 cerraron **#35 sandboxes, #26 better-subagents, #16 plugins** (desbloquea la cadena P3 #34/#38/#40) y **M9/M2/M3/M10** (M3 #144 cerrado con evidencia). 0.34.0 además trajo pipeline N1 + monitor HTTP+SSE + kanban de frida-workflow, lo que **sube el peso de #39** (consolidación). Alta de **#191** (kanban de tareas del usuario) como continuación natural.
 >
 > **Actualizado 2026-08-24:** integración de la pista de **entendimiento,
@@ -46,7 +48,7 @@
 | --- | --- | --- | --- |
 | **P0** | Correctness del core (auditoría/facturación + UX de la feature bandera) | #18, #7 | ✅ **Completo** — #18 cerrado (`eb30dbc`); #7 resuelto por el panel de workflows (v0.29.x) |
 | **P1** | **Moat** — el agente que aprende y fundamenta en el código real | #25 ✅, #21 ✅, #29 ✅, F7 ✅ (#121), M8 (#133) ✅, M1 (#134) ✅ | ✅ **Completo** (0.34.0) — tríada + F7 + Pista M P1 (`/walkthrough` · `/understand` · `/size`) |
-| **P2** | Autonomía y aislamiento (agente seguro y paralelo) | ✅ #35, ✅ #26, ✅ #13; restan **#14, #2↗, F8, F9, F10** | Sandboxes/detached/worktrees/plugins listos; queda el clúster de abort (#2↗, bloqueador de F12), sesiones paralelas y las F de UX |
+| **P2** | Autonomía, aislamiento y **facturación** (agente seguro, paralelo y barato) | ✅ #35, ✅ #26, ✅ #13; **#202 shunt↖, F10, #14, #2✅, F8, F9** | **#202 y F10 = dupla de facturación (cima por valor/esfuerzo)**; sandboxes/detached/worktrees/plugins/abort listos; restan sesiones paralelas (#14) y las F de UX |
 | **P3** | Ecosistema de skills/packs | #19, #20→#22, #28, #32, #34, #38, #40, #41, #30, F12, M6 | **Desbloqueado por #16 ✅** (cc-plugins en producción); F12 sigue bloqueada por el clúster de abort |
 | **P4** | Optimización / observabilidad / nicho / deuda técnica | #17, #23, #31, #24, #27, #33, #36, #39↗, F11, F13b, M7, M4↘, M5, #191 | #39 cobra peso tras 0.34.0 (frida-workflow creció con pipeline N1/monitor/kanban); #191 kanban de tareas listo para arrancar |
 | **Blocked** | Plataforma | #42 | requiere refactor del bus Remote React |
@@ -139,6 +141,8 @@ sesiones) sin riesgo de daño colateral.
 
 | Issue | Qué | Notas |
 | --- | --- | --- |
+| **#202** `frida-shunt` | **Delegación de I/O a modelos baratos** (patrón Spotify Portal): gate de lecturas costosas (read sin offset/limit > N líneas + cat/head/tail sobre grandes) con escalera de delegación (pi-lens → subagent smol → read dirigido), 2 skills y benchmark | **Cima del P2 por valor/esfuerzo**: 82–94% de ahorro reportado en lecturas masivas; ~80% de la infra ya existe (rol smol F7, subagents, gate #196, pi-lens). Dupla de facturación con F10 (input↔output). Research en [docs/research](research/2026-09-06-shunt-portal-spotify.md) |
+| **F10** Edición hashline | Anclas por hash de contenido; rechaza ediciones rancias; −61% tokens de salida | La otra mitad de la dupla de facturación (pilar facturación + calidad del loop de edición) |
 | **#35** `frida-sandboxes` (ADR-0047) | Aislamiento por container Docker/devcontainer por agente | ✅ **Cerrado** — container Docker local por agente (CHANGELOG, [how-to-frida-sandboxes](how-to-frida-sandboxes.md)) |
 | **#13** `frida-worktree` → **#14** sesiones paralelas | Worktrees de git para sesiones paralelas + switcher | #13 ✅ cerrado (0.18.0, src/worktree/ + docs); **#14 sigue abierto** — la base ya está lista |
 | **#26** `frida-better-subagents` | Subagentes detached/sandboxed | ✅ **Cerrado** — modo detached (proceso propio que sobrevive al padre) + how-to |
@@ -252,9 +256,10 @@ cadena P3 (#34 → #38 → #40) ya está desbloqueada por #16✅.
 3. ~~**En paralelo al P1**~~ — #16✅ cerrado (cc-plugins). **QUEDA: #2↗ clúster
    de abort (#85/#90/#96)** — dolor UX diario y prerrequisito de F12: **el
    siguiente sprint natural**.
-4. **Sprint P2** — **#14 (sesiones paralelas**, base #13 lista) + F8 (advisor,
-   F7 listo) + F9 (web_search keyless) + F10 (hashline). ~~#35, #26, M9, M2,
-   M3, M10~~ ✅ todos cerrados.
+4. **Sprint P2** — **#202 frida-shunt (PRIMERO — dupla de facturación, mejor
+   ratio valor/esfuerzo del backlog)** + **F10 hashline** (la otra mitad);
+   después #14 (sesiones paralelas, base #13 lista) + F8 (advisor, F7 listo) +
+   F9 (web_search keyless). ~~#35, #26, M9, M2, M3, M10~~ ✅ todos cerrados.
 5. **Sprint P3** — cadena #19 → #41 (TEA) y #34 → #38 → #40 (CIS, desbloqueada
    por #16✅); **F12 (TTSR)** una vez resuelto el abort; **M6
    (`frida-openrewrite`)** cuando el piloto madure hacia modernización.
