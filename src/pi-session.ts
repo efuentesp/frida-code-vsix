@@ -65,6 +65,7 @@ import { discoverOllamaCloudModels } from "./providers/frida-ollama-cloud/discov
 import { API_KEY_PROVIDER_IDS } from "./providers/api-key-providers";
 import { OPENAI_PROVIDER } from "./providers/openai-provider";
 import { createPermissionSystem } from "./tools/frida-permission-system";
+import { createShuntGate } from "./tools/frida-shunt";
 import { GateStatsStore } from "./tools/frida-permission-system/session-store";
 import { SessionApprovals } from "./tools/frida-permission-system/session-approvals";
 import { getConfig } from "./tools/frida-permission-system/config-store";
@@ -77,6 +78,7 @@ import { ApprovalBridge, type ApprovalRequest } from "./approval-bridge";
 import {
 	readDevengineConfig,
 	readModelRolesConfig,
+	readShuntConfig,
 	readZaiConfig,
 	type GatePatterns,
 } from "./settings";
@@ -721,6 +723,19 @@ export async function createFridaSession(
 					gateStats,
 					sessionApprovals,
 				),
+			},
+			// frida-shunt (#202): router de costo — DESPUÉS del candado en el bus
+			// tool_call (emitToolCall cortocircuita en el primer block: la seguridad
+			// siempre gana). SÓLO en la sesión principal: las hijas (subagents) son
+			// los workers baratos de la escalera — bloquear sus reads sería
+			// contraproducente.
+			{
+				name: "frida-shunt",
+				factory: createShuntGate({
+					isEnabled: () => readShuntConfig().enabled,
+					getMinLines: () => readShuntConfig().minLines,
+					getCwd: () => opts.cwd,
+				}),
 			},
 			// Tools conmutables desde la Configuración (frida.askUserQuestion.enabled /
 			// frida.todo.enabled). El getter se re-evalúa en cada session.reload(), así

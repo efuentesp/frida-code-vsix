@@ -253,6 +253,17 @@
           "default": [],
           "markdownDescription": "Ids de reglas builtin de TTSR a desactivar: `es-mx`, `refs-not-closes`, `vscode-tokens-ui`. Ej.: `[\"vscode-tokens-ui\"]`. Con `frida.ttsr.enabled: false` se apaga todo."
         },
+        "frida.shunt.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "frida-shunt (#202): redirige lecturas costosas a rutas más baratas. Un `read` completo (sin offset/limit) o `cat/head/tail/less/more` sobre archivos mayores al umbral se bloquea con la escalera de delegación: pi-lens (estructura, 0 tokens) → subagent rol smol (preguntas profundas) → read dirigido offset/limit (edición, siempre permitido). Aplica en vivo."
+        },
+        "frida.shunt.minLines": {
+          "type": "number",
+          "default": 350,
+          "minimum": 1,
+          "markdownDescription": "Umbral de líneas de frida-shunt: lecturas completas de archivos con más líneas se redirigen (patrón Spotify shunt; 350 es su default calibrado). Sube el umbral si prefieres delegar menos."
+        },
         "frida.sonar.maxWarnings": {
           "type": "number",
           "default": 0,

@@ -184,6 +184,27 @@ export function readTtsrConfig(): TtsrConfig {
 	};
 }
 
+// === frida-shunt (#202): delegación de I/O — lecturas costosas ===
+
+/** Config en vivo de shunt (frida.shunt.*): se relee en cada tool_call. */
+export interface ShuntConfig {
+	/** Master switch. Default: true. */
+	enabled: boolean;
+	/** Umbral de líneas para redirigir lecturas completas. Default: 350. */
+	minLines: number;
+}
+
+/** Snapshot en vivo de la config de shunt. */
+export function readShuntConfig(): ShuntConfig {
+	const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+	const minLines = cfg.get<number>("shunt.minLines", 350);
+	return {
+		enabled: cfg.get<boolean>("shunt.enabled", true),
+		minLines:
+			Number.isFinite(minLines) && minLines > 0 ? Math.floor(minLines) : 350,
+	};
+}
+
 // === Toggles Fase 2 (issue #53): gates nuevos de módulos conmutables ===
 
 /** ¿Está activo frida-subagents? Default: true. */
