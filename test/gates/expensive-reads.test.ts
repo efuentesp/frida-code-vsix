@@ -21,7 +21,9 @@ beforeAll(() => {
 	// 600 líneas de código sintético (con salto final: semántica wc -l).
 	writeFileSync(
 		bigPath,
-		Array.from({ length: 600 }, (_, i) => `export const x${i} = ${i};`).join("\n") + "\n",
+		Array.from({ length: 600 }, (_, i) => `export const x${i} = ${i};`).join(
+			"\n",
+		) + "\n",
 		"utf8",
 	);
 	writeFileSync(
@@ -81,9 +83,7 @@ describe("evaluateExpensiveRead: tool read", () => {
 	});
 
 	it("archivo chico pasa (delegar costaría más de lo que ahorra)", () => {
-		expect(
-			evaluateExpensiveRead("read", readInput(smallPath), cfg()),
-		).toBeNull();
+		expect(evaluateExpensiveRead("read", readInput(smallPath), cfg())).toBeNull();
 	});
 
 	it("path inexistente pasa (el read fallará con su error natural)", () => {
@@ -93,9 +93,7 @@ describe("evaluateExpensiveRead: tool read", () => {
 	});
 
 	it("extensiones binarias (imágenes/adjuntos) fuera de scope", () => {
-		expect(
-			evaluateExpensiveRead("read", readInput(imgPath), cfg()),
-		).toBeNull();
+		expect(evaluateExpensiveRead("read", readInput(imgPath), cfg())).toBeNull();
 	});
 
 	it("path RELATIVO se resuelve contra cwd", () => {

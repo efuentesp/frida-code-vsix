@@ -14,13 +14,18 @@ import { tmpdir } from "node:os";
 // ── Fixtures deterministas (semilla fija: mismo output en cada corrida) ──
 
 const gen = (n) =>
-	Array.from({ length: n }, (_, i) => `export const handler${i} = (ev${i}: Event) => { return ev${i}.id + ${i}; };`)
-		.join("\n") + "\n";
+	Array.from(
+		{ length: n },
+		(_, i) =>
+			`export const handler${i} = (ev${i}: Event) => { return ev${i}.id + ${i}; };`,
+	).join("\n") + "\n";
 
 const genTests = (n, name) =>
 	`import { describe, it, expect } from "vitest";\nimport { ${name} } from "./${name}";\n\n` +
-	Array.from({ length: n }, (_, i) =>
-		`describe("${name} caso ${i}", () => {\n  it("procesa el evento ${i}", () => {\n    expect(${name}({ id: ${i} })).toBe(${i});\n  });\n});\n`
+	Array.from(
+		{ length: n },
+		(_, i) =>
+			`describe("${name} caso ${i}", () => {\n  it("procesa el evento ${i}", () => {\n    expect(${name}({ id: ${i} })).toBe(${i});\n  });\n});\n`,
 	).join("\n");
 
 const dir = join(tmpdir(), "frida-shunt-bench-");
@@ -40,11 +45,14 @@ for (const [name, content] of Object.entries(fixtures)) {
 /** Outline proxy de module_report (pi-lens): firmas de símbolos + rango. */
 const outlineOf = (content) => {
 	const lines = content.split("\n");
-	const keep = lines.filter((l) =>
-		/^(export |import |describe\(| {2}it\()/.test(l) || /=> \{/.test(l)
+	const keep = lines.filter(
+		(l) => /^(export |import |describe\(| {2}it\()/.test(l) || /=> \{/.test(l),
 	);
 	// Cota del outline: máx 60 líneas por archivo (module_report acota igual).
-	return keep.slice(0, 60).map((l, i) => `${i + 1}-\t${l.trim()}`).join("\n");
+	return keep
+		.slice(0, 60)
+		.map((l, i) => `${i + 1}-\t${l.trim()}`)
+		.join("\n");
 };
 
 const tok = (s) => Math.ceil(s.length / 4);
@@ -52,12 +60,12 @@ const REASON = tok(
 	"Lectura costosa bloqueada por frida-shunt: ~600 líneas (umbral 350). " +
 		"Usa la escalera: 1) module_report/read_symbol de pi-lens (0 tokens); " +
 		"2) subagent Explore (rol smol) para preguntas profundas multi-archivo; " +
-		"3) para editar, read con offset/limit."
+		"3) para editar, read con offset/limit.",
 );
 const SUBAGENT_RET = tok(
 	"- websocket-handler.ts: 602 líneas, exporta 602 handlers (handler0..601), todos (ev: Event) => ev.id + i. Sin estado compartido ni side-effects.\n" +
 		"- user-service.ts: 480 líneas, mismo patrón (handler0..479).\n" +
-		"- order-service.test.ts: 90 bloques describe/it cubriendo orderService({id}) → id."
+		"- order-service.test.ts: 90 bloques describe/it cubriendo orderService({id}) → id.",
 );
 
 // ── Escenarios (espejo del benchmarks.json del upstream) ──
@@ -78,8 +86,15 @@ const scenarios = [
 		id: 2,
 		name: "multi-file-cross-read",
 		desc: "3 archivos, pregunta transversal (exports y relaciones)",
-		without: F("websocket-handler.ts") + F("user-service.ts") + F("order-service.test.ts"),
-		with: REASON + OUT("websocket-handler.ts") + OUT("user-service.ts") + OUT("order-service.test.ts"),
+		without:
+			F("websocket-handler.ts") +
+			F("user-service.ts") +
+			F("order-service.test.ts"),
+		with:
+			REASON +
+			OUT("websocket-handler.ts") +
+			OUT("user-service.ts") +
+			OUT("order-service.test.ts"),
 		withDeep: REASON + SUBAGENT_RET,
 	},
 	{
@@ -93,11 +108,13 @@ const scenarios = [
 	{
 		id: 4,
 		name: "code-generation",
-		desc: "Generar tests de UserService siguiendo el patrón de OrderService (input-side)",
+		desc:
+			"Generar tests de UserService siguiendo el patrón de OrderService (input-side)",
 		without: F("order-service.test.ts") + F("user-service.ts"),
-		with: tok(
-			"Escribe tests para UserService siguiendo exactamente el patrón de tests/OrderService.test.ts (spec+reference). Escribe directo a tests/UserService.test.ts. Reporta ruta + resumen de 3 líneas."
-		) + SUBAGENT_RET,
+		with:
+			tok(
+				"Escribe tests para UserService siguiendo exactamente el patrón de tests/OrderService.test.ts (spec+reference). Escribe directo a tests/UserService.test.ts. Reporta ruta + resumen de 3 líneas.",
+			) + SUBAGENT_RET,
 		withDeep: null, // el code-writer ES el camino profundo
 	},
 ];
@@ -105,10 +122,19 @@ const scenarios = [
 const pct = (without, with_) => Math.round((1 - with_ / without) * 100);
 const rows = scenarios.map((s) => {
 	const best = s.withDeep === null ? s.with : Math.min(s.with, s.withDeep);
-	return { ...s, best, savings: pct(s.without, s.with), savingsDeep: s.withDeep === null ? null : pct(s.without, s.withDeep) };
+	return {
+		...s,
+		best,
+		savings: pct(s.without, s.with),
+		savingsDeep: s.withDeep === null ? null : pct(s.without, s.withDeep),
+	};
 });
-const meanSavings = Math.round(rows.reduce((a, r) => a + r.savings, 0) / rows.length);
-const meanBest = Math.round(rows.reduce((a, r) => a + (r.savingsDeep ?? r.savings), 0) / rows.length);
+const meanSavings = Math.round(
+	rows.reduce((a, r) => a + r.savings, 0) / rows.length,
+);
+const meanBest = Math.round(
+	rows.reduce((a, r) => a + (r.savingsDeep ?? r.savings), 0) / rows.length,
+);
 
 const today = "2026-09-06";
 const report = `# Benchmark de frida-shunt — ahorro de tokens (input del contexto padre)
@@ -124,7 +150,7 @@ const report = `# Benchmark de frida-shunt — ahorro de tokens (input del conte
 
 | # | Escenario | Sin shunt (tokens) | Con shunt — escalera mínima (pi-lens) | Con shunt — peldaño 2 (subagent) | Ahorro pi-lens | Ahorro subagent |
 | --- | --- | --- | --- | --- | --- | --- |
-${rows.map((r) => `| ${r.id} | ${r.name}<br/><sub>${r.desc}</sub> | ${r.without} | ${r.with} | ${r.withDeep ?? "—" } | ${r.savings}% | ${r.savingsDeep ?? "—"}% |`).join("\n")}
+${rows.map((r) => `| ${r.id} | ${r.name}<br/><sub>${r.desc}</sub> | ${r.without} | ${r.with} | ${r.withDeep ?? "—"} | ${r.savings}% | ${r.savingsDeep ?? "—"}% |`).join("\n")}
 
 **Ahorro medio (peldaño 1, pi-lens): ${meanSavings}% · (mejor peldaño por escenario): ${meanBest}%**
 
@@ -156,11 +182,15 @@ node scripts/shunt-benchmark.mjs --dry    # sólo imprime la tabla
 
 if (process.argv.includes("--dry")) {
 	for (const r of rows) {
-		console.log(`#${r.id} ${r.name}: sin=${r.without} pi-lens=${r.with} (${r.savings}%) subagent=${r.withDeep ?? "—"} (${r.savingsDeep ?? "—"}%)`);
+		console.log(
+			`#${r.id} ${r.name}: sin=${r.without} pi-lens=${r.with} (${r.savings}%) subagent=${r.withDeep ?? "—"} (${r.savingsDeep ?? "—"}%)`,
+		);
 	}
 	console.log(`MEDIA: pi-lens ${meanSavings}% · mejor-peldaño ${meanBest}%`);
 } else {
 	writeFileSync("docs/research/2026-09-06-shunt-benchmark.md", report, "utf8");
-	console.log(`ok → docs/research/2026-09-06-shunt-benchmark.md (media pi-lens ${meanSavings}%, mejor ${meanBest}%)`);
+	console.log(
+		`ok → docs/research/2026-09-06-shunt-benchmark.md (media pi-lens ${meanSavings}%, mejor ${meanBest}%)`,
+	);
 }
 rmSync(dir, { recursive: true, force: true });
